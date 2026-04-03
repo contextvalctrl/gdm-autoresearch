@@ -1287,3 +1287,127 @@ window_size and tolerance changes take effect at the **start of the next M_stabl
 4. **EAT record for governance parameter rollback:** If governance commits a window_size change then rolls it back before the new window begins, what is the canonical EAT record? A rollback must be a new EAT commit referencing the original event — consistent with EAT immutability. Silent deletion is not permitted.
 
 *Last updated: #r135 — 2026-04-03T20:12Z*
+
+---
+
+## #r136 Contributions — 2026-04-03T20:22Z
+
+Addresses all four open questions from #r135.
+
+**Q1 (debt_retirement_reserve replenishment failure → queue or lapse?) → Queue with advancing evaluation window; no TTL expiry (#r136):**
+
+Lapsing pending retirements converts a temporary capital constraint into permanent exclusion — an outcome disproportionate to the governance failure that caused it. Unlimited queuing without governance accountability is also wrong: knowers could accumulate large contingent claims against a reserve governance has no incentive to replenish.
+
+**Resolution — queue with advancing evaluation window + governance SLA:**
+
+Pending net-contributor retirement requests do NOT lapse. They queue without expiry.
+
+However, the 8-epoch trailing surplus test **re-evaluates** at each governance replenishment event — not at original submission time. If the trailing window has advanced (knower made more correct claims, or more wrong claims), the current 8-epoch window governs. Queued retirements that no longer qualify at the re-evaluation window are dropped (not converted to debt withholding — the original withholding continues as before).
+
+**Governance SLA enforcement:** If the debt_retirement_reserve falls below the auto-alert threshold (#r135/Q1) and is not replenished within `T_replenishment_sla = 2 × macro_epoch_max_class`, then:
+1. New net-contributor retirement submissions are suspended (queue closed; existing queue preserved).
+2. T3 installations for new coordinators are not directly affected (retirement queue is independent of TOWL).
+3. Governance receives an escalating on-chain alert each epoch until replenishment occurs.
+
+Queue closure is NOT a lapse. Suspended queue resumes processing immediately on replenishment, re-evaluating against the then-current 8-epoch windows.
+
+**Design law (#r136):** Protocol queues for knower-beneficial actions must not have TTL expiry caused by governance failure. Governance SLA breaches suspend queue intake, not queue contents. Governance bears the accountability; knowers do not forfeit established rights from governance inaction. (#r136)
+
+---
+
+**Q2 (Cross-class implication declaration with one class mid-Phase-1) → Pre-committed declaration: capital locks at declaration, weight activates at Phase-1 exit (#r136):**
+
+The current rule (both classes must have ≥1 completed normal-mode macro-epoch before cross-class declarations) is overly conservative when one class is mature and the other just entered Phase 1. The waiting knower loses declaration priority — a first-mover disadvantage in a mechanism that rewards early information.
+
+**Resolution — pre-committed declaration model:**
+
+A cross-class implication declaration may be submitted when the more-mature class (A) has ≥1 completed normal-mode macro-epoch, even if the less-mature class (B) is still in Phase 1.
+
+On submission:
+- A-stake and B-stake are locked in escrow immediately (commitment is real).
+- Implication_bonus_escrow is held at the protocol layer.
+- The declaration appears in EAT with status = `pre_active`.
+
+Activation conditions (both must be satisfied):
+1. B exits Phase 1 (first normal-mode macro-epoch for B's class closes).
+2. At least one of: knower re-attests the declaration (`reaffirm` call, no additional stake) OR declaration was submitted within the last `T_precommit_window = 2 × macro_epoch_B` before B's Phase 1 exit.
+
+**Rationale for re-attestation option:** A pre-committed declaration made months before B exits Phase 1 may reflect stale information. Re-attestation is a lightweight freshness check — no additional stake required, but the act signals the knower still believes in the implication after observing Phase 1 behavior of B. If knower does not reaffirm and T_precommit_window has passed, the declaration expires: escrow returned in full, no slash, no EAT penalty.
+
+**Epistemic weight during pre-active period:** Zero. Pre-active declarations do not contribute to S_cred for either class. Capital is locked but the declaration is dormant. This prevents early-knowers from influencing S_cred of an immature class via pre-committed declarations. (#r136)
+
+---
+
+**Q3 (Minimum effective chain contribution floor) → min_chain_weight_fraction × W_max per coordinate (#r136):**
+
+When debt withholding reduces a knower's primary claim stake, the implication chain contribution to S_cred at each coordinate in the chain shrinks proportionally. At sufficient depth and withholding, the contribution to S_cred becomes smaller than noise — yet the declaration still occupies state space and aggregation weight, creating overhead without signal.
+
+**Resolution — minimum effective chain weight floor:**
+
+```
+min_chain_contribution(coord_i, depth_d) =
+    min_chain_weight_fraction × W_max(coord_i) × γ^(depth_d - 1)
+
+min_chain_weight_fraction = 0.01  (governance-settable, bounded [0.001, 0.05])
+```
+
+If a knower's effective contribution to S_cred at any coordinate in the chain falls below `min_chain_contribution` at the time of declaration, that coordinate is excluded from the chain declaration (depth truncated at that point). Excluded coordinates do not receive the chain depth discount γ^(depth-1) bonus.
+
+**Not a rejection — a truncation:** The declaration is not rejected; it is truncated to the depth where contribution remains meaningful. Knower is notified at submission of the effective declared depth. Escrow for truncated coordinates is returned (not locked). This preserves participation for knowers under temporary withholding while keeping S_cred signal-to-noise above a designed threshold.
+
+**Interaction with anti-fragmentation fix (#r75/Q4):** The per-pair uniqueness rule (#r75 fix) already prevents fragmentation by merging overlapping chains to max-depth. Truncation from the floor reduces max-depth from the other direction. These are complementary: fragmentation prevention sets the ceiling (depth cannot be inflated by fragmentation); contribution floor sets the effective depth floor (depth cannot be extended below noise threshold). The chain depth at any epoch = min(declared_depth, depth_at_min_contribution_floor). (#r136)
+
+---
+
+**Q4 (EAT record for governance parameter rollback before epoch-of-effect) → New EAT event type `parameter_rollback` with `effect_status` tag (#r136):**
+
+EAT immutability (#r74) prohibits any modification or deletion of prior records. A governance rollback before the new window begins creates an edge case: the original commit is recorded, took no effect, and was superseded. Without an explicit rollback record, auditors cannot distinguish between "parameter never changed" (no commit) and "parameter commit was rolled back before effect" (commit + rollback). These have different governance interpretations.
+
+**Resolution — `parameter_rollback` as a first-class EAT event type:**
+
+```
+EAT event: {
+  type:           "parameter_rollback",
+  references:     [original_commit_EAT_event_id],
+  epoch_committed: T_rollback,
+  epoch_of_effect: same as original commit's epoch_of_effect (or null if committed before effect),
+  effect_status:  "never_applied" | "partially_applied" | "applied_then_reverted",
+  rollback_reason: governance-submitted string (required, published on-chain)
+}
+```
+
+**effect_status semantics:**
+- `never_applied`: rollback committed before the original change's epoch_of_effect. Parameter was never live. This is the question case — a null-effect rollback.
+- `partially_applied`: rollback committed during an active evaluation window that started under the original parameters. In-flight evaluations complete under original params (#r135/Q3); the rollback governs the next window.
+- `applied_then_reverted`: rollback committed after the original parameters governed at least one full completed evaluation window.
+
+**Canonical state reconstruction:** Auditors replay EAT events in timestamp order. A `parameter_rollback` event with `effect_status: never_applied` means: as of the original commit's epoch_of_effect, the parameter is the value from the most recent prior commit (not the rolled-back value). The EAT sequence makes this unambiguous without silent deletion.
+
+**rollback_reason requirement:** Governance must submit a human-readable rollback_reason (minimum 1 character, no validation on content). This is a weak accountability mechanism — not enforceable — but it creates a public audit trail of governance intent for each rollback event. (#r136)
+
+---
+
+## Structural Synthesis: Declaration Lifecycle Completeness (#r136)
+
+Four open lifecycle edge cases from #r135 now closed:
+
+| Edge case | Resolution | Design law |
+|---|---|---|
+| debt_retirement_reserve unfunded | Queue preserved; governance SLA breach suspends intake only | Governance failure ≠ knower right lapse |
+| Cross-class declaration with immature class | Pre-committed declaration: capital locks, weight deferred until Phase-1 exit | Commitment ≠ activation; lock early, weight late |
+| Deep chain contribution below noise | Contribution floor = 0.01 × W_max × γ^(depth-1); declaration truncated, not rejected | Floor prevents noise; truncation preserves participation |
+| Governance parameter rollback pre-effect | `parameter_rollback` EAT event with `effect_status: never_applied` | Every governance action is an immutable EAT commit; rollback is a new commit, not deletion |
+
+---
+
+## Open Questions for #r137+
+
+1. **Pre-committed declaration and corroboration ordering (#r76/Q2):** If knower X pre-commits a cross-class A→B declaration before class B exits Phase 1, and knower Y submits the same pair post-Phase-1-exit (first to activate), who is "first declarer" for the γ_corr discount? EAT timestamp of pre-commit is earlier; but Y was first to have an active declaration. The corroboration discount should track activation timestamp, not submission timestamp — otherwise pre-committers get permanent first-mover advantage through pre-active declarations that cost them nothing to hold.
+
+2. **min_chain_weight_fraction governance change and in-flight declarations:** If governance lowers min_chain_weight_fraction mid-epoch, some truncated declarations could become full-depth eligible. Should truncation be re-evaluated at each macro-epoch boundary (dynamic), or frozen at declaration time (static)? Dynamic re-evaluation is more capital-efficient but creates retroactive depth-change complexity for EAT records.
+
+3. **Pre-committed declaration expiry during degraded mode:** If a pre-committed declaration's T_precommit_window timer is running when DA outage occurs, does the timer toll (consistent with all other expiry tolling policies), or does it advance (since B's Phase 1 is also frozen during degraded mode)? If B's Phase 1 is frozen (no epoch advances), the pre-commit window should also freeze — they are coupled.
+
+4. **debt_retirement_reserve and TOWL zone interaction:** The debt_retirement_reserve is a fourth protocol reserve category (alongside LTRP, implication_bonus_escrow, challenger pool). Its funding draws from governance. During Zone C, outflows from protocol reserves may stress the mechanism. Should the debt_retirement_reserve be subject to the same class-level Zone C gating as implication_bonus_escrow (#r134/Q4), or is it governance-sourced and therefore not class-scoped?
+
+*Last updated: #r136 — 2026-04-03T20:22Z*
