@@ -7,7 +7,7 @@
 
 > ⚠️ Google Doc is deprecated as a sync target. Do not attempt gog auth or doc writes. All research output goes to the GitHub repo.
 
-## Current run count: #r131
+## Current run count: #r132
 
 ## Topic files (living docs in repo/topics/)
 - `query-as-first-class-object.md` — demand-side structure, query as first-class object
@@ -27,3 +27,4 @@
 - #r129: Lineage-bifurcated γ_corr; T3 gate = ≥2 submitted epochs; κ_degraded dynamic floor; β_effective clamp [1.0, 2.5].
 - #r130: T3 gate paused in degraded mode; γ_corr_cross ≤ γ_corr invariant; Phase-1 new classes κ_system_max_at_T_outage; unbundled T3 escrow via LTRP.
 - #r131: LTRP genesis seed protocol; LTRP as TOWL-separate protocol buffer; one-epoch epistemic bridge at DA restore; T3_outage_lockup_cap with LTRP assumption. Bounded-liability architecture synthesis: no infinite-lockup obligations for any participant.
+- #r132: r089 fine-tune pass (VAL-494) — cross-corpus consistency check post-r088/r131; duplicate footer removed from epistemic-bond-v0-spec.md; §10 deferred-features list updated with r129–r131 Phase 3 items (LTRP, bounded-liability architecture, DA degraded mode refinements, γ_corr lineage-bifurcation, β_effective clamp). No arithmetic corrections required; r088 corpus verdict confirmed valid.

@@ -520,12 +520,16 @@ These are explicitly out of scope for v0 and should not be added before Phase 1 
 - L2 → L1 advisory coupling (Phase 3; multi-epoch equilibrium proof required first)
 - Governance token for parameter updates (Phase 3)
 - Formal audit (Phase 2; internal review only for Phase 1)
+- Long-Tail Reserve Pool (LTRP) for slow-oracle retroactive slash liability (Phase 3; specified in knowledge-marketplace-aggregate.md r130–r131)
+- Bounded-liability architecture: T3_escrow_longtail, T3_outage_lockup_cap, LTRP genesis seed protocol (Phase 3; specified in knowledge-marketplace-aggregate.md r131)
+- DA degraded mode refinements: T3 gate pause, κ_degraded dynamic floor, one-epoch epistemic bridge at DA restore (Phase 3; specified in knowledge-marketplace-aggregate.md r129–r131)
+- Lineage-bifurcated γ_corr (cross-lineage independence premium) (Phase 3; knowledge-marketplace-aggregate.md r129)
+- β_effective clamp [β_min, β_max] as governance safety rail (Phase 3; knowledge-marketplace-aggregate.md r129)
+
+*(Updated r089/VAL-494: added r129–r131 Phase 3 deferred items to this list. These are fully specified in knowledge-marketplace-aggregate.md but not required for Phase 0–1 v0 deployment.)*
 
 ---
 
 *This spec is the Phase 0–1 engineering handoff. Engineering should implement EpistemicBond.sol and the oracle relay against this interface, deploy to testnet, and confirm the sealed-commit/reveal flow works before beginning knower recruitment. Questions or deviations → update this document and create a GitHub Issue.*
 
-*Logan — ValCtrl AI Chief of Staff | r075 | VAL-460*
-f. Engineering should implement EpistemicBond.sol and the oracle relay against this interface, deploy to testnet, and confirm the sealed-commit/reveal flow works before beginning knower recruitment. Questions or deviations → update this document and create a GitHub Issue.*
-
-*Logan — ValCtrl AI Chief of Staff | r075 | VAL-460*
+*Logan — ValCtrl AI Chief of Staff | r075 | VAL-460 → updated r089 | VAL-494*
