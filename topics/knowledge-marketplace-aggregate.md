@@ -2123,3 +2123,124 @@ The bonus settlement contract design is now complete, with all parameters either
 4. **α_cap formula at genesis (no β_effective history):** New coordinate classes in Phase 0 have no β_effective history (#r76/Q3 bootstrap: fewer than N_calibration normal-mode epochs). α_cap derivation from β_effective is undefined until β_effective is stable. Resolution: during genesis and Phase-1 bootstrap, α_cap defaults to α_max (0.5) — the most capital-protective default — until N_calibration normal-mode epochs have closed. Verify this is consistent with the Phase-1 α_longtail=1.0 (#r131/Q1) and no cross-class implication declarations during Phase 1 (#r133/Q1).
 
 *Last updated: #r142 — 2026-04-03T21:22Z*
+
+---
+
+## #r143 Contributions — 2026-04-03T21:32Z
+
+Addresses all four open questions from #r142.
+
+**Q1 (ρ governance stability — market-derived vs governance-set) → Smoothed EMA of DeFi reference rate; governance-settable floor and ceiling (#r143):**
+
+ρ governs α_cap, which governs the capital-compensation fraction of the implication bonus. An oscillating ρ → oscillating α_cap → unstable bonus components → rational declarants cannot compute expected return reliably. This undermines the incentive to make long-horizon structural declarations.
+
+**Resolution — smoothed reference rate ρ_smooth:**
+
+```
+ρ_smooth(t) = (1 − λ_ρ) × ρ_smooth(t-1) + λ_ρ × ρ_market(t)
+λ_ρ = 2 / (N_ρ + 1)   (EMA weight, default N_ρ = 12 macro-epochs)
+ρ_market(t) = observed DeFi reference rate at macro-epoch boundary (e.g., AAVE 30d USDC supply APY / epoch_per_year)
+```
+
+Floor and ceiling (governance-settable):
+```
+ρ_effective = clip(ρ_smooth, ρ_floor, ρ_ceil)
+ρ_floor = 0.002 per macro-epoch  (annualizes to ~1% for 500 macro-epoch/year pace)
+ρ_ceil  = 0.020 per macro-epoch  (annualizes to ~10%)
+```
+
+ρ_effective is published to the EAT each macro-epoch alongside β_effective and α_cap. The governance interface exposes (N_ρ, ρ_floor, ρ_ceil); ρ_effective derives from on-chain oracle and is not directly governance-set. Governance controls the smoothing window and clamp, not the underlying rate.
+
+**Interaction with β_effective clamp:** When ρ_effective is high (tight capital market), α_cap rises toward α_max. If simultaneously β_effective is clamped at β_max, α_cap = ρ_effective × T_longtail_ref / β_max — bounded, stable. When ρ_effective is low (loose capital market), α_cap falls toward α_min — capital component is small, epistemic-service component dominates. The combination of β_effective and ρ_effective clamps means α_cap is always within [α_min, α_max] regardless of market conditions. No additional stability circuit needed. (#r143)
+
+---
+
+**Q2 (Accumulator reset on reactivation — explicit truncation gap record) → Zero-contribution epochs are implicit in running sum; gap annotation is metadata only (#r143):**
+
+When a claim is truncated (effective_weight = 0 for N truncation epochs) and later reactivates, the running sum adds exactly 0 to `cumulative_eff_weight` during those epochs. The mathematical signal is already present — the accumulator just did not grow. The truncation gap is represented correctly by the flat accumulator segment.
+
+**Resolution:** No explicit gap annotation is required in the settlement-critical accumulator. The running sum is unambiguous: any epoch where the claim was truncated contributes zero, exactly as intended by the staleness formula when effective_weight = 0.
+
+**Auditability (metadata only):** An optional `eff_weight_zero_epochs` counter can be committed alongside `cumulative_eff_weight` at each macro-epoch boundary. This counter increments when effective_weight = 0 for any reason (truncation, staleness, bridge epoch). It is a diagnostic field — not used in bonus computation. Its absence does not affect settlement correctness.
+
+**Why explicit annotation is not required for correctness:** The `bonus_epistemic_service_weight` ratio uses `cumulative_eff_weight / (base_weight × n_active_epochs)`. The denominator `n_active_epochs` counts *all* epochs from activation to resolution, including truncation gap epochs. A claim truncated for half its life earns at most 50% of the maximum epistemic-service component — the denominator is not adjusted to exclude truncation gaps. This correctly penalises epistemic gaps (truncated service is not rewarded retroactively) without requiring a separate gap-tracking mechanism.
+
+**Design law (#r143):** Zero-valued contributions to running accumulators must not be elided. The denominator must not be adjusted to exclude zero-contribution periods. Penalising gaps via the ratio (flat numerator, advancing denominator) is the correct epistemic accounting — it does not require explicit gap records. (#r143)
+
+---
+
+**Q3 (Partial cross-class challenge — implication_bonus_escrow disposition) → A-side challenge success forfeit is proportional; consistent with #r133/Q1 (#r143):**
+
+When a challenger successfully challenges only the A-coordinate of a cross-class declaration (leaving B unchallenged), the implication_bonus_escrow is not yet conditioned on B's outcome. The question is whether the A-side wrong-claim should forfeit the *entire* bonus escrow or only the A-proportional fraction.
+
+**Resolution — proportional forfeiture, consistent with #r133/Q1:**
+
+From #r133/Q1 (established): "slash implication_bonus_escrow to the failing coordinate's loser pool proportionally." The proportional fraction for a cross-class declaration:
+
+```
+forfeiture_fraction_A = A_stake / (A_stake + B_stake)
+```
+
+On successful A-coordinate challenge:
+- `forfeiture_fraction_A × implication_bonus_escrow` → A-class loser pool
+- Remaining `(1 − forfeiture_fraction_A) × implication_bonus_escrow` → continues in escrow pending B's oracle resolution
+
+**New state: partial-forfeiture-pending:**
+After partial forfeiture, the declaration enters `partial_forfeiture_pending` status. The remaining bonus escrow is now conditioned solely on B resolving correctly (the B-stake is still locked; B's oracle has not fired). On B resolution:
+- B correct: knower receives remaining escrow (B-proportional bonus — capital + epistemic-service components for B only)
+- B wrong: remaining escrow forfeited to B-class loser pool
+
+**Rationale:** The knower made two separate claims embedded in the declaration. A being wrong eliminates A's contribution but does not retroactively void the B claim (which is still pending oracle). The implication *bonus* (β multiplier) requires *both* correct — a wrong A forfeits the bonus multiplier but not B's base slot reward. The `implication_bonus_escrow` tracks only the conditional β-premium; B's base escrow (`T3_escrow_standard` or `T3_escrow_longtail`) handles B's base slot settlement independently.
+
+**EAT record:** Challenge settlement creates a `partial_forfeiture` EAT event on the declaration record with: forfeiture_fraction, receiving_loser_pool, and remaining_escrow fields. The declaration remains active (not closed) until B's oracle fires. (#r143)
+
+---
+
+**Q4 (α_cap at genesis — no β_effective history) → α_max default during bootstrap; consistent with Phase-1 protections (#r143):**
+
+During Phase-0 and Phase-1 (bootstrap), there are no N_calibration normal-mode epochs and β_effective is undefined. α_cap = ρ_effective × T_longtail_ref / β_effective cannot be computed.
+
+**Resolution — genesis default α_cap = α_max (0.5):**
+
+During Phase-0 and Phase-1 bootstrap:
+1. α_cap defaults to α_max = 0.5.
+2. This maximises the capital-compensation fraction — the most protective default for declarants when protocol-level reference data is immature.
+3. α_cap transitions to derived formula once both (a) N_calibration normal-mode epochs are available for β_effective (#r76/Q3), and (b) ρ_smooth has accumulated N_ρ epochs of market data (#r143/Q1). Both conditions must hold simultaneously.
+
+**Consistency verification:**
+- Phase-1: no cross-class implication declarations permitted (#r133/Q1 bootstrap constraint). Cross-class bonus escrow mechanics do not apply during Phase-1 bootstrap. α_cap = α_max during Phase-1 is therefore a default for single-class implication declarations only. ✓
+- Phase-1 α_longtail = 1.0 (#r131/Q1): all T3 escrow is longtail during bootstrap. The higher α_cap compensates declarants for the fully-longtail escrow routing. These two Phase-1 defaults are deliberately conservative and mutually reinforcing. ✓
+- T3 admission requires ≥2 completed normal-mode macro-epochs (#r129/Q2). α_cap cannot transition to derived formula until N_calibration ≥ 2 epochs are available — T3 admission and α_cap maturation happen in the same epoch band. ✓
+
+**Transition event:** When the derived formula first becomes available, the shift from α_max to derived α_cap is published as a governance event in the EAT (type: `parameter_genesis_exit`, class: `alpha_cap`). No knower action required; pending declarations use the new α_cap at their oracle resolution epoch. The transition is always forward-looking only. (#r143)
+
+---
+
+## Structural Synthesis: Parameter Derivation Stack — Complete (#r143)
+
+With #r143, all primary bonus and calibration parameters now have:
+1. A derivation formula from observable primitives
+2. Governance-settable inputs (no parameter is directly numeric-by-governance-fiat)
+3. A genesis default (for bootstrap phase)
+4. A transition event when derived formula becomes active
+
+| Parameter | Derived from | Genesis default | Transition event |
+|---|---|---|---|
+| β_effective | K_target, γ, d_ref, α_bond, rolling base reward | N/A (no implication decl during Phase-1) | First N_calibration normal-mode epochs |
+| α_cap | ρ_effective × T_longtail_ref / β_effective | α_max = 0.5 | N_calibration epochs + N_ρ ρ_smooth epochs both satisfied |
+| ρ_effective | EMA of DeFi market rate, clipped [ρ_floor, ρ_ceil] | ρ_floor (conservative) | First ρ_market oracle reading available |
+| challenge_fee | r_floor × fee_fraction (single-class); stake-weighted avg (cross-class) | Per-class r_floor at registration | No transition; active from genesis |
+
+---
+
+## Open Questions for #r144+
+
+1. **ρ_market oracle source governance:** ρ_smooth requires a live DeFi rate oracle (e.g., AAVE USDC supply APY). This oracle must be trusted and manipulation-resistant. If ρ_market is oraculously manipulable, α_cap could be temporarily forced to α_max or α_min — distorting the bonus split. Should ρ_market use a multi-source median (analogous to SEE quorum oracle), or is a single authoritative DeFi protocol rate sufficient?
+
+2. **`partial_forfeiture_pending` state and TOWL capacity:** After a partial A-side forfeiture, the declaration's B-side escrow remains locked. Does the B-side escrow continue to count toward TOWL capacity for class_B? If the A-side failure signals that the knower may be epistemically unreliable, should B-side TOWL contribution be discounted during `partial_forfeiture_pending`?
+
+3. **EMA initialization for ρ_smooth:** At class genesis, the EMA has no prior values. Standard EMA initialization uses the first available market observation as the initial value, then converges over N_ρ epochs. During the first N_ρ epochs, ρ_smooth is less stable. Should α_cap remain at α_max until the EMA has accumulated N_ρ observations (parallel to the β_effective N_calibration condition), or does the EMA's built-in convergence suffice?
+
+4. **`parameter_genesis_exit` timing and in-flight declarations:** When α_cap transitions from α_max to derived formula, in-flight declarations (submitted during Phase-1/bootstrap with α_cap = α_max locked in their escrow computation) should be grandfathered at α_max for their full duration, or should they immediately switch to derived α_cap? Grandfathering is more predictable; immediate switch is more capital-efficient for the protocol.
+
+*Last updated: #r143 — 2026-04-03T21:32Z*
