@@ -2722,3 +2722,184 @@ The registration is NOT blocked. A very slow oracle class (e.g., decadal epidemi
 10. **Saturation is policy, not error:** Parameters that permanently saturate derived outputs → one-time registration warning; recurring operational alerts suppressed. (#r147)
 
 *Last updated: #r147 — 2026-04-03T22:12Z*
+
+---
+
+## #r148 Contributions — 2026-04-03T22:22Z
+
+**First-principles reset: answering the original 10-point framework from the altitude of a complete mechanism.**
+
+After 147 runs of engineering depth, the mechanism is parameter-complete. This run answers the founding 10 questions from #r1 with the full system in view — stripping back to mechanism primitives, not engineering detail.
+
+---
+
+### 1. Base Primitive — What is being exchanged?
+
+Not a probability. Not a share of a prediction-market pool.
+
+**What is exchanged: a warranted state claim.**
+
+A knower locks capital and asserts a value for a coordinate of the global state vector. The capital is not a side-bet on crowd belief — it is a warranty that the asserted value is correct. If correct, the knower earns a base slot reward (query fees from unknowers) and an implication bonus if part of a correct structural chain (A→B). If wrong, the capital is slashed. The warrant is the asset; the capital is its collateral. The exchange is warranty-for-fee, not belief-for-contra-belief.
+
+**What distinguishes this from LMSR:** LMSR prices movement of a shared belief distribution — capital moves a market price toward truth by making it expensive to move prices away from truth. The exchanged primitive is liquidity against a scoring rule. In the knowledge marketplace, the primitive is a *claim with a warranty* — an epistemic commitment, not a directional trade.
+
+---
+
+### 2. State Model — What is the global state vector and how is it updated?
+
+**State vector S:** A collection of coordinate values, each belonging to a typed coordinate class (financial prices, regulatory states, on-chain events, etc.). Each coordinate has a current best estimate S(c), a staleness weight (κ-based decay), and a TOWL zone reflecting financial backing of the installed state.
+
+**Update rule:**
+```
+S_new(c) = weighted_aggregate(S_old(c), {new_claims})
+w_a = C_a × log(1 + k_a_net)   [credibility_ratio × log-stake]
+```
+
+The aggregation is credibility-weighted: more credible, higher-stake knowers move the state further. S(c) is not a market price — it is not moved by buying and selling; it is moved by credible, collateralised assertion.
+
+**What LMSR does instead:** LMSR has a single state variable (market price / belief probability). Capital moves it continuously. Any dollar of capital has the same marginal impact regardless of source credibility. The knowledge marketplace's update rule conditions on *who* is asserting, not only *how much*.
+
+---
+
+### 3. Credibility Model — How does capital stake convert into trustworthy information?
+
+Capital improves epistemics through three mechanisms:
+
+1. **Skin-in-the-game:** A knower who is wrong loses capital. This filters cheap talk. Capital is proof-of-conviction.
+
+2. **Track record compounding:** `C_a = credibility_ratio(a)` is a running calibration score from log-scoring resolved claims. Consistently correct knowers gain more influence per unit of stake.
+
+3. **Implication bonus alignment:** Knowers who identify structural A→B relationships are rewarded only if both coordinates resolve correctly. This creates incentive to model causal structure, not just point values.
+
+**The conserved quantity is WED — Warranted Epistemic Debt (#r69):**
+```
+WED = Σ_c D(c) × A(c) × P(c)
+```
+Capital flows toward high-D(c)×A(c)×P(c) coordinates — where decision losses from wrong state are expensive, the coordinate is influential, and current state is likely wrong. This is categorically different from capital flowing toward high-disagreement coordinates (LMSR) or high-volume trading pairs (orderbooks).
+
+---
+
+### 4. Market Roles — Who are askers/knowers, and who pays whom?
+
+| Role | Identity | Capital flow |
+|------|----------|-------------|
+| **Knower** | Agent with private information about coordinate c | Locks escrow at submission; earns base slot reward + implication bonus if correct; slashed if wrong |
+| **Unknower (query demander)** | Agent who needs a credible state estimate | Pays query fee into pool; fee distributed to active contributors to S_cred |
+| **Challenger** | Agent who suspects a warranted installation is wrong | Posts challenge submission fee (refunded if correct); earns challenger reward from slash proceeds |
+| **Governance** | Protocol stewards | Seeds genesis pools; sets primitive parameters; bears calibration accountability |
+
+**Flow direction:** Information-rich zones (knowers with high C_a and large stake) are paid by information-poor zones (unknowers who cannot cheaply produce the state estimate). This is bilateral flow from high-information to low-information zones — not losers-to-winners in a shared prediction contest.
+
+**LMSR comparison:** In LMSR, "liquidity providers" bear residual risk. In orderbooks, buyers and sellers swap contra positions. Neither has a structural role for "knower" as a distinct class with epistemic accountability. This mechanism introduces role asymmetry absent from both.
+
+---
+
+### 5. Settlement Model — Truth resolution and partial observability
+
+**Hard resolution:** Oracle confirms coordinate value. Correct → base reward + conditional implication bonus released. Wrong → escrow slashed; slash proceeds route to loser pool + challenger reward + (Zone C) LTRP.
+
+**Partial resolution (A resolved, B not yet):** Implication_bonus_escrow held; A-side conditional partial release available (#r133/Q4). A-side base escrow settles normally. B-side remains pending.
+
+**No oracle resolution (slow oracle, T_longtail expiry):** Escrow transitions to LTRP. Knower receives partial capital-comp bonus if A confirmed correct. Bonus_epistemic_service prorated to active epochs with non-zero effective_weight (#r141, #r142).
+
+**Degraded observability (dispute without evidence):** Challengers frozen during DA outage until DA restores. The mechanism tolerates partial observability — never forces resolution when evidence is unavailable. More epistemically honest than LMSR, which resolves at an oracle-chosen point regardless of information completeness.
+
+---
+
+### 6. Attack Surface
+
+| Attack | Defense |
+|--------|---------|
+| **Bluffing / cheap talk** | Slashing makes cheap talk expensive; credibility_ratio degrades on failure |
+| **Sybil / wash credibility** | Capital must be real per-account; sybil costs linear in escrow; γ_corr reduces marginal value of extra identities |
+| **Collusion** | All colluders lose on resolution; net loss = colluder escrow |
+| **Oracle gaming** | Out of mechanism scope; no more vulnerable than LMSR |
+| **WED inflation** | D(c) and A(c) are buyer-declared; unknowers who over-declare D waste their own capital |
+| **Implication chain spoofing** | Requires real escrow per coordinate, real calibration history, actual oracle resolution; chain depth delivers diminishing bonus at γ^(depth-1) |
+| **Front-running provisional scores** | Bridge epoch one-epoch buffer (#r131/Q3) + κ_bridge elevated decay suppresses effective_weight during refinement window |
+
+**Comparison to LMSR:** LMSR's primary attack is market manipulation — moving prices without conviction to extract arbitrage. The knowledge marketplace adds WED inflation as an attack surface absent from LMSR. This is the cost of the richer state model.
+
+---
+
+### 7. Why better or worse than LMSR/orderbooks?
+
+**Better than LMSR:**
+- Information source matters. LMSR treats all capital as epistemically equivalent; this mechanism weights by track record.
+- Correct incentive target. LMSR rewards being right against the crowd; this rewards reducing decision-relevant uncertainty (WED). These are not the same. A market can have LMSR prices fully correct on low-stakes coordinates while leaving high-stakes coordinates poorly informed — LMSR has no mechanism to correct this.
+- No subsidised market maker required. LMSR needs a liquidity subsidy (market maker bears expected loss). This mechanism self-funds through query fees and loser-pool redistribution.
+- Implication chains. LMSR has no mechanism to reward structural causal identification — only terminal probability.
+
+**Worse than LMSR:**
+- Complexity. LMSR is a single formula. This mechanism is a multi-layer system. Attack surface scales with complexity.
+- Requires credibility history. New participants have low C_a. Bootstrap is slow — mechanism's epistemic quality is near LMSR-level until a sufficient history of resolved claims establishes the track-record layer.
+- D(c) and A(c) are private. WED routing is only decision-optimal if unknowers reveal their stakes honestly.
+
+**Better than orderbooks:**
+- Disclosure is profitable. Knowers benefit from revealing information (warranty rewards), not from hoarding it.
+- No speed race. Orderbooks reward fast order placement; this mechanism rewards epistemic quality.
+
+**Worse than orderbooks:**
+- Liquidity depth. Orderbooks can always make a market at some price. If no one knows a coordinate, there is no ask and the state is uninformed.
+
+---
+
+### 8. Simplest viable mechanism sketch
+
+Three contracts, five roles:
+
+**Contracts:**
+1. `StateRegistry`: holds global state vector; accepts warranted claims; updates S(c) via credibility-weighted aggregation.
+2. `EscrowManager`: locks knower capital at submission; releases or slashes at oracle resolution.
+3. `QueryPool`: receives query fees from unknowers; distributes pro-rata to active contributors to S_cred.
+
+**Minimal flow:**
+```
+Knower → submit(claim, c, value, stake) → EscrowManager locks stake
+Oracle → resolve(c, true_value) → StateRegistry scores claim
+  if correct: QueryPool pays base_reward; EscrowManager releases stake
+  if wrong:   EscrowManager slashes stake; challenger_pool and loser_pool credited
+Unknower → query(c) → pays fee → QueryPool → distributed to contributors
+```
+
+Everything else in the document (TOWL, LTRP, implication chains, credibility smoothers) is engineering to make this sketch robust to edge cases, attacks, and slow oracles. The sketch above is the mechanism's core — viable on its own for fast-oracle, single-coordinate, low-adversarial-pressure settings.
+
+---
+
+### 9. Strongest reason this idea fails
+
+**The demand-side revelation problem.**
+
+The mechanism routes capital toward high-WED coordinates only if unknowers reveal D(c) and A(c) honestly through query behaviour and willingness to pay. But D(c) is private: unknowers know how expensive a wrong state estimate is for their decision, and have no incentive to reveal it accurately.
+
+If unknowers do not reveal D(c), the query fee pool does not correctly signal which coordinates need the most epistemic work. Knowers optimise for query fees, not true WED reduction. The mechanism degrades toward a standard prediction market where capital concentrates on *popular* coordinates, not *decision-critical* ones.
+
+**Why this matters more here than in LMSR:** LMSR's epistemic output (the price) is useful regardless of why participants moved it. The knowledge marketplace's output (S(c) and its WED routing) is only decision-optimal if the demand signal is honest. Without honest demand, the mechanism is an expensive version of a standard scoring rule.
+
+**Partial mitigation:** Unknowers can implicitly reveal D(c) through escrow-conditioned queries: committing to higher fees if the state estimate proves correct. This is a revelation mechanism but requires additional design not yet in the document.
+
+---
+
+### 10. Best surviving variant if the raw idea is wrong
+
+**If demand-side revelation fails:** Revert to a purely epistemic scoring rule without WED routing. Knowers are rewarded for calibrated accuracy on any registered coordinate. Governance chooses which coordinates to activate and what base reward to set — governance substitutes for the absent demand signal. Less efficient than true WED routing but honest about what the demand signal cannot deliver.
+
+**The surviving variant is:** A credibility-weighted, track-record-anchored, implication-chain-enabled scoring rule, operating over a governed set of coordinates, with honest settlement, TOWL solvency guarantees, and oracle-tolerant escrow architecture.
+
+This retains the core epistemic advantages over LMSR (credibility weighting, implication chains, source-aware updates) while dropping the demand-signal machinery that requires D(c) revelation. Categorically distinct from LMSR and orderbooks; weaker than the full WED-routing vision but more robust.
+
+**GestAlt v2.1 relevance:** The surviving variant maps cleanly onto a clearing protocol for prediction market positions. Knowers are sophisticated agents with private information about event outcomes; unknowers are retail position-takers who need credible price signals; the clearing layer settles both. The D(c) revelation problem is less acute here because position size implicitly reveals willingness-to-pay — the bet itself is the demand signal.
+
+---
+
+## Structural Synthesis: First-Principles Closure (#r148)
+
+The mechanism, post-#r147 engineering and #r148 comparative analysis, is:
+
+**A warranted-state marketplace where calibrated knowers sell epistemic warranties to decision-making unknowers, rewarded by track-record-weighted accuracy scoring and implication chain bonuses, with capital as proof-of-conviction rather than side-bet collateral.**
+
+It is not LMSR. It is not an orderbook. It is not a batch auction. It is closest to a **quality-graded oracle service with skin-in-the-game**, where the quality grading is endogenous (track record) and the skin-in-the-game is mandatory (slashable escrow).
+
+The mechanism survives its own strongest failure mode (demand-side D(c) revelation) through the GestAlt-specific structural advantage: in prediction market clearing, position size IS the demand signal.
+
+*Last updated: #r148 — 2026-04-03T22:22Z*
