@@ -834,3 +834,33 @@ Each tier has a bounded individual lockup horizon. Each tier has a pool-level ba
 4. **T3_outage_cap interaction with T3 provisional install FSM (#r71):** A T3 provisional install (claim in pending oracle state) whose oracle window overlaps with a DA outage — does T_provisional_max tolling interact with T_outage_cap? Both are tolled independently; they could produce additive lockup. Define the maximum combined tolled lockup explicitly.
 
 *Last updated: #r131 — 2026-04-03T17:52Z*
+
+---
+
+## #r69 — Formal Conserved Quantity: Warranted Epistemic Debt (WED)
+
+The mechanism has never formally answered: *what is the conserved quantity?* This run supplies it.
+
+**Proposed: Warranted Epistemic Debt (WED)**
+
+```
+WED = Σ_c [ D(c) × A(c) × P(c) ]
+```
+- D(c) = expected decision-loss if the installed state on coordinate c is wrong
+- A(c) = authority weight (how much downstream decisions depend on c)
+- P(c) = probability the currently installed state is materially wrong
+
+The mechanism's job is to minimize WED. Capital should route toward high-D, high-A, high-P coordinates — not toward high crowd-disagreement coordinates.
+
+1. **Base primitive:** An update contract is a bid to reduce WED on a specific coordinate, backed by slashable collateral. The buyer pays for WED reduction, not for a correct belief.
+2. **State model:** When an update is installed, the mechanism applies a provisional WED reduction proportional to claimed evidence quality. Holdback releases proportional to actual WED reduction confirmed at truth resolution. Slashing compensates WED harm caused.
+3. **Credibility model:** Capital improves epistemics because updaters become residual claimants of the WED reduction they create. Sellers are paid for decision-quality improvement, not for being on the right side of a crowd bet.
+4. **Market roles:** Demanders price D(c) × A(c). Updaters compete to reduce P(c). Challengers are error-bounty hunters who expose where P(c) is higher than installed state advertises.
+5. **Settlement model:** Truth resolution grades whether P(c) was actually reduced. Under partial observability, graded by proxy: did the installed state survive challenge, re-check, and downstream decision use without triggering a costly correction?
+6. **Attack surface:** WED inflation — malicious actor artificially elevates D(c) or A(c), extracts high prices, lets truth deflate stakes. Defense: D(c) and A(c) are declared by buyers, not sellers.
+7. **Why better than LMSR:** LMSR prices beliefs without weighting by decision relevance. WED pricing routes epistemic work to where errors are expensive.
+8. **Simplest viable sketch:** Publish D(c) and A(c) as buyer-declared fields. Updaters bid WED reduction via evidence quality + escrow. Install the update offering largest WED-reduction per risk budget.
+9. **Strongest failure mode:** D(c) and A(c) are private buyer information. Without credible demand-reporting, WED cannot be computed reliably.
+10. **Best surviving variant:** Use WED as internal optimization target for mechanism designers. Allow buyers to signal D(c) × A(c) implicitly through escrow size and bid price. (ref: #r69; completes conserved-quantity thread from #r1)
+
+*#r69 added retroactively — 2026-04-03T19:09Z*
