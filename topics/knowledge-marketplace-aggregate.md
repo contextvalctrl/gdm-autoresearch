@@ -1083,4 +1083,114 @@ Four formally distinct escrow categories now fully specified:
 
 4. **Zone C + implication bonus partial release interaction:** During Zone C, T3 installations may be throttled. Should partial release from implication_bonus_escrow be blocked during Zone C on solvency grounds, or is Zone C's scope limited to TOWL/LTRP operations and implication_bonus_escrow operates independently?
 
-*Last updated: #r133 — 2026-04-03T19:52Z*
+*Last updated: #r134 — 2026-04-03T20:02Z*
+
+---
+
+## #r134 Contributions — 2026-04-03T20:02Z
+
+Addresses all four open questions from #r133.
+
+**Q1 (implication_bonus_escrow during degraded mode) → Suspend execution; queue oracle events; class-level gating (#r134):**
+
+The implication_bonus_escrow is a protocol reserve (not TOWL-counted, #r133), but its release, clawback, and expiry operations all require EAT commits — they are EAT-dependent and must be suspended during DA outage.
+
+**Resolution:** All implication_bonus_escrow execution (partial releases, clawbacks, expiry distributions) is suspended during degraded mode. Oracle events (A resolves correct, B resolves wrong) that fire during an outage are recorded as pending in the mechanism's local queue (Ethereum calldata only — no DA dependency for the event record itself, just for the state commit). On DA restore, queued events are processed in EAT timestamp order at the first normal macro-epoch boundary.
+
+**One exception — active standard escrow clawback:** If a clawback obligation is sourced from the knower's active standard escrow (not from implication_bonus_escrow), the escrow debit can be recorded in Ethereum state without a DA commit (it is a single per-claim state change). This path is permitted during degraded mode. The corresponding EAT lineage record is queued and committed at DA restore.
+
+**Expiry tolling:** T_longtail expiry timers for implication_bonus_escrow toll during degraded mode (consistent with challenge window tolling policy from #r131/Q4). The expiry clock does not advance during outage; elapsed outage time is excluded from the expiry horizon.
+
+**Interaction with bridge epoch:** On DA restore, pending implication_bonus_escrow operations processed at the normal macro-epoch boundary after the bridge epoch. Not during bridge (bridge epoch has partial DA confidence — the first full-confidence epoch is post-bridge). (#r134)
+
+---
+
+**Q2 (Clawback debt and credibility_ratio growth cap) → Proportional escrow withholding on new claims; net-contributor retirement path (#r134):**
+
+Hard ceiling on credibility_ratio is disproportionate — a knower with one partially-released clawback loss may be net-positive across all other coordinates. Growth-rate cap is implementation-complex. A targeted mechanism is preferred.
+
+**Resolution — proportional withholding on new claim escrow:**
+
+```
+debt_withholding_rate(a) = min(0.5, outstanding_debt_a / (outstanding_debt_a + total_active_escrow_a))
+```
+
+Each new claim by knower a splits its escrow:
+- `(1 - debt_withholding_rate)` → normal claim escrow (TOWL-counted, normal operation)
+- `debt_withholding_rate` → debt recovery account (protocol-held, released to loser pool upon debt clearance)
+
+Cap at 0.5: knower retains at least half capacity to participate. Complete exclusion is not appropriate — continued participation generates the evidence needed to assess ongoing reliability.
+
+**Debt clearance — two paths:**
+1. **Escrow repayment:** Debt recovery account accumulates until it covers outstanding_debt. Debt marked cleared; withholding rate resets to 0.
+2. **Net-contributor retirement:** If cumulative log-score surplus from resolved-correct claims (in the trailing 8 normal-mode macro-epochs) exceeds outstanding_debt_a × 1.5 (50% over-performance buffer), the remaining debt is retired. Knower has demonstrated sustained positive epistemic contribution exceeding the loss. Protocol absorbs residual uncollected debt as a mechanism cost; does not create secondary debt.
+
+**credibility_ratio is NOT directly capped.** Withholding affects escrow capacity, which in turn affects `w_a = C_a × log(1 + k_a_net)`. The epistemic weight penalty is indirect and proportional — not a blunt administrative cap. (#r134)
+
+---
+
+**Q3 (M_stable tolerance governance bounds) → Hard contract invariant: tolerance ≤ ⌊window_size / 4⌋ (#r134):**
+
+If governance sets tolerance = 4 of 5, pool recall is effectively unconditional — any four-epoch high-balance run qualifies regardless of intervening dips. This inverts the purpose of the stability gate.
+
+**Resolution — hard contract ceiling on tolerance:**
+
+```
+tolerance_max = ⌊window_size / 4⌋
+```
+
+For default window_size = 5: tolerance_max = 1 (floor of 1.25). This matches the recommended default (1 of 5) and makes it a hard ceiling enforced at parameter-update time — not a convention.
+
+**Constraint on window_size changes:** Governance may change window_size (to increase the raw number of qualifying epochs), but the tolerance ceiling re-derives from the new window_size. Governance cannot independently raise tolerance above ⌊window_size / 4⌋ regardless of window_size.
+
+**Minimum window_size:** window_size ≥ 4 enforced (smaller windows make the tolerance_max = 0, equivalent to strict consecutive — technically valid but brittle; governance may set this for maximum conservatism).
+
+**Design law (#r134):** Stability gates for irreversible actions must have a contract-enforced tolerance ceiling anchored to the window_size. The ratio tolerance / window_size ≤ 0.25 is the hard constraint. This completes and tightens the #r133 majority-window M_stable rule. (#r134)
+
+---
+
+**Q4 (Zone C + implication bonus partial release) → Class-level Zone C gating; global Zone C does not block (#r134):**
+
+implication_bonus_escrow is not TOWL-counted (protocol reserve, #r133). Zone C restrictions, as designed, apply to TOWL-coupled operations. However, partial release flows liquidity out of the protocol during solvency stress — even if the escrow is protocol-reserve, the direction of flow matters.
+
+**Analysis:** Two Zone C scopes must be distinguished:
+- **Global Zone C:** aggregate TOWL across all classes is under stress. implication_bonus_escrow is structurally separate from TOWL; blocking release globally from a protocol reserve during TOWL stress conflates two distinct solvency models.
+- **Class-level Zone C:** the specific coordinate class(es) involved in the implication declaration are themselves in Zone C. Here, outflows from that class's protocol-adjacent reserves are directionally harmful to that class's epistemic stability.
+
+**Resolution:** Partial release from implication_bonus_escrow is gated on the TOWL zone of the *releasing coordinate class*, not global TOWL:
+- Releasing coordinate class in Zone A or B → partial release proceeds normally.
+- Releasing coordinate class in Zone C → partial release deferred until class returns to Zone A or B.
+- Global Zone C does NOT block implication_bonus_escrow releases for classes that are individually in Zone A/B.
+
+**Ordering when both A and B classes are Zone C:** Deferral applies. Partial release waits for both releasing classes to exit Zone C. Deferral duration tolls against implication_bonus_escrow expiry (expiry clock pauses while deferred — analogous to DA-outage tolling).
+
+**New design law (#r134):** Liquidity outflows from any protocol reserve category are gated at the coordinate-class level, not at the global TOWL level, unless the reserve is explicitly cross-class. Class-local solvency is the correct scope for class-local outflow gating. (#r134)
+
+---
+
+## Structural Synthesis: Operational Completeness of the Bounded-Liability Architecture (#r134)
+
+With #r134, all four immediate open questions from the bounded-liability architecture are closed. The architecture now specifies behavior under:
+
+| Condition | Escrow type | Behavior |
+|---|---|---|
+| Degraded mode (DA outage) | implication_bonus_escrow | Suspend; queue oracle events; execute at post-bridge macro-epoch |
+| Active debt | Standard escrow capacity | Proportional withholding (max 50%) + net-contributor retirement |
+| Governance seed recall | LTRP | Hard tolerance ceiling ≤ ⌊window_size/4⌋ |
+| Zone C stress | implication_bonus_escrow releases | Class-level gating; global Zone C does not block cross-class-clean releases |
+
+The credibility_ratio remains an unmanipulated epistemic signal throughout — debt is enforced through escrow capacity, not by administrative credibility caps. Governance recall is structurally stability-gated with a contract-enforced ceiling. Zone C gating is appropriately class-scoped.
+
+---
+
+## Open Questions for #r135+
+
+1. **Debt recovery account finality:** When the net-contributor retirement path fires (8-epoch trailing surplus ≥ 1.5× outstanding debt), the protocol absorbs the uncollected residual. Is there a maximum per-event protocol absorption cap — to prevent a single knower from engineering a large partial-release clawback and then running the net-contributor path to externalize the loss?
+
+2. **Implication_bonus_escrow expiry during class-level Zone C deferral:** Expiry tolls during both degraded mode and Zone C deferral. If a declaration is simultaneously affected by both (degraded outage ends → class in Zone C → bridge epoch), the toll stacking could extend the effective expiry horizon significantly. Is there a maximum combined expiry extension cap analogous to the #r132 combined lockup ceiling?
+
+3. **window_size governance change + in-flight M_stable qualification:** If governance increases window_size from 5 to 8, is a currently-qualifying pool (4 of last 5 above threshold) retroactively disqualified until 6 of last 8 epochs satisfy the threshold? Or does mid-qualification window_size change take effect on the next M_stable evaluation window?
+
+4. **Debt withholding and implication declaration participation:** If a knower is in debt-withholding mode (reduced effective escrow), their implication_bonus_escrow contribution also decreases proportionally — reducing implication chain depth incentives. Should the debt withholding rate apply to implication escrow at the same ratio as standard escrow, or should implication declarations be exempt (to avoid discouraging information-rich multi-coordinate declarations from temporarily penalized knowers)?
+
+*Last updated: #r134 — 2026-04-03T20:02Z*
