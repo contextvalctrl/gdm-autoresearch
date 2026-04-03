@@ -3887,3 +3887,178 @@ In both cases: shadow-class = epistemic investment layer; clearing-class = finan
 4. **Cross-class credibility portability from archived shadow-class:** Credibility_ratio earned on an archived shadow-class carries over via attenuated formula (#r71): n_T2_resolutions / N_anchor. For a one-shot shadow-class with fewer resolutions than N_anchor, carry-over is fractional. Is this correct — one-shot track records carry less weight than multi-event track records? Or should the formula be adjusted for the structural difference between an archived (one-shot) and a live class?
 
 *Last updated: #r154 — 2026-04-03T23:22Z*
+
+---
+
+## #r155 Contributions — 2026-04-03T23:32Z
+
+Addresses all four open questions from #r154.
+
+**Q1 (Genesis prior mode-mismatch discount — self-calibrating) → Derived from calibration alignment score between S_discovery and oracle_confirmed values; recovers default 0.30 at typical alignment (#r155):**
+
+The mode_mismatch_discount is an attenuation factor on the discovery-class genesis prior. It should reflect how well discovery-mode calibration translates to clearing-mode settlement precision — a measurable quantity once clearing events resolve.
+
+**Resolution — alignment-score-derived discount:**
+
+```
+alignment_score(class_pair, t) =
+    1 - RMSE(S_discovery_at_T_anchor_i, oracle_confirmed_i) / RMSE(uniform_prior, oracle_confirmed_i)
+    averaged over i in resolved clearing events on this coordinate
+    smoothed via EMA with N_align_window = N_calibration epochs
+
+alignment_score_smooth in (-inf, 1]:
+    1.0  = S_discovery perfectly predicted oracle (no mode gap)
+    0.7  = typical (70% skill above uniform prior)
+    0.0  = S_discovery no better than uniform prior
+   <0.0  = S_discovery systematically worse than uniform prior
+
+mode_mismatch_discount(t) = clip(1 - alignment_score_smooth(t), min=0.0, max=0.5)
+```
+
+**Calibration table:**
+
+| alignment_score_smooth | mode_mismatch_discount | Interpretation |
+|---|---|---|
+| 1.0 | 0.0 | Perfect discovery→clearing transfer; no attenuation |
+| 0.70 | 0.30 | Typical — recovers default from first principles |
+| 0.50 | 0.50 | Poor alignment; maximum attenuation |
+| <=0.0 | 0.50 (clipped) | Worse than uniform; prior suppressed to minimum |
+
+**Genesis (no data available):** Before the first clearing resolution, `mode_mismatch_discount` defaults to `mode_mismatch_discount_base = 0.30`. Governance sets `mode_mismatch_discount_base in [0.0, 0.5]`; derived value replaces it once data is available.
+
+**Governance interface update:** (mode_mismatch_discount_base, N_align_window) → mode_mismatch_discount derived from alignment_score_smooth.
+
+**Design law confirmed (#r155):** Attenuation factors between two independently calibrated systems must be derived from their observed empirical alignment, not set as governance intuition. The formula uses oracle_confirmed_value data the mechanism generates naturally — zero new oracle requirements. (#r155)
+
+---
+
+**Q2 (N_prior_epochs optimisation — information-theoretic derivation) → N_prior_epochs = N_calibration; prior decays to zero at clearing-class self-standing threshold (#r155):**
+
+**The optimisation criterion:** Prior contribution should phase out when the clearing class has accumulated sufficient native evidence to be epistemically self-standing — which requires N_calibration normal-mode resolved epochs.
+
+**Derivation:**
+
+```
+prior_contribution(t) = alpha_prior_effective_at_genesis * (1 - t / N_prior_epochs)
+```
+
+Native clearing-class S_cred is self-standing at epoch N_calibration. Setting N_prior_epochs = N_calibration ensures the prior contribution reaches zero exactly when the class is self-standing.
+
+**Properties:**
+1. Reuses an existing governance primitive — no new parameter introduced.
+2. Prior never dominates a clearing class with a stable native track record.
+3. For N_calibration=4: prior at 75% weight at epoch 1, 0 at epoch 4.
+4. Per-class: slow-oracle classes with larger N_calibration get longer prior retention — correct, since native evidence takes longer to accumulate.
+
+**EAT record:** N_prior_epochs = N_calibration is not stored separately — it is derived from the existing registration field. (#r155)
+
+---
+
+**Q3 (Shadow-class wind-down state machine — one-shot clearing) → Three-state machine: ACTIVE → WINDING_DOWN → ARCHIVED; waits for natural escrow expiry; no forced clawback (#r155):**
+
+```
+States: ACTIVE | WINDING_DOWN | ARCHIVED
+
+ACTIVE → WINDING_DOWN:
+  Trigger: clearing-class oracle_resolved EAT event for the linked coordinate
+  Entry actions:
+    - No new claims accepted
+    - Existing claims continue earning query fees until T_longtail expiry
+    - S_cred contribution active for all claims with non-zero effective_weight
+    - Challenge windows continue advancing (not suspended)
+    - EAT event: shadow_class_wind_down_initiated, epoch, linked clearing_class_id
+
+WINDING_DOWN → ARCHIVED:
+  Preconditions (all must hold):
+    (a) All challenge windows closed
+    (b) All escrows released at natural T_longtail expiry (no forced release)
+  Entry actions:
+    - S_cred contribution frozen at zero
+    - Undistributed query fee pool balance -> governance treasury
+    - Final credibility_ratio snapshot for all knowers committed to EAT (for portability)
+    - shadow-class EAT record: status = ARCHIVED, archive_epoch
+```
+
+**Key properties:**
+
+1. No forced escrow clawback — static-escrow design law (#r137).
+2. Query fee earnings continue during WINDING_DOWN — correct reward for delivered service.
+3. Challenge windows not suspended — epistemic enforcement never suspended by lifecycle events (#r139).
+4. credibility_ratio snapshot at ARCHIVED, not at WINDING_DOWN initiation — captures final calibration.
+
+**Expected wind-down duration:** For T_longtail=4 macro-epochs: WINDING_DOWN lasts 4 macro-epochs post-oracle-resolution. Deterministic from registered T_longtail. (#r155)
+
+---
+
+**Q4 (Cross-class credibility portability from archived shadow-class — one-shot thin evidence) → Count-based formula is correct; one-shot shadow-class inherits known thin-evidence discount; no special adjustment (#r155):**
+
+**The tension:** `carry_over_fraction = min(1, n_resolutions / N_anchor)` gives 25% for n_resolutions=1, N_anchor=4. A knower who correctly predicted a hard one-shot event may feel this is unfair.
+
+**Resolution — Theory A (count-based) retained:**
+
+1. **Manipulation resistance:** Quality-weighted carry-over creates an attack — concentrate stake on one visible event, win, carry a large credibility premium. Count-based thin-evidence discount is a feature.
+2. **Calibration theory basis:** credibility_ratio = log-score average. Standard error of mean decreases as 1/sqrt(n). Carry-over fraction appropriately scales with n/N_anchor.
+3. **Single events should not grant disproportionate credibility:** One correct resolution is insufficient evidence of systematic calibration.
+
+**Known trade-off (documented at registration):** EAT registration event includes `expected_carry_over_fraction = min(1, expected_resolution_count / N_anchor)`. For one-shot: `expected_carry_over_fraction = 0.25` — transparent disclosure.
+
+**Compensation via other channels:** Query fee earnings during ACTIVE+WINDING_DOWN phases; implication bonuses if applicable; credibility builds across multiple coordinate classes.
+
+**Design law confirmed (#r155):** Count-based credibility carry-over is manipulation-resistant and calibration-theory-grounded. Mechanism compensates one-shot participants through other earning channels rather than inflating portability on thin evidence. (#r155)
+
+---
+
+## Structural Synthesis: Shadow-Class Architecture — Closed (#r155)
+
+| Feature | Resolution | Law |
+|---|---|---|
+| mode_mismatch_discount calibration | Self-calibrating from alignment_score_smooth; recovers 0.30 at typical alignment | Attenuation derives from empirical alignment |
+| N_prior_epochs | = N_calibration; no new parameter | Reuses existing primitive |
+| Wind-down state machine | ACTIVE → WINDING_DOWN → ARCHIVED; natural expiry; credibility_ratio snapshot at ARCHIVED | No forced clawback; final snapshot for portability |
+| One-shot thin-evidence carry-over | Count-based formula correct; disclosed at registration | Manipulation resistance > quality-weighted inflation |
+
+**Shadow-class two-registration pattern — complete specification summary:**
+
+```
+Registration:
+  shadow_class:    mode=DISCOVERY, coordinate_id, staleness_window, T_longtail, N_calibration
+  clearing_class:  mode=CLEARING, coordinate_id, position_registry, genesis_prior_source=shadow_class_id
+                   mode_mismatch_discount_base=0.30, N_align_window=N_calibration
+                   expected_carry_over_fraction = min(1, expected_resolutions / N_anchor) [disclosure]
+
+Genesis prior:
+  alpha_prior_effective = alpha_prior_base * age_decay * (1 - mode_mismatch_discount)
+  mode_mismatch_discount: 0.30 until first clearing resolution; then derived from alignment_score_smooth
+  N_prior_epochs = N_calibration [no new primitive]
+
+Wind-down (shadow):
+  On clearing oracle: ACTIVE -> WINDING_DOWN (no new claims; natural escrow expiry; queries continue)
+  On all-escrows-released + all-challenges-closed: WINDING_DOWN -> ARCHIVED [credibility_ratio snapshot]
+
+Portability:
+  carry_over_fraction = min(1, n_resolutions / N_anchor) [thin-evidence discount as designed]
+```
+
+---
+
+## Cumulative Invariants (additions through #r155)
+
+**Invariant #18 (#r155):** Attenuation factors between independently calibrated systems are self-calibrating from observed empirical alignment — not set as governance intuition.
+
+**Invariant #19 (#r155):** Shadow-class wind-down respects natural escrow expiry; credibility_ratio snapshot committed at ARCHIVED, not at wind-down initiation.
+
+**Invariant #20 (#r155):** Count-based credibility carry-over is correct by design. Single-event thin-evidence track records carry lower weight; this is manipulation-resistant. Mechanism compensates through other earning channels.
+
+---
+
+## Open Questions for #r156+
+
+1. **alignment_score_smooth with no shared-coordinate data:** For one-shot clearing classes with only 1 resolved event, alignment_score_smooth is based on a single data point — low confidence. Should it require N_align_window observations before replacing the base default, analogous to dual-condition transition for alpha_cap (#r143/Q3)?
+
+2. **WINDING_DOWN query fee floor:** During WINDING_DOWN, query fee income may drop to near-zero (no new unknowers seek state on resolved coordinate). Should WINDING_DOWN classes receive a floor query fee funded from protocol treasury to compensate knowers for outstanding warranty obligations?
+
+3. **Natural expiry misalignment:** If one claim has an extremely long T_longtail, the shadow class cannot archive for the full T_longtail duration. Should there be a T_wind_down_max cap after which remaining escrows transition to LTRP, allowing earlier archiving?
+
+4. **EAT size and historical compaction:** After 155+ runs of protocol engineering, a long-lived production EAT would be enormous. Are there EAT compaction semantics — Merkle root snapshots of resolved epochs with individual record archiving to cold storage — while maintaining the immutability invariant (#r74)?
+
+*Last updated: #r155 — 2026-04-03T23:32Z*
