@@ -1,9 +1,9 @@
 # GDM Epistemic Bond — Phase 0–1 Launch Package
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r078 (VAL-465) → updated r080 (VAL-468) → corrected r081 (VAL-469) → corrected r082 (VAL-470)
+**Run:** r078 (VAL-465) → updated r080 (VAL-468) → corrected r081 (VAL-469) → corrected r082 (VAL-470) → corrected r083 (VAL-471)
 **Date:** 2026-04-03
-**Issue:** VAL-465 → updated by VAL-468 → updated by VAL-469 → updated by VAL-470
+**Issue:** VAL-465 → updated by VAL-468 → updated by VAL-469 → updated by VAL-470 → updated by VAL-471
 **Depends on:** real-world-validation.md (r076/VAL-461), executable-roadmap.md (r077/VAL-462 → r080/VAL-468), epistemic-bond-v0-spec.md (r077/VAL-462), knower-calibration-test.md (r079/VAL-466), phase1-coordinates.md (r079/VAL-466)
 **Purpose:** Final fine-tune and executable consolidation. Everything required to start Phase 0 this week — in one document. Updated in r080 to reflect 30-coordinate / two-wave structure per phase1-coordinates.md r079.
 
@@ -41,6 +41,24 @@ The existing Week 1/2/3 plan is correct in content but was written assuming a 21
 | **Apr 11** | **FIRST COMMIT WINDOW OPENS — Wave 1 BMO reporters (GS, JPM, WFC, C)** | | |
 
 **Fallback if Day 8 is incomplete:** Allow GS, JPM, WFC, C (April 14 BMO batch) to be observer coordinates — oracle resolution captured but no knower claims. Phase 1 runs on 26 active coordinates from April 15. Exit criterion revised: ≥26 resolved predictions per knower.
+
+### Day 1 Engineering Gate (April 3, 2026) — Pass/Fail (r083/VAL-471)
+
+Before ending Day 1, confirm ALL of the following are true. If any are false, escalate to founders immediately — the April 11 commit window is at risk.
+
+**Must be TRUE by end of Day 1:**
+- [ ] `forge build` runs clean with PRBMath v4 + OpenZeppelin v5 in the project
+- [ ] `MockERC20.sol` is deployed on Arbitrum Sepolia; deployment address recorded
+- [ ] `EpistemicBondRegistry.sol` skeleton exists with `register()` stub (even if not fully implemented)
+- [ ] `register()` function accepts USDC transfer (mock) and records address as registered knower on testnet
+- [ ] BD outreach list of ≥30 candidates exists; first 15 emails sent
+
+**Day 1 is NOT complete if:**
+- Any dependency (PRBMath, OZ) install fails and is unresolved
+- USDC mock deployment is still pending at end of business
+- BD outreach list does not yet exist
+
+If Day 1 gate is missed: escalate to founders by EOD April 3. Do not silently absorb the slip — the April 14 Wave 1 batch (GS, JPM, WFC, C) requires all 8 engineering days.
 
 Everything else is sequenced below.
 

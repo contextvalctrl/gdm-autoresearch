@@ -1,9 +1,9 @@
 # EpistemicBond v0 — Technical Specification
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r075 → corrected by r077 (VAL-462) → corrected by r081 (VAL-469)
+**Run:** r075 → corrected by r077 (VAL-462) → corrected by r081 (VAL-469) → corrected by r083 (VAL-471)
 **Date:** 2026-04-03
-**Issue:** VAL-460 → updated by VAL-462
+**Issue:** VAL-460 → updated by VAL-462 → updated by VAL-471
 **Depends on:** executable-roadmap.md (r074), atlas-formal-analysis.md (r072), research-synthesis.md (r073)
 **Purpose:** Bridge the theoretical mechanism design and executable roadmap to concrete engineering artifacts. This document is the handoff to engineering for Phase 0 (testnet deployment, Weeks 1–3).
 
@@ -458,15 +458,18 @@ Prior to testnet deployment, validate:
 
 ## 8. Phase 1 Pilot Spec
 
-### 8.1 Coordinate selection (15 coordinates, 4 weeks)
+### 8.1 Coordinate selection (30 coordinates across two waves, 6–7 weeks)
 
-Target: 40+ US earnings events/week (Lens r073). Select coordinates diversified across:
+**Updated r080/VAL-468 + r083/VAL-471:** Phase 1 uses 30 coordinates across two waves, not 15. The 4-week duration has been corrected to 6–7 weeks. The full confirmed coordinate list with dates, S_prev values, and sector distribution is in `phase1-coordinates.md`.
 
-- 5 × Large-cap (AAPL, MSFT, GOOGL, META, AMZN) — high analyst coverage, highest WTP
-- 5 × Mid-cap growth — moderate coverage, higher epistemic asymmetry
-- 5 × Sector rotation plays (energy, healthcare, financials) — domain expertise signal test
+Target: 40+ US earnings events/week (Lens r073). Phase 1 is diversified across:
 
-Minimum viable: Any 15 coordinates with unambiguous binary outcomes (EPS beat/miss vs. FactSet consensus).
+- Wave 1 (Apr 14–May 1): 17 coordinates — large-cap financials + tech + communication services
+  (GS, JPM, WFC, C, BAC, NFLX, TSLA, GOOGL, META, MSFT, AMZN, AAPL, V, UNH, INTC, T, VZ)
+- Wave 2 (May 5–May 30): 13 coordinates — tech + consumer + energy + industrials
+  (NVDA, CRM, SHOP, DE, HD, WMT, LOW, TGT, DIS, UBER, PYPL, XOM, CVX)
+
+Minimum viable: All 30 coordinates per `phase1-coordinates.md`, with S_prev initialized from the historical beat-rate table and consensus source Wall Street Horizon. FactSet consensus is NOT used in Phase 1 (r077/VAL-462 correction); Wall Street Horizon (~$200/month) is the standard consensus source for v0.
 
 ### 8.2 Knower recruitment criteria
 

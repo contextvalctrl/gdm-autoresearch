@@ -26,6 +26,8 @@ gdm-autoresearch/
 | `query-as-first-class-object.md` | Query as a first-class object — demand-side structure |
 | `knowledge-marketplace-primitive.md` | Knowledge marketplace primitive analysis |
 | `extended-reasoning-notes.md` | Extended reasoning and protocol notes |
+| `r082-fine-tune-notes.md` | r082 fine-tune pass corrections (VAL-470) |
+| `r083-fine-tune-notes.md` | r083 fine-tune pass corrections — final validation (VAL-471) |
 
 ---
 
