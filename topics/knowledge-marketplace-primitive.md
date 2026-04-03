@@ -1,254 +1,236 @@
-# Knowledge Marketplace — GDM Mechanism Design
-## Aggregated Working Document
-
-**Target doc:** https://docs.google.com/document/d/1Z1sbL9WgBHTxs-4YWlVZWfJy-ZsHwdPZu6qCuT_42e0/edit
-**Last sync:** Local only — pending gog auth to push to Google Doc
-**Runs:** #r1 (2026-04-03)
+# Knowledge Marketplace Mechanism Design — Aggregate Document
+## GDM Autoresearch Thread | ValCtrl
+---
+_This file is the canonical aggregate. Each run adds net-new insight and is tagged with run references. Edit for quality, not for log-completeness._
 
 ---
 
-## 1. Base Primitive — What is being exchanged?
-
-In LMSR: shares in outcome states. Market maker absorbs all trades via a cost function; price is a public good.
-In orderbook PM: probability-weighted contracts matched between opposing beliefs; adversarial zero-sum.
-In batch auction (GestAlt-style): orders batched, cleared at uniform prices — still fundamentally price discovery.
-
-**Knowledge marketplace primitive (distinct from all above):**
-What is exchanged is *credentialed information* — a belief update with capital posted as the credential. The credential is not a side-bet on crowd belief; it is a *credibility bond* that the claimant forfeits upon being wrong.
-
-- Ask side: agent posts a claim about world state with stake. "I claim state is μ, I put k capital behind it."
-- Bid side: agent pays fee f to receive (μ, credibility_weight) and reduces their own state uncertainty.
-
-**Conserved quantity:** epistemic utility — expected log-likelihood gain per unit capital at risk. Capital does not move prices; it weights belief updates. (#r1)
-
-**Why this is not just renaming PM matching:** In PM matching, capital moves a price signal that is public and symmetric. Here capital privately certifies a directional claim from a specific agent. The information routing is bilateral; the scoring is relative to a prior, not to an opposing order. (#r1)
+## Run Log
+- #r1 — 2026-04-03 07:52 UTC — First-principles cold start
 
 ---
 
-## 2. State Model — Global state vector and update rule
+## 1. Base Primitive — What Is Being Exchanged?
 
-Let the global state be a probability distribution S over outcomes Ω: S ∈ Δ(Ω).
+**Surviving view (#r1):**
 
-**Layers:**
-- *Prior state* S_prev: last settled or initialized distribution.
-- *Pending claims layer*: set of claims {(μ_i, k_i, T_i)} not yet settled. Each μ_i is a knower's reported posterior.
-- *Public state estimate* S_public: reputation-staked weighted mean of pending claims:
-  `S_public = Σ_i w_i * μ_i`, where `w_i = (k_i / Σk) * sigmoid(α * T_i)`
-  T_i is the knower's historical track record (accuracy-weighted).
-- *Resolved state*: after oracle delivery of ω*, collapses to δ(ω*). Cycle resets.
+The primitive is not a probability-weighted share in an outcome. It is a **credibility-weighted state update**.
 
-**Update rule discipline:** the public state vector is NOT updated on each individual claim arrival. Claims accumulate in the pending layer; the public state is a batch recomputation at each epoch boundary. This prevents front-running on state updates and is structurally compatible with GestAlt's batch epoch model. (#r1)
+Formally: an agent $A$ with private signal $s_A$ about world state $\omega$ "sells" a conditional belief update $\Delta\hat{\omega} = f(s_A)$ to an agent $B$ who wants to reduce uncertainty about $\omega$ and is willing to pay capital $c$ to obtain it.
 
-**What makes this NOT LMSR:** LMSR updates a single shared cost function continuously; price is the partial derivative of total cost. Here there is no cost function and no continuous price signal. State is a weighted posterior average, not a log-odds market price. (#r1)
+The object of exchange is the **epistemic delta** — the reduction in $B$'s uncertainty — and capital is the bond that makes $A$'s claim costly to fake.
+
+This is NOT a share in a payout pool. It is closer to: *A* certifies a signal and *B* pays for that certification, with settlement contingent on whether the signal turns out to have been informative.
+
+**Contrast with LMSR:** LMSR exchanges shares in a scoring rule pool. Capital moves to push a public price toward truth, but the object being "sold" is price impact, not information directly. Knowers and unknowers are not distinguished; all traders are price-movers. The knowledge marketplace makes knower/unknower asymmetry the central organizing feature.
 
 ---
 
-## 3. Credibility Model — How capital converts to trustworthy information
+## 2. State Model — Global State Vector and Update Rule
 
-**Mechanism:** Proper scoring rule applied bilaterally, not to a shared market state.
+**Surviving view (#r1):**
 
-For each resolved claim, knower i with claim μ_i receives:
-```
-R(μ_i, ω*) = k_i * [log μ_i(ω*) - log S_prev(ω*)]
-```
-- Positive reward if claim improves on prior (positive KL contribution toward ω*).
-- Capital forfeiture if claim degrades on prior.
-- Magnitude proportional to stake k_i.
+Let $\Omega$ be the true world state (unknown, revealed at resolution time $T$).
 
-**Track record T_i:** rolling accuracy score over past N settled claims, weighted by stakes and KL contributions. High-stake correct calls compound reputation; high-stake wrong calls degrade it multiplicatively. (#r1)
+The global state vector $\hat{\omega}_t$ is the system's current best estimate of $\Omega$ at time $t$, maintained as a probability distribution over outcomes (or a point estimate + uncertainty interval).
 
-**Credibility weight for unknowers consuming claim i:**
-```
-w_i = (k_i / Σk) * sigmoid(α * T_i)
-```
-Log-diminishing stake effect (doubling stake does not double influence) prevents capital-rich adversaries from flooding the state. (#r1)
+**Update rule candidates:**
 
-**Key property:** This is a Bayesian-consistent aggregation. Under truth-telling equilibrium, an agent with genuine private signal μ_i has strictly positive expected payoff. Under bluffing, expected payoff is negative. Reporting is incentive-compatible. (#r1)
+**Candidate A — Bayesian accumulation:**
+Each accepted knowledge claim arrives with a posted signal $s_i$ and stake $c_i$. The update is:
+$$\hat{\omega}_{t+1} = \text{BayesUpdate}(\hat{\omega}_t, s_i, w_i)$$
+where weight $w_i = g(c_i, \text{track\_record}_i)$ is a credibility function combining stake size and historical accuracy.
+
+**Candidate B — Stake-weighted average:**
+Simpler. The state vector is the stake-weighted mean of all active claims. Each new claim shifts the vector proportionally to its stake. This is computable in O(1) per update.
+
+**Candidate C — Tiered commit-reveal:**
+Claims are submitted in sealed form, stakes are locked, then all claims in a batch are revealed simultaneously. The state update runs once per batch. Prevents front-running and herding.
+
+**Best candidate for now (#r1):** Candidate C (tiered commit-reveal) with Candidate A as the aggregation function inside the reveal step. This gives manipulation resistance (sealed phase) and principled aggregation (Bayesian).
+
+**What is conserved?** Total capital staked is conserved across the system pre-settlement. It transfers from wrong claimants to right ones and to unsatisfied bidders. No capital is created or destroyed except as platform fees.
+
+---
+
+## 3. Credibility Model — How Does Capital Stake Convert to Trustworthy Information?
+
+**Surviving view (#r1):**
+
+Core mechanism: **stake-weighted scoring with retrospective calibration.**
+
+Step 1 — At claim time: claimant $A$ posts signal $s_A$ and locks stake $c_A$. Stake is collateral; it is not payment for placing the claim.
+
+Step 2 — At resolution: $A$'s payout is $\text{Score}(s_A, \omega^*) \cdot c_A$ where $\omega^*$ is the resolved truth. Score is a proper scoring rule (e.g., log score, Brier score). Proper scoring rules make honest reporting dominant under expected utility maximization — this is the key.
+
+Step 3 — Track record: Each agent accumulates a public history of $(s_i, \omega^*_i, c_i)$ tuples. Future state updates weight their claims by calibrated track record. A new claimant with no history gets downweighted.
+
+**Why capital improves epistemics rather than just reallocating PnL:**
+- Cheap talk is broken by the stake requirement. An agent who bluffs loses stake on resolution.
+- Large stake + good track record = high influence on $\hat{\omega}$. This is analogous to a credibility bond.
+- A well-calibrated agent earns more influence over time AND recovers stake plus profit. This creates a compounding incentive to be accurate, not just lucky.
+
+**The key departure from LMSR:** In LMSR, anyone moving price is rewarded for being "first" or for moving in the right direction. In this mechanism, reward is tied specifically to *informational accuracy*, scored against resolution. A lucky guesser's track record doesn't compound.
 
 ---
 
 ## 4. Market Roles
 
-**Knowers (Ask side):**
-- Hold private information, analytical edge, or superior models.
-- Post claims with stake. Earn: (a) fees from unknowers upon verified consumption, (b) scoring reward upon correct settlement.
-- Can post conditional claims: "state is X given that prior indicator Y holds."
-- Fee is held in escrow until settlement — no pre-settlement cash-out of information sales.
+**Surviving view (#r1):**
 
-**Unknowers (Bid side):**
-- Want to reduce state uncertainty at lower cost than independent research.
-- Pay fee f to receive credentialed claim (μ_i, w_i).
-- Portion of fee → knower fee pool (escrowed). Portion → slash reserve.
-- Option: subscribe to aggregated public state S_public (cheaper, less specific) or to individual knower streams.
+| Role | Description | Capital flow |
+|------|-------------|--------------|
+| **Knower (Ask side)** | Agent with private signal. Posts claim + stakes collateral. Seeks to profit from information advantage. | Stakes $c_A$. Recovers $c_A + \text{profit}$ if correct; loses partial or full stake if wrong. |
+| **Unknower (Bid side)** | Agent who wants a credible state update. Posts a "question" with a bounty $b_B$. Pays for information access. | Pays bounty $b_B$. Receives updated $\hat{\omega}$ weighted by accepted claims. Does NOT receive individual signals (privacy-preserving aggregation). |
+| **Validator / Oracle** | Provides the resolution signal $\omega^*$ at time $T$. | Separate trust mechanism (multisig, physical oracle, ZK proof). Receives fixed fee. |
+| **Protocol** | Aggregates claims, updates state vector, settles on resolution. | Collects small % fee from settlements for solvency reserve. |
 
-**Who pays whom at settlement:**
-- Correct knower ← fee pool + scoring reward (from wrong knowers' slashed stakes).
-- Wrong knower → slash pool → distributed pro-rata to unknowers who relied on that claim.
-- Net: capital flows from low-information zone to high-information zone when claims are correct; reverses when wrong.
-
-**No human market maker required.** Protocol layer performs: claim aggregation, credibility-weighted state update, matching (route unknower to best expected KL-reduction source), stake lockup, and settlement. (#r1)
+**Who pays whom?**
+- Unknowers pay bounties into an escrow pool.
+- Bounties are distributed to knowers proportional to their contribution to the state update (information-theoretic contribution, measurable as reduction in unknower's uncertainty).
+- Knowers who were wrong forfeit stake; this goes to the solvency reserve and partially to unknowers as compensation for receiving bad information.
 
 ---
 
 ## 5. Settlement Model
 
-**Hard resolution (binary/categorical outcome):**
-- Oracle delivers ω*. All pending claims scored.
-- Correct claims (KL-reducing): knower receives staked k + escrowed fees + share of slash pool.
-- Wrong claims: stake slashed, distributed to unknowers who relied on them.
-- State resets, cycle begins.
+**Surviving view (#r1):**
 
-**Soft/partial resolution (continuous signals or uncertain oracle):**
-- Oracle delivers partial signal ω̃ with confidence c ∈ [0,1] per outcome.
-- Rewards proportional to KL contribution weighted by c:
-  `R(μ_i, ω̃) = k_i * E_{ω* ~ ω̃}[log μ_i(ω*) - log S_prev(ω*)]`
-- Unknowers may re-stake on updated state post-partial-signal. Knowers whose claims were outdated (not wrong, superseded) receive partial credit. (#r1)
+**Full resolution (truth fully observed):**
+At time $T$, oracle posts $\omega^*$.
+- Each knower's claim is scored: $\text{score}_i = \text{ProperScore}(s_i, \omega^*)$.
+- Payout: $\text{stake}_i \cdot (\text{score}_i / \text{max\_score})$ + share of unknower bounty pool proportional to information contribution.
+- Claimants with score below threshold forfeit partial stake to solvency reserve.
 
-**No resolution / oracle failure:**
-- Stakes returned minus protocol fee.
-- Track records unaffected (no signal = no calibration update).
-- Unknower fees partially refunded from escrow.
-- Design note: oracle failure is a known attack vector (see §6); require oracle bonding. (#r1)
+**Partial resolution (only some dimensions of $\omega$ are observed):**
+- Score only the resolved dimensions.
+- Unresolved dimensions: stakes are held in escrow. Options: (a) extend the claim window, (b) settle at current market consensus, (c) allow claims on the unresolved sub-vector to remain open.
+- This is a real complexity; the mechanism must define a partial resolution schedule at market creation time.
+
+**No resolution (oracle fails / dispute):**
+- All stakes returned minus protocol fee.
+- Bounties returned to unknowers.
+- Track records are not updated (to avoid gaming from oracle failure).
+
+**Key design constraint (#r1):** Partial resolution is the hardest case. A credible partial-resolution rule must be published before the market opens, or sophisticated unknowers will discount the mechanism.
 
 ---
 
 ## 6. Attack Surface
 
-**Bluffing / cheap talk:**
-- Risk: stake small, earn fees, walk away even if wrong (fees paid before settlement).
-- Mitigation: all fees held in escrow until settlement. Knower only receives fee if claim proved net-positive KL OR stake+track-record clears threshold. (#r1)
+**Surviving view (#r1):**
 
-**Sybil / wash credibility:**
-- Risk: knower creates many identities, self-claims, builds fake track records on synthetic unknowers.
-- Mitigation: unknowers must pay real capital to consume claims — synthetic unknowing costs real money. Further: require unknowers to stake reliance-bonds (if claim wrong and you relied on it, you lose some stake). Makes fake unknowing expensive. (#r1)
+| Attack | Description | Mitigation |
+|--------|-------------|------------|
+| **Bluffing / cheap talk** | Knower posts false signal hoping to collect bounty before resolution. | Proper scoring + stake forfeiture makes bluffing negative EV if stake is meaningful. |
+| **Sybil claimants** | Attacker creates many low-stake identities to dilute track-record weighting. | Stake-weighted credibility — many small stakes don't add up to high influence. Identity without stake = zero signal weight. |
+| **Wash credibility** | Agent builds track record on easy/low-value markets, then exploits credibility on high-value markets. | Track record should be domain-weighted and capital-weighted. Credit for easy markets decays. |
+| **Collusion (knower cartel)** | Group of knowers coordinate to post the same signal to shift $\hat{\omega}$. | Diversity incentive: reward diminishes for correlated signals (log of marginal contribution). Early / independent signals earn more. |
+| **Oracle gaming** | Validator manipulates $\omega^*$ to profit on staked positions. | Validator has no staked positions (barred at protocol level). Multisig / ZK oracle. |
+| **Cheap unknower queries** | Unknower posts tiny bounty to extract state updates cheaply. | Minimum bounty threshold per market. State updates below threshold don't propagate to global $\hat{\omega}$. |
+| **Front-running (sealed-bid broken)** | If commit-reveal has timing leaks, early reveals advantage late observers. | Cryptographic commit (hash of signal + nonce), reveal only after commit window closes. |
 
-**Collusion (mutual credibility inflation):**
-- Risk: Knower A and B exchange claims to inflate each other's track records.
-- Mitigation: correlation penalty — if two knowers' claims are highly correlated AND both wrong, neither gets scoring credit. Claim similarity graph enables collusion detection. (#r1)
-
-**Capital-flood disinformation (adversarial staking):**
-- Risk: rich adversary stakes wrong claims, accepts capital loss, degrades public state.
-- Mitigation: log-diminishing influence (stake doubling does not double w_i) + public reputation trail makes adversarial history observable and progressively discounts adversary's future claims. (#r1)
-
-**Oracle gaming:**
-- Risk: knower with oracle influence stakes, triggers favorable resolution, collects.
-- This is the hardest attack. Mitigations: (a) oracle bonding > any possible knower stake; (b) multi-source oracle with BFT aggregation; (c) mandatory delay between claim posting and oracle invocation window; (d) cross-oracle consistency requirement. (#r1)
-- **Unresolved:** if the knower IS the oracle source, no mechanism fully prevents this without trusted hardware or reputation over long time horizons. Flag as open research problem. (#r1)
-
-**Thin market / knower starvation:**
-- Risk: no unknower demand → knowers don't stake → empty market. (See §9.)
+**Biggest unresolved attack (#r1):** **Signal laundering** — a knower with a strong private signal fragments it across many claimed "independent" signals, extracting maximum bounty while appearing to provide diverse information. Mitigation requires a correlation detection step in the aggregation layer, which adds complexity.
 
 ---
 
 ## 7. Comparison: LMSR / Orderbooks / Batch Auctions
 
-| Dimension | LMSR | Orderbook PM | Batch Auction (GestAlt) | Knowledge Marketplace |
-|---|---|---|---|---|
-| What is exchanged | Outcome shares | Contracts between opposing bettors | Batched orders cleared at uniform price | Credentialed belief updates |
-| Market maker | Required (subsidized) | None (or AMM) | None (batch clearing) | None (protocol layer) |
-| Capital role | Moves shared price | Backs directional bet | Backs batch order | Credibility bond on specific claim |
-| Information routing | Public, symmetric | Public, adversarial | Public, batch-fair | Bilateral, knower→unknower |
-| Zero-sum? | No (MM subsidizes) | Yes | Yes (net of fees) | No (correct knowers and unknowers both benefit) |
-| Thin market behavior | Always quotes price | No liquidity | No liquidity | No claims, fails |
-| Adversarial | Front-run resistant if DLMSR | Front-running possible | Batch reduces front-run | Capital-flood disinformation possible |
+**Surviving view (#r1):**
 
-**Knowledge marketplace advantages:**
-- No MM subsidy needed — self-sustaining via fee model.
-- Not zero-sum: aligned incentive for everyone to improve epistemic quality.
-- Directly rewards information transfer, not just directional bet accuracy.
-- State vector is a calibrated posterior, not a price signal distorted by liquidity effects. (#r1)
+| Dimension | Knowledge Marketplace | LMSR | Orderbook | Batch Auction |
+|-----------|----------------------|------|-----------|---------------|
+| **What is exchanged** | Credibility-weighted signal | Price impact / share | Limit orders | Cleared orders per batch |
+| **Who earns** | Accurate knowers + early movers | Traders who move price toward truth | Market makers + correct directional traders | Efficient allocators |
+| **Role asymmetry** | Explicit (knower/unknower) | None — all are price movers | Partial (maker/taker) | None |
+| **Manipulation resistance** | Stake + track record | Costly via capital, not structural | Low (spoofing, layering) | High (sealed bids) |
+| **Partial truth** | Hard — must pre-define schedule | N/A — settles on binary outcome | N/A | N/A |
+| **Solvency model** | Reserve from forfeited stakes | AMM reserves (always solvent by design) | Counterparty risk | Clearinghouse |
+| **Epistemics** | Explicit: reward for accurate signal | Implicit: reward for correct directional price move | Implicit: reward for being on right side | Implicit |
+| **Complexity** | High (track records, correlation detection, partial resolution) | Low (closed-form update) | Low (matching engine) | Medium |
 
-**Knowledge marketplace disadvantages:**
-- Requires actual knowers to exist and stake credibly (bootstrap problem, §9).
-- No natural continuous liquidity — discrete claim lifecycle.
-- Unknown behavior under adversarial high-capital environments (open).
-- Complexity vs LMSR simplicity. (#r1)
+**Why better:** LMSR and orderbooks reward being on the right side, but don't distinguish *why* a trader was right. A lucky guesser and a well-informed analyst get the same payoff structure. The knowledge marketplace makes informativeness structurally rewarded through proper scoring + track record compounding.
+
+**Why worse:** Much higher complexity. Requires oracle, proper scoring rule selection, partial resolution rules, correlation detection, track record infrastructure. LMSR works with almost zero infrastructure. The gap in implementation cost is large.
 
 ---
 
-## 8. Simplest Viable Mechanism (MVP)
+## 8. Simplest Viable Mechanism Sketch
 
-**Protocol: EpistemicBond v0**
+**Surviving view (#r1):**
 
-```
-State:
-  S_prev: prior distribution (from last settlement or initialization)
-  claims[]: pending {μ_i, k_i, fees_escrowed_i, unknowers_i[]}
-  registry[]: {agent_id, track_record T_i, historical_stakes}
+**Minimal Knowledge Market (MKM):**
 
-Lifecycle:
-  1. knower.post(μ, stake k) → claim_id, lock k in escrow
-  2. unknower.consume(claim_id, fee f) → receive (μ, w_i), lock f in escrow, record reliance
-  3. [epoch boundary] recompute S_public = Σ w_i * μ_i (credibility-weighted mean)
-  4. oracle.resolve(ω*) → settle_all()
+1. **Market creation:** Define state variable $\omega \in \{0,1\}$ (binary for simplicity), resolution time $T$, oracle address, minimum stake $c_{min}$, bounty pool $B$.
 
-settle_all():
-  For each claim c:
-    score_c = log c.μ(ω*) - log S_prev(ω*)
-    if score_c > 0:
-      c.knower.receive(c.k + c.fees_escrowed + pro_rata_slash_share)
-      update T_c.knower += positive_update(score_c, c.k)
-    else:
-      slash_pool += c.k
-      c.fees_escrowed → refund to unknowers_c pro-rata by reliance
-      update T_c.knower += negative_update(score_c, c.k)
-  distribute slash_pool to correct-claim unknowers pro-rata by reliance
-  S_prev = δ(ω*)
-  reset claims[]
-```
+2. **Claim phase (commit):** Knower submits $H = \text{hash}(s_i || \text{nonce})$ and locks stake $c_i \geq c_{min}$. No signal is visible.
 
-No oracle bonding, no correlation penalties, no conditional claims in MVP. Add those in v1. (#r1)
+3. **Reveal phase:** At $t = T - \Delta$, commit window closes. Knowers reveal $(s_i, \text{nonce})$. Revealed signals are aggregated:
+   $$\hat{\omega} = \frac{\sum_i c_i \cdot s_i}{\sum_i c_i}$$
+   (stake-weighted mean, simplest aggregation).
+
+4. **State update:** $\hat{\omega}$ is published as the market's best estimate.
+
+5. **Resolution:** Oracle posts $\omega^*$. Payout for knower $i$:
+   $$P_i = c_i + (B \cdot \frac{c_i \cdot \text{Brier}(s_i, \omega^*)}{\sum_j c_j \cdot \text{Brier}(s_j, \omega^*)}) - c_i \cdot (1 - \text{Brier}(s_i, \omega^*))$$
+   Where $\text{Brier}(s, \omega^*) = 1 - (s - \omega^*)^2$ (normalized to [0,1]).
+
+6. **Track record:** Update agent's calibration score on-chain.
+
+This is implementable in a single smart contract. Track record oracle is the only off-chain dependency.
 
 ---
 
-## 9. Strongest Failure Mode
+## 9. Strongest Reason This Idea Fails
 
-**The bootstrap / thin-knower problem:**
+**Surviving view (#r1):**
 
-For unknowers to pay, credible knowers must exist with track records. For knowers to stake, paying unknowers must exist. Before track records exist, credibility weights are uninformative (all claims look the same to unknowers). Rational unknowers don't pay. Knowers don't stake. Market fails to launch.
+**The unknower demand problem.**
 
-This is structurally more severe than in LMSR (MM always quotes) or orderbook PM (liquidity from natural believers and skeptics based on pre-existing beliefs).
+For this mechanism to work, unknowers must be willing to pay bounties for state updates they receive in aggregated, privacy-preserving form. But:
 
-The knowledge marketplace requires either:
-- External bootstrapping: seed period where protocol subsidizes knower stakes or guarantees minimum unknower fees. Subsidized period creates artificial track records that carry over to the live market.
-- Credentialing: require knowers to present verifiable expertise credentials (domain credentials, institutional affiliation) that proxy track record before on-chain history exists.
-- Neither solves the underlying problem: what if there genuinely aren't agents with superior information? The mechanism is vacuous without them.
+- If unknowers can observe $\hat{\omega}$ for free (public state), why pay a bounty?
+- If the bounty is required to access $\hat{\omega}$, this creates a paywall on a public good (aggregate belief), which is unusual and may suppress participation.
+- Real unknowers often want the *raw signal* (e.g., "who is the knower, what exactly do they know"), not the aggregated state update. The mechanism explicitly denies this.
 
-**Root issue:** LMSR extracts truth from heterogeneous public beliefs; it doesn't require anyone to "know" things. Knowledge marketplace requires genuine epistemic asymmetry to exist and to be monetizable. This is a stronger assumption. (#r1)
+**The result:** Unknower demand may be too low to fund sufficient knower incentives, especially when the information is partially public or derivable from other sources. The mechanism may work well in information-sparse environments but degrades as public information improves.
 
----
-
-## 10. Best Surviving Variant
-
-**Epistemic Bond Layer on Top of Financial Settlement Layer**
-
-Don't replace the PM settlement mechanism. Instead:
-
-1. **Layer 1 (Financial):** Run standard batch auction / LMSR for price discovery and financial settlement. This is GestAlt's existing direction and solves the liquidity/bootstrap problem.
-
-2. **Layer 2 (Epistemic):** Add an epistemic bond layer. Any participant who wants to publish a state claim with credibility stakes an epistemic bond. Epistemic bonds affect only the *state aggregation for downstream consumers* (oracles, derivative instruments, information buyers) — NOT the primary settlement price.
-
-3. **Consumers of Layer 2** pay subscription fees to access credentialed state updates. Knowers build track records anchored to Layer 1 settlement truth. Layer 1 provides natural ground-truth resolution regardless of Layer 2 activity.
-
-**Why this survives:**
-- Bootstrap problem solved: Layer 1 provides liquidity regardless; Layer 2 only adds value on top.
-- Truth source is clean: Layer 1 settlement resolves Layer 2 claims without oracle entanglement.
-- Revenue model: Layer 2 generates subscription/fee revenue independent of Layer 1 trading volume.
-- GestAlt fit: the batch clearing architecture of GestAlt provides natural epoch boundaries for epistemic bond settlement. (#r1)
-
-**This is the strongest surviving variant:** knowledge marketplace as a credibility and state-aggregation service layer, not as a primary market mechanism. (#r1)
+This is a structural demand-side failure, not just an implementation challenge.
 
 ---
 
-## Open Questions (to resolve in future runs)
+## 10. Best Surviving Variant If the Raw Idea Is Wrong
 
-- [ ] Can the credibility weight function w_i be made Sybil-proof without identity/KYC?
-- [ ] What is the correct log-diminishing function for stake influence to deter capital-flood attacks?
-- [ ] How do conditional claims (μ_i|Y) interact with the aggregation in S_public?
-- [ ] Can epistemic bond layer be priced such that L2 revenue > L2 operational cost at realistic knower population sizes?
-- [ ] Formal proof that truth-telling is a dominant strategy under the proposed scoring rule and bilateral fee structure.
-- [ ] Oracle gaming: is there a mechanism-complete solution, or is this always a trust assumption?
+**Surviving view (#r1):**
+
+**Variant: Credibility-Gated Liquidity Provision (CGLP)**
+
+If the bilateral knower/unknower exchange doesn't work due to demand-side failure, the best surviving variant reframes the mechanism as a *liquidity provision game* rather than an information sale:
+
+- Knowers are **liquidity providers** who post limit orders against a shared state. Their orders are weighted by track record, not just capital.
+- Unknowers are **takers** who pay a spread that is dynamically set by the knower's credibility score.
+- The spread serves as the information rent: a highly credible knower quotes a tight spread (worth paying), a low-credibility knower quotes a wide spread (market disciplines them).
+- Settlement is identical: proper scoring rule, stake forfeiture for wrong claims.
+
+**Why this survives:** It reuses the familiar liquidity provision framework (unknowers already understand "pay the spread for immediacy") while embedding credibility as the determinant of spread width. It avoids the demand-side problem because takers aren't buying "information" — they're buying certainty of execution at a price, which has clear value.
+
+**What it preserves from the core idea:**
+- Knower/unknower role asymmetry
+- Capital as credibility bond
+- Proper scoring + track record compounding
+- Stake forfeiture for inaccuracy
+
+**What it concedes:** It reintroduces a spread/pricing mechanism, which makes it superficially similar to an AMM. The key difference is that spread is endogenously set by verified track record, not by an arbitrary curve parameter.
 
 ---
 
-*Local file — to be synced to Google Doc once gog auth is restored.*
+## Open Questions (tracked across runs)
+
+- [ ] (#r1) Can partial resolution be handled without pre-commitment to a schedule? (Hard problem — likely no.)
+- [ ] (#r1) What is the right proper scoring rule for continuous $\omega$ vs. binary $\omega$?
+- [ ] (#r1) Signal laundering: is correlation detection computationally feasible on-chain?
+- [ ] (#r1) Is CGLP variant meaningfully distinct from Uniswap v4 hooks + reputation layer, or is this just DeFi re-skinning?
+- [ ] (#r1) Unknower demand: what market types (prediction markets, insurance, financial derivatives, AI training data markets) have strong enough demand to fund knower incentives?
+
+---
+_Last updated: #r1 — 2026-04-03 07:52 UTC_
