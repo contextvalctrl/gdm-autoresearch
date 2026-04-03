@@ -2488,4 +2488,128 @@ No parameter is set by direct numeric fiat at steady state. Every computed outpu
 
 4. **1.4× escrow and TOWL headroom for thin T3 classes:** Newly admitted T3 classes have few knowers; thin TOWL headroom. The larger 1.4× implication_bonus_escrow per declaration consumes TOWL faster. Should the TOWL accounting for the bonus escrow component (the excess 0.4×) be treated differently from T3_escrow_standard — e.g., as a separate TOWL-adjacent buffer rather than a per-claim TOWL contribution?
 
-*Last updated: #r145 — 2026-04-03T21:52Z*
+*Last updated: #r146 — 2026-04-03T22:02Z*
+
+---
+
+## #r146 Contributions — 2026-04-03T22:02Z
+
+Addresses all four open questions from #r145.
+
+**Q1 (γ_escrow_multiplier sensitivity to α_min/α_max changes) → Epoch-open snapshot governs; governance range changes are prospective; narrowing is benign, widening requires participation impact assessment (#r146):**
+
+The epoch-open snapshot rule (#r145/Q3) already resolves the core timing question: γ_escrow_multiplier at any epoch is computed from the (α_min, α_max) committed at that epoch's opening boundary. Governance changes to α_min or α_max take effect at the next epoch open — never mid-epoch.
+
+**Narrowing [α_min, α_max] (multiplier decreases):** Future declarations lock less escrow. In-flight declarations retain original 1.4× (or prior multiplier) via static commitment — they over-fund and receive larger excess refunds at settlement. Benign: no capital at risk is reduced, and larger refunds improve knower capital efficiency retrospectively. No special handling.
+
+**Widening [α_min, α_max] (multiplier increases):** Future declarations must lock more escrow per declaration. Thin T3 classes with limited TOWL headroom may see participation drop as the escrow requirement increases. Governance must evaluate participation impact before widening.
+
+**Design law (#r146):** Governance changes to [α_min, α_max] must include a `participation_impact_estimate` field (human-supplied, EAT-committed): the estimated change in declaration count per epoch for affected thin-TOWL classes. This is an accountability signal, not a gate — the governance change is not blocked, but the estimate is public and auditable. Retroactive analysis compares the estimate to observed post-change participation. Consistent with #r132/Q3 governance seed miscalibration recovery: governance bears accountability for parameter estimates that turn out wrong.
+
+**EAT record:** Each governance update to (α_min, α_max) or γ_escrow_multiplier is committed as a `parameter_update` EAT event with `epoch_of_effect`, new values, derived γ_escrow_multiplier, and `participation_impact_estimate`. (#r146)
+
+---
+
+**Q2 (Excess escrow refund tax) → No tax; excess returned in full; tax is a participation discourager with no epistemic benefit (#r146):**
+
+The excess escrow (implication_bonus_escrow_initial − bonus_total) arises mechanically from the static-commitment design law (#r137): declaring α_cap_at_declaration in advance requires pre-funding at the maximum possible bonus level. The excess is not a declarant error — it is the mechanism's fee for providing the static-commitment guarantee to the declarant.
+
+**Why no tax:**
+1. *Epistemic neutrality:* An excess-refund tax creates incentives to time declarations to epochs where α_cap_at_declaration ≈ α_cap_at_settlement — narrowing the predicted gap. This timing optimization has no epistemic value (it does not improve S_cred quality) and adds noise to declaration submission patterns.
+2. *Participation cost:* A tax effectively increases the cost of all declarations (since excess is unpredictable at declaration time), most acutely for long-horizon cross-class declarations where the α_cap evolution gap is largest. This disproportionately discourages exactly the declarations the mechanism values most.
+3. *Symmetry:* The protocol charges a challenge submission fee (#r141/Q1) to discourage low-quality challenges. Charging declarants for over-funding their committed escrow is the opposite incentive — it penalizes good-faith compliance with the pre-funding rule.
+
+**Design law (#r146):** Zero-friction return of excess escrow is a first-class mechanism invariant for all pre-funded reserves. Any reserve funded at a maximum-possible level to cover parameter uncertainty must return excess without tax or deduction. This applies to γ_escrow_multiplier excess at settlement and to any future pre-funding construct. (#r146)
+
+---
+
+**Q3 (ρ_effective publication during TWAP initialization gap — ρ_source EAT tag) → Three-state ρ_source tag; degraded-mode freeze and resume policy formalized (#r146):**
+
+The EAT should distinguish three regimes for ρ_effective publication:
+
+```
+ρ_source ∈ {
+  genesis_floor:    initial T_twap window before first valid TWAP observation
+                    (ρ_effective = ρ_floor; EMA initialized at ρ_floor)
+  TWAP_market:      post-initialization normal operation
+                    (ρ_effective = clip(ρ_smooth, ρ_floor, ρ_ceil))
+  degraded_frozen:  DA outage active; ρ_effective frozen at pre-outage value
+}
+```
+
+**Degraded-mode ρ_effective behavior — new specification (#r146):**
+
+TWAP oracle data requires DA availability to commit observations. During DA outage: ρ_smooth cannot advance (no new TWAP input). ρ_effective freezes at the last value committed to the EAT at T_outage. This is published with `ρ_source: degraded_frozen`.
+
+On DA restore:
+1. ρ_smooth resumes from the pre-outage EMA value — not from ρ_floor (restarting from ρ_floor would discard valid history). The EMA formula uses the pre-outage ρ_smooth as the prior and the first post-restore TWAP observation as the new input.
+2. ρ_source transitions to `TWAP_market` immediately at the first post-restore macro-epoch boundary where a valid TWAP observation is available.
+3. No re-initialization window required: the EMA's decay structure means that pre-outage history naturally attenuates as new observations accumulate. There is no analogue to the N_ρ initialization condition here — the EMA is already initialized from pre-outage state.
+
+**N_calibration/N_ρ dual-condition and outage:** Outage epochs do not advance the N_ρ counter (consistent with the rule that exceptional-mode epochs do not advance initialization counters, #r144/Q3). If a new class was bootstrapping its N_ρ window during an outage, the counter picks up where it paused.
+
+**EAT record per macro-epoch:** Each epoch commits ρ_source alongside ρ_effective. Auditors can reconstruct at any settlement whether the α_cap_at_declaration used a frozen, floor, or market-derived rate — and discount accordingly. (#r146)
+
+---
+
+**Q4 (1.4× escrow and TOWL headroom for thin T3 classes) → γ_escrow_excess is protocol-side contingent buffer; not TOWL-counted; follows #r131/Q2 pool-reserve design law (#r146):**
+
+The implication_bonus_escrow is decomposed into two economic components at declaration time:
+
+```
+implication_bonus_escrow_initial = β_escrow + γ_escrow_excess
+
+β_escrow      = β × A_stake    (base implication bonus escrow, the "nominal" bonus at stake)
+γ_escrow_excess = (γ_escrow_multiplier − 1) × β_escrow = 0.4 × β_escrow  (worst-case pre-funding buffer)
+```
+
+**β_escrow** represents the actual epistemic warranty. It is a meaningful financial commitment backing the claim's accuracy — it contributes to per-claim TOWL capacity (consistent with the role of escrow as financial warranty in the TOWL model).
+
+**γ_escrow_excess** is pure parameter-uncertainty pre-funding. It exists only to cover the case where α_cap_at_declaration > α_cap_at_settlement, producing a bonus total slightly above β_escrow. In expected value (with stable governance parameters), γ_escrow_excess is largely returned. It does NOT represent an additional epistemic warranty — it is a contingent buffer for parameter evolution.
+
+**Resolution — split TOWL treatment:**
+
+```
+TOWL contribution per declaration =
+    β_escrow × w_a  (per-claim TOWL, same as standard T3_escrow_standard)
+
+γ_escrow_excess is held as a protocol-side contingent escrow buffer:
+    - Not TOWL-counted (consistent with #r131/Q2 pool-reserve design law)
+    - Reported in a new `implication_reserve_status.contingent_excess_pool` field
+    - Returned to knower at settlement from the same `implication_bonus_escrow` settlement flow
+    - Not available for LTRP top-up or slash routing during Zone C (#r134/Q4 class-gated rule applies to β_escrow portion only; γ_escrow_excess is not a solvency instrument)
+```
+
+**Practical impact on thin T3 classes:** TOWL headroom consumed per implication declaration = β_escrow × w_a — same as a standard T3 claim at equivalent stake. The 0.4× excess does not reduce TOWL availability. Thin classes can accommodate implication declarations at the same TOWL headroom rate as standard T3 claims. The concern in #r145/Q4 is resolved.
+
+**Design law confirmed and extended (#r146):** Pre-funding buffers for parameter uncertainty are always protocol-side contingent reserves: not TOWL-counted, not solvency-gated, not available for slash routing. Only the nominal epistemic-warranty component of any escrow counts toward TOWL. This closes the #r131/Q2 design law against a new category of escrow. (#r146)
+
+---
+
+## Structural Synthesis: Escrow Taxonomy — Extended (#r146)
+
+With the γ_escrow_excess classification, the escrow taxonomy from #r133 gains a fifth sub-component within the implication_bonus_escrow category:
+
+| Component | TOWL-counted | Returned at settlement | Zone C gated | Notes |
+|---|---|---|---|---|
+| T3_escrow_standard | Yes (per-claim) | At challenge window close | Class-local | In-warranty financial backing |
+| T3_escrow_longtail | No (LTRP) | Via LTRP after T_longtail | Class-local | Long-tail liability pool |
+| β_escrow (bonus nominal) | Yes (per-claim) | If correct: to knower; if wrong: to loser pool | Class-local | Actual epistemic warranty component |
+| γ_escrow_excess (pre-funding buffer) | No (contingent) | Excess returned regardless of outcome | No | Parameter-uncertainty pre-funding; not a solvency instrument |
+| implication_bonus_escrow combined | N/A | Decomposed per above | Per β_escrow portion | β_escrow + γ_escrow_excess |
+
+**Five-component escrow model:** T3_standard, T3_longtail, β_escrow (bonus nominal, TOWL-counted), γ_escrow_excess (pre-funding buffer, not TOWL-counted), implication_reserve (protocol-held pending settlement). The model is now closed — any future escrow category must be classified against this taxonomy. (#r146)
+
+---
+
+## Open Questions for #r147+
+
+1. **ρ_source during bridge epoch:** The bridge epoch fires post-DA-restore. ρ_source would be `TWAP_market` (first valid TWAP is available). But the bridge epoch uses elevated κ_bridge — meaning all S_cred effective weights are suppressed. β_effective is computed from rolling base reward, which is suppressed in bridge epoch (excluded from rolling window per #r132/Q2). Does ρ_effective also use a bridge-epoch-excluded rolling input, or does ρ_smooth advance normally during bridge? Since ρ_smooth uses TWAP observations (not epoch reward data), it advances normally — the two smoothers are independent.
+
+2. **γ_escrow_excess and debt withholding:** Debt withholding (#r134/Q2) applies to primary claim escrow. For implication declarations, the primary escrow is the combined implication_bonus_escrow_initial = β_escrow + γ_escrow_excess. Does debt withholding apply to the combined amount (reducing both components proportionally), or only to β_escrow (the TOWL-counted warranty component)? Given the #r146 decomposition, withholding should apply only to β_escrow — the epistemic commitment. γ_escrow_excess is a pre-funding buffer; reducing it by debt withholding means the protocol may be under-funded at worst-case settlement.
+
+3. **TOWL Zone C and β_escrow portion of implication declarations during Zone C deferral:** During Zone C, the β_escrow portion of implication_bonus_escrow is class-gated (#r134/Q4 extended to β_escrow per #r146). But Zone C throttles new T3 installations, not existing escrow flow. Does Zone C block *releases* of β_escrow (analogous to implication_bonus_escrow deferral), or only new *installations*? The distinction matters: existing declarations mid-life during Zone C should not have their bonus deferral policy changed retroactively.
+
+4. **ρ_effective and the combined α_cap formula at the extremes of T_longtail_ref:** For extremely long T_longtail (e.g., T_longtail_ref = 1000 macro-epochs at ρ_effective = 0.005), α_cap = (0.005 × 1000) / β_effective = 5.0 / β_effective. At β_effective = 2.5 (β_max), α_cap = 2.0 — well above α_max = 0.5. The clamp absorbs this correctly (α_cap = α_max). But the clamp-binding duration would be permanent for very long T_longtail classes — governance would always see the β_effective clamp alert for these classes. Is there a T_longtail_ref governance ceiling to prevent extreme lockup horizons from permanently pinning α_cap at α_max?
+
+*Last updated: #r146 — 2026-04-03T22:02Z*
