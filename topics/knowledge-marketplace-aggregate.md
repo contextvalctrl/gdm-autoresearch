@@ -4215,3 +4215,225 @@ Four-step dispute verification: cold storage CID → blob retrieval → Merkle i
 4. **EAT compaction eligibility re-evaluation after governance parameter changes:** If governance oscillates min_chain_weight_fraction and reactivates previously truncated declarations, a "settled" epoch may re-acquire active obligations. Must compaction eligibility be re-evaluated after any governance parameter change that could reactivate resolved claims?
 
 *Last updated: #r156 — 2026-04-03T23:42Z*
+
+---
+
+## #r157 Contributions — 2026-04-04T00:00Z
+
+Addresses all four open questions from #r156. Adds one net-new structural insight: lazy compaction eligibility as the correct invariant for parameter-oscillation safety.
+
+---
+
+**Q1 (Cold archive CID liveliness — Arweave vs IPFS) → Hybrid tiered availability; IPFS multi-provider for dispute window; Arweave for post-compaction audit permanence (#r157):**
+
+The dispute resolution requirement has a finite duration: once an epoch's challenge windows close and N_compact_grace elapses, the epoch is compaction-eligible. No dispute can reopen a compacted epoch (oracle-resolved + challenges closed = irreversible). Therefore the "mechanism-safety liveliness" requirement for cold-archived records is bounded to the challenge-window period, not permanent.
+
+**Two distinct requirements separated (#r157):**
+
+| Period | Liveliness requirement | Purpose | Required provider |
+|---|---|---|---|
+| Within challenge window | High availability, low-latency retrieval | Dispute resolution in active mechanism | IPFS with multi-provider redundancy |
+| Post-compaction (epoch fully settled) | Permanent content-addressability | Audit, regulatory, historical reference | Arweave (permanent endowment model) |
+
+**Resolution — hybrid cold archive:**
+
+1. **IPFS multi-provider:** At compaction, protocol pins the cold archive blob with ≥3 independent IPFS pinning services. Coverage monitoring: governance alert if fewer than 2 of 3 pinning services confirm availability at next compaction cycle check. No new governance primitive required — pin-service health is an operational metric.
+
+2. **Arweave mirroring:** Within 1 macro-epoch of Ethereum-confirmed `compaction_event`, the cold archive blob is additionally submitted to Arweave. Arweave transaction hash is committed as a `compaction_arweave_mirror` EAT event field alongside the primary cold_storage_cid. Arweave mirroring is mandatory for epochs containing settlement-finality records (CLEARING_MODE classes); optional for pure DISCOVERY_MODE epochs.
+
+3. **EAT anchor update:** `compaction_event` fields:
+   ```
+   cold_storage_cid:         primary CID (IPFS)
+   arweave_tx_id:            Arweave transaction ID (null if optional-class and not submitted)
+   pin_service_count:        number of IPFS pinning services confirmed at compaction time
+   arweave_mandatory:        true for CLEARING_MODE epochs; false for DISCOVERY_MODE
+   ```
+
+**Why not mandate Arweave for all epochs:** Arweave is significantly more expensive than IPFS pinning. DISCOVERY_MODE epochs are lower-stakes (no financial settlement records). Imposing Arweave costs on all epochs would price out low-value coordinate classes. CLEARING_MODE mandates reflect the higher financial stakes.
+
+**Design law (#r157):** Archive liveliness requirements are stratified by the consequence of unavailability, not by mechanism symmetry. Dispute-window availability = multi-provider IPFS. Post-compaction financial settlement records = Arweave permanent. Non-settlement historical records = IPFS with governance monitoring. (#r157)
+
+---
+
+**Q2 (T_wind_down_max and LTRP_seed joint calibration) → Symmetric with outage LTRP mechanics; wind_down_assumption_factor = outage_assumed_slash_factor + mode_discount (#r157):**
+
+The LTRP absorbs outstanding T_longtail tail obligations at T_wind_down_max, analogously to how LTRP absorbs assumed-adversarial escrow at DA outage cap (#r131/Q4). The joint calibration formula mirrors that derivation.
+
+**Outstanding tail exposure at wind-down cap:**
+
+```
+wind_down_tail_exposure(shadow_class, T_wind_down_max) =
+    Σ_{claims_in_WINDING_DOWN} outstanding_escrow(claim_c) × Pr(wrong_at_resolution)
+```
+
+`Pr(wrong_at_resolution)` ≈ 1 − credibility_ratio(a) for claim c by knower a (using most recent calibration_ratio at WINDING_DOWN entry — snapshotted at WINDING_DOWN initiation, not updated during wind-down since no new resolution events can occur).
+
+**Joint calibration formula:**
+
+```
+LTRP_seed_adjustment_wind_down = wind_down_assumption_factor × Σ_claims max_escrow(claim_c)
+wind_down_assumption_factor = outage_assumed_slash_factor × (1 + w_mode)
+w_mode = {
+  0.0  for CLEARING_MODE shadow-class (oracle alignment is stronger predictor)
+  0.2  for DISCOVERY_MODE shadow-class (weaker oracle alignment at wind-down)
+}
+```
+
+This conservatively inflates the outage_assumed_slash_factor for discovery-mode shadow classes whose oracle alignment is less certain.
+
+**Governance UI presentation:**
+
+```
+wind_down_exposure_summary at shadow-class registration:
+  T_wind_down_max          = <epochs>
+  T_longtail_reference     = <epochs>
+  expected_tail_exposure   = wind_down_assumption_factor × total_max_escrow_at_genesis
+  LTRP_seed_minimum        = max(LTRP_seed_general_minimum, expected_tail_exposure)
+```
+
+The summary is disclosed at registration alongside the expected_carry_over_fraction disclosure from #r155/Q4. No new governance primitive — `outage_assumed_slash_factor` is already governance-settable; `w_mode` is derived from class mode.
+
+**Design law (#r157):** LTRP seeding for time-bounded obligation absorption (outage, wind-down, longtail) always uses the same structural formula: `assumption_factor × max_escrow_at_risk`. The assumption_factor is calibrated to the specific obligation's oracle reliability. All seeding disclosures are committed at registration, not post-hoc. (#r157)
+
+---
+
+**Q3 (Cross-coordinate alignment pools for mode_mismatch_discount) → Valid only within same market-structure tier; governance-declared pool at registration; semantic distance governs eligibility (#r157):**
+
+The mode_mismatch_discount captures the gap between discovery-mode calibration quality and clearing-mode settlement precision. This gap is driven by:
+
+1. **Oracle mechanism** (same AAVE oracle): affects alignment in the same direction across all coordinates using that oracle.
+2. **Market structure** (liquidity depth, participant count, bid-ask spread): varies by coordinate even with the same oracle. A liquid high-volume AAVE USDC rate has a different mode-mismatch characteristic than a thin AAVE small-cap token rate.
+3. **Information structure** (how private information distributes): varies by coordinate class type.
+
+**Resolution — pooling valid within governance-declared market-structure tiers:**
+
+```
+alignment_pool_eligibility:
+  Condition A: same oracle_address (shares oracle mechanism)
+  Condition B: same market_structure_tier (governance-declared at class registration)
+
+market_structure_tier ∈ {
+  TIER_1: major fiat/stablecoin rates (USDC, USDT, DAI on major protocols)
+  TIER_2: major crypto asset rates (ETH, BTC, SOL on major protocols)
+  TIER_3: long-tail or low-liquidity rates
+  GOVERNANCE_CUSTOM: any tier declared explicitly by governance
+}
+```
+
+**Pooled alignment_score_smooth:**
+
+```
+alignment_score_pool(oracle_X, tier_T, t) =
+    EMA over all clearing resolutions from {class_i : oracle(class_i) = oracle_X AND tier(class_i) = tier_T}
+    with per-class weight = n_resolutions_i / Σ n_resolutions_j  (resolution-count weighted)
+```
+
+The pool reaches N_align_window faster: if 4 classes in the pool each resolve once, N_align_window=4 is satisfied.
+
+**Cross-tier pooling is prohibited:** TIER_1 and TIER_3 have structurally different mode-mismatch characteristics. Mixing samples across tiers produces a meaningless average that neither class can use reliably.
+
+**Single-class override:** A class may opt out of pool alignment and use its own data exclusively. Opt-out is governance-declared at registration. Pool membership is the default for eligible classes.
+
+**Disclosure at registration:** `alignment_pool_id: oracle_X_TIER_T` or `alignment_pool_id: null (standalone)`.
+
+**Design law (#r157):** Alignment sample pooling is epistemically valid only within oracle-type AND market-structure-tier boundaries. Pooling across semantically heterogeneous coordinates produces attenuation estimates that are wrong for every member class. Governance-declared tiers are the minimum-discrimination boundary. (#r157)
+
+---
+
+**Q4 (EAT compaction eligibility re-evaluation after governance parameter changes) → Lazy eligibility; invalidation events; no permanent eligibility cache (#r157):**
+
+The attack: governance oscillates `min_chain_weight_fraction` → declarations truncated → epoch appears "all-escrows-released" → epoch incorrectly enters compaction eligibility → governance restores parameter → declarations reactivate → epoch has active obligations but was compaction-eligible.
+
+**The root error:** Compaction eligibility was implicitly treated as a stable state, cached at the epoch level. It should be a **lazy predicate**, evaluated at compaction execution time.
+
+**Resolution — lazy compaction eligibility:**
+
+```
+is_compaction_eligible(epoch_E, eval_time T):
+  1. oracle_resolved_all(E) = true                   [permanent once fired]
+  2. all_challenge_windows_closed(E, T) = true       [epoch-indexed; check at T]
+  3. all_escrows_released(E, T) = true               [requires live state at T]
+  4. N_compact_grace passed since max(oracle_resolved_epoch, last_governance_param_change_epoch)
+```
+
+Condition 4 is the key addition. N_compact_grace resets to zero at any governance parameter change that could affect active claim status (min_chain_weight_fraction, staleness_window_i, κ_i, or any parameter appearing in effective_weight or truncation logic).
+
+**`compaction_eligibility_invalidation` EAT event:**
+
+```
+On any governance parameter update to { min_chain_weight_fraction, staleness_window, κ }:
+  emit compaction_eligibility_invalidation {
+    epoch: current_epoch,
+    affected_classes: [class_ids with active declarations],
+    parameter_changed: <param_name>,
+    N_compact_grace_reset: true
+  }
+```
+
+All epochs that had accumulated N_compact_grace progress and are in `affected_classes` must restart their N_compact_grace countdown. The governance parameter change is thus free to execute but carries the deferred cost of extending compaction eligibility on all affected epoch classes.
+
+**Attack vector analysis:**
+
+1. *Oscillation attack:* Adversarial governance oscillates parameters to prevent any epoch from ever reaching compaction, growing EAT without bound. Defence: `compaction_eligibility_invalidation` events are public. Persistent oscillation is visible in the EAT. Governance must pass explicit `invalidation_impact_disclosure` with each parameter change (number of grace-countdown-reset epochs). Unusual patterns alert monitoring.
+
+2. *Compaction after claim reactivation:* An epoch compacted under prior-eligibility that is later invalidated: compaction is irreversible once executed (Arweave-anchored). If compaction fires before an invalidation event, the epoch is settled and the obligation is now an LTRP claim. This is the correct safety valve: LTRP was designed to absorb unanticipated tail obligations (#r131/Q4 design law).
+
+**Design law (#r157):** Compaction eligibility is a lazy predicate evaluated at execution time, never a cached state. Governance parameter changes emit invalidation events that reset N_compact_grace for affected epochs. Permanent eligibility caches are prohibited for any state that depends on live governance parameters. (#r157)
+
+---
+
+## Net-New Structural Insight: Lazy Evaluation as the Correct Invariant for Parameter-Oscillation Safety (#r157)
+
+The compaction-eligibility problem is a specific instance of a broader pattern: any precondition that depends on a parameter subject to governance change must be evaluated lazily, not cached.
+
+**Other mechanism preconditions that must be lazy (audit of prior design):**
+
+| Precondition | Depends on | Lazy already? | Action required |
+|---|---|---|---|
+| TOWL zone classification | TOWL capacity (= Σ escrows × w_a); w_a depends on credibility_ratio updates | Yes — computed per epoch | ✓ |
+| T3 admission eligibility | min_chain_weight_fraction | Yes — checked at admission epoch | ✓ |
+| challenge_window_closed | epoch-indexed; closes naturally | Yes — epoch-indexed is lazy by construction | ✓ |
+| compaction_eligibility | all_escrows_released; governance parameters | **No** (was implicitly cached) | Fixed by #r157 |
+| α_cap_at_declaration | ρ_effective, β_effective (published at epoch-open) | Yes — epoch-open snapshot | ✓ |
+| mode_mismatch_discount threshold | n_clearing_resolutions count | Yes — live count at each use | ✓ |
+
+**The #r157 correction is targeted and complete.** Compaction eligibility is the only cached precondition identified across the full mechanism design. The `N_compact_grace_reset_on_param_change` rule is the specific fix. No other precondition requires a similar patch.
+
+**General design law (#r157):** Any mechanism precondition whose truth-value can be altered by governance parameter changes must be evaluated lazily at execution time. The only preconditions safe to cache are those whose truth is guaranteed monotone (once true, never false): oracle_resolved, T_finality_reached. Non-monotone preconditions must be lazy. (#r157)
+
+---
+
+## Structural Synthesis: Production Architecture — Final Close (#r157)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Cold archive liveliness | Dispute-window IPFS multi-provider; post-compaction Arweave mandatory for CLEARING_MODE | Stratified by consequence of unavailability |
+| LTRP/T_wind_down_max calibration | outage_assumed_slash_factor × (1 + w_mode); disclosed at registration | Same structural formula for all time-bounded obligation absorptions |
+| Cross-coordinate alignment pooling | Valid within oracle + market-structure-tier boundary; governance-declared tier; resolution-count weighted | Pool within semantic-similarity boundary; tier-crossing prohibited |
+| Compaction eligibility oscillation | Lazy predicate; N_compact_grace resets on parameter changes; invalidation EAT event | Non-monotone preconditions are always lazy |
+
+---
+
+## Cumulative Invariants (additions through #r157)
+
+**Invariant #24 (#r157):** Archive liveliness requirements are stratified by the consequence of unavailability. Financial settlement records require Arweave permanence. Dispute-window records require multi-provider IPFS. Non-settlement historical records require governance-monitored IPFS.
+
+**Invariant #25 (#r157):** Alignment sample pooling is valid only within oracle-type AND market-structure-tier boundaries. Cross-tier pooling is epistemically invalid.
+
+**Invariant #26 (#r157):** Non-monotone preconditions must be lazily evaluated at execution time. Caching non-monotone preconditions that depend on governance parameters is prohibited.
+
+**Invariant #27 (#r157):** Governance parameter changes emit `compaction_eligibility_invalidation` events that reset N_compact_grace for all affected epochs. Parameter-change cost includes deferred compaction delay.
+
+---
+
+## Open Questions for #r158+
+
+1. **Arweave mandatory trigger for CLEARING_MODE — what if Arweave is unavailable at compaction time?** The Arweave mandate for CLEARING_MODE epochs requires Arweave transaction confirmation within 1 macro-epoch. If Arweave is congested or unavailable, compaction proceeds without Arweave mirroring — delaying the `arweave_tx_id` field. Is there a fallback SLA (retry for N_arweave_retry_epochs before flagging as `arweave_mirror_failed`) and a defined mechanism action if `arweave_mirror_failed` persists?
+
+2. **market_structure_tier assignment governance:** Governance declares tier at class registration. What prevents a registrant from declaring TIER_1 for a thin, low-liquidity coordinate to benefit from the richer alignment pool? Is there an objective criterion for tier assignment (e.g., 30-day average position volume on the linked clearing class), or is tier assignment purely subjective governance discretion?
+
+3. **invalidation_impact_disclosure as a governance gate or advisory:** #r157 defines `invalidation_impact_disclosure` as a mandatory field in parameter-change proposals. Should this be a hard gate (proposal reverts if disclosure is absent) or advisory (disclosure is committed to EAT but proposal is not blocked)? If advisory, the disclosure is an accountability tool; if a hard gate, it could block legitimate emergency parameter adjustments (e.g., emergency min_chain_weight_fraction correction during a solvency event).
+
+4. **LTRP single vs per-class instance for shadow-class wind-down:** Shadow-class LTRP obligation at T_wind_down_max routes to which LTRP? The shadow-class has its own LTRP (registered at shadow-class genesis). At ARCHIVED transition, outstanding obligations transfer to the shadow-class LTRP. But if the shadow-class LTRP is under-funded (thin class), obligations could exceed it. Should the clearing-class LTRP serve as a backstop for shadow-class wind-down obligations, given they share a coordinate?
+
+*Last updated: #r157 — 2026-04-04T00:00Z*
