@@ -3062,3 +3062,149 @@ The pure DISCOVERY_MODE form (where WED routing depends on EQ demand-signal reve
 4. **Implication chains in clearing mode:** CLEARING_MODE_PROFILE sets implication_bonus_default = 0. But some clearing scenarios have structural implication relationships — e.g., a bond default event (A) implies collateral haircut events (B_1, B_2). Should implication chains be opt-in per coordinate class in clearing mode rather than disabled by default?
 
 *Last updated: #r149 — 2026-04-03T22:32Z*
+
+
+---
+
+## #r150 Contributions — 2026-04-03T22:42Z
+
+Addresses all four open questions from #r149. Adds one net-new structural insight on settlement-price credibility tension.
+
+---
+
+**Q1 (EQ q_bonus minimum ratio calibration) → Information-rent floor formula; ratio ≥ (1 − σ_resolve) / σ_resolve (#r150):**
+
+The q_bonus/q_fee ratio reveals quality-sensitivity (D(c) proxy). The calibration question: what minimum ratio ensures the signal is informative rather than noise?
+
+**Derivation from first principles:**
+
+An unknower with true D(c) faces two options:
+- Set `q_bonus = 0`: pays q_fee unconditionally; receives any-quality answer.
+- Set `q_bonus > 0`: pays q_fee + expected q_bonus; receives accuracy-conditioned reward.
+
+Let σ_resolve = probability that active S_cred state is within quality threshold at resolution (the protocol's track record for the class). The revealing condition at break-even:
+
+```
+min_ratio = q_bonus_min / q_fee_min = (1 − σ_resolve) / σ_resolve
+```
+
+At σ_resolve = 0.75: min_ratio ≈ 0.33.
+At σ_resolve = 0.50: min_ratio = 1.0 (uncertainty demands high D(c) signal).
+At σ_resolve = 0.90: min_ratio ≈ 0.11 (accurate track record → small bonus is informative).
+
+**Governance interface:** min_q_bonus_ratio is per-coordinate-class, derived from σ_resolve — the rolling accuracy rate over the most recent N_calibration normal-mode resolved epochs per class. Same window as β_effective. No new governance primitive required.
+
+**Design law (#r150):** EQ minimum ratio derives from the protocol's own demonstrated accuracy (σ_resolve), not set by governance fiat. A class with poor track record automatically demands higher quality-sensitivity signal — a self-correcting feedback. (#r150)
+
+---
+
+**Q2 (Mode transition — DISCOVERY to CLEARING calibration continuity) → Mode-weighted rolling average; no reset; N_calibration window mode-tagged (#r150):**
+
+At transition epoch T_transition, the rolling N_calibration window contains DISCOVERY-mode epochs. A hard reset discards valid history; carry-forward unchanged misapplies DISCOVERY calibration to CLEARING incentives.
+
+**Resolution — mode-weighted rolling average:**
+
+```
+mode_weight(epoch_e) = {
+  1.0  if epoch_e.mode == current_mode
+  w_transition = 0.5  if epoch_e.mode != current_mode
+  (governance-settable, bounded [0.2, 0.8])
+}
+
+β_effective_rolling_avg = Σ (base_reward_e × mode_weight_e) / Σ mode_weight_e
+```
+
+Post-transition: DISCOVERY-tagged epochs are weighted 0.5; new CLEARING-tagged epochs weighted 1.0. β_effective converges over N_calibration epochs without discontinuity.
+
+**EAT record:** Each macro-epoch boundary commit includes `epoch_mode: DISCOVERY | CLEARING`. No new EAT event type required. σ_resolve (for EQ min_ratio) uses the same mode-weighted window. (#r150)
+
+---
+
+**Q3 (WED_clearing observability lag — smoothed WED signal) → EMA smoothing; anchored to governance reference (#r150):**
+
+WED_clearing = Σ_positions_on_c |max_loss_if_wrong| changes each epoch as positions register or close. Raw per-epoch signal creates volatile base reward incentives incompatible with multi-epoch knower planning.
+
+**Resolution — WED_clearing_smooth via EMA:**
+
+```
+WED_clearing_smooth(c, t) = (1 − λ_WED) × WED_clearing_smooth(c, t-1) + λ_WED × WED_clearing(c, t)
+λ_WED = 2 / (N_WED + 1)   default N_WED = 6 macro-epochs
+
+base_reward_clearing(c) = base_reward_floor(c) × (WED_clearing_smooth(c) / WED_clearing_ref(c))
+```
+
+`WED_clearing_ref(c)` = governance-declared reference WED at class registration (expected normal position exposure). Auto-alert if WED_clearing_smooth deviates > 5× from WED_clearing_ref for ≥ M_stable consecutive normal epochs.
+
+**Design law (#r150):** Any volatile on-chain signal used as a knower incentive input must be EMA-smoothed before reward formula exposure. Smooth first, incentivize from the smooth signal. (#r150)
+
+---
+
+**Q4 (Implication chains in clearing mode) → Opt-in at class registration; enabled only for declared structural dependency pairs (#r150):**
+
+CLEARING_MODE_PROFILE sets implication_bonus_default = 0 because most clearing coordinates are independent. But contractually linked position types (e.g., bond default A → collateral haircut B_1, B_2) have genuine structural dependency.
+
+**Resolution — structural dependency flag at class registration:**
+
+`class_registration.implication_chains_enabled = { disabled (default) | opt_in }`. Opt-in requires at least one registered position type to declare an explicit structural dependency on another class. Opt-in enables implication chains for declared pairs only — not for all coordinate combinations.
+
+Governance `participation_impact_estimate` field required at opt-in (per #r146/Q1 — 1.4× escrow and TOWL impact must be disclosed).
+
+**WED_clearing interaction for chain pairs:**
+```
+WED_clearing_chain(A→B) = min(WED_clearing(A), WED_clearing(B))
+```
+Chain's WED relevance is the minimum of the two coordinates — discourages deep chains on thin-book clearing coordinates. (#r150)
+
+---
+
+### Net-New Structural Insight: Settlement-Price Credibility vs Belief-Aggregate Tension (#r150)
+
+**The tension:** The knowledge marketplace produces S(c) as a credibility-weighted belief aggregate (optimises for calibration over many resolutions). GestAlt v2.1 needs a settlement price — a single, final, legally authoritative value (optimises for legitimacy and non-contestability in a single instance). These are different objects.
+
+A 75%-accurate S(c) generates settlement disputes 25% of the time, and those disputes correlate with high-stakes positions — exactly when wrong settlement prices cause the most WED damage.
+
+**Resolution — Settlement Freeze Protocol:**
+
+```
+Settlement flow:
+1. T_anchor:          Oracle fires; S(c) frozen for this event.
+2. T_challenge_window: Challenge window opens (existing challenge mechanic).
+3. T_settlement:      No challenge → settlement_price = S(c)_at_T_anchor.
+                      Challenge succeeds → oracle authoritative override (no slash to original knower).
+                      Challenge fails → S(c)_at_T_anchor confirmed (challenger loses fee).
+4. T_finality:        settlement_price committed to position registry; positions marked.
+```
+
+**Critical distinction:** A successful oracle override does NOT slash the original knower. The oracle is the final authority; knowers are provisional attestors. A successful override is an authority event, not a quality failure. This requires a new EAT event type (`oracle_settlement_override`, distinct from `challenge_success_slash`) — left as an open question for #r151.
+
+**New attack surface:** Counterparties with financial interest in alternative settlement prices are incentivised to challenge even correct S(c) values. The challenge fee is worth paying if the settlement difference is large.
+
+**Defence — pre-T_anchor position registration required for challenge eligibility:** Challenge eligibility is tied to position registered before T_anchor. A counterparty cannot register a position post-T_anchor specifically to gain challenge access. (#r150)
+
+---
+
+## Structural Synthesis: Settlement Freeze Protocol + Clearing-Mode Closure (#r150)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| EQ min_ratio calibration | (1 − σ_resolve) / σ_resolve; derived from class track record | EQ ratio from demonstrated accuracy; no governance fiat |
+| Mode transition calibration | Mode-weighted rolling average; w_transition = 0.5; no reset | Continuity over transitions; mode-tagged epoch history |
+| WED_clearing volatility | EMA-smoothed WED_clearing_smooth; anchored to governance reference | Smooth volatile inputs before reward formula exposure |
+| Implication chains in clearing mode | Opt-in; enabled for declared structural dependency pairs only | Position-type justified, not mechanism-wide default |
+| Settlement-price vs belief-aggregate tension | Settlement Freeze Protocol: S(c) = candidate price; challenge window = legitimacy gate | Knowledge marketplace = price discovery layer; oracle = final authority |
+
+**New attack surface formalised (#r150):** Settlement-mode challenge by counterparties with financial interest in alternative settlement prices. Defence: challenge eligibility requires pre-T_anchor registered position.
+
+---
+
+## Open Questions for #r151+
+
+1. **Settlement Freeze Protocol and TOWL Zone C interaction:** Zone C is not degraded mode — challenge windows advance during Zone C (#r138/Q3). Does the T_challenge_window in the Settlement Freeze Protocol also advance during Zone C, or should settlement-critical challenge windows get an explicit Zone C deferral option given the financial finality stakes?
+
+2. **`oracle_settlement_override` EAT event type:** New event distinct from `challenge_success_slash`. Specify full EAT record and settlement routing: what flows to whom when the oracle overrides S(c) without slashing the original knower? Where do challenge fees route — to the overriding oracle, to the challenger, or returned?
+
+3. **Challenge eligibility pre-T_anchor position requirement — grace period:** If T_anchor fires unexpectedly (e.g., early oracle resolution), some legitimate counterparties may not have registered positions yet despite genuine exposure. Should there be a brief grace period (e.g., 1 micro-epoch post-T_anchor) during which position registration still qualifies for challenge eligibility?
+
+4. **EQ q_bonus settlement vs Settlement Freeze Protocol:** In a CLEARING_MODE class with EQ enabled, should q_bonus distribution wait until settlement_price is final (T_finality) or settle at oracle resolution (T_anchor)? If q_bonus settles at T_anchor but settlement_price is subsequently overridden, the EQ bonus was distributed against a candidate price that did not become final — a consistency gap.
+
+*Last updated: #r150 — 2026-04-03T22:42Z*
