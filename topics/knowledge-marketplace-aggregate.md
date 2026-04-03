@@ -11,6 +11,7 @@
 - **#r74** — 2026-04-03T08:52Z — Per-class staleness decay shape κ; two-tier SEE appeals (oracle Tier A + sortition Tier B); β range [1.3, 2.0]; SEE pre-staging defense via claim consistency + query fee clawback; Epistemic Audit Trail (EAT) named as fourth integrity property.
 - **#r75** — 2026-04-03T09:52Z — EAT DA stack (Celestia + Ethereum anchor); DA liveness as fifth precondition integrity property; degraded mode specification; pre_shock_window principled formula; continuous SEE taper; trustless correlation filter computation; anti-fragmentation gap in β/γ fixed; closed-form β/γ joint calibration with governance redesign.
 - **#r132** — 2026-04-03T19:12Z — Multi-class LTRP attribution (per-class independent, no spillover); bridge/degraded epoch exclusion from calibration rolling windows; LTRP over-seed proactive recall (conditional 3× safety × 4-epoch gate); non-additive combined-lockup ceiling for simultaneous provisional+outage tolling; bounded-liability architecture closed.
+- **#r133** — 2026-04-03T19:52Z — `implication_bonus_escrow` as fourth first-class escrow category (protocol reserve, not TOWL-counted, bilateral lockup ceiling); Zone C epochs included in calibration (not excluded, flagged only); M_stable majority-window tolerance (1-of-5, non-consecutive); A-side conditional partial release for cross-class implication declarations with clawback obligation; escrow taxonomy complete.
 
 ---
 
@@ -980,3 +981,106 @@ The mechanism's job is to minimize WED. Capital should route toward high-D, high
 10. **Best surviving variant:** Use WED as internal optimization target for mechanism designers. Allow buyers to signal D(c) × A(c) implicitly through escrow size and bid price. (ref: #r69; completes conserved-quantity thread from #r1)
 
 *#r69 added retroactively — 2026-04-03T19:09Z*
+
+---
+
+## #r133 Contributions — 2026-04-03T19:52Z
+
+Addresses all four open questions from #r132.
+
+**Q1 (Implication bonus escrow across different T_longtail classes) → `implication_bonus_escrow` as first-class escrow category, not TOWL-counted (#r133):**
+
+The implication bonus β is conditional on both A and B resolving correctly. When A and B belong to classes with different T_longtail horizons, the bonus must remain locked until the slower class's oracle resolves — a lockup horizon that belongs to neither class individually and is not a per-coordinate warranty obligation.
+
+**Resolution — `implication_bonus_escrow` is a distinct fourth escrow category:**
+
+| Escrow type | Belongs to | TOWL-counted | Backstop | Lockup ceiling |
+|---|---|---|---|---|
+| T3_escrow_standard | per-claim, fast classes | Yes (per-claim) | Per-claim TOWL | challenge_window_class |
+| T3_escrow_longtail | per-claim, slow classes | No (LTRP buffer) | LTRP per class | T_longtail_class |
+| implication_bonus_escrow | bilateral (A+B pair) | No (protocol reserve) | See below | max(T_longtail_A, T_longtail_B) |
+
+`implication_bonus_escrow` is protocol-held, not per-claim. It does not count toward either class's TOWL capacity (consistent with #r131/Q2 pool-reserve design law). It is reported in a new `implication_reserve_status` output field, separate from LTRP_status and TOWL.
+
+**Release conditions:**
+- Both A and B resolve correctly: release full bonus to knower.
+- Either resolves wrong: slash implication_bonus_escrow to the failing coordinate's loser pool (proportional split if both fail).
+- Slower class T_longtail expires before oracle resolution: release 0.5× to knower if A confirmed correct, 0 if A unresolved; remainder to slower-class challenger pool.
+
+**Bootstrapping:** New classes in Phase 1 (bootstrap epoch) may not participate in cross-class implication declarations. Both participating classes must have at least one completed normal-mode macro-epoch. (#r133)
+
+---
+
+**Q2 (Zone C epochs in calibration rolling windows) → Zone C NOT excluded; flagged in β_effective publication (#r133):**
+
+Zone C is a TOWL solvency stress signal. It does not alter κ or effective_weight from mechanism design — unlike degraded/bridge epochs which artificially suppress weights. The base slot reward shift in Zone C is real market signal (high-escrow-only participation, compressed liquidity) and should propagate into β_effective calibration. Excluding it would produce a stress-blind calibration gap.
+
+**Resolution:** Zone C epochs are NOT excluded from the N_calibration rolling window.
+
+β_effective publication includes `zone_c_epochs_in_window: N`. If N ≥ M_stable (4), governance alert fires (independent of clamp-binding alert). Zone C and DA-anomaly flags are orthogonal: an epoch can simultaneously be Zone C (included in calibration) and a bridge epoch (excluded for DA-restore reason). Each flag is assessed independently. (#r133)
+
+---
+
+**Q3 (M_stable continuity gap) → Moving 5-epoch window with 1 non-consecutive below-threshold tolerance (#r133):**
+
+Strict consecutive reset is too brittle for large pools where a single LTRP payout causes a transient one-epoch dip. Such dips are mechanism events, not structural underfunding signals.
+
+**Resolution — majority-window M_stable:**
+
+```
+M_stable satisfied iff:
+  in the last 5 normal-mode macro-epochs,
+  LTRP_balance > LTRP_seed × S_safety in ≥4 of those 5 epochs
+  AND the current epoch is above threshold
+```
+
+Tolerance: 1 below-threshold epoch per 5-epoch window. Two below-threshold epochs in any 5-epoch window (consecutive or not) resets qualification entirely — prevents adversarial dip-recover-dip patterns.
+
+**Design law (#r133):** Stability gates for irreversible actions must use rolling-window majority tolerance, not strict consecutiveness. Tolerance / window_size default = 0.2 (1 of 5). (#r133)
+
+---
+
+**Q4 (Partial release of A-side for resolved correct claim in cross-class implication) → Conditional partial release with clawback obligation (#r133):**
+
+When A resolves correct and B remains pending for months, locking the full implication_bonus_escrow is a capital-efficiency failure proportional to T_longtail mismatch.
+
+**Resolution — A-side conditional partial release:**
+
+```
+partial_release_A = (A_stake / (A_stake + B_stake)) × β_bonus_escrow_total
+```
+
+Released when oracle confirms A correct; B-side remainder stays locked.
+
+**Clawback obligation:** If B resolves wrong, partial_release_A must be clawed back. Priority: (1) knower's active standard escrow; (2) knower's active longtail escrow; (3) governance-tracked knower debt record (caps credibility_ratio growth until cleared). Clawback exposure is disclosed at declaration time. Mechanism does not absorb implication-bonus clawback losses.
+
+**Opt-out:** Partial release is knower-selectable at declaration. Default: enabled (capital-efficient). Knowers preferring no clawback risk hold full bonus until both coordinates resolve. (#r133)
+
+---
+
+## Structural Synthesis: Escrow Taxonomy — Complete (#r133)
+
+Four formally distinct escrow categories now fully specified:
+
+| Category | TOWL-counted | Backstop | Max ceiling | Partial release |
+|---|---|---|---|---|
+| T3_escrow_standard | Yes (per-claim) | Per-claim TOWL | challenge_window | No |
+| T3_escrow_longtail | No | LTRP (per-class) | T_longtail | No (via pool) |
+| Outage-assumed (LTRP) | No | LTRP | T_outage_cap | N/A |
+| implication_bonus_escrow | No | implication_reserve | max(T_longtail_A, T_longtail_B) | Yes (A-side) |
+
+**Design invariant (#r133):** Every escrow category must have a formally specified lockup ceiling, named backstop, and defined TOWL treatment before it is design-complete. (#r133)
+
+---
+
+## Open Questions for #r134+
+
+1. **implication_bonus_escrow during degraded mode:** Should partial releases, clawbacks, and expiry distributions on implication_bonus_escrow be suspended during DA outage (consistent with other EAT-dependent operations), or does it operate independently since it is a protocol reserve rather than a per-claim TOWL obligation?
+
+2. **Clawback debt and credibility_ratio growth cap:** What is the cap formula for knower debt records — hard ceiling on credibility_ratio value, growth rate cap, or temporary freeze? And is debt cleared by escrow repayment only, or can it be retired by subsequent sustained correct claims demonstrating the knower is not a systemic bad actor?
+
+3. **M_stable tolerance parameter governance bounds:** What prevents governance from setting tolerance = 4 of 5 (near-unconditional seed recall)? Should the protocol enforce a hard constraint: tolerance / window_size ≤ 0.3 (majority of window must be above threshold for recall eligibility)?
+
+4. **Zone C + implication bonus partial release interaction:** During Zone C, T3 installations may be throttled. Should partial release from implication_bonus_escrow be blocked during Zone C on solvency grounds, or is Zone C's scope limited to TOWL/LTRP operations and implication_bonus_escrow operates independently?
+
+*Last updated: #r133 — 2026-04-03T19:52Z*
