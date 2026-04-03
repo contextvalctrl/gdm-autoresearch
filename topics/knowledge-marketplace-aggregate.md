@@ -1638,4 +1638,139 @@ There is no accounting identity that links these two flows. Zone C reducing α_l
 
 4. **Catalog completeness check — deadline-adjacent timers:** The catalog covers named deadlines. Some mechanism features use duration-from-event timers that are not named as "deadlines" but function identically: e.g., the β_effective clamp alert (clamp binding for ≥2 consecutive macro-epochs, #r129/Q4). Are these epoch-indexed or wall-clock-indexed? If they are missed from the catalog, the design law from #r137 is not fully applied.
 
-*Last updated: #r138 — 2026-04-03T20:42Z*
+*Last updated: #r139 — 2026-04-03T20:52Z*
+
+---
+
+## #r139 Contributions — 2026-04-03T20:52Z
+
+Addresses all four open questions from #r138.
+
+**Q1 (Z's γ_corr discount with two co-activators) → Position-count interpretation; co-activators each consume a sequence position (#r139):**
+
+When X and Y are co-activators (`co_activation: true`), each is at position 1 in the ordering sequence for the pair. The γ_corr formula operates on position index in the activation sequence, not on "number of prior unique first declarers."
+
+**Resolution — position-count interpretation:**
+
+```
+bonus(declarer at position p, same lineage) = β × (1 - γ_corr)^(p - 1)
+bonus(declarer at position p, cross-lineage) = β × (1 - γ_corr_cross)^(p - 1)
+```
+
+Co-activators X and Y are both at position 1 → exponent = 0 → both earn full β (no discount, consistent with #r138/Q1).
+
+Z is the next declarer. The position counter advances from 1 to the next available position after all co-activators. With two co-activators at position 1, the next position is 3 (not 2):
+
+```
+Z's position p(Z) = 1 + count_of_prior_declarers_of_same_lineage_class
+```
+
+For Z (same lineage as X and Y): p(Z) = 1 + 2 = 3 → exponent = 2 → Z earns `β × (1 - γ_corr)^2`.
+
+**Rationale:** Co-activators X and Y each delivered independent epistemic contributions at activation — even though neither was discounted relative to the other, both occupy positions in the sequence that a subsequent declarer must follow. From Z's perspective, X and Y are both prior contributors of the same information, regardless of their mutual tie. The information Z adds is discounted against the combined prior baseline.
+
+**Cross-lineage Z:** If Z is cross-lineage to both X and Y, Z uses γ_corr_cross. Position counting is per-lineage-class:
+
+```
+p_cross(Z) = 1 + count_of_prior_cross_lineage_declarers
+```
+
+X and Y are same-lineage to each other but cross-lineage to Z. If X and Y are both in lineage class L1 and Z is in lineage class L2, then Z's cross-lineage position = 1 (first L2 declarer). Z earns `β × (1 - γ_corr_cross)^0 = β × 1.0` — near-full bonus, consistent with the independence premium.
+
+**EAT record:** Settlement contract computes position at bonus-computation time by counting EAT-committed declarers of each lineage class with earlier or equal (co_activation) activation epoch. (#r139)
+
+---
+
+**Q2 (Effective depth reactivation after threshold decrease) → Original activation EAT timestamp preserved; corroboration position resumes at pre-truncation rank; fees strictly forward-looking (#r139):**
+
+When min_chain_weight_fraction is lowered in epoch T_low, a contributor previously truncated at depth D in epoch T_trunc may re-cross the contribution floor and become eligible to contribute to S_cred again.
+
+**Resolution:**
+
+1. **EAT timestamp:** The original activation EAT timestamp (from the contributor's initial declaration) is preserved. It was never deleted — EAT is immutable (#r74). Reactivation does not create a new declaration record; S_cred contribution weight is dynamically re-derived from the existing declaration record using the new threshold (consistent with #r137/Q2 static escrow / dynamic S_cred rule). The declaration simply moves from contributing weight 0 back to contributing its chain-depth-discounted weight.
+
+2. **Corroboration position:** The contributor retains their original activation sequence position. If they were the sole depth-D declarer before truncation, and no other contributor activated at depth D during the truncation gap: they re-enter as sole contributor at their original position. If new contributors activated at depth D during the gap (because min_chain_weight_fraction was low enough for them but not the original contributor — possible if debt withholding caused the original truncation, not a threshold increase): the original contributor resumes at their original sequence position, and the gap-period contributors hold positions they earned during the gap. No re-ordering occurs at reactivation; each contributor retains the position assigned at their respective activation epoch.
+
+3. **Query fees:** Strictly forward-looking from reactivation epoch (epoch T_low) onward — consistent with #r138/Q2. Zero fees earned retroactively for the truncation gap. Historical fees during active period are final and not touched.
+
+4. **Escrow:** Unchanged throughout (static, #r137/Q2). Truncation and reactivation are purely epistemic events.
+
+**Adversarial case — threshold cycling:** Governance could theoretically oscillate min_chain_weight_fraction to selectively truncate and reactivate specific contributors. Defense: threshold changes are EAT-committed governance events with rollback records (#r136/Q4). Repeated oscillations are publicly auditable. The mechanism does not add defense beyond auditability — this is a governance accountability issue, not a mechanism parameter one. (#r139)
+
+---
+
+**Q3 (Challenge window advancing during Zone C — asymmetric exposure) → Windows advance normally; Zone C slash routing: LTRP buffer first (#r139):**
+
+Zone C is a TOWL solvency stress condition. Challenge windows are epoch-indexed — they advance normally during Zone C (#r138/Q3, explicitly established). This means existing T3 warranted installations can be challenged and slashed during Zone C even as new T3 installations are throttled.
+
+**Analysis of the asymmetry:** This is not an error — it is epistemically correct. Zone C should not grant immunity to poor-quality information. A challenge that succeeds during Zone C indicates a real quality failure in a warranted installation; suppressing that challenge would degrade S_cred quality precisely when epistemic reliability matters most.
+
+However, slashing during Zone C adds to financial stress: the slashed stake flows to the loser pool (standard settlement), which in a stressed epoch may exacerbate TOWL pressure if the protocol's reserve structure is thin.
+
+**Resolution — Zone C slash routing override:**
+
+During Zone C (class-level or global), successful challenge slashing follows a modified routing sequence:
+
+```
+Normal mode:   slash → loser pool (distributed to winners + challenger reward)
+Zone C mode:   slash → LTRP buffer first (up to LTRP underfunding amount)
+                     → loser pool (remainder)
+```
+
+The LTRP buffer receives slash proceeds during Zone C up to the amount needed to bring LTRP coverage_ratio to GREEN threshold. Slash proceeds above that amount route normally to the loser pool.
+
+**Why this is correct:** Zone C slash is real forfeiture from a genuine quality failure. Routing a portion to LTRP during Zone C converts the epistemic-enforcement mechanism into a partial solvency stabilizer — without suppressing the challenge incentive. Challengers still earn their reward (sourced from the loser pool remainder or protocol fee). The slash magnitude is unchanged.
+
+**Challenger reward protection:** Challenger reward is paid before LTRP routing. Priority: (1) challenger reward pool, (2) LTRP buffer top-up (to GREEN threshold), (3) loser pool distribution. Challengers are never disadvantaged by Zone C routing.
+
+**Scope:** This applies to the coordinate-class-level Zone C for the class containing the challenged installation. Global Zone C applies Zone C routing to all classes simultaneously.
+
+**Design law (#r139):** Epistemic enforcement mechanisms (challenge windows, slashing) are never suspended by solvency conditions. Only routing of proceeds changes. This preserves epistemic incentives while using enforcement events opportunistically for solvency repair. (#r139)
+
+---
+
+**Q4 (Deadline-adjacent timers — catalog extension) → Bridge epoch duration, β_effective clamp alert, and Zone C alert added to catalog (#r139):**
+
+The #r137 design law requires all deadline-adjacent timers to be classified as epoch-indexed or wall-clock-indexed. Several mechanism timers were not in the #r138 catalog:
+
+| Timer | Anchor event | Index type | Degraded-mode behavior | Source |
+|---|---|---|---|---|
+| Bridge epoch duration | DA restore event | Epoch-indexed (exactly 1 macro-epoch post-restore) | N/A — bridge only fires on DA restore (which ends degraded mode) | #r131/Q3 |
+| β_effective clamp alert | Clamp binding epoch | Epoch-indexed (≥2 consecutive normal-mode macro-epochs) | Implicit freeze (normal-mode count pauses during degraded mode) | #r129/Q4, #r132/Q2 |
+| Zone C → implication_bonus_escrow deferral | Zone C entry event | Epoch-indexed (Zone C duration in macro-epochs) | N/A — Zone C is not a degraded-mode condition; epochs advance normally | #r134/Q4 |
+| zone_c_epochs_in_window alert | Rolling N_calibration window | Epoch-indexed (normal-mode epochs in window) | Implicit freeze | #r133/Q2 |
+| Provisional score refinement at DA restore | DA restore event | Event-triggered (fires at first post-bridge macro-epoch boundary) | N/A — fires on DA restore | #r131/Q3 |
+| debt_withholding_rate recalculation | Per macro-epoch boundary | Epoch-indexed (continuous, no expiry deadline) | Implicit freeze | #r134/Q2 |
+
+**New classification added to catalog (#r139):** Bridge epoch duration is epoch-indexed with a fixed length of exactly 1 macro-epoch. It does not toll — it has no tolling clock because it fires only after DA restores (degraded mode ends). The bridge epoch cannot overlap with degraded mode by construction.
+
+**Observation — timer-adjacent features without deadlines:** `debt_withholding_rate` and `provisional_score_refinement` are recurrent computations, not deadlines. They have no expiry. They are not subject to the epoch-indexed vs. wall-clock design law (which applies to deadlines — timers with terminal states). These should not appear in the deadline catalog; they appear here for completeness only and are explicitly marked as non-deadline timers.
+
+**Catalog closure statement (#r139):** With this extension, all known mechanism deadlines and deadline-adjacent timers have been classified. Future features that introduce timers with terminal states MUST explicitly declare their index type at feature design time per the #r137 design law. Non-deadline recurrent computations are excluded from the catalog but noted in feature documentation. (#r139)
+
+---
+
+## Structural Synthesis: Mechanism Closure State After #r139 (#r139)
+
+The bounded-liability architecture, escrow taxonomy, deadline catalog, and reserve governance framework are now internally consistent and closed. Key closure milestones:
+
+| Domain | Closed in | Law |
+|---|---|---|
+| Bounded-liability decomposition | #r130–#r132 | Every unbounded individual liability → bounded window + pool |
+| Escrow taxonomy (4 categories) | #r133 | Each category: named ceiling, backstop, TOWL treatment |
+| Reserve governance (4 reserves) | #r137–#r138 | Escrow-sourced → class-gated; governance-funded → not gated |
+| Deadline catalog (all timers) | #r138–#r139 | Epoch-indexed (implicit freeze) vs wall-clock (explicit tolling) |
+| Corroboration ordering (all edge cases) | #r138–#r139 | Position-count; co-activators each consume position; activation timestamp governs |
+| Zone C slash routing | #r139 | Epistemic enforcement never suspended; proceeds routing adapts |
+
+**Open question frontier as of #r139 (proposed for #r140+):**
+
+1. **Zone C slash routing and challenger reward pool solvency:** During Zone C with many simultaneous challenges, the challenger reward pool may be depleted before LTRP top-up if all proceeds route through priority-1 challenger rewards first. Is there a per-challenge challenger reward cap during Zone C to prevent challenger pool exhaustion at the expense of LTRP recovery?
+
+2. **Reactivation at depth D when gap-period contributors have higher credibility:** If contributor A (original, reactivating) has lower current credibility_ratio than contributor B (joined during gap), but A holds a lower sequence position, A has higher corroboration priority despite being epistemically weaker. Is the position-based model too rigid — should corroboration discounts be credibility-weighted rather than purely position-ordered?
+
+3. **Bridge epoch exact length — does 1 macro-epoch fit all coordinate classes?** For a fast-changing coordinate class (short macro-epoch, high κ), one bridge epoch may be too short for score refinement to propagate through the S_cred → clearing feed cycle. For a slow class (long macro-epoch), one bridge epoch is conservative overkill. Should bridge epoch length be per-class (1 macro-epoch of the class), as implied, or globally fixed?
+
+4. **Position counter persistence across governance threshold oscillations (#r139/Q2 adversarial case):** If min_chain_weight_fraction oscillates, contributors are truncated and reactivated. Their sequence position is preserved through reactivation. But if a contributor has been truncated for many epochs and all other contributors at that depth have churned (declarations expired), could the reactivating contributor return with a first-position claim that is stale (their original information was submitted years prior)? The position is preserved but the epistemic claim may no longer reflect current knowledge. A staleness discount on reactivating-contributor S_cred weight (beyond κ-based decay) may be warranted.
+
+*Last updated: #r139 — 2026-04-03T20:52Z*
