@@ -1411,3 +1411,107 @@ Four open lifecycle edge cases from #r135 now closed:
 4. **debt_retirement_reserve and TOWL zone interaction:** The debt_retirement_reserve is a fourth protocol reserve category (alongside LTRP, implication_bonus_escrow, challenger pool). Its funding draws from governance. During Zone C, outflows from protocol reserves may stress the mechanism. Should the debt_retirement_reserve be subject to the same class-level Zone C gating as implication_bonus_escrow (#r134/Q4), or is it governance-sourced and therefore not class-scoped?
 
 *Last updated: #r136 — 2026-04-03T20:22Z*
+
+---
+
+## #r137 Contributions — 2026-04-03T20:32Z
+
+Addresses all four open questions from #r136.
+
+**Q1 (Pre-committed declaration corroboration ordering) → Activation timestamp governs γ_corr priority; submission timestamp has no ordering relevance (#r137):**
+
+The corroboration discount (γ_corr, #r76/Q2; γ_corr_cross, #r129/Q1) was designed to discount repeat same-pair declarations because additional contributions add diminishing epistemic information. The relevant information event is when a declaration begins contributing to S_cred — the activation timestamp — not when capital was locked.
+
+**Resolution:** γ_corr priority is determined by activation EAT timestamp exclusively.
+
+- Pre-committed declaration activates at B's Phase-1-exit epoch boundary (if re-attestation condition is met, #r136/Q2).
+- Normal declaration activates at submission time (both classes already have ≥1 normal-mode macro-epoch).
+- First-mover = first activation EAT timestamp. If X's pre-commit reaffirms exactly at B's Phase-1-exit boundary and Y submits immediately after that boundary, X and Y have distinct activation timestamps in EAT order and priority is unambiguous.
+- X's pre-commit submission timestamp is not recorded as an ordering input to γ_corr — only activation timestamp matters.
+
+**Rationale:** A pre-committed declaration has zero epistemic contribution during pre-active status. The mechanism has no information about its quality prior to activation. A post-Phase-1-exit submission from Y that activates immediately is epistemically equivalent to "arrived first" from the S_cred perspective, regardless of when X locked capital.
+
+**Adversarial implication:** An adversary cannot game first-mover advantage by pre-committing many declarations in Phase 1 bootstrap epochs to ensure activation priority on Phase-1-exit. Pre-committed declarations require re-attestation within T_precommit_window (#r136/Q2) — holding pre-active declarations indefinitely without fresh re-attestation causes them to expire with escrow returned. The capital cost of maintaining pre-committed declarations is real (locked capital); the corroboration reward is not guaranteed. (#r137)
+
+---
+
+**Q2 (min_chain_weight_fraction governance change and in-flight declarations) → Escrow commitment static; S_cred effective depth dynamic; bonus at resolution from last pre-resolution depth (#r137):**
+
+The critical decomposition: escrow is committed at declaration time (capital obligation); S_cred contribution weight is a protocol output (epistemic computation). These are governed by different update rules.
+
+**Resolution — two independent update rules:**
+
+1. **Escrow (static):** The escrow locked at declaration for each coordinate in the chain is fixed. Governance changing min_chain_weight_fraction does not trigger escrow adjustment. A threshold increase that would now truncate a coordinate does not release that coordinate's escrow — the capital commitment is not retroactively reduced. A threshold decrease does not lock additional escrow.
+
+2. **S_cred effective depth (dynamic):** Evaluated at each macro-epoch boundary using the current min_chain_weight_fraction. If the threshold rises and a depth-3 chain drops to effective depth 2, coordinate C at depth 3 no longer contributes to S_cred until (a) governance lowers the threshold again or (b) the knower's debt withholding situation improves (if that was the source of contribution reduction). This is a pure epistemic update — no escrow changes, no EAT event required for the contribution change (it derives from chain_weight and current threshold deterministically).
+
+3. **Implication bonus (resolution-time):** Bonus is conditional on both coordinates resolving correctly. The effective depth governing the bonus is the last macro-epoch's effective depth before oracle resolution fires. This is the most conservative reasonable point — it prevents a knower from briefly expanding effective depth during the resolution epoch to capture a deeper bonus.
+
+**EAT treatment:** Escrow commitment is recorded at declaration. Dynamic depth changes are not separately EAT-committed (they are deterministically computable from chain parameters and current governance values). The resolution-settlement EAT event records: declared_depth, effective_depth_at_resolution, and bonus_applied.
+
+**Design law (#r137):** Protocol-level epistemic computation (S_cred weights, effective depth) is dynamically re-derived from current parameters each epoch. Capital commitment (escrow) is statically committed at declaration. These must never be conflated. If a mechanism feature requires capital to move in response to a governance parameter change, it requires an explicit escrow adjustment event — not implicit dynamic re-computation. (#r137)
+
+---
+
+**Q3 (Pre-committed declaration expiry during degraded mode) → Window is epoch-indexed to B's Phase-1-exit; implicit freeze; no explicit tolling rule needed (#r137):**
+
+The T_precommit_window is defined as "within 2 × macro_epoch_B before B's Phase 1 exit" (#r136/Q2). It is a countdown indexed to the Phase-1-exit epoch event, not to wall-clock time from declaration.
+
+**Analysis:** B's Phase 1 epoch count is frozen during degraded mode (#r130/Q1: T3 gate epoch count paused; Phase 1 falls under the same DA-liveness precondition). If B's Phase-1-exit epoch has not yet been reached, the exit event is deferred by the number of frozen epochs. T_precommit_window is measured backward from that exit event — so when the exit event is deferred, the window is automatically deferred by the same amount.
+
+**Resolution:** No explicit tolling rule is required. The pre-committed declaration's reaffirmation deadline is inherently coupled to B's Phase-1-exit timeline. Degraded mode freezes B's Phase 1 progression, which defers the exit epoch, which defers the T_precommit_window end, which extends the knower's reaffirmation opportunity.
+
+**Edge case — declaration made just before DA outage with B's Phase 1 exit already queued:** B's exit was 0.5 × macro_epoch_B away when outage started. After DA restore, B needs to complete the remaining 0.5 macro-epoch of Phase 1. T_precommit_window end follows B's exit. Knower has the full window post-exit to reaffirm; no truncation from the outage period.
+
+**Design law (#r137):** Any deadline indexed to a mechanism epoch event (not to wall clock) is automatically frozen when that epoch event is suspended. This is a first-class mechanism invariant: epoch-indexed deadlines require no separate tolling rules under degraded mode — they inherit the freeze from the epoch system. This complements the wall-clock tolling rules established for challenge windows and T_longtail expiry. Designers must explicitly choose at feature-design time whether a deadline is epoch-indexed or wall-clock-indexed; the freeze behavior follows automatically. (#r137)
+
+---
+
+**Q4 (debt_retirement_reserve and TOWL zone interaction) → Not class-gated; not TOWL-gated; governed exclusively by governance SLA framework (#r137):**
+
+The debt_retirement_reserve is protocol-global and governance-funded. Its capacity is not derived from any coordinate class's escrow flows — unlike LTRP (per-class, sourced from T3_escrow_longtail) and implication_bonus_escrow (bilateral, sourced from knower stake + loser pool).
+
+**Resolution:** debt_retirement_reserve outflows are not subject to class-level Zone C gating and are not subject to global Zone C gating.
+
+**Reasoning:**
+1. *Class-level Zone C gating (#r134/Q4)* applies to outflows from reserves whose capacity is coupled to the class's TOWL health. debt_retirement_reserve draws from governance allocation, not from any class's escrow. Drawing from it does not affect any class's TOWL zone.
+2. *Global Zone C* is a TOWL aggregate signal. debt_retirement_reserve is orthogonal to TOWL by construction (#r131/Q2 design law: pool-level reserves are reported separately, not TOWL-counted).
+3. Blocking debt retirement during Zone C would punish knowers for a solvency stress event unrelated to their debt — the debt was incurred from an implication bonus clawback, not from TOWL strain.
+
+**The reserve is governed exclusively by the governance SLA framework (#r136/Q1):** funded by governance, monitored by auto-alert, queue-suspended on SLA breach. This is a governance accountability mechanism, not a solvency mechanism. Zone C is a solvency signal; debt retirement is a governance function. They are orthogonal.
+
+**Scope definition:** The classification of each protocol reserve category by governance type vs. solvency scope is now formally tabulated:
+
+| Reserve | Governed by | Zone C gated? | TOWL-counted? |
+|---|---|---|---|
+| LTRP | Class-level solvency (per-class) | Yes (class-local) | No (buffer) |
+| implication_bonus_escrow | Bilateral, protocol-held | Yes (class-local) | No (protocol reserve) |
+| challenger_pool | Per-class (from forfeitures) | Yes (class-local) | No (buffer) |
+| debt_retirement_reserve | Governance SLA | No | No |
+
+**Design law (#r137):** Governance-funded reserves are orthogonal to solvency gating. Only escrow-flow-sourced reserves (whose capacity is mechanically coupled to class-level financial flows) are subject to Zone C gating. The gating criterion is: does the reserve's capacity derive from coordinate-class escrow? If yes, class-gated. If sourced from governance allocation, not gated. (#r137)
+
+---
+
+## Structural Synthesis: Declaration Lifecycle and Reserve Governance — Closed (#r137)
+
+| Feature | Resolution | Law |
+|---|---|---|
+| Corroboration ordering for pre-committed declarations | Activation timestamp only; submission timestamp irrelevant | Epistemic contribution starts at activation, not capital lock |
+| Governance change to min_chain_weight_fraction | Escrow static; S_cred depth dynamic; bonus at last pre-resolution depth | Capital commitment ≠ epistemic computation; never conflate |
+| Pre-committed declaration expiry during degraded mode | Epoch-indexed deadline; implicit freeze; no explicit tolling needed | Epoch-indexed deadlines auto-freeze with epoch system |
+| debt_retirement_reserve Zone C interaction | Governance-funded → not Zone C gated; governed by SLA only | Escrow-flow-sourced reserves are solvency-gated; governance reserves are not |
+
+---
+
+## Open Questions for #r138+
+
+1. **Activation timestamp tie-breaking:** If X (pre-commit) and Y (normal submission) both activate in the same epoch boundary event (e.g., B exits Phase 1 and X reaffirms in the same block as Y's post-Phase-1-exit submission), both have the same macro-epoch activation. Should γ_corr ordering be: (a) EAT within-block ordering, (b) both treated as simultaneous first declarers (both earn full β, no discount), or (c) one randomized as first?
+
+2. **Dynamic effective depth and fee distribution:** When S_cred effective depth drops (threshold increase), contributors at the now-truncated coordinate no longer contribute to S_cred — but they already have capital locked. Do they still earn query fees for periods where their contribution was active (historical pro-rata), or is fee distribution purely forward-looking based on current effective depth?
+
+3. **Epoch-indexed vs wall-clock deadlines — catalog:** The design law from #r137/Q3 distinguishes epoch-indexed and wall-clock-indexed deadlines. What is the complete catalog of mechanism deadlines and their index type? Some deadlines (e.g., challenge_window) were implemented as duration from event, which is wall-clock-ish but indirectly epoch-indexed since challenge windows run from epoch close.
+
+4. **debt_retirement_reserve and α_longtail interaction during Zone C:** The reserve is not Zone C gated. But α_longtail (fraction of T3 escrow routed to LTRP) is part of the solvency model. During Zone C, if governance suspends new T3 installations, α_longtail contributions to LTRP also pause — but debt_retirement_reserve continues to pay out retirements (unaffected by Zone C). Is there any cross-effect from Zone C on the reserve's self-sufficiency? Answer: likely none, since the reserve is governance-funded, not LTRP-fed. But worth explicitly verifying the funding independence.
+
+*Last updated: #r137 — 2026-04-03T20:32Z*
