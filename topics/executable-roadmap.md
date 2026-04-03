@@ -1,8 +1,8 @@
 # GDM Epistemic Bond Layer — Executable Roadmap
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Issue:** VAL-459
-**Run:** r074 (fine-tune and validate pass)
+**Issue:** VAL-459 → updated by VAL-462 (r077 fine-tune corrections) → updated by VAL-468 (r080 coordinate correction)
+**Run:** r080 (30-coordinate correction applied from phase1-coordinates.md r079/VAL-466)
 **Date:** 2026-04-03
 **Inputs:** Synthesis of r001–r073 across all research tracks (Atlas, Scout, Lens, Sage, Echo)
 **Purpose:** Convert the theoretical mechanism design into a time-sequenced, resource-tagged, risk-acknowledged execution plan.
@@ -17,8 +17,8 @@ The GDM epistemic bond layer is ready to build. The mechanism is theoretically s
 
 **Three numbers that anchor the plan:**
 - **$150K** seed capital → first 50 credentialed knowers → organic flywheel within 3–6 months
-- **4–6 weeks** to first statistically meaningful track record differentiation (corporate earnings domain)
-- **~$1.8M/year** first-year SOM at $10/unit × 500 active coordinates (Lens r073)
+- **6–7 weeks** to first statistically meaningful track record differentiation (corporate earnings domain, 30 coordinates across two waves)
+- **~$182.5K/year** proof-of-mechanism SOM at $1/unit × 500 active coordinates/epoch × 365 days (path to $1.8M/year as unit value scales with track record depth in Phase 3)
 
 ---
 
@@ -75,12 +75,14 @@ A smart contract layer and off-chain coordination service that:
 | Identify 15 credentialed analyst-tier knowers (ex-sell-side, alt-data providers) | BD/GTM | Knower cohort list |
 | Deploy on mainnet (or production L1 testnet if L1 not yet live) | Engineering | Live contract |
 | Seed subsidy: guarantee minimum `10 units/epoch` floor reward for first 30 epochs per knower | Protocol treasury | Knower participation lock-in |
-| Open 15 earnings coordinates (mix of large-cap and mid-cap US equities) | Protocol team | Active coordinate set |
+| Open 30 earnings coordinates across two waves (Wave 1: Apr 14–May 1; Wave 2: May 5–May 30) | Protocol team | Active coordinate set |
 | No unknower fees yet — build track records only | — | Integrity of track record bootstrap |
+
+**Coordinate structure (r080 correction):** Phase 1 uses **30 coordinates** across two waves, not 15. The original 15-coordinate scope is arithmetically incompatible with the "≥30 resolved predictions each" exit criterion. Wave 1 (15 large-cap + financials + tech, confirmed Q1 2026 dates) runs April 14–May 1. Wave 2 (15 supplemental across sectors, estimated dates) runs May 5–May 30. See `phase1-coordinates.md` for the full confirmed list, S_prev initializations, and date verification checklist.
 
 **Exit criteria for Phase 1:**
 - ≥10 knowers with ≥30 resolved predictions each
-- At least 3 knowers with statistically distinguishable T_i from baseline (p < 0.05, binary outcomes)
+- At least 3 knowers with T_i ≥ 0.5 (on-chain credibility signal; replaces p < 0.05 test — 30 epochs is statistically insufficient for p < 0.05 at 80% power with binary outcomes; T_i ≥ 0.5 is the practical threshold that matters to the mechanism's credibility weighting)
 - Zero evidence of Sybil clustering (monitor cross-claim correlation per §7.3 atlas attack models)
 
 ---
@@ -129,23 +131,25 @@ A smart contract layer and off-chain coordination service that:
 
 These are the concrete protocol constants for deployment. All are governance-adjustable post-launch.
 
-| Parameter | Symbol | v0 Value | Rationale |
-|---|---|---|---|
-| Identity registration fee | `c_id` | 100 units (non-refundable) | ~10% of average honest w_i; Atlas r073 Sybil lower bound requirement |
-| Reference stake | `k_0` | 100 units | Log-diminishing inflection point; prevents trivially small stakes from gaming |
-| Credibility sigmoid sensitivity | `α` | 1.0 | Moderate sigmoid steepness; tune empirically after Phase 1 |
-| Track record learning rate | `η` | 0.01 | Slow-moving credibility; prevents single-epoch manipulation |
-| W_max (max credibility weight) | `W_max` | 0.25 | No single knower controls >25% of S_public |
-| Minimum claim stake | `k_min` | 50 units | Prevents cheap-talk pollution |
-| Epoch duration | — | 24 hours (daily) | Matches earnings release cadence; one resolution per active coordinate per epoch max |
-| Holdback base | — | 30% of stake | 70% released at epoch close; 30% at oracle resolution |
-| T_freshness window | — | 72 hours | Time from first-detectable to provisional install; staleness penalty applies beyond this |
-| TOWL capacity thresholds | Zone A/B/C | 70% / 90% | r070 resolution; hard gates, no continuous discount |
-| Fee rate (base) | `f_base` | 5 bps/epoch | Floor; protocol-subsidized if needed during bootstrap |
-| Fee rate (performance) | `f_perf` | 0–25 bps/epoch | Premium for top credibility-tier knowers |
-| Protocol take rate | — | 15% | 85% of fees flow to knower escrow |
-| ε-smoothing for S_prev | `ε` | 0.001 | Avoids undefined log at zero-probability outcomes |
-| Seed subsidy | — | 10 units/epoch floor | First 30 epochs for Phase 1 knowers; floor only, not bonus |
+**Staking asset:** USDC (ERC-20) on Base mainnet (or Arbitrum Sepolia for testnet). 1 unit = $1 USDC. Dollar-denomination eliminates knower exposure to ETH price volatility and simplifies accounting.
+
+| Parameter | Symbol | v0 Value | $-equivalent | Rationale |
+|---|---|---|---|---|
+| Identity registration fee | `c_id` | 100 units (non-refundable) | **$100 USDC** | ~10% of average honest w_i; Atlas r073 Sybil lower bound; below annoyance threshold for credentialed professionals |
+| Reference stake | `k_0` | 100 units | **$100 USDC** | Log-diminishing inflection point; prevents trivially small stakes from gaming |
+| Credibility sigmoid sensitivity | `α` | 1.0 | — | Moderate sigmoid steepness; tune empirically after Phase 1 |
+| Track record learning rate | `η` | 0.01 | — | Slow-moving credibility; prevents single-epoch manipulation |
+| W_max (max credibility weight) | `W_max` | 0.25 | — | No single knower controls >25% of S_public |
+| Minimum claim stake | `k_min` | 50 units | **$50 USDC** | Meaningful skin in game; not prohibitive for credentialed professionals |
+| Epoch duration | — | 24 hours (daily) | — | Matches earnings release cadence; one resolution per active coordinate per epoch max |
+| Holdback base | — | 30% of stake | — | 70% released at epoch close; 30% at oracle resolution |
+| T_freshness window | — | 72 hours | — | Time from first-detectable to provisional install; staleness penalty applies beyond this |
+| TOWL capacity thresholds | Zone A/B/C | 70% / 90% | — | r070 resolution; hard gates, no continuous discount |
+| Fee rate (base) | `f_base` | 5 bps/epoch | — | Floor; protocol-subsidized if needed during bootstrap |
+| Fee rate (performance) | `f_perf` | 0–25 bps/epoch | — | Premium for top credibility-tier knowers |
+| Protocol take rate | — | 15% | — | 85% of fees flow to knower escrow |
+| ε-smoothing for S_prev | `ε` | 0.001 | — | Avoids undefined log at zero-probability outcomes |
+| Seed subsidy | — | 10 units/epoch floor | **$10 USDC/epoch** | First 30 epochs for Phase 1 knowers; floor only, not bonus |
 
 ---
 
@@ -184,13 +188,15 @@ These are the binary criteria that validate the idea is executable before commit
 | Criterion | Target | Measured by |
 |---|---|---|
 | Supply bootstrapped | ≥10 knowers, ≥30 resolved predictions each | On-chain settlement records |
-| Track record differentiation | ≥3 knowers with p < 0.05 vs. baseline at T_i | Statistical test on settlement history |
+| Track record differentiation | ≥3 knowers with T_i ≥ 0.5 after ≥30 resolved predictions | On-chain T_i values (replaces p < 0.05 — insufficient sample for binary outcomes at 30 epochs) |
 | Demand validated | ≥3 paying unknowers (not subsidized) | Fee payment records |
 | Fee revenue positive | Protocol revenue > protocol subsidy outlay | Treasury accounting |
 | No material Sybil clustering | No cross-claim correlation > 0.85 among top-5 knowers | Automated correlation monitor |
 | No oracle resolution disputes | Zero escalations in 30-day window | Dispute registry |
 
-If all 6 are green by Week 16: proceed to Phase 3 scale with confidence. If 2+ are red: pause, diagnose, pivot domain or fee structure.
+If all 6 are green by Week 17 (Phase 1 now 6–7 weeks per r080 correction): proceed to Phase 3 scale with confidence. If 2+ are red: pause, diagnose, pivot domain or fee structure.
+
+**Phase timeline correction (r080):** Phase 1 is now 6–7 weeks (Weeks 4–10), not 4 weeks, due to the 30-coordinate / two-wave structure. Phase 2 unknower soft launch shifts to Week 11. Phase 3 scale target shifts to Week 20+. All other phase milestones shift proportionally.
 
 ---
 
@@ -218,12 +224,16 @@ These are known open items from r073. They are real, they matter long-term, but 
 
 **Why us:** GestAlt's batch clearing architecture is native infrastructure for this mechanism. Layer 1 epoch-based settlement is the oracle. The track record registry compounds as a time-locked moat no competitor can fork.
 
-**First move:** Corporate earnings, closed beta, 15 knowers, 30 epochs. $150K seed capital. Organic flywheel in 3–6 months. First-year SOM: $1.8M/year.
+**First move:** Corporate earnings, closed beta, 15 knowers, 30 epochs. $150K seed capital. Organic flywheel in 3–6 months. First-year proof-of-mechanism SOM: $182.5K/year at $1/unit × 500 coordinates/epoch. Path to $1.8M/year as unit value scales with track record depth in Phase 3.
 
 **What success looks like:** Institutional buyers (hedge funds, event-driven strategies) paying for credentialed pre-earnings belief updates with verified track records — the GLG model, but automated, on-chain, and self-settling.
+
+**Note for external communications:** v0 Phase 0–1 runs on a centralized oracle relay (EDGAR + secondary sources), not the full GestAlt L1. L1 integration is the Phase 2 migration trigger. Do not reference L1 architecture in Phase 1 external pitch materials.
 
 ---
 
 *This document supersedes all prior "roadmap" or "next steps" sections in the r073 corpus. It is the single canonical execution reference for GDM Layer 2 v0. All further research should update this document rather than creating new roadmap artifacts.*
 
-*Logan — ValCtrl AI Chief of Staff | r074 | VAL-459*
+*Four corrections applied in r077 (VAL-462) per real-world validation pass (r076, VAL-461): (1) unit pricing anchored to $1 USDC; (2) oracle sourcing corrected for Phase 1 (see epistemic-bond-v0-spec.md); (3) L1 dependency scope clarified; (4) Phase 1 exit criterion updated from p < 0.05 to T_i ≥ 0.5.*
+
+*Logan — ValCtrl AI Chief of Staff | r077 | VAL-462*

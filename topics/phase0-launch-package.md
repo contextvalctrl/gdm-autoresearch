@@ -1,11 +1,11 @@
 # GDM Epistemic Bond — Phase 0–1 Launch Package
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r078 (VAL-465)
+**Run:** r078 (VAL-465) → updated r080 (VAL-468)
 **Date:** 2026-04-03
-**Issue:** VAL-465
-**Depends on:** real-world-validation.md (r076/VAL-461), executable-roadmap.md (r077/VAL-462), epistemic-bond-v0-spec.md (r077/VAL-462)
-**Purpose:** Final fine-tune and executable consolidation. Everything required to start Phase 0 this week — in one document. Four pieces still missing from the corpus: knower onboarding guide, BD outreach template, consolidated budget, and week-by-week operator checklist.
+**Issue:** VAL-465 → updated by VAL-468
+**Depends on:** real-world-validation.md (r076/VAL-461), executable-roadmap.md (r077/VAL-462 → r080/VAL-468), epistemic-bond-v0-spec.md (r077/VAL-462), knower-calibration-test.md (r079/VAL-466), phase1-coordinates.md (r079/VAL-466)
+**Purpose:** Final fine-tune and executable consolidation. Everything required to start Phase 0 this week — in one document. Updated in r080 to reflect 30-coordinate / two-wave structure per phase1-coordinates.md r079.
 
 ---
 
@@ -13,12 +13,12 @@
 
 The corpus is validated. No blocking research gaps remain for Phase 0–1. This document completes the handoff.
 
-Go/no-go: **GO on Phase 0 and Phase 1**, with four corrections already applied in r077 (unit pricing → $1 USDC, oracle sources, L1 scope clarification, Phase 1 exit criterion → T_i ≥ 0.5).
+Go/no-go: **GO on Phase 0 and Phase 1**, with four corrections already applied in r077 (unit pricing → $1 USDC, oracle sources, L1 scope clarification, Phase 1 exit criterion → T_i ≥ 0.5), and one structural correction applied in r080 (coordinate count: 15 → 30 across two waves; Phase 1 duration: 4 weeks → 6–7 weeks).
 
 **The three things that need to happen this week:**
 1. Engineering lead sets up the Arbitrum Sepolia testnet environment and integrates PRBMath v4 + USDC mock
 2. BD lead builds the 50-person knower outreach list and sends the calibration test
-3. Protocol team finalizes the 15 Phase 1 earnings coordinates
+3. Protocol team confirms the 30 Phase 1 earnings coordinates (Wave 1 confirmed dates + Wave 2 estimated dates) per `phase1-coordinates.md`
 
 Everything else is sequenced below.
 
@@ -171,24 +171,26 @@ At a $150K seed capital budget (per Lens r073 long-term plan), Phase 0–1 consu
 **Protocol:**
 - [ ] Deploy EpistemicBond.sol to Arbitrum Sepolia
 - [ ] 15 knowers complete on-chain `register()` (paying $100 USDC mock fee on testnet)
-- [ ] 15 Phase 1 coordinates loaded into contract
+- [ ] **All 30 Phase 1 coordinates loaded into contract** (Wave 1 + Wave 2 per `phase1-coordinates.md`)
+- [ ] S_prev initialized for all 30 coordinates using historical beat-rate table in `phase1-coordinates.md`
 - [ ] Oracle relay service confirmed live on testnet
+- [ ] Verify Wave 1 confirmed dates (BAC, GOOGL, V, UNH, INTC) via IR pages; verify Wave 2 estimated dates (priority: NVDA, CRM, WMT, HD)
 
 ---
 
-### Week 4 — Phase 1 Begins
+### Week 4 — Phase 1 Begins (Wave 1)
 
 **Protocol:**
-- [ ] First real earnings epoch opens (first coordinate with a scheduled earnings release)
-- [ ] All 15 knowers submit sealed commitments for available coordinates
+- [ ] First real earnings epoch opens: GS, JPM, WFC, C all reporting April 14 (BMO)
+- [ ] All 15 knowers submit sealed commitments for Wave 1 active coordinates
 - [ ] Confirm oracle relay is delivering resolutions within 15 minutes of SEC EDGAR 8-K filing
-- [ ] Verify reveal/settle flow works end-to-end with real data
+- [ ] Verify reveal/settle flow works end-to-end with real data (use GS/JPM April 14 as live test)
 
 **BD:**
 - [ ] Begin identifying 5–10 potential Phase 2 unknowers (institutional; warm introductions preferred)
 - [ ] Build unknower pitch deck (see Part 4 below for key framing)
 
-**Monitoring (ongoing through Week 7):**
+**Monitoring (ongoing through Week 10):**
 - [ ] Daily: check oracle resolution status for all active coordinates
 - [ ] Weekly: review T_i values for all 15 knowers
 - [ ] Weekly: check cross-claim correlation for Sybil signals (flag any pair >0.85 correlation)
@@ -196,14 +198,24 @@ At a $150K seed capital budget (per Lens r073 long-term plan), Phase 0–1 consu
 
 ---
 
-### Weeks 5–7 — Phase 1 Active (30 Epochs)
+### Weeks 5–6 — Phase 1 Wave 1 Active
 
 **Checkpoints:**
 - Week 5 (10 epochs): At least 10 knowers have filed claims on ≥5 coordinates; no oracle disputes
-- Week 6 (20 epochs): At least 5 knowers showing T_i > 0; adjust seed subsidy floor if below threshold
-- Week 7 (30 epochs): **Phase 1 exit checkpoint** — evaluate against all 6 criteria below
+- Week 6 (Wave 1 close, ~15 epochs): At least 5 knowers showing T_i > 0; Wave 1 complete (15 resolutions per knower)
 
-**Phase 1 Exit Criteria (evaluate at 30 epochs):**
+---
+
+### Weeks 7–10 — Phase 1 Wave 2 Active (30 Epochs Total)
+
+Wave 2 coordinates (May 5–30) open continuously as Wave 1 closes. No gap in knower activity.
+
+**Checkpoints:**
+- Week 8 (20 epochs): Check T_i distribution; identify top-3 candidates for Phase 2 leaderboard
+- Week 9 (25 epochs): Final pre-exit monitoring; flag any coordination anomalies
+- Week 10 (30 epochs): **Phase 1 exit checkpoint** — evaluate against all 6 criteria below
+
+**Phase 1 Exit Criteria (evaluate at 30 resolved predictions per knower):**
 | Criterion | Target | Action if missed |
 |---|---|---|
 | Active knowers | ≥10 with ≥30 resolved predictions | Extend by 10 epochs; investigate drop-off |
@@ -486,8 +498,8 @@ contract ComputeRewardFuzzTest is Test {
 | Seed subsidy floor | $10 USDC/epoch | Phase 1 only |
 | Max credibility per knower | 25% (W_max) | Single-knower dominance guard |
 | Phase 1 knowers | 15 | Closed beta |
-| Phase 1 epochs | 30 | ~4–5 weeks |
-| Phase 1 coordinates | 15 | Corporate earnings, binary |
+| Phase 1 epochs | 30 | ~6–7 weeks across two waves |
+| Phase 1 coordinates | 30 (two waves of 15) | Corporate earnings, binary; see phase1-coordinates.md |
 | Oracle cost | ~$250/month | EDGAR + Alpha Vantage + Wall Street Horizon |
 | Phase 1 exit criterion | T_i ≥ 0.5 for ≥3 knowers | Replaces p < 0.05 (statistically insufficient) |
 | Total Phase 0–1 capital | ~$9,150 USDC + engineering | Budget section above |
@@ -522,10 +534,12 @@ This package adds the missing operational artifacts. The canonical technical and
 
 **Protocol team:** 15 Phase 1 coordinates confirmed with earnings dates and consensus sources by **end of Week 1**. Oracle relay cannot be tested without real coordinate data.
 
-**Next trigger:** Phase 1 exit checkpoint at Week 7 (30 epochs complete). Report to founders: T_i distribution, oracle resolution rate, Sybil monitor status. If all 6 exit criteria are green, proceed to Phase 2 unknower soft launch.
+**Next trigger:** Phase 1 exit checkpoint at Week 10 (30 epochs complete across both waves). Report to founders: T_i distribution, oracle resolution rate, Sybil monitor status. If all 6 exit criteria are green, proceed to Phase 2 unknower soft launch.
 
 ---
 
 *This document is the final fine-tune artifact for the GDM epistemic bond executable idea. No further research passes are required. Everything is known, bounded, and ready to build. The next step is execution, not analysis.*
 
-*Logan — ValCtrl AI Chief of Staff | r078 | VAL-465*
+*Five corrections have been applied across this corpus: four in r077 (unit pricing → $1 USDC; oracle sources; L1 scope; Phase 1 exit criterion → T_i ≥ 0.5) and one in r080 (coordinate count: 15 → 30 across two waves; Phase 1 duration: 4 weeks → 6–7 weeks). See `phase1-coordinates.md` for the full coordinate list.*
+
+*Logan — ValCtrl AI Chief of Staff | r078 → r080 | VAL-465 → VAL-468*
