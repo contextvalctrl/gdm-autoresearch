@@ -10,6 +10,7 @@
 - **#r73** — 2026-04-03T07:52Z — Cycle/deadlock elimination (implication declarations are incentive-metadata only); timestamp-tagged staleness discount for cross-epoch-class GestAlt interface; four-layer SEE capture defense; chain-length discount γ^(depth-1) for implication stacking.
 - **#r74** — 2026-04-03T08:52Z — Per-class staleness decay shape κ; two-tier SEE appeals (oracle Tier A + sortition Tier B); β range [1.3, 2.0]; SEE pre-staging defense via claim consistency + query fee clawback; Epistemic Audit Trail (EAT) named as fourth integrity property.
 - **#r75** — 2026-04-03T09:52Z — EAT DA stack (Celestia + Ethereum anchor); DA liveness as fifth precondition integrity property; degraded mode specification; pre_shock_window principled formula; continuous SEE taper; trustless correlation filter computation; anti-fragmentation gap in β/γ fixed; closed-form β/γ joint calibration with governance redesign.
+- **#r132** — 2026-04-03T19:12Z — Multi-class LTRP attribution (per-class independent, no spillover); bridge/degraded epoch exclusion from calibration rolling windows; LTRP over-seed proactive recall (conditional 3× safety × 4-epoch gate); non-additive combined-lockup ceiling for simultaneous provisional+outage tolling; bounded-liability architecture closed.
 
 ---
 
@@ -834,6 +835,121 @@ Each tier has a bounded individual lockup horizon. Each tier has a pool-level ba
 4. **T3_outage_cap interaction with T3 provisional install FSM (#r71):** A T3 provisional install (claim in pending oracle state) whose oracle window overlaps with a DA outage — does T_provisional_max tolling interact with T_outage_cap? Both are tolled independently; they could produce additive lockup. Define the maximum combined tolled lockup explicitly.
 
 *Last updated: #r131 — 2026-04-03T17:52Z*
+
+---
+
+## #r132 Contributions — 2026-04-03T19:12Z
+
+Addresses all four open questions from #r131.
+
+**Q1 (LTRP multi-class spillover for implication chain claims) → Per-class independent attribution; no cross-class spillover needed (#r132):**
+
+Implication declarations were designed so capital accountability exists at every coordinate independently (#r72). When knower posts an implication declaration A→B spanning two coordinate classes (class_i for A, class_j for B), independent escrow is posted for each coordinate. Slash for a wrong A-claim is drawn from the A-escrow; slash for B from the B-escrow.
+
+**Resolution:** Each coordinate's LTRP absorbs longtail liability for that coordinate's claims independently. T3_escrow_longtail for coordinate A flows into class_i LTRP; for coordinate B into class_j LTRP. No cross-class spillover mechanism is required.
+
+**Partial oracle case (A resolves, B not yet):** Consistent with partial resolution model (#r5) — A's LTRP liability is settled at A's oracle resolution; B's remains pending in class_j LTRP until B's oracle resolves. The two liabilities are independent and tracked separately. The implication bonus (β) is conditional on both resolving correctly — if only one resolves, the bonus is held in escrow until the second resolves (or times out per T_longtail for the slower class).
+
+**Edge case — different T_longtail across classes:** If class_i has shorter T_longtail than class_j, class_i's standard escrow releases first while class_j's longtail obligation is still live. No cross-class subsidy; each class's pool stands alone. For implication declarations crossing fast and slow classes, the knower's effective combined lockup horizon is max(T_longtail_i, T_longtail_j) — disclosed at claim submission. (#r132)
+
+---
+
+**Q2 (Bridge epoch × implication bonus calibration) → Exclude bridge and degraded epochs from N_calibration rolling window (#r132):**
+
+Bridge epoch artificially suppresses effective_weight via elevated κ_bridge. Lower effective_weight → lower per-epoch base slot reward. If included in the N_calibration = 4 rolling window, the denominator in the β_effective formula shrinks, causing β_effective to spike upward — potentially triggering the clamp (#r129/Q4). This would be spurious governance noise from a DA-restore event, not a genuine market signal.
+
+**Resolution:** The N_calibration rolling average excludes all exceptional-mode epochs: degraded-mode epochs and bridge epochs. Only normal-mode macro-epochs count toward the rolling average.
+
+If fewer than N_calibration normal-mode epochs exist in the rolling window (e.g., system just restored after extended outage), use the most recent available normal-mode epochs without substitution. β_effective is computed as usual; clamp absorbs any residual volatility.
+
+**β_effective publication during bridge epoch:** β_effective is published each epoch. During a bridge epoch, the published β_effective is labeled `beta_effective_bridge_hold = true` to indicate it is computed from a potentially shorter-than-N_calibration window. Governance alert is not triggered solely from bridge-epoch clamp binding — only from clamp binding on normal-mode epochs (updating the #r129/Q4 alert protocol).
+
+**Design law extended (#r132):** Calibration rolling windows MUST exclude all exceptional-mode epochs. A "normal-mode epoch" is defined as: DA live, κ = κ_class (not elevated), no active SEE, TOWL in zone A or B. This exclusion rule applies to all rolling averages in the mechanism, not only β_effective. (#r132)
+
+---
+
+**Q3 (Governance seed miscalibration recovery) → Proactive recall with stability gating and graduated withdrawal (#r132):**
+
+If oracle_resolution_p50_latency was over-estimated at class registration, LTRP_balance accumulates well above effective liability and governance seed recovery is delayed unnecessarily. Governance needs a proactive recall pathway without creating sudden LTRP capacity collapse.
+
+**Resolution — conditional proactive recall:**
+
+Governance may submit an `LTRP_seed_reduce` proposal when all three conditions hold simultaneously:
+1. `LTRP_balance > LTRP_seed_current × S_safety` where `S_safety = 3.0` (pool holds ≥3× current seed)
+2. Pool has been continuously above S_safety threshold for ≥ `M_stable = 4` consecutive normal-mode macro-epochs
+3. No active `challenge_window_outage_expired` installations with outstanding LTRP assumption obligations
+
+Recall constraints:
+- New seed floor = `LTRP_seed_original × min_retention` where `min_retention = 0.5` (governance cannot recall >50% of original seed in one proposal)
+- Excess governance recovery distributed gradually over `K_recovery = 4` macro-epochs (no one-shot withdrawal)
+- Governance seed recovery resumes from LTRP contributions; seed cannot be recalled below LTRP_balance (never drain the pool)
+
+**Auto-alert:** If LTRP_balance exceeds S_safety × LTRP_seed for M_stable consecutive epochs, protocol publishes a `LTRP_overfunded_flag` alongside LTRP_status output. Governance is informed but not required to act. Recall is always discretionary — governance may prefer conservatism.
+
+**Inverse direction — LTRP under-funded:** If LTRP coverage_ratio < RED_threshold after pool is live (not genesis), governance must top up within one macro-epoch or T3 installations on that class are suspended. Symmetric accountability. (#r132)
+
+---
+
+**Q4 (T3_outage_cap + T3 provisional FSM additive lockup ceiling) → Non-additive ceiling: max of independent maxima + 1 buffer (#r132):**
+
+A T3 provisional install (oracle-pending, per #r71 FSM) during a concurrent DA outage has two independent tolling mechanisms active: T_provisional_max tolling and T_outage_cap tolling. If additive, worst-case lockup could reach T_provisional_max + T_outage_cap — well beyond either individual design intent.
+
+**Resolution — hard combined ceiling:**
+
+```
+max_combined_tolled_lockup(c) = max(T_provisional_max(c), T_outage_cap(c)) + 1 macro-epoch
+```
+
+NOT additive. The ceiling is the larger of the two independent maximums plus one buffer macro-epoch for settlement processing.
+
+**Semantics:** Both T_provisional_max and T_outage_cap are responses to the same class of epistemic unavailability (information needed for challenge/confirmation is not accessible). They do not compound — the system is in one degraded state at a time, even if two clocks are nominally running.
+
+**When both are simultaneously active:**
+1. Both clocks toll normally until the first expiry.
+2. At first expiry, LTRP assumption triggers for that mechanism's obligation (provisional FSM → auto-demotion to T2 per #r71; outage lockup → LTRP assumption per #r131/Q4).
+3. The remaining clock may continue tolling up to the combined ceiling from the first expiry event.
+4. At combined ceiling: all remaining obligations transfer to LTRP regardless of which clock is still running.
+
+**Per-class parameter requirement:** T_provisional_max and T_outage_cap must both be specified at class registration. Governance UI must compute and display `max_combined_tolled_lockup` alongside each class registration — not a derived field to be discovered post-facto.
+
+**LTRP seed sizing impact:** The over-lapping-clock scenario increases worst-case LTRP exposure vs. either clock alone. The `outage_assumed_slash_factor` from #r131/Q4 LTRP_seed formula implicitly accounts for this if set conservatively. Governance should explicitly include overlapping-clock probability in their slash exposure estimate. (#r132)
+
+---
+
+## Structural Synthesis: Bounded-Liability Architecture — Closed (#r132)
+
+With #r132, the bounded-liability architecture is complete. Every time-unbounded individual lockup risk has been:
+1. Decomposed into a bounded individual window + pool backstop (#r130)
+2. Seeded at genesis (#r131/Q1)
+3. TOWL-separated at protocol level (#r131/Q2)
+4. Isolated from exceptional-mode calibration contamination (#r132/Q2)
+5. Given a proactive recovery pathway when over-seeded (#r132/Q3)
+6. Capped against additive multi-mechanism lockup (#r132/Q4)
+
+The four liability tiers now with explicit ceiling:
+
+| Tier | Mechanism | Lockup ceiling | Backstop |
+|------|-----------|----------------|----------|
+| In-warranty | Standard escrow + challenge window | challenge_window_class | Per-claim TOWL |
+| Long-tail | LTRP via T3_escrow_longtail | T_longtail | LTRP (per-class pool) |
+| Outage-suspended | LTRP at T_outage_cap | T_outage_cap | LTRP |
+| Combined (provisional + outage) | Non-additive ceiling | max(T_provisional_max, T_outage_cap) + 1 epoch | LTRP |
+
+Every tier has a bounded horizon. No individual participant faces indefinite lockup from mechanism design. (#r132)
+
+---
+
+## Open Questions for #r133+
+
+1. **Implication bonus escrow across different T_longtail classes:** The implication bonus β is conditional on both A and B resolving correctly. When A and B belong to different coordinate classes with different T_longtail, the bonus must be held until the slower class resolves. This creates a third escrow type for implication bonus — distinct from T3_escrow_standard and T3_escrow_longtail. Does this escrow belong to the slower class's LTRP horizon or is it a separate first-class escrow category? Does it count toward TOWL?
+
+2. **Normal-mode epoch definition edge: zone C during normal DA:** A TOWL zone C event (#r71) is a solvency stress condition, not a DA or epistemic anomaly. Should zone C epochs be excluded from calibration rolling windows alongside degraded/bridge epochs? Zone C indicates market stress but does not distort κ or effective_weight the same way degraded mode does — the calibration distortion is different in kind.
+
+3. **M_stable continuity gap:** The LTRP_seed recall stability gate requires M_stable = 4 consecutive normal-mode macro-epochs above S_safety. If the pool dips just below S_safety for one epoch (e.g., large LTRP payout) then recovers, the M_stable counter resets. Is reset-on-any-dip the correct policy, or should M_stable tolerate brief dips (e.g., max 1 below-threshold epoch per 4-epoch window)?
+
+4. **Cross-class implication chain oracle ordering:** When A→B spans two coordinate classes with different oracle timing, and A's oracle resolves first (A correct), the mechanism should update the implication declaration status. But if B's oracle is delayed by months and A's knower was correct, the knower has money locked for B's resolution that they rationally should have as working capital. Is there a partial-release mechanism for the A-side of a cross-class implication declaration when A resolves correctly?
+
+*Last updated: #r132 — 2026-04-03T19:12Z*
 
 ---
 
