@@ -1991,3 +1991,135 @@ The implication bonus settlement contract now has a fully specified design:
 4. **Challenge admission fee in cross-class implication declarations:** When challenging a cross-class implication declaration (challenging the A→B claim as a whole vs. challenging only one coordinate), which class's `r_floor` governs the submission fee? Option A: the lower-r_floor class (cheaper to challenge, lower barrier — may encourage legitimate challenges on cheap classes). Option B: the higher-r_floor class (harder to challenge, higher quality bar — may block legitimate cheap-class challenges). Option C: average of both classes' r_floor. This choice affects the incentive to challenge cross-class declarations.
 
 *Last updated: #r141 — 2026-04-03T21:12Z*
+
+---
+
+## #r142 Contributions — 2026-04-03T21:22Z
+
+Addresses all four open questions from #r141.
+
+**Q1 (α_cap calibration basis) → Opportunity-cost anchor: α_cap derived from protocol reference rate ρ, T_longtail, and β (#r142):**
+
+The capital-compensation component should, at minimum, make a fully-stale correct declarant whole on the opportunity cost of locked capital. A claim locked for T_longtail earns `bonus_capital_comp = α_cap × β_escrow` only at resolution (conditional on both coordinates resolving correctly). The minimum α_cap that covers opportunity cost satisfies:
+
+```
+α_cap × β × k_a ≥ k_a × ρ × T_longtail_ref
+α_cap ≥ (ρ × T_longtail_ref) / β
+```
+
+Where `ρ` = protocol-declared reference rate per macro-epoch (annualized / epoch_per_year), `T_longtail_ref` = the reference lockup horizon in macro-epochs (e.g., `T_longtail_class / macro_epoch_length`), and β = current β_effective (computed, not governance-set).
+
+**Derived governance formula (#r142):**
+```
+α_cap = clip((ρ × T_longtail_ref_epochs) / β_effective, α_min=0.1, α_max=0.5)
+```
+
+Like β_effective (#r75/Q4, #r76/Q3), α_cap is a *derived* parameter. Governance exposes (ρ, T_longtail_ref) and the contract computes α_cap. The default 0.30 is valid only when `ρ × T_longtail_ref_epochs / β_effective ≈ 0.30` — governance must verify this at deployment and recalibrate if market conditions shift substantially.
+
+**New governance interface entry:** (γ, K_target, d_ref, α_bond, N_calibration, β_min, β_max) → β_effective computed. Now extended: (ρ, T_longtail_ref) → α_cap computed. All bonus parameters are derived from primitives; none are set by direct governance fiat. (#r142)
+
+**Interaction with β_effective drift:** If β_effective is clamped at β_max (high-demand epoch), α_cap = ρ × T_longtail_ref / β_max — lower than unclamped. Capital component is temporarily reduced relative to opportunity cost. If β_effective is clamped at β_min, α_cap = ρ × T_longtail_ref / β_min — may hit α_max=0.5. Both clamp-boundary cases should be surfaced in governance alerts alongside the β_effective clamp alert (#r129/Q4). (#r142)
+
+---
+
+**Q2 (Challenge submission fee during degraded mode) → Fee frozen in EAT-pending state; no new rule required (#r142):**
+
+A challenge submitted just before DA outage has its fee collected into an EAT-pending escrow record. Fee disposition (reimbursement on success, forfeiture on failure) requires a settlement EAT commit — which is suspended during degraded mode per the #r134/Q1 principle.
+
+**Resolution:** The challenge submission fee freezes alongside the challenge itself. No new rule is required. The existing framework covers this:
+
+1. Challenge window is epoch-indexed → implicit freeze during degraded mode (challenge deadline does not advance).
+2. All EAT-dependent operations (including fee settlement) are suspended during degraded mode (#r134/Q1).
+3. On DA restore, the challenge window resumes from its tolled position; at the next macro-epoch boundary after restore (post-bridge), the challenge settles and fee disposition is committed.
+
+**Consistency check:** The submission fee is recorded in the challenge's EAT record at submission time. The reimbursement/forfeiture is a settlement event referencing that record. Since both are EAT-committed and settlement is epoch-indexed, the fee naturally inherits the challenge window's freeze behavior. No separate fee-freeze clause is needed.
+
+**Fee during bridge epoch:** Analogous to implication_bonus_escrow operations (#r134/Q1): challenge fee settlement is deferred to the first normal post-bridge macro-epoch boundary. Bridge epoch does not process EAT-dependent settlement. (#r142)
+
+---
+
+**Q3 (`Σ effective_weight` accumulator — EAT storage and update rule) → O(1) per-epoch accumulator; batched with S_cred macro-epoch commits (#r142):**
+
+A per-claim running sum accumulated at each macro-epoch boundary eliminates the need to reconstruct the sum at settlement.
+
+**Accumulator update rule (per claim, per macro-epoch boundary):**
+```
+cumulative_eff_weight(claim_c, epoch_t) =
+    cumulative_eff_weight(claim_c, epoch_{t-1}) + effective_weight(claim_c, epoch_t)
+
+effective_weight(claim_c, epoch_t) =
+    base_weight(claim_c) × max(0, 1 − ((epoch_t − epoch_activation) / staleness_window_i)^κ_i)
+```
+
+`base_weight(claim_c)` is the credibility-weighted stake at activation — a constant stored at declaration time.
+
+**Denominator for bonus_epistemic_service:**
+```
+Σ_epochs base_weight = base_weight(claim_c) × n_active_epochs
+n_active_epochs = epoch_resolution − epoch_activation  (computable on-demand at settlement)
+```
+
+No separate denominator accumulator is needed — it is a simple product of a stored constant and a derived epoch count.
+
+**EAT commit frequency:** The `cumulative_eff_weight` accumulator is committed alongside the S_cred macro-epoch boundary update already required per coordinate class. No new EAT commit cadence introduced. The per-claim accumulator update is a delta to the claim record at each boundary.
+
+**Storage cost:** O(1) per claim per epoch (one scalar addition). For a protocol with N active claims, this is O(N) per macro-epoch boundary — equivalent to the existing S_cred weighting computation already required. No asymptotic overhead added.
+
+**Settlement reads:**
+```
+bonus_epistemic_service_weight =
+    cumulative_eff_weight(claim_c, epoch_resolution) / (base_weight(claim_c) × n_active_epochs)
+```
+
+Single-read at settlement; O(1). (#r142)
+
+---
+
+**Q4 (Cross-class challenge submission fee governance) → Stake-weighted average of per-class r_floor values (#r142):**
+
+A single-class r_floor sets the fee proportional to the value at risk per coordinate class. For a cross-class implication declaration, the value at risk is distributed between the A-coordinate and B-coordinate escrows proportionally to stake. The natural extension:
+
+```
+cross_class_challenge_fee =
+    r_floor(class_A) × (A_stake / (A_stake + B_stake))
+    + r_floor(class_B) × (B_stake / (A_stake + B_stake))
+```
+
+**Properties:**
+- Reduces to single-class fee when one coordinate's stake = 0 (degenerate case).
+- Naturally cheaper when one leg is in a lower-r_floor class — reflecting lower value-at-risk from that coordinate.
+- Remains calibrated to the combined escrow at risk, not to either class in isolation.
+- Does not create an exploit: a challenger cannot route a cross-class challenge through the cheaper class independently (the cross-class challenge is a single atomic submission covering both coordinates).
+
+**Challenging only one coordinate of a cross-class declaration:** If a challenger disputes only the A-coordinate assertion (not A→B as a whole), the challenge is treated as a single-class challenge against class_A at class_A's r_floor. This is correct: partial challenges have smaller value-at-risk (only one coordinate's escrow is at stake).
+
+**Design law (#r142):** For any mechanism parameter that is per-coordinate-class, its application to cross-class constructs is the stake-weighted average of the per-class values, proportional to each coordinate's escrow share. This principle generalizes to any future cross-class parameter extension. (#r142)
+
+---
+
+## Structural Synthesis: Bonus Settlement Contract — Fully Parameterized (#r142)
+
+The bonus settlement contract design is now complete, with all parameters either derived from governance primitives or accumulator-backed:
+
+| Parameter | Derivation | Governance input |
+|---|---|---|
+| β_effective | K_target, γ, d_ref, α_bond, rolling base reward | (K_target, γ, d_ref, α_bond, N_cal, β_min, β_max) |
+| α_cap | ρ × T_longtail_ref / β_effective, clamped | (ρ, T_longtail_ref) |
+| bonus_capital_comp | α_cap × β_escrow × time_locked / T_longtail_ref | Derived |
+| bonus_epistemic_service | (1-α_cap) × β_escrow × (Σ eff_weight / Σ base) | Accumulator at each epoch |
+| challenge_fee (single-class) | r_floor × fee_fraction | fee_fraction ∈ [0.05, 0.25] |
+| challenge_fee (cross-class) | Stake-weighted average of per-class r_floor | Derives from per-class r_floor |
+
+---
+
+## Open Questions for #r143+
+
+1. **ρ governance stability:** α_cap is sensitive to ρ (protocol reference rate). If ρ is market-derived (e.g., from DeFi lending rates), it may fluctuate and cause α_cap to oscillate between α_min and α_max, producing unstable bonus components. Should ρ be governance-set (stable but potentially stale) or market-derived (accurate but volatile)? A smoothed rolling average of a market rate could bridge the two.
+
+2. **Accumulator reset on reactivation:** If a claim is truncated (contribution drops to zero, #r136/Q3) and later reactivated, the `cumulative_eff_weight` accumulator has zero contributions during the truncation gap. This is correct — no S_cred contribution means no epistemic service. But should the accumulator record the truncation gap explicitly (for auditability), or is the running sum already unambiguous since effective_weight = 0 during truncation?
+
+3. **Partial challenge of cross-class declaration — bonus escrow disposition:** If a partial challenge succeeds (A-coordinate claim wrong, B not challenged), the A-coordinate escrow is slashed normally. But the implication_bonus_escrow is conditional on *both* coordinates resolving correctly. Does a successful A-coordinate challenge immediately forfeit the entire implication_bonus_escrow, or only the A-side portion (per #r133/Q1: "slash implication_bonus_escrow to the failing coordinate's loser pool proportionally")?
+
+4. **α_cap formula at genesis (no β_effective history):** New coordinate classes in Phase 0 have no β_effective history (#r76/Q3 bootstrap: fewer than N_calibration normal-mode epochs). α_cap derivation from β_effective is undefined until β_effective is stable. Resolution: during genesis and Phase-1 bootstrap, α_cap defaults to α_max (0.5) — the most capital-protective default — until N_calibration normal-mode epochs have closed. Verify this is consistent with the Phase-1 α_longtail=1.0 (#r131/Q1) and no cross-class implication declarations during Phase 1 (#r133/Q1).
+
+*Last updated: #r142 — 2026-04-03T21:22Z*
