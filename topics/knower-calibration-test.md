@@ -1,9 +1,9 @@
 # GDM Epistemic Bond — Knower Calibration Test
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r079 → corrected by r081 (VAL-469)
+**Run:** r079 → corrected by r081 (VAL-469) → corrected by r082 (VAL-470)
 **Date:** 2026-04-03
-**Issue:** VAL-466 → updated by VAL-469
+**Issue:** VAL-466 → updated by VAL-469 → updated by VAL-470
 **Depends on:** phase0-launch-package.md (r078/VAL-465)
 **Purpose:** The actual 10-question historical earnings calibration test for knower recruitment screening. Administers as a blind test before issuing Phase 1 invitations. Pass threshold: ≥6/10 correct (60%).
 
@@ -192,6 +192,19 @@ Alphabet reported Q3 2024 results. The consensus EPS estimate was **$1.84 per sh
 - What differentiates genuinely calibrated candidates from base-rate followers is their **stated probability** on the 2 "Miss" questions (TSLA Q4 2024, INTC Q2 2024) — a well-calibrated candidate should assign meaningful "Miss" probability (>40%) to those questions
 - Apply the Brier score analysis below to all passing candidates; Brier score distinguishes true calibration from systematic bias
 - Consider adding 2–3 "Miss" questions in future test versions to bring the answer distribution to 50/50 Beat/Miss for a cleaner calibration screen
+
+**Concrete base-rate filter rule (r082/VAL-470):** Apply the following two-step gate for all candidates scoring 6–8/10 binary accuracy:
+
+Step 1 — Base-rate flag: Did the candidate answer "Beat" on ≥9 of 10 questions?
+- If YES → apply Brier score threshold (Step 2)
+- If NO → standard qualification (Brier ≤ 0.20 recommended; binary pass at ≥6)
+
+Step 2 — Brier threshold for flagged candidates: Compute Brier score from stated probabilities.
+- Brier ≤ 0.15 → **QUALIFIED** (genuine calibration signal despite base-rate pattern)
+- Brier 0.15–0.20 → **BORDERLINE** — review probability distribution; look for non-trivial probability on Q2 (TSLA Miss) and Q4 (INTC Miss); qualified if stated probability ≥35% Miss on both
+- Brier > 0.20 → **REJECTED** as likely base-rate follower; no genuine epistemic signal
+
+Derivation: A candidate answering "60% Beat" on all 10 achieves Brier = (1/10)[8×(0.6−1)² + 2×(0.6−0)²] = 0.20. A well-calibrated candidate who correctly assigned ≥40% Miss probability to Q2/Q4 achieves Brier ≈ 0.11–0.13. The 0.15 threshold cleanly separates the two populations.
 
 ---
 

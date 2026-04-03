@@ -1,9 +1,9 @@
 # GDM Epistemic Bond — Phase 1 Coordinate List
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r079 → corrected by r081 (VAL-469)
+**Run:** r079 → corrected by r081 (VAL-469) → corrected by r082 (VAL-470)
 **Date:** 2026-04-03
-**Issue:** VAL-466 → updated by VAL-469
+**Issue:** VAL-466 → updated by VAL-469 → updated by VAL-470
 **Depends on:** phase0-launch-package.md (r078/VAL-465), executable-roadmap.md (r077/VAL-462)
 **Purpose:** Concrete, source-verified list of Phase 1 coordinates with real Q1 2026 earnings dates. Also resolves the "15 coordinates / 30 resolutions" reconciliation gap identified in this pass.
 
@@ -101,7 +101,7 @@ Wave 2 uses the second batch of Q1 2026 reporters and maintains diversity across
 | 19 | DE | Deere & Co | NYSE | May 16, 2026 | Industrials | FY2026 Q2 (Feb–Apr); typically mid-May |
 | 20 | HD | Home Depot | NYSE | May 20, 2026 | Consumer Disc. | Q1 FY2027 (Feb–Apr); typically mid-May |
 | 21 | WMT | Walmart | NYSE | May 15, 2026 | Consumer Staples | Q1 FY2027 (Feb–Apr); typically mid-May |
-| 22 | COST | Costco | NASDAQ | Jun 5, 2026 | Consumer Staples | Q3 FY2026 (Mar–May); adjust if needed |
+| 22 | LOW | Lowe's Companies | NYSE | ~May 21, 2026 | Consumer Disc. | Q1 FY2027 (Feb–Apr); replaces COST (Jun 5 — outside Phase 1 window); well-covered by sell-side |
 | 23 | TGT | Target | NYSE | May 21, 2026 | Consumer Disc. | Q1 FY2027; typically late May |
 | 24 | DIS | Walt Disney | NYSE | May 7, 2026 | Comm. Services | Q2 FY2026 (Jan–Mar); typically early May |
 | 25 | UBER | Uber | NYSE | May 7, 2026 | Tech/Transport | Q1 2026; typically early May |
@@ -117,6 +117,7 @@ Wave 2 uses the second batch of Q1 2026 reporters and maintains diversity across
 - [ ] Verify all Wave 2 dates via IR pages (priority: NVDA, CRM, WMT, HD — largest epistemic asymmetry)
 - [ ] Load confirmed Wave 2 coordinates into the contract before Week 4 start
 - [ ] Confirm Wall Street Horizon EPS consensus coverage for all 30 tickers
+- [ ] Verify LOW (Lowe's, ~May 21) reporting date on ir.lowes.com before loading as coordinate #22 (replaces COST)
 
 ---
 
@@ -179,8 +180,18 @@ Each new coordinate needs an initial `S_prev` (the market-implied prior probabil
 | HD | 78% | 0.78 |
 | DIS | 68% | 0.68 |
 | XOM | 65% | 0.65 |
+| CRM | 83% | **0.83** |
+| SHOP | 60% | **0.60** |
+| DE | 72% | 0.72 |
+| TGT | 64% | **0.64** |
+| UBER | 70% | 0.70 |
+| PYPL | 68% | 0.68 |
+| T | 75% | 0.75 |
+| VZ | 70% | 0.70 |
+| CVX | 65% | **0.65** |
+| LOW | 75% | 0.75 |
 
-*Source: Approximate based on public historical EPS beat/miss data. Verify with Wall Street Horizon historical data before loading. For all other Wave 2 tickers not listed, use 0.70 as default S_prev.*
+*Source: Approximate based on public historical EPS beat/miss data (2021–2025). All 30 Phase 1 tickers now have explicit S_prev values. Verify with Wall Street Horizon historical data before loading — these are initialization priors, not oracle values. Tickers in **bold** deviate materially from the 0.70 default and must not be left at 0.70. (r082/VAL-470: full S_prev table extended; COST replaced by LOW.)*
 
 ---
 
@@ -211,12 +222,14 @@ For an AMC reporter on April 16:
 | Technology | 4 | 4 | 8 |
 | Financials | 5 | 2 | 7 |
 | Communication Services | 2 | 3 | 5 |
-| Consumer Discretionary | 2 | 2 | 4 |
-| Consumer Staples | 0 | 3 | 3 |
+| Consumer Discretionary | 2 | 3 | 5 |
+| Consumer Staples | 0 | 2 | 2 |
 | Energy | 0 | 2 | 2 |
 | Healthcare | 1 | 0 | 1 |
 | Industrials | 0 | 1 | 1 |
 | **Total** | **15** | **17\*** | **30** |
+
+*Note: Consumer Discretionary count increases by 1 (COST→LOW) and Consumer Staples decreases by 1. Total remains 30. (r082/VAL-470)*
 
 *\*T (AT&T, est. Apr 23) and VZ (Verizon, est. Apr 21) in the Wave 2 list overlap with the Wave 1 timing window (April 14–May 1). These should be treated as Wave 1 coordinates for contract loading and commit-window purposes, even if they are listed in the Wave 2 planning table. Protocol team should load T and VZ into the contract alongside Wave 1 coordinates (by end of Week 3) and update the sector distribution table accordingly: Wave 1 count increases to 17, Wave 2 count decreases to 13. The 30-coordinate total is unchanged.*
 
@@ -227,8 +240,8 @@ For an AMC reporter on April 16:
 | Technology | 4 | 4 | 8 |
 | Financials | 5 | 2 | 7 |
 | Communication Services | 4 | 1 | 5 |
-| Consumer Discretionary | 2 | 2 | 4 |
-| Consumer Staples | 0 | 3 | 3 |
+| Consumer Discretionary | 2 | 3 | 5 |
+| Consumer Staples | 0 | 2 | 2 |
 | Energy | 0 | 2 | 2 |
 | Healthcare | 1 | 0 | 1 |
 | Industrials | 0 | 1 | 1 |

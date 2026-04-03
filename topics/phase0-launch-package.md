@@ -1,24 +1,46 @@
 # GDM Epistemic Bond — Phase 0–1 Launch Package
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r078 (VAL-465) → updated r080 (VAL-468) → corrected r081 (VAL-469)
+**Run:** r078 (VAL-465) → updated r080 (VAL-468) → corrected r081 (VAL-469) → corrected r082 (VAL-470)
 **Date:** 2026-04-03
-**Issue:** VAL-465 → updated by VAL-468 → updated by VAL-469
+**Issue:** VAL-465 → updated by VAL-468 → updated by VAL-469 → updated by VAL-470
 **Depends on:** real-world-validation.md (r076/VAL-461), executable-roadmap.md (r077/VAL-462 → r080/VAL-468), epistemic-bond-v0-spec.md (r077/VAL-462), knower-calibration-test.md (r079/VAL-466), phase1-coordinates.md (r079/VAL-466)
 **Purpose:** Final fine-tune and executable consolidation. Everything required to start Phase 0 this week — in one document. Updated in r080 to reflect 30-coordinate / two-wave structure per phase1-coordinates.md r079.
 
 ---
 
-## Status: Ready to Launch
+## Status: Ready to Launch — 8-Day Compressed Phase 0 Required
 
 The corpus is validated. No blocking research gaps remain for Phase 0–1. This document completes the handoff.
 
-Go/no-go: **GO on Phase 0 and Phase 1**, with four corrections already applied in r077 (unit pricing → $1 USDC, oracle sources, L1 scope clarification, Phase 1 exit criterion → T_i ≥ 0.5), and one structural correction applied in r080 (coordinate count: 15 → 30 across two waves; Phase 1 duration: 4 weeks → 6–7 weeks).
+Go/no-go: **GO on Phase 0 and Phase 1**, with four corrections already applied in r077 (unit pricing → $1 USDC, oracle sources, L1 scope clarification, Phase 1 exit criterion → T_i ≥ 0.5), one structural correction applied in r080 (coordinate count: 15 → 30 across two waves; Phase 1 duration: 4 weeks → 6–7 weeks), and two coordinate corrections applied in r082 (COST replaced by LOW; S_prev table fully completed for all 30 tickers).
 
-**The three things that need to happen this week:**
-1. Engineering lead sets up the Arbitrum Sepolia testnet environment and integrates PRBMath v4 + USDC mock
-2. BD lead builds the 50-person knower outreach list and sends the calibration test
-3. Protocol team confirms the 30 Phase 1 earnings coordinates (Wave 1 confirmed dates + Wave 2 estimated dates) per `phase1-coordinates.md`
+**⚠️ CRITICAL TIMELINE ALERT (r082/VAL-470):** Today is April 3, 2026. The first Wave 1 commit window opens **April 11** (48 hours before the April 12 consensus freeze for April 14 BMO reporters GS, JPM, WFC, C). That is **8 calendar days**, not the 21 days the three-week Phase 0 plan assumed. Phase 0 must be compressed and parallelized immediately to capture Wave 1.
+
+**The three things that need to start TODAY:**
+1. Engineering: set up Foundry + PRBMath v4 + USDC mock; deploy `register()` to Arbitrum Sepolia by EOD
+2. BD: build 50-person outreach list and send calibration test to first 20 candidates today
+3. Protocol team: confirm Wave 1 coordinate dates and init S_prev values against phase1-coordinates.md
+
+---
+
+## Accelerated 8-Day Critical Path (r082/VAL-470)
+
+The existing Week 1/2/3 plan is correct in content but was written assuming a 21-day Phase 0. The actual window is 8 days. All three tracks must run in parallel from Day 1.
+
+| Day | Engineering | BD | Protocol |
+|-----|-------------|----|----|
+| **Day 1 (Apr 3)** | Foundry init; PRBMath v4 + OZ; USDC mock deployed to Arbitrum Sepolia; `register()` live | 50-person outreach list finalized; calibration test sent to first 20 | S_prev table reviewed; Wave 1 IR page verification begun |
+| **Day 2 (Apr 4)** | `EpistemicBondRegistry.sol` complete: `register()`, `trackRecord()`, `credibilityWeight()` | Follow-up to first 20 outreach; begin second batch of 30 | Confirm ALL Wave 1 dates (BAC, GOOGL, V, UNH, INTC) via IR pages |
+| **Day 3 (Apr 5)** | `commit()` with sealed-commitment scheme | Calibration test scoring begins; identify top-30 for next step | Wall Street Horizon account active; query consensus for all 15 Wave 1 tickers |
+| **Day 4 (Apr 6)** | `reveal()` + `computeSPublic()` (LOP aggregation) | Top-15 knower invitations sent | Load Wave 1 coordinate parameters into staging sheet |
+| **Day 5 (Apr 7)** | `resolveOracle()` + `settle()` + circuit breaker | Wallet setup sessions with accepted knowers | Oracle relay: EDGAR API integration tested |
+| **Day 6 (Apr 8)** | Oracle relay service live on Arbitrum Sepolia; all three sources connected | Continue wallet setup; 10 knowers registered on testnet by EOD | Wave 1 S_prev values finalized; load coordinates into testnet contract |
+| **Day 7 (Apr 9)** | End-to-end testnet run: 3 synthetic epochs, 5 mock knowers; fuzz tests for `_computeReward` | 15 knowers registered on testnet; registration confirmed on-chain | Verify oracle relay test resolution against 3 historical 8-K filings |
+| **Day 8 (Apr 10)** | Security checklist; TOWL zone check; all 30 coordinates loaded + S_prev initialized | 15 knowers receive Phase 1 briefing; commit window instructions sent | Final go/no-go check: contract, oracle, 15 knowers, 30 coordinates |
+| **Apr 11** | **FIRST COMMIT WINDOW OPENS — Wave 1 BMO reporters (GS, JPM, WFC, C)** | | |
+
+**Fallback if Day 8 is incomplete:** Allow GS, JPM, WFC, C (April 14 BMO batch) to be observer coordinates — oracle resolution captured but no knower claims. Phase 1 runs on 26 active coordinates from April 15. Exit criterion revised: ≥26 resolved predictions per knower.
 
 Everything else is sequenced below.
 
@@ -528,11 +550,13 @@ This package adds the missing operational artifacts. The canonical technical and
 
 ## Final Call to Action
 
-**Engineering:** PRBMath v4 + USDC mock + `register()` function live on Arbitrum Sepolia testnet by **end of Week 1**. If this slips, Phase 1 slips.
+**⚠️ TIMELINE COMPRESSION (r082/VAL-470):** The original "end of Week 1" deadlines are now **Day 1–2 deadlines** (April 3–4). See the Accelerated 8-Day Critical Path above.
 
-**BD:** 50-person outreach list built and calibration test sent to first 20 candidates by **end of Week 1**. Recruitment takes 3 weeks; it must run in parallel with engineering, not sequentially.
+**Engineering:** PRBMath v4 + USDC mock + `register()` function live on Arbitrum Sepolia testnet by **end of Day 1 (April 3)**. Full contract + oracle relay complete by **Day 8 (April 10)**. If this slips, Wave 1 (April 14 BMO reporters) slips.
 
-**Protocol team:** All 30 Phase 1 coordinates (Wave 1: 15 confirmed dates, Wave 2: 15 estimated dates per `phase1-coordinates.md`) verified with consensus sources by **end of Week 1**. Wave 1 IR page verification checklist must complete by end of Week 3. Oracle relay cannot be tested without real coordinate data.
+**BD:** 50-person outreach list built and calibration test sent to first 20 candidates by **end of Day 1 (April 3)**. Recruitment must run in parallel with engineering from Day 1. Target: 15 knowers registered on testnet by Day 8.
+
+**Protocol team:** All 30 Phase 1 coordinates (Wave 1: 15 confirmed dates, Wave 2: 15 estimated dates per `phase1-coordinates.md`) verified with consensus sources and S_prev initialized by **Day 6 (April 8)**. LOW replaces COST as coordinate #22 — verify LOW IR date at ir.lowes.com.
 
 **Next trigger:** Phase 1 exit checkpoint at Week 10 (30 epochs complete across both waves). Report to founders: T_i distribution, oracle resolution rate, Sybil monitor status. If all 6 exit criteria are green, proceed to Phase 2 unknower soft launch.
 
