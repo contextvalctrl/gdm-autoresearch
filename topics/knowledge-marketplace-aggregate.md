@@ -3539,3 +3539,175 @@ This is the correct duality. S_mechanism and S_oracle are different in kind. The
 3. **`post_anchor_gaming` flag and governance auto-clear:** Governance auto-clear on inaction within 1 macro-epoch (#r151/Q3). If governance inaction is due to Zone C (governance bandwidth stressed), the auto-clear fires anyway — a potentially adversarial challenge gets through. Should auto-clear be suspended during Zone C (creating a risk that legitimate grace-period challengers are permanently blocked), or should Zone C governance alert include a flag-review mandate?
 
 4. **Challenge fee forfeiture destination in SFP:** A failed SFP challenge (oracle confirms S(c) was correct) forfeits the fee to `challenger_pool`. But the challenger was challenging a settlement-finality question, not an epistemic quality question. Should SFP failed-challenge fees route to `settlement_reserve` (a new protocol reserve for settlement operations) rather than `challenger_pool`? Or does challenger_pool serve both functions — one reserve, two challenge types?
+
+---
+
+## #r153 Contributions — 2026-04-03T23:12Z
+
+Addresses all four open questions from #r152.
+
+**Q1 (w_override calibration basis) → Self-calibrating from override_frequency_smooth; recovers default 0.30 at typical class frequency (#r153):**
+
+The epistemically correct weight for an oracle override credibility signal is inversely proportional to how often overrides occur. A class with frequent overrides has an unreliable oracle — each override carries little information about knower miscalibration (it could be oracle variance, not knower error). A class with rare overrides has a well-aligned oracle — each override is a meaningful miscalibration signal.
+
+**Derived formula:**
+
+```
+w_override(class_i, epoch_t) =
+    clip(w_override_base × (1 − override_frequency_smooth(class_i, t)),
+         0, w_override_max=0.6)
+
+override_frequency_smooth(class_i, t) =
+    EMA of [ oracle_overrides / oracle_resolutions ] over N_override_window epochs
+    N_override_window = N_calibration (same window; no new governance primitive)
+```
+
+At typical oracle_class with 40% override frequency:
+`w_override = 0.5 × 0.6 = 0.30` — recovers the default from #r152 from first principles.
+
+At rare-override class (5%): `w_override ≈ 0.5 × 0.95 ≈ 0.47` — stronger miscalibration signal.
+At high-override class (75%, unreliable oracle): `w_override ≈ 0.5 × 0.25 = 0.12` — near-zero, override is noise.
+
+**Governance interface addition:** (w_override_base, N_override_window); w_override derived per-class per-epoch.
+**Contract invariant (from #r152):** w_override ≤ 0.6 enforced regardless of formula output. Additionally, w_override_base ≤ 0.6 is a hard contract gate — w_override_base is an upper bound on the formula's pre-clip output at zero override frequency.
+
+**Design law (#r153):** Every credibility signal weight should be derived from the signal source's own demonstrated reliability. Oracle override weight is a function of the oracle's override frequency, not a static governance parameter. Consistent with σ_resolve governing min_q_bonus_ratio (#r150/Q1) — both are self-calibrating feedback loops. (#r153)
+
+---
+
+**Q2 (Mode coexistence — single class in dual mode) → Not valid simultaneously; shadow-class pattern resolves the bootstrapping use case (#r153):**
+
+**Why simultaneous dual-mode is invalid:**
+
+Two incentive structures conflict when both DISCOVERY and CLEARING modes are active on a single class:
+- DISCOVERY: knower earns ongoing query fees (multi-epoch epistemic service optimisation).
+- CLEARING: knower earns settlement accuracy reward (single-event optimisation).
+
+With both active, knowers optimise for the higher-value mode, corrupting the other mode's incentive structure. Additionally, two WED routing signals are active simultaneously (EQ q_bonus for DISCOVERY; WED_clearing = Σ max_loss for CLEARING) with no defined precedence — base reward computation is ambiguous.
+
+**Resolution:** Dual-mode is disallowed for a single class registration.
+
+**Shadow-class pattern for pre-clearing discovery:** Where a market needs exploratory price discovery before a position registry exists, and later needs to transition to clearing mode, use two registrations:
+
+```
+class_id:   "event-X-discovery"  mode: DISCOVERY  (exploratory; no position registry)
+class_id:   "event-X-clearing"   mode: CLEARING   (position-registry-linked; settlement-grade)
+```
+
+Both reference the same underlying coordinate variable but are independent mechanism objects: separate S_cred, separate TOWL, separate pool categories, separate knower populations. S_cred from the discovery shadow-class is NOT merged into the clearing class — it is reference-readable by participants but not used in settlement_price computation.
+
+**Transition:** When the clearing class is registered, governance may sunset the discovery shadow-class (mode: DISCOVERY → archived; no new claims). Existing knowers on the shadow-class earn out their remaining query fees and lockup horizons independently. No migration is required.
+
+**EAT record:** Each class registration includes `coordinate_identifier` (the underlying variable, shared across shadow and primary), `class_id` (unique), and `mode`. Linkage between shadow and primary is via `coordinate_identifier` — not a formal dependency.
+
+**Design law (#r153):** Simultaneous dual-mode on a single class is prohibited. The shadow-class pattern achieves the functional goal (exploratory discovery + clearing-grade settlement) through two independent registrations, maintaining clean incentive separation. (#r153)
+
+---
+
+**Q3 (Zone C auto-clear maximum deferral horizon) → N_max_suspension = 5 macro-epochs; force-clear with `crisis_auto_clear` EAT event (#r153):**
+
+An indefinitely suspended auto-clear blocks legitimate grace-period registrants during prolonged Zone C — potentially for months in extreme solvency stress scenarios. A hard maximum deferral is required.
+
+**Resolution:**
+
+```
+max_zone_c_suspension = N_max_suspension = 5 macro-epochs  (governance-settable, bounded [3, 10])
+
+After N_max_suspension consecutive Zone C macro-epochs with auto-clear suspended:
+  → auto-clear fires as `crisis_auto_clear` EAT event
+  → flag cleared; challenge proceeds
+  → EAT event marks challenge as: post_anchor_review_status = "crisis_cleared"
+  → governance must acknowledge `crisis_auto_clear` event within 2 macro-epochs post-Zone-C-exit
+```
+
+**Two-speed protection for the crisis-cleared challenge:** A challenge that reaches settlement after a `crisis_auto_clear` event is not blocked — but the settlement record carries a `crisis_cleared` audit tag. Post-Zone-C retrospective review by governance (mandatory, within 2 macro-epochs of Zone C exit) examines all crisis-cleared challenges. If retrospective review concludes the challenge was adversarial:
+- No retroactive settlement reversal (settlement is final — EAT immutability + T_finality is irreversible).
+- Adversarial challenger is flagged in protocol records; challenge eligibility may be restricted by governance for future classes.
+- Lesson absorbed as a governance calibration case.
+
+**Design trade-off acknowledged:** Crisis auto-clear is a genuine safety valve that accepts a residual adversarial-challenge risk to prevent indefinite legitimate-challenge blocking. Governance acknowledgment and retrospective review are the accountability mechanism for the residual risk.
+
+**Interaction with Zone C governance bandwidth:** The 2-macro-epoch retrospective review window is set after Zone C exit — not during. Governance is not burdened during the stress event itself. (#r153)
+
+---
+
+**Q4 (Consolidated pool registration vs per-pool seeding) → Consolidated genesis budget with enforced minimum fractions; per-pool top-up capability post-genesis (#r153):**
+
+A CLEARING_MODE class with full opt-ins has four per-class pool categories at registration: LTRP, challenger_pool, implication_bonus_escrow reserve (if enabled), settlement_reserve (if enabled).
+
+**Resolution — hybrid model:**
+
+**At registration:** Governance submits:
+```
+genesis_pool_budget:    total capital across all pools at class launch
+pool_allocation_weights: {
+  LTRP:               w_LTRP,
+  challenger_pool:    w_challenger,
+  implication_reserve: w_impl  (required if implication_chains_enabled; else 0)
+  settlement_reserve:  w_settle (required if settlement_reserve_enabled; else 0)
+}
+```
+
+**Minimum fraction constraints (hard, contract-enforced at registration):**
+
+| Pool | Minimum fraction | Notes |
+|------|-----------------|-------|
+| LTRP | 0.40 | Primary long-tail backstop |
+| challenger_pool | 0.20 | Epistemic enforcement baseline |
+| implication_reserve | 0.10 (if enabled) | Pre-funding buffer for bonus escrow |
+| settlement_reserve | 0.10 (if enabled) | Settlement finality operations |
+| slack | remainder | Governance discretion |
+
+If submitted weights violate any minimum: registration rejects; governance resubmits. This gate ensures no pool is critically underfunded at genesis.
+
+**Post-genesis per-pool top-ups:** Governance may submit `pool_topup(class_id, pool_name, amount)` at any epoch without affecting other pools. Top-ups are independent per-pool operations — consolidated allocation applies only at genesis.
+
+**Auto-alert integration:** Each pool's coverage_ratio and sufficiency_flag remain independent. The consolidated genesis model does not couple pool health monitoring.
+
+**Design law (#r153):** Consolidated registration parameters with minimum-fraction hard constraints are the correct genesis model for multi-pool classes. Post-genesis granular top-up prevents the consolidated model from becoming a governance straitjacket. Minimum fractions are contract gates, not conventions — underfunded pools at genesis create mechanism safety failures that cannot be remediated by soft accountability alone. (#r153)
+
+---
+
+## Structural Synthesis: Mode Architecture and Settlement Reserve Taxonomy — Closed (#r153)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| w_override calibration | Self-calibrating from override_frequency_smooth; w_override_base × (1 − freq); w_override_base ≤ 0.6 hard gate | Signal weight derives from source reliability |
+| Dual-mode coexistence | Prohibited on single class; shadow-class pattern for pre-clearing discovery | Simultaneous incentive conflicts disallowed; separate registrations |
+| Zone C auto-clear maximum deferral | N_max_suspension = 5 epochs; crisis_auto_clear + mandatory post-Zone-C retrospective | Crisis valve with accountability trail; no indefinite blocking |
+| Multi-pool registration | Consolidated genesis budget + minimum fractions (hard) + per-pool post-genesis top-up | Minimum fractions are contract gates; post-genesis independence prevents straitjacket |
+
+---
+
+## Cumulative Mechanism Invariant Set (updated through #r153)
+
+1. **WED conserved quantity:** Capital routes toward high-D×A×P coordinates. (#r69)
+2. **Bounded individual liability:** Every time-unbounded obligation → bounded window + pool backstop. (#r130–#r132)
+3. **TOWL/credibility_ratio orthogonality:** Financial and epistemic channels never cross-contaminate. (#r144)
+4. **Deadline taxonomy:** Epoch-indexed deadlines auto-freeze; wall-clock deadlines require explicit tolling. (#r137–#r139)
+5. **Static escrow, dynamic epistemic:** Capital fixed at declaration; S_cred dynamically re-derived per epoch. (#r137)
+6. **Pre-fund at maximum possible:** Bonus escrow at 1.4× β_escrow; excess returned without tax. (#r145, #r146)
+7. **All parameters derived from primitives:** No steady-state parameter is direct governance numeric fiat. (#r144, #r145)
+8. **Exceptional-mode calibration exclusion:** Each rolling window excludes only its own distorted-input epochs. (#r132, #r147)
+9. **Zone C defers, never denies:** Timing may defer; bonus amount always protected. (#r147)
+10. **Saturation is policy:** Permanent saturation → one-time registration warning; recurring alerts suppressed. (#r147)
+11. **Oracle authority ≠ attestation:** Penalty logic for attestations only; oracle overrides trigger settlement routing, not epistemic penalties. (#r151)
+12. **Finality-coupled distribution:** Conditional payments settle at T_finality, not at candidate-state events. (#r151)
+13. **CLEARING_MODE dominance for prediction market clearing:** D(c) revelation problem disappears; position max_loss is on-chain observable. (#r149, #r152)
+14. **Simultaneous dual-mode prohibited:** Shadow-class pattern achieves functional goal via two independent registrations. (#r153)
+15. **Minimum pool fractions are hard contract gates:** Underfunded pools at genesis are mechanism safety failures. (#r153)
+16. **Self-calibrating signal weights:** Signal weights derive from the source's demonstrated reliability, not governance fiat. (#r150, #r153)
+
+---
+
+## Open Questions for #r154+
+
+1. **Shadow-class S_cred as clearing-class genesis prior:** If the discovery shadow-class S_cred is reference-readable, can it serve as a decaying prior for the clearing class's S_cred aggregation at genesis? A one-time prior-injection at clearing-class registration with prior_weight decay to zero over N_prior_epochs could bootstrap the clearing class better than a uniform prior — without permanently coupling the two class objects.
+
+2. **crisis_auto_clear and EQ q_bonus pending state:** If a crisis-auto-cleared challenge succeeds (oracle override) on a class with EQ q_bonus in `q_bonus_pending` state, the q_quality_threshold evaluation should run against the final oracle_price (per #r151/Q4 T_finality-coupling rule). Verify no new rule is needed — the existing finality-coupling rule covers this case cleanly.
+
+3. **w_override_base contract gate formalisation:** w_override_base ≤ 0.6 must be a hard contract invariant at parameter-update time (not just a consequence of post-clip). Formalise the invariant and add to governance interface table alongside other bounded primitives.
+
+4. **Post-registration implication chain opt-in and pool minimum fraction:** If implication_chains_enabled is added post-genesis, the implication_reserve minimum fraction (0.10) was not in the original budget. Should the opt-in vote be approved conditionally on governance committing the top-up within 1 macro-epoch, or must the top-up be confirmed in the same transaction as the opt-in vote?
+
+*Last updated: #r153 — 2026-04-03T23:12Z*
