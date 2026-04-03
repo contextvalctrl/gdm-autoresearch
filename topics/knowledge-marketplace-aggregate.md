@@ -3711,3 +3711,179 @@ If submitted weights violate any minimum: registration rejects; governance resub
 4. **Post-registration implication chain opt-in and pool minimum fraction:** If implication_chains_enabled is added post-genesis, the implication_reserve minimum fraction (0.10) was not in the original budget. Should the opt-in vote be approved conditionally on governance committing the top-up within 1 macro-epoch, or must the top-up be confirmed in the same transaction as the opt-in vote?
 
 *Last updated: #r153 — 2026-04-03T23:12Z*
+
+---
+
+## #r154 Contributions — 2026-04-03T23:22Z
+
+Addresses all four open questions from #r153. Adds one net-new structural insight: shadow-class pattern closes the one-shot clearing incentive gap.
+
+---
+
+**Q1 (Shadow-class S_cred as clearing-class genesis prior) → One-time prior injection with mode-mismatch attenuation and N_prior_epochs decay; credibility_ratio does NOT transfer (#r154):**
+
+Discovery shadow-class S_cred captures the same underlying coordinate's probability distribution as the clearing class needs at genesis. A uniform prior discards real information. The question is whether the signal is contaminated by mode-mismatch.
+
+**Mode-mismatch analysis:**
+
+Discovery-mode knowers optimise for multi-epoch query fee accumulation. Clearing-mode knowers optimise for single-event settlement accuracy on high-WED_clearing positions. The posterior distributions they produce are both honest conditional on their information — but their time-horizon optimisations differ. A discovery knower who is right about direction but imprecise on magnitude may be well-calibrated for discovery-mode rewards but poorly calibrated for clearing-mode settlement-price precision.
+
+**Resolution — attenuated prior injection:**
+
+```
+S_clearing_genesis(c) = α_prior_effective × S_discovery_snapshot(c)
+                      + (1 − α_prior_effective) × uniform_prior
+
+α_prior_effective = α_prior_base × max(0, 1 − shadow_age / staleness_window_shadow)
+                  × (1 − mode_mismatch_discount)
+
+mode_mismatch_discount = 0.30 (governance-settable, bounded [0.0, 0.5])
+   reflects that discovery calibration ≠ clearing precision
+α_prior_base = 0.5 (governance-settable, bounded [0.0, 0.8])
+staleness_window_shadow = the shadow class's registered staleness_window
+shadow_age = macro-epochs since last S_discovery update
+```
+
+**Decay over clearing-class epochs:**
+
+```
+α_prior_effective_at_epoch_t = α_prior_effective_at_genesis × (1 − t / N_prior_epochs)
+N_prior_epochs = 4 macro-epochs  (governance-settable at clearing-class registration)
+```
+
+By epoch N_prior_epochs, prior contribution is zero; clearing class is fully self-standing.
+
+**Critical constraint:** Shadow-class S_cred is a **read-only genesis prior**, not a live feed. The clearing class reads a snapshot at registration time. Shadow and clearing class remain independent mechanism objects.
+
+**credibility_ratio does NOT transfer:** Individual knower calibration from the discovery shadow-class is not imported to the clearing class. Knowers must build a fresh clearing-class track record. This prevents discovery-track-record exploitation for clearing-class warranty obligations.
+
+**EAT record:** Clearing-class registration event includes `genesis_prior_source: shadow_class_id` and `α_prior_effective_at_genesis`. All future S_cred updates are clearing-class-native. (#r154)
+
+---
+
+**Q2 (crisis_auto_clear × EQ q_bonus pending — verification) → Existing finality-coupling rule covers this cleanly; no new rule required (#r154):**
+
+Scenario: T_anchor fires → q_bonus_pending → Zone C begins → settlement-finality challenge window defers → Zone C persists ≥ 5 epochs → crisis_auto_clear fires → SFP challenge succeeds → oracle_settlement_override → T_finality reached.
+
+**Verification against #r151/Q4:** Rule: q_bonus settles at T_finality; q_quality_threshold evaluated against oracle_price if oracle_settlement_override occurs. At T_finality, standard evaluation runs against oracle_confirmed_value. No new rule needed.
+
+**The only non-obvious interaction:** Zone C deferral tolls the settlement-finality challenge window expiry. T_finality cannot be reached until the challenge window closes. Therefore q_bonus cannot expire before T_finality — the deferral and expiry tolling are coupled through the challenge window lifecycle.
+
+**Design law confirmed (#r154):** Finality-coupling is self-consistent under crisis auto-clear. Conditional payment suspension + challenge-window expiry tolling + Zone C deferral all extend together through any Zone C duration. No separate q_bonus tolling rule is required. (#r154)
+
+---
+
+**Q3 (w_override_base contract gate formalisation) → Hard bounds [0.0, 0.6]; phantom range above clip max eliminated (#r154):**
+
+The formula: `w_override = clip(w_override_base × (1 − freq), 0, 0.6)`. A w_override_base above 0.6 would always be clipped — creating a phantom governance range.
+
+**Resolution:**
+
+Contract invariant at parameter-update time:
+```
+w_override_base ∈ [0.0, 0.6]
+```
+
+Any governance proposal with w_override_base outside this range is rejected without execution.
+
+**Updated governance interface:**
+
+| Parameter | Hard contract bounds | Derived output |
+|---|---|---|
+| w_override_base | [0.0, 0.6] | w_override = clip(w_override_base × (1 − override_freq_smooth), 0, 0.6) |
+
+**Design law confirmed (#r154):** Governance input parameters must be bounded to exclude the phantom range above the derived quantity's natural ceiling. The clip is a secondary safety rail; the hard bound is the primary constraint. Pattern: [input_bound ≤ output_max_clip]. (#r154)
+
+---
+
+**Q4 (Post-registration implication chain opt-in — atomic top-up requirement) → Atomic phase 2: activation + pool confirmation in same transaction; two-phase permitted for multisig architectures (#r154):**
+
+Pool minimum fractions are pre-conditions for feature activation, not post-conditions (#r153). Activating implication_chains_enabled without simultaneously funding implication_reserve creates a safety gap — even for 1 macro-epoch.
+
+**Resolution:**
+
+```
+implication_chain_optin_tx = {
+  enable_feature:   true,
+  pool_top_up:      amount ≥ 0.10 × current_class_pool_total,
+  pool_destination: class_id.implication_reserve
+}
+```
+
+The contract rejects any opt-in where pool_top_up < minimum. Feature does not activate until pool confirmation is atomic in the same transaction.
+
+**current_class_pool_total:** Sum of all active class pools at opt-in time (LTRP + challenger_pool + any others currently active). Not original genesis budget.
+
+**Two-phase for governance multisig architectures:**
+
+- **Phase 1:** Commit top-up amount to `implication_reserve_seed_pending` (token movement only; no feature activation).
+- **Phase 2 (atomic):** Execute opt-in referencing Phase 1 escrow. Contract verifies escrow ≥ minimum, then atomically transfers to implication_reserve + activates feature.
+
+Phase 1 escrow has timeout T_optin_timeout = 4 macro-epochs; returns to governance treasury on expiry if Phase 2 is not executed.
+
+**Design law (#r154):** Pool minimum fractions are pre-conditions; never post-conditions. Feature activation is always atomic with pool confirmation. Two-phase architectures are permitted; phase 2 (activation) is always atomic. No feature activation with pending-unfunded pool is valid. (#r154)
+
+---
+
+## Net-New Structural Insight: Shadow-Class Pattern Closes the One-Shot Clearing Incentive Gap (#r154)
+
+**The gap:** In CLEARING_MODE for a recurring coordinate class, knowers invest in credibility_ratio because it compounds over multiple clearing events. For a **one-shot clearing market** (unique, non-repeating event), the coordinate class closes after one resolution. No future clearing events → no future track record value → no future query fees → effective incentive collapses to "collateralised prediction market." The mechanism becomes LMSR with a different scoring rule.
+
+**The fix is the shadow-class pattern from #r153/Q2, applied to one-shot events (#r154):**
+
+```
+shadow_class:   "event-X-discovery"  mode: DISCOVERY  (multi-epoch; runs before event)
+clearing_class: "event-X-clearing"   mode: CLEARING   (single resolution; runs at settlement)
+```
+
+Knowers invest in the discovery shadow-class:
+1. Earn query fees over multiple epochs from unknowers who want pre-event state estimates.
+2. Build credibility_ratio — portable to other discovery classes via standard attenuated carry-over (#r71).
+3. Contribute to the genesis prior of the clearing class via Q1 attenuated prior injection.
+
+The clearing class at registration: inherits discovery S_cred as attenuated genesis prior → single settlement event → closes after resolution.
+
+**Shadow-class dual purpose (formally confirmed):**
+
+| Use case | Shadow-class role | Clearing-class role |
+|---|---|---|
+| New recurring class bootstrapping (#r153/Q2) | Exploratory discovery before position registry | Production clearing after position registry |
+| One-shot event (#r154) | Multi-epoch knowledge accumulation + track record | Single-event settlement with discovery genesis prior |
+
+In both cases: shadow-class = epistemic investment layer; clearing-class = financial settlement layer.
+
+**Why knowers participate in the discovery shadow-class for a one-shot event:**
+
+1. Query fee income during discovery phase — real ongoing revenue from unknowers.
+2. Credibility_ratio is portable — not stranded on class closure.
+3. Genesis prior contribution — accurate discovery-phase knowers have higher-weight genesis prior in the clearing class, increasing their effective S_cred influence at settlement.
+
+**This resolves the mechanism's last major incentive gap for prediction market applications.** One-shot markets are not structurally inferior under this framework — they are identical in incentive structure to recurring markets, distributed over the two-registration construct. (#r154)
+
+---
+
+## Structural Synthesis: Mechanism Closure State After #r154 (#r154)
+
+| Feature | Resolution | Law |
+|---|---|---|
+| Shadow-class genesis prior | Attenuated by mode-mismatch and age; decays N_prior_epochs; credibility_ratio not transferred | Prior ≠ authority; read-only snapshot; no ongoing coupling |
+| crisis_auto_clear × EQ q_bonus | Covered by finality-coupling rule; no new rule needed | Zone C deferral + expiry tolling + pending state extend together |
+| w_override_base contract gate | Hard bounds [0.0, 0.6]; phantom range eliminated | Input bounds ≤ output ceiling; clip is secondary rail |
+| Post-registration implication opt-in | Atomic phase 2; two-phase for multisig; phase 2 always atomic | Pool fractions are pre-conditions; activation = confirmation |
+| One-shot clearing incentive gap | Shadow-class two-registration pattern resolves collapse | Discovery layer (multi-epoch) + clearing layer (single-event) |
+
+**Invariant #17 (#r154):** One-shot clearing markets always use the shadow-class two-registration pattern. Single-registration one-shot clearing degrades to collateralised prediction market and is structurally inferior.
+
+---
+
+## Open Questions for #r155+
+
+1. **Genesis prior mode-mismatch discount calibration:** The default `mode_mismatch_discount = 0.30` is reasoned but not formally derived. Should it be self-calibrating — a function of observed calibration divergence between discovery-mode scores and clearing-mode oracle-divergence scores on the same coordinate class?
+
+2. **N_prior_epochs optimisation:** 4 macro-epochs is the default decay horizon. Too short: clearing class inherits stale prior before its own track record is built. Too long: clearing class dominated by discovery-mode calibration past knower credibility. An information-theoretic derivation based on relative credibility_ratio growth rate vs. prior decay rate would give the optimal N_prior_epochs.
+
+3. **One-shot clearing shadow-class wind-down protocol:** After clearing-class oracle resolution, the shadow-class archives. Specify the wind-down epoch sequence: oracle fires on clearing-class → shadow-class enters wind-down → no new claims → all escrows release at T_longtail → shadow-class closes. Define the complete wind-down state machine.
+
+4. **Cross-class credibility portability from archived shadow-class:** Credibility_ratio earned on an archived shadow-class carries over via attenuated formula (#r71): n_T2_resolutions / N_anchor. For a one-shot shadow-class with fewer resolutions than N_anchor, carry-over is fractional. Is this correct — one-shot track records carry less weight than multi-event track records? Or should the formula be adjusted for the structural difference between an archived (one-shot) and a live class?
+
+*Last updated: #r154 — 2026-04-03T23:22Z*
