@@ -348,3 +348,145 @@ r1 described three implicit design variants. Explicit kill analysis:
 ---
 
 *This document is cumulative. Each run adds net-new synthesis only. Superseded ideas are updated in-place with run reference tags.*
+
+---
+
+## R3 Additions — 2026-04-03
+
+### 3a. Oracle Regress — Termination Condition (#r3)
+
+r2 left the oracle staking problem open: oracle providers need to be credibility-bonded, but who bonds the meta-oracle? The infinite regress must terminate somewhere.
+
+**The key reframe**: Regress terminates at *cost*, not at *truth*.
+
+You do not need the oracle to be epistemically perfect. You need oracle manipulation to be more expensive than the benefit from manipulation. This is a game-theoretic termination condition, not an epistemic one. The design goal is: `cost_to_manipulate_oracle > max_gain_from_manipulation`. (#r3)
+
+**Concrete mechanism: Dispute-bond oracle**
+
+Oracle fires with value θ_oracle. A dispute window T_dispute opens (e.g. 24 hours). Any party can post a counter-oracle bond δ_dispute claiming θ_oracle is wrong. If δ_dispute exceeds a threshold (e.g. 10× protocol fee), a meta-review is triggered. The meta-reviewer is a multi-sig governance committee — this IS a trust anchor, but it terminates the regress. Key properties:
+
+1. Dispute bonds must exceed the benefit of false disputes (prevents spurious disputes from informants who lost on a truthful oracle).
+2. Successful disputes slash the original oracle provider's stake (not just the bond).
+3. Oracle providers post a *pre-committed* stake before the claim window opens, locked until after dispute window closes. This prevents oracle providers from holding positions that benefit from their own manipulation.
+
+**Role separation via capital lockup**: Oracle providers with locked pre-committed stake cannot also be informants in the same round (their capital is committed). This structurally separates the oracle-provider role from the informant role, preventing the "stake on θ, then manipulate oracle to confirm" attack identified in §6. Dual-role participation is possible but requires 2× capital: once for the oracle stake and once for the informant stake. The cost of the attack rises proportionally. (#r3)
+
+**Which facts need Schelling-point vs. dispute-bond oracles**: For questions where truth is publicly observable (fed rate decision, election outcome, sports result), a pure Schelling-point oracle is sufficient — manipulation is detectable by any observer and coordination to dispute is free. No staking needed. For questions where truth is contested or privately observed (startup valuation, private company metrics, proprietary data), dispute-bond oracles with governance backstop are required. PSS should distinguish these two oracle tiers at question-posting time. (#r3)
+
+---
+
+### 3b. Correlation Detection — Practical Design (#r3)
+
+r2 identified wash-credibility (sybil cluster building correlated reputation) as an open problem but provided only a heuristic correlation penalty.
+
+**The right diagnostic**: Track *claim residual correlation* — correlation between informant claims after removing the public-signal component. Correlated claims driven by the same news are not attacks; correlated claims that cannot be explained by observable public information are suspicious.
+
+**Operationally**: Each claim round, the protocol publishes a "public information baseline" θ_baseline (e.g. the LMSR-equivalent of current prediction-market prices). Informant i's residual is `r_i = θ_i - θ_baseline`. If agents A, B, C have high pairwise correlation in their *residuals* across N rounds (not in their raw claims), they are likely coordinating on private signal coordination or sybil-washing rather than independently observing the same public information. (#r3)
+
+**Residual correlation penalty**:
+```
+ρ_ij = corr(r_i, r_j) over last N rounds
+effective_R_i = R_i * (1 - max_j≠i ρ_ij * penalty_weight)
+```
+Where `penalty_weight ∈ [0, 1]` is a protocol parameter. Setting it to 0.5: an informant with a perfectly correlated sybil twin has effective R halved.
+
+**Coordination timing defense**: Even if sybil agents want to coordinate claims, sealed commitments + randomized window-close timing (Poisson-distributed close signal) break the coordination timing. Sybils can pre-agree on a target θ, but if they cannot see each other's commitments until post-reveal, randomized window timing means they cannot confirm coordinated participation before the window closes. This makes coordination costly (requires pre-round communication that is off-protocol and detectable via social-layer monitoring). (#r3)
+
+**Remaining gap**: Agents with a shared employer or common information source will naturally have correlated residuals without being sybils. The mechanism cannot distinguish "same firm, shared research" from "same person, multiple wallets." This is an accepted limitation — the protocol can penalize claim clusters without making a legal determination about their origin. (#r3)
+
+---
+
+### 3c. Equilibrium Welfare Conjecture — When PSS Beats LMSR (#r3)
+
+**Informal conjecture**: In a setting where K << N agents have high-quality private signals (K much less than N), and these agents are privacy-sensitive about their signal structure, PSS achieves higher information aggregation efficiency than LMSR. (#r3)
+
+**Argument**:
+LMSR aggregates signals through price movement. Each informed trade reveals directional signal strength through price impact. A K-informed agent with strong private signal must choose: trade aggressively and reveal their signal (enabling free-riding by other agents who piggyback on their price impact), or trade conservatively and under-reveal to protect their information advantage. This is Kyle (1985)'s strategic informed trading problem. LMSR informed agents face the same tradeoff: large trades = more profit but more signal revelation.
+
+PSS eliminates this tradeoff for informed agents. The informant's claim is delivered *privately* to the subscriber — no price signal leaks to non-subscribers. The informant still reveals their claim at resolution (for scoring), but at that point the information is already stale. Privacy-sensitive K-informants who would avoid LMSR participation (or trade minimally to hide their edge) are willing to participate in PSS because their private signal structure is not broadcast during the round.
+
+**Implication for mechanism design**: PSS is not just "LMSR with credibility bonds." It solves a different participation problem. LMSR maximizes breadth of participation (many weak signals are aggregated). PSS maximizes depth of participation (few strong signals are elicited from privacy-sensitive agents who would not participate in LMSR). Optimal mechanism design for a given question type depends on whether the information environment is wide-shallow (many noise traders, few insiders → LMSR) or narrow-deep (few high-signal insiders → PSS). (#r3)
+
+**Practical implication**: Questions where the best-informed agents are institutionally sensitive (e.g. regulators, company insiders, specialized analysts who cannot publicly reveal positions) favor PSS over LMSR. Questions where crowd wisdom aggregation is the primary value favor LMSR. GestAlt should support both and route question types accordingly. (#r3)
+
+---
+
+### 3d. Latency Solutions — Rolling Window with Express Lane (#r3)
+
+r2 flagged latency as a potential mechanism killer for time-sensitive questions.
+
+**Rolling-window PSS with sealed commits**: Informants post sealed commitments at any time in a rolling T_window duration window. Aggregate is only computed at window close. Window close time is probabilistic (Poisson-distributed), preventing timing games. Informants cannot observe each other's commitments during the window (sealed), preventing herding. At window close, all commitments are simultaneously revealed and the aggregate computed. This enables continuous claim availability while preserving the sealed-commit incentive properties. (#r3)
+
+**Express lane protocol**:
+- D posts question with `priority: EXPRESS` and W_express > W_standard (higher payment)
+- Express window is short: T_express = 5 minutes (configurable)
+- Express-lane informants must have `R_i > R_express_threshold` (e.g. R > 1.5) — gates out cold-start informants from time-sensitive rounds
+- Higher W_express compensates informants for participating in a shorter window with less time to observe public signals before posting
+- Protocol charges a priority fee δ_express that is distributed to informants who consistently show up for express rounds (participation incentive for maintaining express-lane readiness)
+
+**Streaming PSS** (r4 candidate): Rather than batch windows, informants post claims continuously with an infinite time horizon, and D receives a continuously updated aggregate θ_t that decays old claims (time-weighted exponential average). This is operationally simpler but re-introduces the herding problem because later informants observe the running aggregate. Flagged for r4 analysis. (#r3)
+
+---
+
+### 3e. Composability with GestAlt (#r3)
+
+r2 asked: can PSS serve as a credibility oracle feeding GestAlt's batch-auction clearing layer?
+
+**Integration architecture**:
+
+```
+Layer 1 — PSS oracle (5-minute sealed-commit rolling windows)
+  ↓ θ_aggregate with credibility signal (Σσ*R, variance, claim count)
+Layer 2 — GestAlt batch clearing (e.g. hourly)
+  Uses: (a) θ_aggregate from PSS + (b) order-flow-derived clearing price
+  Reconciliation: if |θ_PSS - θ_orderflow| > δ_divergence, flag for dispute window before clearing
+Layer 3 — Settlement
+  PSS informants settle against resolution oracle
+  GestAlt positions settle against clearing price
+```
+
+**What PSS adds to GestAlt's security model**: A parallel credibility signal that is independent of the order-flow price. An attacker trying to manipulate GestAlt's clearing price via order flow manipulation must also manipulate the PSS aggregate to avoid triggering the divergence flag. This requires capital on two independent layers simultaneously — significantly raising attack cost. (#r3)
+
+**Key design question**: Does the PSS aggregate feed as a *hard constraint* on GestAlt clearing (clearing cannot deviate from θ_PSS by more than δ) or as a *soft signal* (informational input to clearing price with no hard constraint)?
+
+**Recommendation**: Soft signal in early deployment, hard constraint after the PSS layer has accumulated sufficient reputation history to be trusted. The transition from soft to hard can be governed by a credibility threshold: when the total staked weight Σσ*R in the PSS pool exceeds a solvency-level threshold relative to the GestAlt clearing volume, upgrade to hard constraint. This is a gradual trust accumulation mechanism that avoids over-reliance on a nascent PSS layer. (#r3)
+
+**Solvency implication**: If PSS is providing a hard oracle for GestAlt clearing, PSS informant stakes must be large enough to cover the solvency cost of a wrong oracle input. Informant stake pool must be sized relative to GestAlt's maximum clearing exposure. This creates a capital requirement for PSS participation in the hard-constraint mode — naturally gating out undercapitalized informants who shouldn't be providing hard oracles. (#r3)
+
+---
+
+### 3f. New Thread — BTS-PSS Hybrid for Dominant-Strategy Truthfulness (#r3)
+
+r1-r2 achieved Bayes-Nash truthfulness via proper scoring. This is weaker than dominant-strategy truthfulness — it assumes others are also truthful. If even one informant defects strategically, the BNE can unravel.
+
+**Bayesian Truth Serum (BTS) insight** (Prelec 2004): dominant-strategy truthfulness in multi-agent elicitation is achievable if each agent also reports a *meta-prediction* of the distribution of other agents' reports. A truthful agent's meta-prediction is more accurate (in a specific sense) than a lying agent's, enabling a payment rule that rewards truthful reporters.
+
+**BTS-PSS hybrid structure**:
+- Informant i posts: `(θ_i, σ_i, meta_i)` where `meta_i` is their prediction of the distribution of other informants' claims
+- Payment rule includes a term that rewards θ_i being *surprisingly more common* than meta_i predicted
+- Formally: BTS payment = `score(θ_i, θ*) + α * [log P(θ_i | others' reports) - log meta_i(θ_i)]`
+- The second term is positive when your report is more common among truthful agents than you expected it to be — which is exactly what happens when you report truthfully and others are also truthful
+
+**Why this achieves dominant-strategy truthfulness**: Lying involves posting θ_i ≠ μ_i. A liar must also post an accurate meta_i to maximize the second term. But an accurate meta_i reflects what truthful agents would report — which is centered around truth. This creates a self-defeating incentive: reporting falsely while accurately predicting that others will report truthfully maximizes the second term but loses on the first. No consistent payoff improvement from lying. (#r3)
+
+**Practical complexity**: BTS requires informants to have a model of other informants' type distribution. This is cognitively and informationally demanding. Practical implementation may need to approximate: informants post a scalar "confidence in consensus" rather than a full distribution. Simplified BTS has weaker guarantees but preserves the directional incentive property. Flag for r4: full BTS-PSS specification with simplified meta-report structure. (#r3)
+
+---
+
+### Updated Open Problems for #r4+
+
+Carried from r2 (updated status):
+1. **Correlation detection** — ✅ residual correlation + randomized window timing design complete (#r3). Open: distinguishing institutional from sybil correlation.
+2. **Oracle staking** — ✅ dispute-bond + oracle/informant role separation via capital lockup (#r3). Open: oracle tier selection (Schelling vs. dispute-bond) at question-posting time.
+3. **Equilibrium welfare comparison** — ✅ informal conjecture + wide-shallow vs. narrow-deep routing (#r3). Open: formal model.
+4. **Latency** — ✅ rolling window + express lane (#r3). Open: streaming PSS analysis.
+5. **Composability** — ✅ layered architecture + soft→hard constraint migration path (#r3).
+
+New from r3:
+6. **BTS-PSS hybrid**: Full specification with simplified meta-report. What is the simplest BTS variant that is cognitively tractable for informants while still achieving dominant-strategy or near-dominant-strategy truthfulness? (#r3→r4)
+7. **Capital sizing for hard-constraint PSS oracle**: What is the minimum informant stake pool size (as a function of GestAlt clearing volume and maximum oracle deviation) required for the hard-constraint upgrade to be solvency-safe? (#r3→r4)
+8. **Question routing heuristic**: What observable question properties (breadth of potential informants, privacy-sensitivity of signal, time horizon, oracle type) determine whether to route to PSS vs. LMSR? Can this be automated? (#r3→r4)
+
+---
+
+*This document is cumulative. Each run adds net-new synthesis only. Superseded ideas are updated in-place with run reference tags.*
