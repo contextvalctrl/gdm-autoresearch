@@ -1,8 +1,8 @@
 # GDM Autoresearch
 
-Automated research runs on the GestAlt Decentralized Marketplace (GDM) protocol — produced by Richard, ValCtrl's AI executive assistant.
+A living knowledge base on the GestAlt Decentralized Marketplace (GDM) protocol, maintained by Richard (ValCtrl's AI executive assistant) and open for contribution by humans and other agents.
 
-This repo is a living knowledge base. Both AI agents and human contributors can add, review, and build on research runs.
+**This is not a run log.** Topic docs are CRUDed in place as research deepens. Each file in `topics/` represents the current best understanding of that area — it gets updated, not duplicated.
 
 ---
 
@@ -10,103 +10,102 @@ This repo is a living knowledge base. Both AI agents and human contributors can 
 
 ```
 gdm-autoresearch/
-├── README.md                   — this file
-├── runs/                       — individual research run outputs (one file per run)
-│   └── gdm_run<NNN>_<topic>.md
+├── README.md               — this file
+├── topics/                 — living topic docs (CRUDed in place)
+│   └── <topic-slug>.md
 └── scripts/
-    └── sync_to_github.sh       — hourly cron sync from Richard's memory dir
+    └── sync_to_github.sh   — hourly cron sync from Richard's memory
 ```
 
 ---
 
-## Runs Index
+## Topics
 
 | File | Topic |
 |------|-------|
-| `gdm_run069_query-first-class-object.md` | Query as a first-class object — demand-side structure |
-| `gdm_run070_extended-reasoning.md` | Extended reasoning notes |
-| `gdm_knowledge-marketplace-primitive.md` | Knowledge marketplace primitive analysis |
+| `query-as-first-class-object.md` | Query as a first-class object — demand-side structure |
+| `knowledge-marketplace-primitive.md` | Knowledge marketplace primitive analysis |
+| `extended-reasoning-notes.md` | Extended reasoning and protocol notes |
 
 ---
 
-## How Research Runs Work
+## How It Works
 
-Richard runs autonomous research sessions on GDM protocol questions. Each session produces a structured markdown file saved to `runs/`. A cron job runs every hour and pushes any new or updated files to this repo.
+Richard continuously researches GDM protocol questions. After each research pass, the relevant topic doc in `topics/` is updated (created, revised, or expanded). A cron job runs hourly to sync the latest state to this repo.
 
-Run files follow this naming convention:
-```
-gdm_run<NNN>_<short-topic-slug>.md
-```
+There is one doc per topic. If new insight changes a prior conclusion, the doc is edited — not a new file added.
 
 ---
 
 ## Contributing — For Humans
 
-1. **Clone the repo:**
+1. **Clone:**
    ```bash
    git clone https://github.com/contextvalctrl/gdm-autoresearch.git
    cd gdm-autoresearch
    ```
 
-2. **Add a research note or analysis:**
-   - Create a new file in `runs/` following the naming convention above.
-   - Use markdown. Start with a `# Title`, then `## Summary`, `## Key Findings`, `## Open Questions`.
+2. **Edit an existing topic** in `topics/` or create a new one:
+   ```bash
+   # Edit existing
+   vim topics/knowledge-marketplace-primitive.md
+
+   # Or create new
+   vim topics/your-new-topic.md
+   ```
 
 3. **Commit and push (or open a PR):**
    ```bash
    git checkout -b research/your-topic
-   git add runs/your-file.md
-   git commit -m "research: <short description>"
+   git add topics/
+   git commit -m "research: <what changed and why>"
    git push origin research/your-topic
-   # then open a PR on GitHub
    ```
 
-4. **Review existing runs** in `runs/` and leave comments via GitHub Issues or PR reviews if you spot errors, gaps, or want to challenge a finding.
+4. Use GitHub Issues to flag open questions, challenge a finding, or propose a new topic area.
 
 ---
 
 ## Contributing — For Agents
 
-Agents with write access to this repo (or to Richard's memory dir on the host) can contribute in two ways:
-
-### Option A — Write to Richard's memory dir (auto-synced)
-Drop a file matching `gdm_*.md` into:
+### Option A — Update Richard's memory file (auto-synced hourly)
+Write or update the relevant source file in:
 ```
 /home/ubuntu/agents/richard/.openclaw/workspace/memory/
 ```
-The hourly cron (`scripts/sync_to_github.sh`) will pick it up and push it automatically within the hour.
+The cron job maps memory files to `topics/` and pushes any changes within the hour.
+
+To add a new topic to the sync map, update `TOPIC_MAP` in `scripts/sync_to_github.sh`.
 
 ### Option B — Push directly to the repo
-Clone or pull `https://github.com/contextvalctrl/gdm-autoresearch.git`, write your file to `runs/`, commit, and push to `main` (or open a branch + PR for review).
+Pull the repo, edit or create a file in `topics/`, commit, and push to `main` (or open a branch + PR).
 
-### Research file format
+### Topic doc format
 ```markdown
 # <Topic Title>
 
-**Run:** r<NNN>
-**Date:** YYYY-MM-DD
-**Author:** <Agent or Human Name>
+**Maintainer:** <Agent or Human>
+**Last updated:** YYYY-MM-DD
 
 ## Summary
-One paragraph overview of what was investigated and the core conclusion.
+Current best understanding in one paragraph.
 
 ## Key Findings
-- Finding 1
+- Finding 1 (with confidence level if relevant)
 - Finding 2
 
 ## Open Questions
-- Question 1
-- Question 2
+- Question still unresolved
 
-## References
-- Link or citation if applicable
+## Revision History (optional)
+- YYYY-MM-DD: <what changed>
 ```
 
 ---
 
 ## Automation
 
-The sync script runs hourly via cron on the ValCtrl EC2 host:
+Hourly cron on the ValCtrl EC2 host:
 ```
 0 * * * * /home/ubuntu/dev/contextvalctrl/gdm-autoresearch/scripts/sync_to_github.sh
 ```
@@ -116,4 +115,4 @@ Logs: `sync.log` in the repo root (gitignored).
 
 ## Contact
 
-Raise questions or flag issues via GitHub Issues or ping Richard / Gaurav in Slack.
+Questions or challenges → GitHub Issues or ping Richard / Gaurav in Slack.
