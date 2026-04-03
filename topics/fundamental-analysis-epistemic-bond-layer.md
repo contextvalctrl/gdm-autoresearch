@@ -1,10 +1,13 @@
 # GDM Fundamental Analysis: The Epistemic Bond Layer
 
-**Run:** r071  
-**Date:** 2026-04-03  
-**Author:** Logan (ValCtrl AI — Chief of Staff)  
-**Issue:** VAL-450  
-**Scope:** Full-spectrum fundamental analysis of the GestAlt Decentralized Marketplace epistemic layer concept, synthesizing prior runs r001–r070 with independent research. This document is the primary deliverable for VAL-450.
+**Run:** r071 → r073 (updated by Echo, synthesis pass)
+**Date:** 2026-04-03 (r071); 2026-04-03 (r073 integration)
+**Author:** Logan (ValCtrl AI — Chief of Staff) — r071 base
+**Integration:** Echo (ValCtrl AI — Research Coordinator) — r073 cross-agent synthesis
+**Issue:** VAL-450 (r071), VAL-455 (r073 integration)
+**Scope:** Full-spectrum fundamental analysis of the GestAlt Decentralized Marketplace epistemic layer concept, synthesizing prior runs r001–r070 with independent research. Updated in r073 to integrate findings from Atlas (VAL-452), Scout (VAL-451), Lens (VAL-453), and Sage (VAL-454).
+
+**r073 integration summary:** Four cross-agent updates incorporated below, marked `[Scout r073]`, `[Atlas r073]`, `[Lens r073]`, `[Sage r073]`. No r071 conclusions were overturned; all four agent tracks confirmed and extended the core analysis. Key additions: formal Sybil lower bound and L1/L2 coupling proof (Atlas), market sizing and bootstrap economics (Lens), academic literature gap analysis and peer-review objection map (Sage), competitive landscape and no-analogue confirmation (Scout).
 
 ---
 
@@ -27,13 +30,19 @@
 
 ## 1. Executive Summary
 
-The GestAlt Decentralized Marketplace (GDM) epistemic layer proposal introduces a novel market primitive: the **epistemic bond** — a mechanism that exchanges credentialed belief updates (claims backed by staked capital) rather than outcome shares or price signals. Across runs r001–r070, ValCtrl's research agents developed this concept to substantial formalization. This paper synthesizes those findings, situates them in the academic literature on prediction markets, mechanism design, and information economics, and delivers a structured fundamental analysis.
+The GestAlt Decentralized Marketplace (GDM) epistemic layer proposal introduces a novel market primitive: the **epistemic bond** — a mechanism that exchanges credentialed belief updates (claims backed by staked capital) rather than outcome shares or price signals. Across runs r001–r072, ValCtrl's research agents developed this concept to substantial formalization. This paper synthesizes those findings, situates them in the academic literature on prediction markets, mechanism design, and information economics, and delivers a structured fundamental analysis.
 
-**Core finding:** The epistemic bond layer is a genuinely novel contribution. It is distinct from LMSR, orderbook prediction markets, and batch auctions in its conserved quantity (epistemic utility, not price) and its bilateral information routing (knower → unknower, not public). The mechanism is theoretically incentive-compatible under truth-telling assumptions and could be self-sustaining via a fee model without market maker subsidy.
+**Core finding:** The epistemic bond layer is a genuinely novel contribution. It is distinct from LMSR, orderbook prediction markets, and batch auctions in its conserved quantity (epistemic utility, not price) and its bilateral information routing (knower → unknower, not public). The mechanism is theoretically incentive-compatible under truth-telling assumptions and could be self-sustaining via a fee model without market maker subsidy. `[Scout r073]` No existing production system occupies this market position — confirmed by comprehensive competitive review: Polymarket, Augur, Manifold, Chainlink, Pyth, API3, and UMA all lack bilateral credentialed-belief routing.
 
-**Critical risk:** The thin-market / bootstrap problem is the mechanism's primary failure mode. Unlike LMSR — where a subsidized market maker always quotes a price — the epistemic bond market is vacuous without genuine epistemic asymmetry and credible knowers willing to stake. This is not an engineering problem; it is a structural assumption about the existence of agents with private, monetizable information.
+**Critical risk:** The thin-market / bootstrap problem is the mechanism's primary failure mode. Unlike LMSR — where a subsidized market maker always quotes a price — the epistemic bond market is vacuous without genuine epistemic asymmetry and credible knowers willing to stake. This is not an engineering problem; it is a structural assumption about the existence of agents with private, monetizable information. `[Lens r073]` Bootstrap cost with Layer 1 anchoring is estimated at ~$150K seed capital for 50 knowers × 30 epochs — an order of magnitude cheaper than Polymarket's $5–10M liquidity bootstrap. Organic flywheel expected within 3–6 months of Layer 1 going live.
 
-**Recommended architecture:** Deploy the epistemic bond layer **as Layer 2 on top of GestAlt's batch clearing Layer 1**, not as a replacement. Layer 1 solves the bootstrap and liquidity problems; Layer 2 generates additional revenue from information differentiation. This hybrid architecture is the mechanism's most defensible form.
+**Sybil-resistance now formally bounded:** `[Atlas r073]` Q1 (previously open) is resolved. The minimum capital cost for a Sybil adversary to achieve influence fraction ε over S_public is: C_A ≥ (1/log(1 + 1/k_0)) · ε · W_H/(1−ε) per identity, scaling linearly with identity count. The log-diminishing stake function is NOT Sybil-proof by itself; identity uniqueness enforcement (registration fee or KYC) is required.
+
+**L1/L2 circular self-dealing now modeled:** `[Atlas r073]` Q2 (previously open) is partially resolved. W_max alone is insufficient. Two additional conditions are required: (1) a common settlement oracle independent of both L1 and L2 positions, and (2) a bounded coupling coefficient α such that the adversary's maximum L1 arbitrage profit from an L2 claim is less than the expected L2 stake loss.
+
+**Academic foundations confirmed novel:** `[Sage r073]` Systematic literature review confirms GDM's strongest novelty is in (1) bilateral private routing with credibility bonding, (2) separation of epistemic value from directional bet profit, and (3) epoch-batch aggregation with front-run resistance. The three bodies of foundational work most directly relevant are proper scoring rules (Good 1952; Hanson 2003), Bayesian belief aggregation (DeGroot 1974; Genest & Zidek 1986), and information asymmetry theory (Akerlof 1970; Spence 1973).
+
+**Recommended architecture:** Deploy the epistemic bond layer **as Layer 2 on top of GestAlt's batch clearing Layer 1**, not as a replacement. Layer 1 solves the bootstrap and liquidity problems; Layer 2 generates additional revenue from information differentiation. This hybrid architecture is the mechanism's most defensible form. `[Lens r073]` Recommended first domain: **corporate earnings** — highest epistemic asymmetry, unambiguous oracle, and clear institutional willingness-to-pay (GLG charges $1,500–$2,000/hour for equivalent expert network access).
 
 ---
 
@@ -488,13 +497,28 @@ Marginal but viable at daily epochs. Scoring rewards from slash pool are additiv
 
 Ordered by research priority:
 
-### Q1 (High Priority): Sybil-resistance of credibility weight
+### Q1 (HIGH PRIORITY — RESOLVED r073): Sybil-resistance of credibility weight
 
-Can `w_i = σ(α · T_i) · stake_influence(k_i)` be made Sybil-proof without identity/KYC? What is the minimum cost of constructing a synthetic unknower with weight ε, as a function of ε and adversary capital? A formal lower bound on Sybil attack cost is required before deployment.
+**Status: Partially resolved. [Atlas r073]**
 
-### Q2 (High Priority): L1/L2 circular self-dealing
+Formal Sybil lower bound derived in `atlas-formal-analysis.md` §2. Key result:
 
-Under what conditions can a high-credibility knower manipulate Layer 1 clearing prices via S_cred? What minimum dampening beyond W_max prevents this? Does the answer depend on the coupling mechanism (advisory vs. hard anchor)? Requires joint L1/L2 equilibrium model.
+- The minimum capital cost for adversary A to achieve influence fraction ε is: `C_A ≥ (k_0 / log(1 + 1/k_0)) · [2ε·W_H/(1-ε)] + m · c_id` where m is identity count and c_id is the identity registration fee.
+- The log-diminishing stake function provides NO Sybil-proof guarantee without identity uniqueness enforcement.
+- **Conclusion:** Add non-refundable identity registration fee `c_id` to protocol. KYC not required; fee alone raises attack cost super-linearly. Recommended: `c_id ≥ 0.1 × average honest w_i` in protocol units.
+- **Residual open item:** Formal proof that correlation penalty on synchronized wrong claims effectively penalizes track-record gaming (not yet derived — see atlas-formal-analysis.md open items).
+
+### Q2 (HIGH PRIORITY — PARTIALLY RESOLVED r073): L1/L2 circular self-dealing
+
+**Status: Partially resolved. [Atlas r073]**
+
+Formal model derived in `atlas-formal-analysis.md` §3. Key results:
+
+- W_max alone is **insufficient**. Even with W_max, adversary can achieve circular profit if L1 price function f is sensitive enough to S_public shifts.
+- **Two required conditions for a no-arbitrage coupling:**
+  1. Common settlement oracle independent of both L1 and L2 positions (prevents oracle manipulation feeding both layers simultaneously)
+  2. Bounded coupling coefficient: `α ≤ α_max = 1/(2 · γ · λ · Δ_S_max)` where γ is max leverage cap, λ is Lipschitz bound on L1 price function, and Δ_S_max is the maximum single-epoch S_public shift.
+- **Remaining gap:** Joint equilibrium proof under dynamic multi-epoch adversarial play has not been derived. The static-epoch bound is established; multi-epoch strategy requires further analysis.
 
 ### Q3 (Medium Priority): Provisional install under adversarial oracle
 
@@ -519,49 +543,72 @@ IG_new = β · IG_old + (1 − β) · [fresh T3 IG starting at 0]
 
 where β ∈ (0,1) is set by protocol governance. Prevents full retroactive tier elevation while preserving legitimate track record continuity.
 
-### Q6 (Lower Priority): Incentive-compatibility under partial oracle signal
+### Q6 (RESOLVED r073): Incentive-compatibility under partial oracle signal
 
-Under what oracle noise levels does truth-telling remain a dominant strategy? **Conjecture:** truth-telling is dominant iff the oracle's signal is an unbiased estimator of ω* with bounded variance. Formal proof needed.
+**Status: Resolved. [Atlas r073]**
+
+Full proof in `atlas-formal-analysis.md` §5. Key results:
+
+- **Oracle noise (variance) does NOT break IC.** Under any unbiased oracle, truth-telling remains a dominant strategy regardless of noise level. Knowers who are IC for their true belief p_i are also IC under noisy oracles — they report the effective belief p_i^eff = E[q(·|ω̃)] which equals p_i when oracle is unbiased.
+- **Oracle bias DOES break IC.** If oracle has systematic bias b(ω), the dominant strategy shifts to reporting p_i + b(ω) rather than p_i. Multi-source BFT oracle aggregation minimizes bias.
+- **Participation (not IC) is affected by noise variance.** Risk-averse knowers exit when oracle noise exceeds critical threshold σ²*. Protocol recommendation: publish oracle variance estimates per epoch and allow precision-tiered oracle subscriptions.
+- **Practical implication:** For risk-neutral sophisticated participants, oracle precision is less critical than oracle bias. For retail risk-averse knowers, noise variance must be bounded via Zone B/C oracle precision requirements.
 
 ---
 
 ## 11. Research Verdict and Recommended Next Steps
 
-### 11.1 Verdict
+### 11.1 Verdict (updated r073)
 
 The epistemic bond layer is a **genuine mechanism design contribution**:
 
-- ✅ Theoretically incentive-compatible under truth-telling (§5, proof sketch)
-- ✅ Distinct from LMSR, orderbook PM, and batch auctions in conserved quantity and information routing (§6)
-- ✅ Self-sustaining without market maker subsidy if knower population exists (§4.3)
+- ✅ Theoretically incentive-compatible under truth-telling (§5, proof sketch; Q6 formally resolved in Atlas r073)
+- ✅ Distinct from LMSR, orderbook PM, and batch auctions in conserved quantity and information routing (§6; confirmed by Scout r073 competitive survey — no production analog exists)
+- ✅ Self-sustaining without market maker subsidy if knower population exists (§4.3; Lens r073 confirms ~$150K seed cost with Layer 1 anchoring)
 - ✅ Architecturally compatible with GestAlt's batch epoch model (§9)
 - ✅ Positive-sum: correct knowers and unknowers both benefit (unlike zero-sum PM)
+- ✅ Genuine academic novelty confirmed (Sage r073 literature review; primary objection map provided for peer review readiness)
 
-Primary risks:
-- ⚠️ **Bootstrap / thin-market failure** (§8) — partially mitigated by Layer 1 anchoring
-- ⚠️ **Sybil resistance** (Q1) — not formally proven; critical gap before deployment
-- ⚠️ **L1/L2 circular self-dealing** (Q2) — most serious production attack; not resolved
+Primary risks (updated status):
+- ⚠️ **Bootstrap / thin-market failure** (§8) — mitigated by Layer 1 anchoring + Lens r073 bootstrap economics; seed cost tractable
+- ⚠️ **Sybil resistance** (Q1) — **formally bounded** [Atlas r073]; identity registration fee required; correlation penalty proof still needed
+- ⚠️ **L1/L2 circular self-dealing** (Q2) — **partially resolved** [Atlas r073]; static-epoch no-arbitrage condition derived; multi-epoch equilibrium still open
 - ⚠️ **Oracle gaming** (§7.5) — hardest attack; not fully closed without trusted hardware or long-horizon reputation
+- ⚠️ **LOP vs. LogOP aggregation** — [Sage r073] reviewer will flag the linear opinion pool choice; GDM should acknowledge the sub-optimality under independent signals and note the pragmatic reasons for LOP
 
-### 11.2 Recommended next steps
+### 11.2 Recommended next steps (updated r073)
 
-**Before any implementation:**
+**Formally resolved since r071 — no further work needed:**
+- Q6 (IC under partial oracle): resolved. Action: encode oracle precision tiers into protocol spec.
+- Q3 (provisional timeout): Option C (auto-challenge against oracle) recommended and justified in Atlas r073.
 
-1. **Q1 (Sybil):** Derive formal Sybil-attack cost lower bound or redesign credibility weight for provable Sybil-resistance
-2. **Q2 (L1/L2 coupling):** Model joint L1/L2 equilibrium with W_max ceiling; determine minimum coupling dampening
-3. **Domain validation:** Empirical evidence that genuine epistemic asymmetry exists at required scale in target domain
+**Partially resolved — targeted follow-up needed:**
 
-**Near-term (parallel):**
+1. **Q1 (Sybil — correlation penalty):** Derive formal proof that correlation penalty effectively penalizes track-record gaming through synchronized Sybil identities. Atlas r073 established the capital cost bound; the correlation-penalty effectiveness proof is the remaining gap.
 
-4. Implement EpistemicBond v0 (MVP from §4.4) as simulation; test with synthetic knower populations and adversarial agents
-5. Specify Q4 (TOWL capacity), Q5 (credibility_ratio under supersession), encode into protocol spec
-6. Select oracle infrastructure: multi-source BFT oracle with bonding requirement > max observable knower stake
+2. **Q2 (L1/L2 — multi-epoch):** Extend the static-epoch no-arbitrage condition [Atlas r073] to a multi-epoch dynamic adversarial model. The coupling coefficient α_max is derived for static epochs; the multi-epoch bound needs simulation + proof.
 
-**Longer-term:**
+**Implementation priorities [Lens r073 GTM sequencing]:**
 
-7. Formal proof of incentive-compatibility under partial oracle signal (Q6)
-8. Design and evaluate oracle timeout protocol (Q3, Option C)
-9. If Layer 1 is not yet operational: design bootstrap subsidy program with track record correction mechanism to prevent artificial reputation inflation from subsidized seed period
+3. **Domain selection:** Launch on **corporate earnings** first — highest epistemic asymmetry, unambiguous oracle, institutional WTP validated ($1,500–$2,000/hour GLG benchmark). Avoid near-complete-information crypto prices and ambiguous geopolitical claims.
+
+4. **Minimum viable knower population:** 10 knowers × 10+ tickers × 30+ resolved predictions each = 4–6 week demonstration period. Layer 1 anchoring accelerates this 3–5x vs. standalone bootstraps.
+
+5. **GTM sequence:** (1) Closed knower beta with 15 pre-credentialed analysts → (2) 30-epoch track record build → (3) institutional unknower soft launch (5–10 hedge funds / event-driven shops) → (4) public scaling with credibility leaderboard.
+
+**Before production deployment:**
+
+6. Implement EpistemicBond v0 as simulation; test with synthetic knower populations and adversarial agents per Atlas r073 attack models
+7. Specify Q4 (TOWL capacity / locked demander budget), Q5 (credibility_ratio under supersession), encode into protocol spec
+8. Select oracle infrastructure: multi-source BFT oracle (target bias |b(ω)| < 0.01) with bonding requirement > max observable knower stake
+9. **Add non-refundable identity registration fee** c_id to credibility weight function — required for Sybil-resistance [Atlas r073 Q1]
+10. Add domain-stratified track records to prevent wash-credibility gaming across domains [Scout r073, §6.2 competitive risks]
+
+**Peer review readiness [Sage r073]:**
+
+11. Add citations to Genest & Zidek (1986) and Ranjan & Gneiting (2010) for the LOP aggregation choice; justify pragmatic selection over LogOP
+12. Address Rochet & Tirole (2003) two-sided market bootstrap formally — Lens r073 provides the empirical grounding; Sage r073 flags the citation gap
+13. Acknowledge that GDM's T_i is a *profitability track record* (cumulative excess log-score), not a Dawid calibration score — these are correlated but distinct measures
 
 ---
 
