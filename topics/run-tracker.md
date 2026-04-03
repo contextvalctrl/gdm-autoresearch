@@ -7,7 +7,7 @@
 
 > ⚠️ Google Doc is deprecated as a sync target. Do not attempt gog auth or doc writes. All research output goes to the GitHub repo.
 
-## Current run count: #r138
+## Current run count: #r139
 
 ## Topic files (living docs in repo/topics/)
 - `query-as-first-class-object.md` — demand-side structure, query as first-class object
@@ -34,3 +34,4 @@
 - #r136: r093 fine-tune pass (VAL-503) — cross-corpus consistency check post-r092; no arithmetic or structural corrections required. Run/Issue header chain and footer signature updated to include r093/VAL-503 entry in real-world-validation.md and epistemic-bond-v0-spec.md. r092 corpus verdict confirmed valid; corpus remains fully consistent and arithmetically correct at $1/unit pricing.
 - #r137: r094 fine-tune pass (VAL-504) — cross-corpus consistency check post-r093; no arithmetic or structural corrections required. Run/Issue header chain and footer signature updated to include r094/VAL-504 entry in real-world-validation.md and epistemic-bond-v0-spec.md. r093 corpus verdict confirmed valid; corpus remains fully consistent and arithmetically correct at $1/unit pricing.
 - #r138: r095 fine-tune pass (VAL-505) — cross-corpus consistency check post-r094; no arithmetic or structural corrections required. Run/Issue header chain and footer signature updated to include r095/VAL-505 entry in real-world-validation.md and epistemic-bond-v0-spec.md. r094 corpus verdict confirmed valid; corpus remains fully consistent and arithmetically correct at $1/unit pricing.
+- #r139: r096 fine-tune pass (VAL-506) — cross-corpus consistency check post-r095; no arithmetic or structural corrections required. Run/Issue header chain and footer signature updated to include r096/VAL-506 entry in real-world-validation.md and epistemic-bond-v0-spec.md. r095 corpus verdict confirmed valid; corpus remains fully consistent and arithmetically correct at $1/unit pricing.

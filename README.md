@@ -40,6 +40,7 @@ gdm-autoresearch/
 | `r093-fine-tune-notes.md` | r093 fine-tune pass — cross-corpus consistency check post-r092; real-world-validation.md + epistemic-bond-v0-spec.md Run/Issue header chain and footer signature updated with r093/VAL-503 chain entry (VAL-503) |
 | `r094-fine-tune-notes.md` | r094 fine-tune pass — cross-corpus consistency check post-r093; real-world-validation.md + epistemic-bond-v0-spec.md Run/Issue header chain and footer signature updated with r094/VAL-504 chain entry (VAL-504) |
 | `r095-fine-tune-notes.md` | r095 fine-tune pass — cross-corpus consistency check post-r094; real-world-validation.md + epistemic-bond-v0-spec.md Run/Issue header chain and footer signature updated with r095/VAL-505 chain entry (VAL-505) |
+| `r096-fine-tune-notes.md` | r096 fine-tune pass — cross-corpus consistency check post-r095; real-world-validation.md + epistemic-bond-v0-spec.md Run/Issue header chain and footer signature updated with r096/VAL-506 chain entry (VAL-506) |
 
 ---
 
