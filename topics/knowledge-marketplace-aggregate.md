@@ -11,7 +11,8 @@
 - **#r74** — 2026-04-03T08:52Z — Per-class staleness decay shape κ; two-tier SEE appeals (oracle Tier A + sortition Tier B); β range [1.3, 2.0]; SEE pre-staging defense via claim consistency + query fee clawback; Epistemic Audit Trail (EAT) named as fourth integrity property.
 - **#r75** — 2026-04-03T09:52Z — EAT DA stack (Celestia + Ethereum anchor); DA liveness as fifth precondition integrity property; degraded mode specification; pre_shock_window principled formula; continuous SEE taper; trustless correlation filter computation; anti-fragmentation gap in β/γ fixed; closed-form β/γ joint calibration with governance redesign.
 - **#r132** — 2026-04-03T19:12Z — Multi-class LTRP attribution (per-class independent, no spillover); bridge/degraded epoch exclusion from calibration rolling windows; LTRP over-seed proactive recall (conditional 3× safety × 4-epoch gate); non-additive combined-lockup ceiling for simultaneous provisional+outage tolling; bounded-liability architecture closed.
-- **#r133** — 2026-04-03T19:52Z — `implication_bonus_escrow` as fourth first-class escrow category (protocol reserve, not TOWL-counted, bilateral lockup ceiling); Zone C epochs included in calibration (not excluded, flagged only); M_stable majority-window tolerance (1-of-5, non-consecutive); A-side conditional partial release for cross-class implication declarations with clawback obligation; escrow taxonomy complete.
+- **#r133** — 2026-04-03T19:52Z
+- **#r135** — 2026-04-03T20:12Z — Debt retirement absorption cap (lifetime-escrow-anchored); toll-stacking doubling ceiling for implication_bonus_escrow; M_stable evaluation-boundary parameter activation; debt withholding scope — capital-at-risk only, contingent rewards exempt — `implication_bonus_escrow` as fourth first-class escrow category (protocol reserve, not TOWL-counted, bilateral lockup ceiling); Zone C epochs included in calibration (not excluded, flagged only); M_stable majority-window tolerance (1-of-5, non-consecutive); A-side conditional partial release for cross-class implication declarations with clawback obligation; escrow taxonomy complete.
 
 ---
 
@@ -1194,3 +1195,95 @@ The credibility_ratio remains an unmanipulated epistemic signal throughout — d
 4. **Debt withholding and implication declaration participation:** If a knower is in debt-withholding mode (reduced effective escrow), their implication_bonus_escrow contribution also decreases proportionally — reducing implication chain depth incentives. Should the debt withholding rate apply to implication escrow at the same ratio as standard escrow, or should implication declarations be exempt (to avoid discouraging information-rich multi-coordinate declarations from temporarily penalized knowers)?
 
 *Last updated: #r134 — 2026-04-03T20:02Z*
+
+---
+
+## #r135 Contributions — 2026-04-03T20:12Z
+
+Addresses all four open questions from #r134.
+
+**Q1 (Debt recovery account finality — max per-event protocol absorption cap) → Lifetime-escrow-anchored cap (#r135):**
+
+Without a cap, a knower could engineer a large partial-release clawback loss, then demonstrate surplus on low-risk coordinates to retire that loss at protocol cost — effectively externalizing capital risk via the net-contributor path.
+
+**Resolution — per-event absorption cap:**
+
+```
+absorption_cap(a) = min(outstanding_debt_a, 0.2 × total_historical_escrow_posted_lifetime_a)
+```
+
+Protocol absorbs only up to `absorption_cap`. Remaining debt above cap is not retired — it stays as a debt obligation subject to withholding until cleared via escrow repayment. The net-contributor path closes only the capped portion; partial retirement is permitted.
+
+**Rationale:** Anchoring to `total_historical_escrow_posted_lifetime` ties the forgiveness ceiling to the knower's demonstrated long-run skin-in-the-game. New knowers with small history face a small absorption cap — protecting the protocol against rapid-cycle exploits. Established knowers with large history earn a proportionally larger cap — consistent with their track record as reliable contributors. The 0.2 factor (governance-settable, bounded [0.05, 0.35]) prevents a single retirement event from exceeding one-fifth of lifetime commitment.
+
+**Interaction with LTRP:** Protocol absorption draws from a separate `debt_retirement_reserve`, distinct from LTRP and implication_reserve. Seeded at governance discretion; auto-alert if debt_retirement_reserve < trailing_12_epoch_retirement_cost. (#r135)
+
+---
+
+**Q2 (Implication_bonus_escrow expiry toll stacking — combined cap) → Doubling cap: max 2× max(T_longtail_A, T_longtail_B) (#r135):**
+
+Degraded mode tolling (#r134/Q1) and Zone C class-level deferral (#r134/Q4) can stack. An implication declaration spanning a slow-oracle class can accumulate toll from both simultaneously — dramatically extending its effective expiry beyond any individually-designed horizon.
+
+**Resolution — combined expiry extension ceiling:**
+
+```
+max_expiry_with_tolling = original_expiry + max(T_longtail_A, T_longtail_B)
+```
+
+Effective cap: total time from registration to expiry ≤ `2 × max(T_longtail_A, T_longtail_B)`. This is a doubling cap — one natural horizon of tolling is permitted in aggregate across all toll sources. Additional toll beyond the cap is discarded; the position expires under partial-settlement rules (#r133: 0.5× release if A confirmed correct, 0 if unresolved).
+
+**Toll priority:** When multiple toll sources are simultaneously active (degraded mode AND Zone C deferral), they are not additive to the cap — the cap is a single ceiling regardless of how many independent toll clocks are running. Structurally identical to the #r132 non-additive combined lockup ceiling for provisional + outage tolling.
+
+**Design law extended (#r135):** All toll-stacking scenarios (degraded mode, bridge epoch, Zone C deferral, provisional FSM) are subject to a combined ceiling defined as N× the natural horizon, where N is specified at feature design time. Current instances: T3 provisional + outage = max(T_provisional_max, T_outage_cap) + 1 epoch (#r132); implication_bonus_escrow = 2× max(T_longtail_A, T_longtail_B) (#r135). The N factor (1× or 2×) reflects whether the toll compensates for information unavailability (1×) or capital-uncertainty accumulation (2×). (#r135)
+
+---
+
+**Q3 (window_size governance change + in-flight M_stable evaluation) → Epoch-boundary activation; in-flight evaluation completes under original parameters (#r135):**
+
+Retroactive disqualification on window_size change creates discontinuous state changes for pools already in M_stable evaluation — exactly the kind of unpredictable cliff the stability gate is designed to prevent.
+
+**Resolution — evaluation-boundary parameter activation:**
+
+window_size and tolerance changes take effect at the **start of the next M_stable evaluation window** after the governance update is committed to the EAT. Any evaluation currently in progress completes under the parameters that were active when it began. If the in-flight evaluation qualifies (under old parameters), the recall proceeds and new parameters govern the subsequent evaluation cycle.
+
+**Consistency with tolerance_max invariant (#r134/Q3):** When window_size changes, tolerance_max = ⌊new_window_size / 4⌋ derives immediately — live from governance commit, not from window start. Governance cannot front-run a recall by briefly expanding window_size to qualify, then changing it back; the tolerance ceiling is enforced from commit.
+
+**EAT record:** Every window_size or tolerance change is recorded as a governance event in the EAT with the epoch-of-effect marked explicitly. Auditors can reconstruct which parameter set governed each historical M_stable evaluation. (#r135)
+
+---
+
+**Q4 (Debt withholding and implication declaration participation) → Primary claim escrow withheld; implication_bonus_escrow exempt (#r135):**
+
+**Resolution — split treatment:**
+
+- `debt_withholding_rate` applies to primary claim escrow (A-stake and B-stake) at the standard formula (#r134/Q2). These are up-front locked capital.
+- `implication_bonus_escrow` is fully exempt from debt withholding. The bonus is a contingent protocol reward funded at resolution from the loser pool — not the knower's own locked capital.
+
+**Consequence:** A debt-withholding knower has reduced primary claim weight (lower k_a_net → lower w_a) and a proportionally smaller implication bonus (since bonus scales with α_bond × net_stake). The incentive to declare structural implications remains; the scale is reduced proportionally. The declaration is not blocked.
+
+**Design law (#r135):** Debt withholding targets capital at risk (up-front locked escrow). It does not target contingent protocol rewards earned from loser-pool redistribution. These are categorically distinct. If a reward is sourced from the protocol's loser-pool rather than the knower's locked capital, it is exempt from debt withholding. This principle applies to all future reward categories. (#r135)
+
+---
+
+## Structural Synthesis: Debt and Governance Constraint Completeness (#r135)
+
+| Feature | Constraint | Enforcement |
+|---|---|---|
+| Net-contributor debt retirement | Absorption cap = 0.2× lifetime escrow | Contract-enforced per event |
+| Toll stacking | Combined ceiling = 2× max natural horizon | Contract-enforced, non-additive |
+| window_size governance changes | In-flight evaluation completes under original params | EAT-recorded, epoch-boundary activation |
+| Debt withholding scope | Capital at risk only; contingent rewards exempt | Categorically enforced by escrow type |
+
+---
+
+## Open Questions for #r136+
+
+1. **debt_retirement_reserve seeding and replenishment:** The reserve is auto-alerted when underfunded (#r135/Q1). If governance does not replenish within a defined window, do pending net-contributor retirement requests queue or lapse? If they lapse, debt withholding never clears for those knowers — converting a temporary mechanism into a permanent exclusion.
+
+2. **Implication declaration with one class in Phase 1 bootstrap:** Cross-class implication declarations require both classes to have at least one completed normal-mode macro-epoch (#r133/Q1). If class B completes Phase 1 while class A is still mid-Phase-1, a knower with prior A track record cannot lock in a cross-class declaration until A finishes bootstrap. Is this overly conservative?
+
+3. **Primary claim escrow reduction × implication chain depth:** Debt withholding reduces the primary A-stake in a deep chain declaration (A→B→C), applying the chain-length discount γ^(depth-1) to a smaller base — reducing implication bonus geometrically. Should there be a minimum effective chain contribution floor below which the declaration is rejected as too small to register meaningful weight?
+
+4. **EAT record for governance parameter rollback:** If governance commits a window_size change then rolls it back before the new window begins, what is the canonical EAT record? A rollback must be a new EAT commit referencing the original event — consistent with EAT immutability. Silent deletion is not permitted.
+
+*Last updated: #r135 — 2026-04-03T20:12Z*
