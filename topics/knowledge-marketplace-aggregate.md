@@ -13,6 +13,7 @@
 - **#r132** — 2026-04-03T19:12Z — Multi-class LTRP attribution (per-class independent, no spillover); bridge/degraded epoch exclusion from calibration rolling windows; LTRP over-seed proactive recall (conditional 3× safety × 4-epoch gate); non-additive combined-lockup ceiling for simultaneous provisional+outage tolling; bounded-liability architecture closed.
 - **#r133** — 2026-04-03T19:52Z
 - **#r135** — 2026-04-03T20:12Z — Debt retirement absorption cap (lifetime-escrow-anchored); toll-stacking doubling ceiling for implication_bonus_escrow; M_stable evaluation-boundary parameter activation; debt withholding scope — capital-at-risk only, contingent rewards exempt — `implication_bonus_escrow` as fourth first-class escrow category (protocol reserve, not TOWL-counted, bilateral lockup ceiling); Zone C epochs included in calibration (not excluded, flagged only); M_stable majority-window tolerance (1-of-5, non-consecutive); A-side conditional partial release for cross-class implication declarations with clawback obligation; escrow taxonomy complete.
+- **#r141** — 2026-04-03T21:12Z — Challenge submission fee replaces slash-gate (spam filter, never blocks small-stake challenge); bifurcated implication bonus: capital-comp (α_cap × β_escrow, staleness-insensitive) + epistemic-service (staleness-discounted via Σ eff_weight); cross-class bridge asymmetry confirmed consistent — no coordination rule; bonus settlement contract design-complete.
 
 ---
 
@@ -1865,3 +1866,128 @@ Governance threshold oscillation that selectively advantages a stale first-posit
 4. **Bonus reward theory — retrospective vs prospective:** Connects to Q2 above. The mechanism so far treats implication bonus as a retrospective reward for having correctly identified a structural relationship. An alternative: treat it as a prospective payment for epistemic service rendered to the clearing system during the claim's active life. Under the prospective model, a claim with near-zero active effective_weight delivered near-zero prospective service and should earn a staleness-discounted bonus. This is a deeper architectural question about what the bonus is paying for — resolve before implementing the bonus settlement contract.
 
 *Last updated: #r140 — 2026-04-03T21:02Z*
+
+---
+
+## #r141 Contributions — 2026-04-03T21:12Z
+
+Addresses all four open questions from #r140.
+
+**Q1 (Minimum viable challenge threshold — minimum slash gate?) → Challenge submission fee replaces slash gate; no floor on admissible slash size (#r141):**
+
+A minimum slash gate solves the wrong problem. If below-floor-stake claims are never challengeable, adversaries can make small wrong claims with impunity — epistemic damage scales with density of bad small-stake claims, not just large ones. Blocking challenges by slash size is therefore the correct defence for the mechanism's budget but the wrong defence for S_cred quality.
+
+**Resolution — challenge submission fee:**
+
+```
+challenge_submission_fee = r_floor_per_class × fee_fraction
+fee_fraction = 0.1  (governance-settable, bounded [0.05, 0.25])
+```
+
+The fee is:
+- **Reimbursed in full** if the challenge succeeds (slash confirmed).
+- **Forfeited** if the challenge fails (claim vindicated).
+
+**Properties:**
+1. *Spam filter:* A challenger who fails loses the fee. Trivial or exploratory challenges have a real cost without blocking economically rational small-stake challenges.
+2. *Small-slash coverage:* Challenge is never gated by the claim's stake size. A small wrong claim is challengeable; the challenger just cannot recoup the fee from a slash smaller than the fee. Rational challengers only pursue small claims when they have high confidence.
+3. *Pool-RED behaviour:* When challenger_pool is RED and per-challenge pool draw is suspended, the submission fee is still collected (it is challenger-funded, not pool-funded). The fee continues to filter spam even when the pool is stressed.
+
+**Interaction with r_floor degradation during RED (#r140/Q1):** During challenger_pool RED, `r_floor` degrades to self-funding only. Challenge admission (fee collection) continues normally. Challengers facing small slashes in RED mode are self-funding challengers accepting lower expected returns — a rational market response, not a mechanism failure.
+
+**EAT record:** Challenge submission fee is recorded at challenge submission event. Reimbursement or forfeiture is recorded at challenge settlement. (#r141)
+
+---
+
+**Q2 + Q4 (Bonus reward theory — retrospective vs prospective) → Bifurcated bonus: capital-lockup component + epistemic-service component (#r141):**
+
+These two questions are architecturally coupled and resolved together.
+
+**The core tension:**
+- *Retrospective:* Bonus compensates for correctly identifying a structural relationship first. Full bonus to first-position contributor regardless of active-weight period. Incentivises deep early research.
+- *Prospective:* Bonus compensates for epistemic service rendered while claim was actively contributing to S_cred. Staleness-proportional. Incentivises ongoing accurate state maintenance.
+
+Neither alone is correct. A knower who locks capital for T_longtail bears two distinct costs: (1) opportunity cost of locked capital regardless of S_cred contribution, and (2) epistemic work done while actively contributing to the state vector.
+
+**Resolution — bifurcated implication bonus:**
+
+```
+implication_bonus_total = bonus_capital_comp + bonus_epistemic_service
+
+bonus_capital_comp = α_cap × β_escrow × min(1, time_locked / T_longtail_reference)
+
+bonus_epistemic_service = (1 - α_cap) × β_escrow
+                           × (Σ_epochs effective_weight(epoch) / Σ_epochs base_weight)
+```
+
+Where:
+- `α_cap` = capital-compensation fraction (governance-settable, recommended 0.30, bounded [0.1, 0.5])
+- `T_longtail_reference` = max(T_longtail_A, T_longtail_B) — the natural lockup horizon
+- `effective_weight(epoch)` = the claim's S_cred contribution weight in that epoch, subject to staleness decay
+- `base_weight` = the claim's weight at first activation (no staleness discount, full credibility weight)
+- Sum runs over all epochs from activation to oracle resolution
+
+**Consequences:**
+
+| Scenario | bonus_capital_comp | bonus_epistemic_service | Interpretation |
+|---|---|---|---|
+| Fresh claim, full lockup, correct | α_cap × β_escrow | ≈ (1-α_cap) × β_escrow | Full bonus — both components earned |
+| Stale claim, long lockup, correct | α_cap × β_escrow | ≈ 0 | Capital cost compensated; near-zero epistemic service |
+| Fresh claim, early resolution, correct | Fractional | Full (weight was fresh) | Early-resolve shortfall; epistemic service fully earned |
+| New entrant, small stake, correct | Proportional to stake | Proportional to stake × active epochs | Scale-invariant |
+
+**Why this is correct:**
+1. A stale first-position contributor still locked capital and correctly identified the structural relationship. Denying the capital component would create an incentive to withdraw or expire stale declarations before resolution — artificially shortening declaration lifespans. The capital component preserves the incentive to hold long-horizon declarations to resolution.
+2. A prospective-only model would make implication declarations uncompetitive vs standard claims once staleness decay kicks in. The capital component prevents this.
+3. The epistemic-service component preserves incentives to maintain fresh, actively contributing declarations — not just lock capital and wait.
+
+**`Σ_epochs effective_weight` accumulation:** This requires a per-claim running sum tracked at each macro-epoch boundary. This IS a new EAT-tracked quantity — addressed as an open question below (#r141/OQ3).
+
+**Governance parameter α_cap:** The split between capital and service compensation is a mechanism design choice, not a technical constraint. Governance sets α_cap to reflect the relative value of structural identification vs ongoing epistemic service in the protocol's information model. Default 0.30 favours epistemic service (70%) over capital compensation (30%). (#r141; resolves #r140/Q2 and #r140/Q4 jointly)
+
+---
+
+**Q3 (Asymmetric per-class bridge state in cross-class implication declarations) → Asymmetry is consistent; no coordination rule needed; bonus is oracle-triggered, not bridge-state-dependent (#r141):**
+
+**Analysis:** When class A (short macro_epoch) exits its bridge epoch while class B (long macro_epoch) is still in bridge: A's S_cred contribution resumes at κ_class(A) while B's remains suppressed at κ_bridge(B). The question is whether this asymmetric state should block or coordinate the implication bonus calculation.
+
+**Resolution:** No coordination rule. Asymmetric bridge is a natural consequence of per-class epoch independence, which is the established design (#r73 timestamp-tagged staleness; #r140/Q3 per-class bridge epoch confirmed).
+
+**Why the bonus is unaffected:**
+
+The implication bonus `bonus_epistemic_service` accumulates `effective_weight(epoch)` per class per epoch. During A's bridge epoch: A's weight is at κ_bridge(A) — reduced. During B's bridge epoch: B's weight is at κ_bridge(B) — reduced. These are independent per-class contributions summed separately. The combined epistemic service reflected in the bonus naturally accounts for bridge-suppressed epochs — they contribute less to the `Σ effective_weight` sum. No coordination flag needed.
+
+The bonus_capital_comp component is purely time-based (time_locked / T_longtail_reference) — independent of any bridge state.
+
+**Settlement trigger:** Both oracle events (resolution of A and resolution of B) are required before bonus distribution. Oracle events are independent of bridge state. A bridge epoch at A does not delay A's oracle. Settlement happens at the first macro-epoch boundary after both oracles resolve — at that point, all bridge epochs for both classes have long since concluded.
+
+**Potential edge case — oracle fires during bridge epoch:** If A's oracle resolves during A's bridge epoch, the oracle event is recorded in EAT immediately (oracle events are not suspended by bridge epochs — bridge only affects κ, not oracle queue processing). Settlement waits for both A and B oracles, so partial oracle during bridge simply means the `effective_weight` sum through bridge epoch contributes bridge-level weight for those epochs — correct epistemic accounting.
+
+**Design law confirmed (#r141):** Cross-class declarations with different epoch lengths require no synchronization on bridge epochs. Per-class independent epistemic accounting + oracle-triggered settlement is sufficient. Adding coordination rules to synchronize bridge exit across classes would create unnecessary coupling between otherwise independent coordinate classes. (#r141)
+
+---
+
+## Structural Synthesis: Bonus Settlement Contract — Design-Complete (#r141)
+
+The implication bonus settlement contract now has a fully specified design:
+
+| Component | Formula | Staleness-sensitive? | Governance parameter |
+|---|---|---|---|
+| bonus_capital_comp | α_cap × β_escrow × min(1, time_locked / T_longtail_ref) | No | α_cap ∈ [0.1, 0.5] |
+| bonus_epistemic_service | (1-α_cap) × β_escrow × (Σ eff_weight / Σ base_weight) | Yes (via effective_weight decay) | α_cap |
+| Challenge admission | fee = r_floor × fee_fraction; reimbursed if succeeds | N/A | fee_fraction ∈ [0.05, 0.25] |
+| Cross-class bridge asymmetry | No coordination rule; per-class independent accounting | Natural via eff_weight accumulation | None |
+
+---
+
+## Open Questions for #r142+
+
+1. **α_cap calibration basis:** How should governance set α_cap? The default 0.30 is reasoned but not formally derived. Is there a principled formula analogous to the β closed-form calibration (#r75/Q4)? For example: α_cap could be calibrated to ensure that a claim at exactly T_longtail staleness (fully stale, zero effective_weight) earns enough bonus to cover the opportunity cost of capital at the protocol's reference rate. This would anchor α_cap to a capital market rate rather than governance intuition.
+
+2. **Challenge submission fee during degraded mode:** If a challenge is submitted (fee collected, EAT commit pending) and DA outage begins before the challenge resolves, is the fee frozen (not reimbursed, not forfeited) until DA restores? Since fee reimbursement/forfeiture is an EAT-dependent operation (#r134/Q1 principle: all EAT-dependent operations suspend during degraded mode), the fee should freeze alongside the challenge. Verify this is consistent with the challenge window tolling rules.
+
+3. **`Σ effective_weight` EAT storage cost:** The bifurcated bonus requires a per-claim running sum of `effective_weight` over all active epochs. This is an O(epochs) quantity per claim. For long-lived claims on slow-oracle coordinates (many epochs, very long T_longtail), this could become non-trivial. Can the running sum be maintained as a single accumulator updated per macro-epoch boundary (O(1) per epoch per claim), rather than reconstructed from history at settlement? If yes, define the accumulator update rule and its EAT commit frequency.
+
+4. **Challenge admission fee in cross-class implication declarations:** When challenging a cross-class implication declaration (challenging the A→B claim as a whole vs. challenging only one coordinate), which class's `r_floor` governs the submission fee? Option A: the lower-r_floor class (cheaper to challenge, lower barrier — may encourage legitimate challenges on cheap classes). Option B: the higher-r_floor class (harder to challenge, higher quality bar — may block legitimate cheap-class challenges). Option C: average of both classes' r_floor. This choice affects the incentive to challenge cross-class declarations.
+
+*Last updated: #r141 — 2026-04-03T21:12Z*
