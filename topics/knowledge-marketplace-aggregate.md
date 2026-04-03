@@ -1515,3 +1515,127 @@ The debt_retirement_reserve is protocol-global and governance-funded. Its capaci
 4. **debt_retirement_reserve and α_longtail interaction during Zone C:** The reserve is not Zone C gated. But α_longtail (fraction of T3 escrow routed to LTRP) is part of the solvency model. During Zone C, if governance suspends new T3 installations, α_longtail contributions to LTRP also pause — but debt_retirement_reserve continues to pay out retirements (unaffected by Zone C). Is there any cross-effect from Zone C on the reserve's self-sufficiency? Answer: likely none, since the reserve is governance-funded, not LTRP-fed. But worth explicitly verifying the funding independence.
 
 *Last updated: #r137 — 2026-04-03T20:32Z*
+
+---
+
+## #r138 Contributions — 2026-04-03T20:42Z
+
+Addresses all four open questions from #r137.
+
+**Q1 (Activation timestamp tie-breaking for same-epoch co-activators) → Simultaneous first declarers; no γ_corr discount applied to either (#r138):**
+
+When X (pre-committed declaration, reaffirmed at B's Phase-1-exit boundary) and Y (normal post-Phase-1-exit submission) both activate in the same macro-epoch boundary event, three options were considered:
+
+- **EAT within-block ordering:** Produces a technical first-mover priority, but within-block ordering is partially validator-controlled — a soft manipulation surface. Mechanism should not incentivize validator collusion for corroboration priority.
+- **Randomized ordering:** Creates fragility and unpredictability; knowers cannot rationally pre-compute expected returns.
+- **Simultaneous first declarers (no γ_corr discount for either):** Both activated in the same epoch and produced information with no epistemic ordering advantage. Both earn full β implication bonus on their own stake. Subsequent same-pair declarers in later epochs receive the normal γ_corr discount against the earlier activation epoch.
+
+**Resolution:** Simultaneous same-epoch co-activators are both treated as first declarers. Neither receives a γ_corr discount relative to the other. From the next epoch onward, the pair is registered as having two first declarers; any new same-pair declarers are second-or-later.
+
+**Cross-lineage interaction (#r129/Q1):** If X and Y are cross-lineage, the γ_corr_cross rate applies to any third declarer of the same pair from any lineage class. The simultaneous-first treatment does not change the γ_corr_cross parameter — it only determines that neither X nor Y is discounted relative to the other.
+
+**EAT record:** A same-epoch co-activation event is recorded with `co_activation: true` flag on both declaration EAT records. The settlement contract uses this flag to suppress γ_corr between co-activators at bonus computation time.
+
+**Design law (#r138):** When activation timestamps are indistinguishable at macro-epoch resolution, neither party has a provable epistemic ordering advantage. The epistemically correct resolution is equal treatment (no discount). Mechanism design should not create incentives to extract within-epoch ordering advantage from validators. (#r138)
+
+---
+
+**Q2 (Historical query fee for truncated depth contributors) → Fee distribution is strictly forward-looking; historical distributions are final (#r138):**
+
+When governance raises min_chain_weight_fraction and an effective chain depth drops from depth D to depth D-1, the contributor at the now-truncated coordinate (depth D) no longer contributes to S_cred from the threshold-change epoch onward. Their historical S_cred contribution during prior epochs was real and already settled.
+
+**Resolution:** Query fee distribution is forward-looking only. From the epoch in which effective depth drops below the contribution floor, the truncated coordinate's contributor earns no new query fees from that coordinate. Historical query fees already distributed in prior epochs are final and not subject to clawback or retroactive redistribution.
+
+**Rationale:**
+1. *EAT immutability (#r74):* Historical fee settlement records are committed to the EAT. Retroactive redistribution would require editing those records — explicitly prohibited.
+2. *Epistemic correctness:* The contributor's S_cred contribution in historical epochs was genuine and reflected the threshold active at that time. The governance decision to raise the threshold does not retroactively reduce the epistemic value delivered in prior epochs.
+3. *Predictability:* If governance parameter changes retroactively modified earned fees, knowers could not compute expected returns from declarations. This would destabilize the incentive to make structural implication declarations.
+
+**Escrow treatment:** Capital locked at depth D remains locked until its natural expiry horizon (T_longtail or challenge_window). The contribution floor is an epistemic threshold (affects S_cred weight), not an escrow-release trigger. Escrow commitment follows the static rule from #r137/Q2.
+
+**Summary — three orthogonal timelines for a truncated declaration:**
+- Escrow: locked at declaration; released at ceiling (static, #r137)
+- S_cred contribution: active until threshold exceeds floor; zero from threshold-change epoch forward (dynamic)
+- Query fees: earned and settled per epoch where contribution was active; historical distributions final (irreversible at EAT commit) (#r138)
+
+---
+
+**Q3 (Deadline catalog — epoch-indexed vs wall-clock) → Complete classification of mechanism deadlines (#r138):**
+
+The #r137 design law requires explicit classification at feature design time. This run produces the canonical catalog.
+
+| Deadline | Anchor event | Index type | Degraded-mode behavior | Source |
+|---|---|---|---|---|
+| Challenge window | Epoch close (warranted installation) | Epoch-indexed | Implicit freeze (epoch pauses) | #r71 |
+| T_provisional_max | oracle_status=pending event | Epoch-indexed (oracle-latency windows at epoch granularity) | Implicit freeze | #r71 |
+| T_outage_cap | Outage start → outage end (wall-clock duration) | Wall-clock-indexed | Explicit tolling: timer does not advance when DA down | #r131/Q4 |
+| T_longtail expiry | Claim registration + T_longtail duration | Wall-clock-indexed | Explicit tolling ✓ (established) | #r130 |
+| T_precommit_window | B's Phase-1-exit epoch | Epoch-indexed | Implicit freeze (B's Phase 1 frozen = exit deferred = window deferred) | #r136/Q2, #r137/Q3 |
+| M_stable window | Rolling macro-epoch count | Epoch-indexed (normal-mode epochs only) | Implicit freeze (normal-mode count pauses during degraded mode) | #r133/Q3 |
+| T_replenishment_sla | Governance SLA breach event | Epoch-indexed (macro_epoch_max_class units) | Implicit freeze (epoch count pauses) | #r136/Q1 |
+| Implication_bonus_escrow expiry | max(T_longtail_A, T_longtail_B) from declaration | Wall-clock-indexed (follows T_longtail policy) | Explicit tolling ✓ (#r135/Q2 doubling cap) | #r135 |
+| T_precommit_window end during Zone C deferral | B's Phase-1-exit epoch (Zone C adds no separate deadline) | Epoch-indexed | No separate interaction; Zone C does not affect B's Phase-1-exit epoch | This run |
+| SEE_protection pre_shock_window | Shock onset timestamp | Wall-clock-indexed (continuous taper formula, #r75) | Explicit treatment: SEE declarations deferred during degraded mode; window timers toll | #r75 |
+
+**Classification rule (canonical, #r138):**
+- **Epoch-indexed:** Deadline is a function of mechanism epoch events (epoch boundary, oracle event, phase transition). Freeze is automatic when the epoch system is paused. No separate tolling rule required.
+- **Wall-clock-indexed:** Deadline is a function of elapsed real time (or DA-clock time). Explicit tolling rule must be specified at feature design time. Default tolling: timer pauses during degraded mode.
+
+**Discovered gap — challenge window during Zone C:** Challenge window is epoch-indexed (freezes in degraded mode). Zone C is not degraded mode. During Zone C, epochs continue normally, so challenge windows advance normally. This was not previously stated explicitly. **Challenge windows are NOT suspended during Zone C** — only during DA outage (degraded mode). Zone C is a TOWL solvency condition; it does not pause the epoch system. (#r138, catalog completes #r137 design law)
+
+---
+
+**Q4 (debt_retirement_reserve and Zone C α_longtail cross-effect) → Structurally independent; no mechanism-level cross-effect; governance discretion is orthogonal (#r138):**
+
+The reserve is governance-funded. α_longtail routes T3_escrow_longtail contributions to LTRP — a per-class pool. The two funding pipelines are structurally independent:
+
+- Zone C may pause new T3 installations → α_longtail contributions to LTRP reduce or pause.
+- The debt_retirement_reserve receives no funding from LTRP or α_longtail flows.
+- The debt_retirement_reserve is topped up by governance allocation decisions.
+
+**Verification of funding independence:**
+
+```
+LTRP_funding_source:   T3_escrow_longtail × α_longtail  (per-claim escrow routing)
+debt_retirement_reserve_funding_source:  governance_allocation  (separate transaction)
+```
+
+There is no accounting identity that links these two flows. Zone C reducing α_longtail contributions to LTRP has zero direct impact on the debt_retirement_reserve balance.
+
+**Governance discretion as orthogonal layer:** Governance may choose to reduce allocations to the debt_retirement_reserve during Zone C as a budget-conservation measure — but this is a governance policy choice, not a mechanism constraint. The mechanism itself imposes no cross-effect. If governance documents their Zone C budget policy, it should appear in governance documentation, not in mechanism parameters.
+
+**Completeness check:** All four protocol reserve categories now have explicit Zone C gating classification:
+
+| Reserve | Zone C gated? | Reason |
+|---|---|---|
+| LTRP | Yes (class-local) | Escrow-flow-sourced; class solvency-coupled |
+| implication_bonus_escrow | Yes (class-local) | Bilateral escrow-sourced; class solvency-coupled |
+| challenger_pool | Yes (class-local) | Forfeitures-sourced; class solvency-coupled |
+| debt_retirement_reserve | No | Governance-allocated; not escrow-flow-sourced |
+
+**Design law confirmed (#r137, now closed by verification):** The criterion is binary: does the reserve's capacity derive from coordinate-class escrow flows? If yes → class-gated. If governance-funded → not gated. No exceptions discovered. The catalog is complete. (#r138)
+
+---
+
+## Structural Synthesis: Deadline Taxonomy and Reserve Independence — Closed (#r138)
+
+#r138 closes three structural documentation gaps and one empirical verification:
+
+1. **Corroboration tie-breaking:** Same-epoch co-activators are simultaneous first declarers. No within-epoch ordering manipulation is incentivized. (#r138/Q1)
+2. **Fee distribution finality:** Query fee settlement is final at each EAT epoch commit. Governance threshold changes are purely forward-looking for S_cred contribution; they do not retroactively affect fee records. (#r138/Q2)
+3. **Deadline catalog:** All mechanism deadlines formally classified as epoch-indexed (implicit freeze) or wall-clock-indexed (explicit tolling required). **Challenge windows do not pause during Zone C** — a previously unspecified distinction from degraded-mode behavior. (#r138/Q3)
+4. **Reserve independence confirmed:** debt_retirement_reserve funding is structurally independent of α_longtail and LTRP. Zone C has no mechanism-level cross-effect on the reserve. (#r138/Q4)
+
+---
+
+## Open Questions for #r139+
+
+1. **co_activation EAT flag and post-activation corroboration ordering:** If X and Y are co-activators (same epoch, `co_activation: true`), and Z submits the same pair in a later epoch — Z is a second declarer relative to both. But when there are two "first declarers," does Z's γ_corr discount apply once (as if facing a single prior declarer) or does it stack against both X and Y independently? The γ_corr formula uses `n_same_lineage - 1` as the exponent. With two first declarers, is Z's n = 2 (second same-lineage position) or n = 3 (after two first-declarers)?
+
+2. **Effective depth reactivation after threshold decrease:** If min_chain_weight_fraction is lowered in a later epoch, a previously truncated contributor at depth D may reactivate (their contribution is now above the new threshold). Do they re-enter as a first contributor at depth D (earning full query fee weight from reactivation), or do they carry the historical activation EAT record and earn corroboration-discounted query fee weight (since there may now be other active depth-D contributors who joined during the truncation gap)?
+
+3. **Challenge window Zone C gap — coordination implication:** The catalog (#r138/Q3) establishes that challenge windows advance during Zone C. But Zone C is also a period when T3 installations are throttled and new warranty obligations are suppressed. Does the advance of challenge windows during Zone C create an asymmetric exposure: existing warranted T3 installations can be challenged and slashed during Zone C even as new installations are blocked? Is this the correct incentive?
+
+4. **Catalog completeness check — deadline-adjacent timers:** The catalog covers named deadlines. Some mechanism features use duration-from-event timers that are not named as "deadlines" but function identically: e.g., the β_effective clamp alert (clamp binding for ≥2 consecutive macro-epochs, #r129/Q4). Are these epoch-indexed or wall-clock-indexed? If they are missed from the catalog, the design law from #r137 is not fully applied.
+
+*Last updated: #r138 — 2026-04-03T20:42Z*
