@@ -1,9 +1,9 @@
 # GDM Epistemic Bond — Real-World Validation & Fine-Tune
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r076
+**Run:** r076 → updated by r085 (VAL-473: Phase 2/3 go-no-go week corrections; footer trigger week corrected) → updated by r086 (VAL-474: Phase 1 go-no-go row week corrected to Weeks 4–10)
 **Date:** 2026-04-03
-**Issue:** VAL-461
+**Issue:** VAL-461 → updated by VAL-473 → updated by VAL-474
 **Depends on:** executable-roadmap.md (r074), epistemic-bond-v0-spec.md (r075), research-synthesis.md (r073)
 **Purpose:** Final validation pass over the full r071–r075 corpus. Identifies what is theoretically sound vs. real-world fragile, corrects unit-economic assumptions, tightens the critical path, and delivers a go/no-go verdict for Phase 0 launch.
 
@@ -356,15 +356,15 @@ These updates preserve the corpus structure (CRUD in place); this validation doc
 | Phase | Verdict | Conditions |
 |---|---|---|
 | Phase 0 (testnet, Weeks 1–3) | **GO** | Apply four corrections: USDC/unit pricing, oracle sources, L1 scope, T_i exit metric |
-| Phase 1 (closed beta, Weeks 4–7) | **GO** | BD starts recruitment in Week 1; 15 knowers onboarded by Week 4; coordinates finalized |
-| Phase 2 (unknower soft launch, Weeks 8–16) | **CONDITIONAL** | Must hit T_i ≥ 0.5 for ≥3 knowers; Phase 1 must complete without oracle disputes |
-| Phase 3 (scale + expansion, Week 17+) | **HOLD** | Gated on Phase 2 revenue positive + Atlas open items 1–2 resolved |
+| Phase 1 (closed beta, Weeks 4–10) | **GO** | BD starts recruitment in Week 1; 15 knowers onboarded by Week 4; coordinates finalized |
+| Phase 2 (unknower soft launch, Weeks 11–19) | **CONDITIONAL** | Must hit T_i ≥ 0.5 for ≥3 knowers; Phase 1 must complete without oracle disputes |
+| Phase 3 (scale + expansion, Week 20+) | **HOLD** | Gated on Phase 2 revenue positive + Atlas open items 1–2 resolved |
 
 **Single most important action to unblock Phase 0 start:**
 Establish the USDC ERC-20 deployment on Arbitrum Sepolia and confirm the engineering lead has PRBMath v4 integrated before any other contract work begins. Everything else flows from that.
 
 ---
 
-*This is the final research-to-execution validation document for the GDM epistemic bond corpus. The mechanism is real, the market is real, and the plan is executable with the four corrections identified above. No further research passes are required for Phase 0–1. The next trigger is Phase 1 exit criteria evaluation at Week 8.*
+*This is the final research-to-execution validation document for the GDM epistemic bond corpus. The mechanism is real, the market is real, and the plan is executable with the four corrections identified above. No further research passes are required for Phase 0–1. The next trigger is Phase 1 exit criteria evaluation at Week 10.*
 
 *Logan — ValCtrl AI Chief of Staff | r076 | VAL-461*

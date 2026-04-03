@@ -1,8 +1,8 @@
 # GDM Epistemic Bond Layer — Executable Roadmap
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Issue:** VAL-459 → updated by VAL-462 (r077 fine-tune corrections) → updated by VAL-468 (r080 coordinate correction) → updated by VAL-472 (r084 phase-number corrections)
-**Run:** r084 (phase 2/3 week-number correction; phase headers aligned with 6–7 week Phase 1)
+**Issue:** VAL-459 → updated by VAL-462 (r077 fine-tune corrections) → updated by VAL-468 (r080 coordinate correction) → updated by VAL-472 (r084 phase-number corrections) → updated by VAL-473 (r085 Phase 1 header + §5 title corrections)
+**Run:** r085 (Phase 1 section header corrected to Weeks 4–10; §5 title corrected to Week 19; real-world-validation.md Phase 2/3 go-no-go table corrected)
 **Date:** 2026-04-03
 **Inputs:** Synthesis of r001–r073 across all research tracks (Atlas, Scout, Lens, Sage, Echo)
 **Purpose:** Convert the theoretical mechanism design into a time-sequenced, resource-tagged, risk-acknowledged execution plan.
@@ -64,7 +64,7 @@ A smart contract layer and off-chain coordination service that:
 
 ---
 
-### Phase 1: Closed Knower Beta (Weeks 4–7)
+### Phase 1: Closed Knower Beta (Weeks 4–10)
 
 **Goal:** Recruit 15 credentialed knowers, open 15 earnings coordinates, build the first 30 epochs of track records.
 
@@ -185,7 +185,7 @@ These are the concrete protocol constants for deployment. All are governance-adj
 
 ---
 
-## 5. Minimum Viable Success Criteria (by Week 16)
+## 5. Minimum Viable Success Criteria (by Week 19)
 
 These are the binary criteria that validate the idea is executable before committing to Phase 3 resources:
 
@@ -240,4 +240,4 @@ These are known open items from r073. They are real, they matter long-term, but 
 
 *Four corrections applied in r077 (VAL-462) per real-world validation pass (r076, VAL-461): (1) unit pricing anchored to $1 USDC; (2) oracle sourcing corrected for Phase 1 (see epistemic-bond-v0-spec.md); (3) L1 dependency scope clarified; (4) Phase 1 exit criterion updated from p < 0.05 to T_i ≥ 0.5.*
 
-*Logan — ValCtrl AI Chief of Staff | r077 → r084 | VAL-462 → VAL-472*
+*Logan — ValCtrl AI Chief of Staff | r077 → r085 | VAL-462 → VAL-473*

@@ -1,9 +1,9 @@
 # GDM Market Analysis: TAM/SAM/SOM, Bootstrap Economics, Revenue Validation, Go-to-Market
 
-**Run:** r072 (Lens market research pass)
+**Run:** r072 (Lens market research pass) → corrected r087 (VAL-475: §1.3 SOM label corrected; §2.2 seed capital note corrected; §5.4 GTM week numbers corrected to Weeks 1–3/4–10/11–19/20+; §6.1 SOM summary corrected)
 **Date:** 2026-04-03
 **Author:** Logan / Lens persona (ValCtrl AI — Chief of Staff)
-**Issue:** VAL-453
+**Issue:** VAL-453 → updated by VAL-475
 **Parent:** VAL-450 (fundamental-analysis-epistemic-bond-layer.md)
 **Scope:** Market sizing, bootstrap comparison, revenue stress-test, competitive moat, GTM sequencing for the GDM epistemic bond layer.
 
@@ -117,8 +117,8 @@ SOM_annual at $10/unit, same volume = $1.825M/year
 | TAM | ~$14B | Full expert-info + PM + quant addressable |
 | SAM (steady state) | $550M–$11B | Active PM users with private signal |
 | SAM (seed-period) | $500K–$6M/year | 500 coordinates, $10–50/epoch fee |
-| SOM (r071 model, $1/unit) | ~$180K/year | Minimum mechanism proof |
-| SOM ($10/unit, 500 coords) | ~$1.8M/year | Plausible first-year target |
+| SOM (r071 model, $1/unit) | ~$180K/year | Minimum mechanism proof; first-year Phase 1 target |
+| SOM ($10/unit, 500 coords) | ~$1.8M/year | Phase 3 target as unit value scales with track record depth (not a first-year number; unit pricing is $1 USDC in Phase 1) |
 
 ---
 
@@ -165,7 +165,7 @@ Assumptions:
 Seed subsidy = 50 × 10 × 30 = 15,000 units
 ```
 
-At $10/unit, that's $150,000 in seed capital. Modest relative to peer bootstraps (GLG raised $10M+ before scaling). The Layer 1 anchoring dramatically reduces this because:
+At $10/unit (50 knowers at Phase 3 scale), that's $150,000 in seed capital — valid as a Phase 1–2 combined budget but not as the Phase 1-only seed subsidy. Per r077 correction (VAL-462), Phase 1 runs 15 knowers at $1/unit; actual Phase 1 seed subsidy = 15 × 10 × 30 = **$4,500 USDC**. The $150K figure remains a useful Phase 3 planning number and overall budget envelope. Modest relative to peer bootstraps (GLG raised $10M+ before scaling). The Layer 1 anchoring dramatically reduces this because:
 - Oracle resolutions are automatic (Layer 1 clears regardless)
 - Track records accrue from first epoch, without manufactured demand
 - No subsidy needed to create oracle outputs — they exist from Layer 1 settlement
@@ -414,26 +414,28 @@ This is extraordinarily fast compared to GLG (3–5 years) or Polymarket (18+ mo
 
 ### 5.4 GTM Sequencing
 
-**Week 1–2: Pre-seed recruit**
-- Identify 10–15 credentialed knowers with verifiable earnings forecasting track records (ex-analysts, alt-data providers, quant shops)
-- Hand-curate; do not open public claiming yet
-- Offer guaranteed minimum reward for first 30 epochs
+**Weeks 1–3: Phase 0 — Engineering + BD pre-seed recruit** *(r087/VAL-475 correction: was "Week 1–2 pre-seed + Week 3–6 closed beta"; corrected to canonical phase week numbers per executable-roadmap.md)*
+- Engineering: deploy EpistemicBondRegistry.sol + EpistemicBondCoordinate.sol to Arbitrum Sepolia; integrate PRBMath v4, OpenZeppelin SafeERC20, USDC mock
+- BD: identify 15 credentialed knowers (ex-analysts, alt-data providers, quant shops); send calibration tests; onboard by end of Week 3
+- Protocol: verify all 30 Phase 1 coordinates; load Wave 1 S_prev values; activate Wall Street Horizon oracle account
+- Target: 8-day accelerated critical path (see phase0-launch-package.md); Wave 1 commit window opens April 11
 
-**Week 3–6: Closed beta with Layer 1**
-- Open 10–15 earnings coordinates
-- Seed knowers stake claims on Layer 1-anchored outcomes
-- Layer 1 clears; Layer 2 records track records automatically
-- No unknower fees yet; build the track record registry
+**Weeks 4–10: Phase 1 — Closed knower beta (30 coordinates, two waves)** *(r087/VAL-475 correction: was "Week 3–6"; corrected to Weeks 4–10 per r080/VAL-468 and r085/VAL-473)*
+- Open 30 earnings coordinates across two waves (Wave 1: Apr 14–May 1; Wave 2: May 5–May 30)
+- 15 knowers stake claims; oracle resolves per EDGAR 8-K filings
+- No unknower fees yet — build the track record registry
+- Exit criterion: ≥3 knowers with T_i ≥ 0.5 after ≥30 resolved predictions each (replaces p < 0.05)
 
-**Week 7–12: Unknower soft launch**
+**Weeks 11–19: Phase 2 — Unknower soft launch** *(r087/VAL-475 correction: was "Week 7–12"; corrected to Weeks 11–19 per r080/VAL-468 and r084/VAL-472)*
 - Invite 5–10 institutional unknowers (small hedge funds, event-driven quant traders)
-- Charge 10 bps/epoch for credibility-weighted claim bundles
-- Gather feedback on S_public vs. their internal models
+- Charge 5–25 bps/epoch for credibility-weighted claim bundles
+- Gather feedback on S_public vs. internal models; validate willingness-to-pay
 
-**Week 13+: Scale**
+**Week 20+: Phase 3 — Scale** *(r087/VAL-475 correction: was "Week 13+"; corrected to Week 20+ per r084/VAL-472)*
 - Open to broader knower/unknower population based on track record data
-- Expand to additional domains (macro data, crypto events)
+- Expand to additional domains (macro data, crypto events); target 100+ coordinates by Week 23
 - Publish credibility weight leaderboard (public-facing trust signal)
+- Governance-increase unit pricing as track record moat deepens (path to $1.8M/year SOM)
 
 ---
 
@@ -443,7 +445,7 @@ This is extraordinarily fast compared to GLG (3–5 years) or Polymarket (18+ mo
 
 - **TAM** is real and large (~$14B across expert networks, PM, quant research) but fragmented
 - **SAM** at seed is $500K–$6M/year; at scale, $550M–$11B/year
-- **SOM** at r071 model is $180K/year minimum; $1.8M/year at $10/unit is the realistic first-year target
+- **SOM** at $1/unit (Phase 1) is $182.5K/year proof-of-mechanism; $1.8M/year at $10/unit is the Phase 3 target as unit value scales with track record depth — not a first-year number *(r087/VAL-475 correction)*
 - The mechanism captures value not currently priced: the *epistemic premium* on private information, currently earned silently by informed PM traders ($143M+ at Polymarket since 2024)
 
 ### 6.2 Bootstrap Economics

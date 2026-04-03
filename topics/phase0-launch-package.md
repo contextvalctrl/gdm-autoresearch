@@ -1,9 +1,9 @@
 # GDM Epistemic Bond — Phase 0–1 Launch Package
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r078 (VAL-465) → updated r080 (VAL-468) → corrected r081 (VAL-469) → corrected r082 (VAL-470) → corrected r083 (VAL-471) → corrected r084 (VAL-472)
+**Run:** r078 (VAL-465) → updated r080 (VAL-468) → corrected r081 (VAL-469) → corrected r082 (VAL-470) → corrected r083 (VAL-471) → corrected r084 (VAL-472) → corrected r086 (VAL-474)
 **Date:** 2026-04-03
-**Issue:** VAL-465 → updated by VAL-468 → updated by VAL-469 → updated by VAL-470 → updated by VAL-471 → updated by VAL-472
+**Issue:** VAL-465 → updated by VAL-468 → updated by VAL-469 → updated by VAL-470 → updated by VAL-471 → updated by VAL-472 → updated by VAL-474
 **Depends on:** real-world-validation.md (r076/VAL-461), executable-roadmap.md (r077/VAL-462 → r080/VAL-468), epistemic-bond-v0-spec.md (r077/VAL-462), knower-calibration-test.md (r079/VAL-466), phase1-coordinates.md (r079/VAL-466)
 **Purpose:** Final fine-tune and executable consolidation. Everything required to start Phase 0 this week — in one document. Updated in r080 to reflect 30-coordinate / two-wave structure per phase1-coordinates.md r079.
 
@@ -64,7 +64,7 @@ Everything else is sequenced below.
 
 ---
 
-## Part 1: Consolidated Budget (Phase 0–1, Weeks 1–7)
+## Part 1: Consolidated Budget (Phase 0–1, Weeks 1–10)
 
 ### 1.1 Engineering (Phase 0, Weeks 1–3)
 
@@ -94,7 +94,7 @@ Everything else is sequenced below.
 
 ---
 
-### 1.3 Seed Subsidy (Phase 1, Weeks 4–7)
+### 1.3 Seed Subsidy (Phase 1, Weeks 4–10)
 
 The seed subsidy floor guarantees knower participation during the track-record bootstrap. It is a floor (minimum reward per epoch), not a bonus.
 
@@ -160,7 +160,7 @@ At a $150K seed capital budget (per Lens r073 long-term plan), Phase 0–1 consu
 - [ ] Begin sending to first 20 candidates
 
 **Protocol:**
-- [ ] Finalize 15 Phase 1 coordinate candidates (earnings events for Weeks 4–7; check earnings calendar)
+- [ ] Finalize 15 Phase 1 coordinate candidates (earnings events for Weeks 4–10; check earnings calendar)
 - [ ] Document each coordinate: ticker, reporting date, consensus source (Wall Street Horizon)
 - [ ] Set up Wall Street Horizon account ($200/month)
 
@@ -300,7 +300,7 @@ Your reward (or loss) per epoch is:
 
 In plain English: **you make money when you're more right than the crowd.** If you match the crowd exactly, R = 0. You only make money by being better than the consensus.
 
-Phase 1 (Weeks 1–7): **Seed subsidy floor of $10 per epoch guaranteed** for any epoch where you file a valid claim — regardless of outcome. This covers your expected staking cost and compensates you for participating while the track record bootstraps.
+Phase 1 (Weeks 4–10): **Seed subsidy floor of $10 per epoch guaranteed** for any epoch where you file a valid claim — regardless of outcome. This covers your expected staking cost and compensates you for participating while the track record bootstraps.
 
 Phase 2 (post-exit): Fee revenue from institutional buyers replaces the seed subsidy. The Phase 1 track record is your proof-of-edge that earns premium fees.
 
@@ -584,4 +584,4 @@ This package adds the missing operational artifacts. The canonical technical and
 
 *Five corrections have been applied across this corpus: four in r077 (unit pricing → $1 USDC; oracle sources; L1 scope; Phase 1 exit criterion → T_i ≥ 0.5) and one in r080 (coordinate count: 15 → 30 across two waves; Phase 1 duration: 4 weeks → 6–7 weeks). See `phase1-coordinates.md` for the full coordinate list.*
 
-*Logan — ValCtrl AI Chief of Staff | r078 → r080 | VAL-465 → VAL-468*
+*Logan — ValCtrl AI Chief of Staff | r078 → r086 | VAL-465 → VAL-474*

@@ -29,6 +29,9 @@ gdm-autoresearch/
 | `r082-fine-tune-notes.md` | r082 fine-tune pass corrections (VAL-470) |
 | `r083-fine-tune-notes.md` | r083 fine-tune pass corrections — final validation (VAL-471) |
 | `r084-fine-tune-notes.md` | r084 fine-tune pass — real-world validation + phase week-number corrections (VAL-472) |
+| `r085-fine-tune-notes.md` | r085 fine-tune pass — Phase 1 header + §5 title + real-world-validation week corrections (VAL-473) |
+| `r086-fine-tune-notes.md` | r086 fine-tune pass — Phase 1 "Weeks 4–7" → "Weeks 4–10" corrections in real-world-validation + phase0-launch-package (VAL-474) |
+| `r087-fine-tune-notes.md` | r087 fine-tune pass — lens-market-analysis.md: SOM label corrections, seed capital note corrected, §5.4 GTM week numbers corrected to canonical phase timeline (VAL-475) |
 
 ---
 
