@@ -3207,4 +3207,194 @@ Settlement flow:
 
 4. **EQ q_bonus settlement vs Settlement Freeze Protocol:** In a CLEARING_MODE class with EQ enabled, should q_bonus distribution wait until settlement_price is final (T_finality) or settle at oracle resolution (T_anchor)? If q_bonus settles at T_anchor but settlement_price is subsequently overridden, the EQ bonus was distributed against a candidate price that did not become final — a consistency gap.
 
-*Last updated: #r150 — 2026-04-03T22:42Z*
+*Last updated: #r151 — 2026-04-03T22:52Z*
+
+---
+
+## #r151 Contributions — 2026-04-03T22:52Z
+
+Addresses all four open questions from #r150. Adds one net-new structural insight: the oracle-authority/knower-attestor duality as a formal design primitive.
+
+---
+
+**Q1 (Settlement Freeze Protocol and TOWL Zone C interaction) → Settlement-critical challenge windows are Zone C-deferred; standard epistemic challenges are not (#r151):**
+
+The general rule is: challenge windows advance during Zone C (epistemic enforcement is never suspended by solvency conditions, #r139/Q3). The Settlement Freeze Protocol introduces a categorically different type of challenge window — not a quality-dispute challenge but a *settlement-finality challenge*.
+
+**The distinction is material:**
+- **Epistemic challenge (standard):** "This warranted installation is factually wrong." Slashes escrow. Outcome: state update + financial penalty.
+- **Settlement-finality challenge (SFP):** "This candidate settlement price should be overridden by oracle authority." Does NOT slash the original knower. Outcome: oracle override + position settlement at oracle value. No financial penalty on the knower.
+
+If settlement-finality challenge windows advance during Zone C, parties with the largest financial interest in an alternative settlement price (large positions, Zone C conditions) can strategically time challenges when protocol resources are most stressed — the mechanism's solvency state is worst, governance bandwidth is lowest, and challenge resolution capacity may be impaired.
+
+**Resolution — settlement-critical challenge windows are Zone C-deferred:**
+
+```
+challenge_type ∈ { epistemic (standard) | settlement_finality (SFP) }
+
+epistemic challenges: advance during Zone C (unchanged from #r139/Q3)
+settlement_finality challenges: deferred during class-level Zone C
+  → T_challenge_window clock pauses
+  → expiry tolls (consistent with all other class-level deferral policies)
+  → resumes at first macro-epoch boundary after Zone C exit
+```
+
+**Rationale:** Settlement finality is a higher-stakes, irreversible event than an epistemic state update. Deferring finality during Zone C is consistent with the general principle that irreversible high-stakes operations are gated during solvency stress. The epistemically-enforcement operations remain active (standard challenges proceed) — only settlement finality is held.
+
+**Zone C notification:** Position-holders are notified via EAT event of Zone C deferral of any pending settlement-finality challenge window. Expiry tolling ensures no challenge right is forfeited due to Zone C. (#r151)
+
+---
+
+**Q2 (`oracle_settlement_override` EAT event type — full specification) (#r151):**
+
+**New EAT event type: `oracle_settlement_override`**
+
+```
+EAT event: {
+  type:                  "oracle_settlement_override",
+  epoch_committed:       T_override,
+  coordinate_class:      class_id,
+  coordinate:            c,
+  candidate_price:       S(c)_at_T_anchor,   // what the mechanism believed
+  oracle_price:          oracle_confirmed_value,
+  challenge_initiator:   challenger_address (or null if oracle-initiated),
+  challenge_fee_routing: see below,
+  knower_slash:          false  // explicit: no knower penalty
+  settlement_price_final: oracle_confirmed_value,
+  EAT_ref_T_anchor:      [T_anchor EAT event id]
+}
+```
+
+**Settlement routing table:**
+
+| Scenario | Challenge fee routing | Knower escrow |
+|---|---|---|
+| Challenge filed; oracle confirms override | Fee returned to challenger (oracle confirmed challenge was correct) | Not slashed |
+| Challenge filed; oracle confirms S(c) was correct | Fee forfeited to challenger_pool (challenge failed) | Not slashed |
+| Oracle-initiated override (no challenger) | N/A (no fee collected) | Not slashed |
+
+**Why knower is never slashed on oracle override:**
+
+The knower attested S(c) under the information available at their declaration epoch. An oracle override means the oracle's final resolution differed from the knower's calibrated belief — this is expected, and not necessarily a knower error. Slashing on oracle override would create an incentive for knowers to *not* participate in settlement-mode classes (any oracle override costs them capital, regardless of their epistemic quality). This breaks the mechanism.
+
+**The oracle is an authority, not an adversary.** Oracle override is analogous to a final judicial ruling overriding an arbitration award — the arbitrator is not penalised for the court's independent conclusion. Knower and oracle are in different epistemic roles.
+
+**Challenger reward on successful override:** The challenger's reward is the fee refund only (challenge submission fee returned). There is no additional slash-based reward since no slash occurs. The challenger served as a legitimacy trigger — they invoked oracle authority, not epistemic enforcement. A challenger who values the oracle override's financial outcome gets that reward directly through their position's settlement at oracle_price — not through a mechanism reward. This is intentional: the financial reward for a correct settlement-finality challenge is the position settlement benefit, not a protocol mechanism reward. (#r151)
+
+---
+
+**Q3 (Challenge eligibility pre-T_anchor — grace period) → Brief grace period: 1 micro-epoch post-T_anchor; anti-abuse gate required (#r151):**
+
+**Analysis of the tradeoff:**
+
+Strict pre-T_anchor requirement risks freezing out legitimate counterparties on unexpected early oracle resolution. Zero grace = legitimate exposure holders cannot challenge. But a grace period creates an attack vector: adversaries can post-date position registration to gain challenge access specifically to exercise the `oracle_settlement_override` path.
+
+**Resolution — 1 micro-epoch grace window with anti-abuse gate:**
+
+```
+challenge_eligible_if:
+  position registered before T_anchor
+  OR position registered within T_grace after T_anchor
+    AND T_grace ≤ 1 × micro_epoch_length
+    AND position_registration_value ≥ min_challenge_position_value
+    AND NOT flagged as post_anchor_gaming (see below)
+```
+
+**Anti-abuse gate — `post_anchor_gaming` flag:**
+
+A position registered within T_grace is flagged for review if any of:
+- Registered address had no prior positions in this coordinate class (new participant during challenge window is suspicious).
+- Position value ≥ 5× median position for this class in this epoch.
+- Registration address is within 2 hops of the primary challenger address (graph proximity).
+
+Flagged positions are challenge-eligible but the challenge is suspended until governance clears the flag (within 1 macro-epoch; auto-clear if no governance response). This does not block settlement — the challenge window advances for all other eligible parties. Only the flagged position's challenge right is held pending review.
+
+**Governance burden:** Flag review requires governance action within 1 macro-epoch. Auto-clear on inaction (innocent-until-proven) to prevent governance inaction from blocking legitimate challenges. EAT records all flag events, reviews, and dispositions.
+
+**Design law (#r151):** Short grace windows for time-critical eligibility gates must include anti-gaming heuristics proportionate to the financial stakes. Pure time-extension without abuse detection creates a registration-race attack vector. The heuristics need not be perfect — EAT audit trail and governance review are the final backstop. (#r151)
+
+---
+
+**Q4 (EQ q_bonus settlement vs Settlement Freeze Protocol — finality coupling) → q_bonus settles at T_finality only; T_anchor fires EQ-pending state (#r151):**
+
+If q_bonus is distributed at T_anchor and settlement_price is subsequently overridden at T_override, the EQ bonus was paid for epistemic service calibrated against a candidate price that was not final. This is a consistency gap: the unknower contracted for accuracy on the final settlement price, not on the candidate.
+
+**Resolution — EQ q_bonus is coupled to T_finality:**
+
+```
+q_bonus settlement:
+  T_anchor:     EQ moves to `q_bonus_pending` state
+                S_cred effective_weight snapshot taken (for pro-rata distribution at resolution)
+  T_finality:   settlement_price_final known
+    → if S(c)_final within q_quality_threshold: q_bonus distributed
+    → if S(c)_final outside q_quality_threshold: q_bonus returned to query submitter
+    → if oracle_settlement_override: q_quality_threshold evaluated against oracle_price
+```
+
+**The T_anchor snapshot matters:** Even though distribution waits for T_finality, the pro-rata distribution weights are snapshotted at T_anchor. This prevents knowers from adjusting S_cred positions between T_anchor and T_finality to game the distribution weight. The epistemic contribution eligible for EQ reward is the contribution *at the time oracle resolution fired*, not at settlement finality.
+
+**Edge case — T_finality delayed by Zone C deferral (Q1):** Settlement-finality challenge windows are deferred during Zone C. T_finality is reached when the challenge window closes without challenge, or when the oracle override is processed. If Zone C deferral extends T_finality by multiple epochs, q_bonus remains in `q_bonus_pending` state. The q_bonus escrow is locked (not refunded, not distributed) until T_finality arrives. Knowers cannot withdraw their S_cred contributions to release q_bonus early — the snapshot is final at T_anchor.
+
+**Design law (#r151):** Any bonus conditioned on a "final" state must settle no earlier than when that state is formally final. Interim candidate states may trigger snapshot events (locking pro-rata weights) but cannot trigger irreversible distribution. Distribution is always coupled to the finality event. This applies to q_bonus, implication_bonus_escrow, and any future conditional-on-resolution payment. (#r151)
+
+---
+
+## Net-New Structural Insight: Oracle-Authority/Knower-Attestor Duality as Design Primitive (#r151)
+
+The Settlement Freeze Protocol forces a clean separation that was implicit throughout the mechanism but never formalised:
+
+**Two epistemically distinct roles:**
+
+| Role | Entity | Function | Source of authority |
+|---|---|---|---|
+| **Knower (attestor)** | Capital-posting participant | Provides S(c) best estimate; earns rewards proportional to calibrated accuracy over time | Calibration track record + skin-in-the-game |
+| **Oracle (authority)** | External resolution source | Provides final definitive value of c; cannot be contested within the mechanism | Protocol-registered external authority |
+
+**The duality:**
+
+S(c) (mechanism-produced) is an *attestation* — a credibility-weighted aggregate of private information. It is good under normal conditions and improves over time.
+
+oracle_confirmed_value is an *authority* — an external determination that the mechanism accepts as final. It may conflict with S(c) without either being wrong in an epistemic sense.
+
+**Why this matters for mechanism design:**
+
+Conflating attestation and authority leads to:
+1. Slashing knowers for oracle overrides (they were wrong in authority terms, not epistemic terms).
+2. Treating oracle-produced prices as just another signal for S_cred aggregation (oracle authority is not the same epistemic object as a knower's calibrated belief).
+3. Misrouting the q_bonus settlement — the EQ contract is with the final authority, not with the preliminary attestation.
+
+**Formal design primitive:**
+
+```
+S_mechanism(c) = attestation(c) — produced by credibility-weighted knower aggregate
+S_oracle(c)    = authority(c)   — produced by registered external oracle at resolution
+settlement_price(c) = S_oracle(c) if oracle fires; else S_mechanism(c) after challenge window
+```
+
+This is the correct duality. S_mechanism and S_oracle are different in kind. The Settlement Freeze Protocol is the interface between them.
+
+**New law (#r151):** The mechanism must maintain explicit type distinction between attestation-produced state and authority-produced state. Reward and penalty mechanisms apply only to attestations. Authority overrides trigger settlement routing changes, not epistemic penalties. Any future feature that mixes these types requires explicit design justification. (#r151)
+
+---
+
+## Structural Synthesis: Settlement Architecture — Complete (#r151)
+
+| Component | Rule | Law |
+|---|---|---|
+| SFP Zone C interaction | Settlement-finality challenge windows are Zone C-deferred; epistemic challenges advance normally | Settlement finality is higher-stakes than epistemic state; Zone C gates irreversible events |
+| `oracle_settlement_override` routing | Fee returned on correct challenge; forfeited on failed challenge; knower never slashed | Oracle authority ≠ knower epistemic failure; no cross-contamination |
+| Challenge eligibility grace period | 1 micro-epoch; anti-gaming heuristics + governance flag-review | Short grace windows require proportionate abuse detection |
+| EQ q_bonus finality coupling | T_anchor = snapshot; T_finality = distribution; q_bonus coupled to final settlement price | No irreversible distribution before finality event |
+| Duality design primitive | attestation(c) ≠ authority(c); penalty logic applies only to attestations | Mechanism must maintain explicit type separation |
+
+---
+
+## Open Questions for #r152+
+
+1. **S_mechanism vs S_oracle divergence — credibility recalibration:** When `oracle_settlement_override` fires and S_mechanism(c) ≠ S_oracle(c), should knowers' credibility_ratio be penalised for the divergence? The current answer is no slash (#r151/Q2). But a persistent pattern of S_mechanism systematically diverging from S_oracle at the same coordinate would indicate the knower pool is miscalibrated. Is there a soft recalibration signal (credibility_ratio adjustment, not slash) triggered by oracle overrides?
+
+2. **Settlement Freeze Protocol in DISCOVERY_MODE:** The SFP was designed for clearing (positions registered, oracle fires, settlement happens). In pure DISCOVERY_MODE (no position registry), there is no T_finality event tied to a position settlement. Does the SFP concept have any meaning in DISCOVERY_MODE, or is `oracle_settlement_override` a CLEARING_MODE-only EAT event type?
+
+3. **`post_anchor_gaming` flag and governance auto-clear:** Governance auto-clear on inaction within 1 macro-epoch (#r151/Q3). If governance inaction is due to Zone C (governance bandwidth stressed), the auto-clear fires anyway — a potentially adversarial challenge gets through. Should auto-clear be suspended during Zone C (creating a risk that legitimate grace-period challengers are permanently blocked), or should Zone C governance alert include a flag-review mandate?
+
+4. **Challenge fee forfeiture destination in SFP:** A failed SFP challenge (oracle confirms S(c) was correct) forfeits the fee to `challenger_pool`. But the challenger was challenging a settlement-finality question, not an epistemic quality question. Should SFP failed-challenge fees route to `settlement_reserve` (a new protocol reserve for settlement operations) rather than `challenger_pool`? Or does challenger_pool serve both functions — one reserve, two challenge types?
