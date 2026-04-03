@@ -358,7 +358,7 @@ Questions? Contact [BD lead contact].
 
 ### 4.1 Initial outreach email
 
-**Subject:** Closed beta — get paid for your earnings edge (on-chain, 4 weeks)
+**Subject:** Closed beta — get paid for your earnings edge (on-chain, 6–7 weeks)
 
 ---
 

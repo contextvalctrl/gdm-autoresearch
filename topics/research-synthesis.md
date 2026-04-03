@@ -1,6 +1,6 @@
 # GDM Research Synthesis: Cross-Agent Integration
 
-**Run:** r073 (Echo — synthesis pass) → corrected by r077 (VAL-462) → corrected by r081 (VAL-469)
+**Run:** r073 (Echo — synthesis pass) → corrected by r077 (VAL-462) → corrected by r081 (VAL-469) → corrected by r088 (VAL-493: §1.1 bootstrap cost and confidence table seed cost corrected from $150K to $15K at $1/unit)
 **Date:** 2026-04-03
 **Author:** Echo (ValCtrl AI — Research Coordinator)
 **Issue:** VAL-455 → updated by VAL-462 (unit repricing) → updated by VAL-469 (timeline + bootstrap cost corrections)
@@ -35,7 +35,7 @@ All four research tracks independently confirm the same conclusion: the GDM epis
 - **Scout** surveyed all major prediction markets (Polymarket ~$9B 2024 volume; Augur; Manifold; Metaculus) and oracle networks (Chainlink, Pyth, API3, UMA) and found zero production systems offering bilateral credentialed-belief routing. The design occupies an unoccupied market position.
 - **Sage** reviewed the academic literature (Hanson 2003 LMSR; proper scoring rules from Brier/Good/McCarthy; Bayesian aggregation from DeGroot/Dawid; information asymmetry from Akerlof/Spence/Kyle) and concluded that GDM's novelty is strongest in three specific dimensions: bilateral routing + stake credentialing (not in any prior mechanism), epistemic value separated from directional bet profit (not in LMSR or orderbook PM), and epoch-batch front-run-resistant aggregation (new architectural combination).
 - **Atlas** worked through the four formally open questions from r071 and resolved Q1 (Sybil lower bound), Q2 (L1/L2 coupling conditions), Q3 (provisional timeout → Option C), and Q6 (IC under partial oracle).
-- **Lens** validated the mechanism's market economics: TAM is ~$14B (expert networks + prediction markets + quant research), proof-of-mechanism SOM at $1/unit × 500 active coordinates/epoch × 365 days is ~$182.5K/year (path to $1.8M/year as unit value scales with track record depth in Phase 3; the $1.8M figure is the Phase 3 target at higher unit pricing, not a first-year number), bootstrap cost with Layer 1 anchoring is ~$150K and 3–6 months to organic flywheel. *(Updated r078/VAL-465 per real-world-validation.md §2 and §11 corrections — unit repriced to $1 USDC.)*
+- **Lens** validated the mechanism's market economics: TAM is ~$14B (expert networks + prediction markets + quant research), proof-of-mechanism SOM at $1/unit × 500 active coordinates/epoch × 365 days is ~$182.5K/year (path to $1.8M/year as unit value scales with track record depth in Phase 3; the $1.8M figure is the Phase 3 target at higher unit pricing, not a first-year number), bootstrap **seed subsidy** at $1/unit is ~$15K (50-knower expansion) / $4,500 (Phase 1, 15 knowers); overall Phase 1–2 **budget envelope** is ~$150K; 3–6 months to organic flywheel. *(Updated r078/VAL-465 per real-world-validation.md §2 and §11 corrections — unit repriced to $1 USDC. Updated r088/VAL-493: $150K is the budget envelope, not the seed subsidy arithmetic at $1/unit.)*
 
 **Team verdict:** The epistemic bond mechanism is ready to proceed from research to protocol specification, conditional on the remaining open items identified below.
 
@@ -253,7 +253,7 @@ No outright contradictions between research tracks. The following tensions requi
 | Bootstrap solvable via Layer 1 + corporate earnings pilot | **High** | Lens r073 economics; Scout r073 market data |
 | Sybil resistance requires identity fee | **High** | Formal lower bound proof (Atlas r073); identity fee requirement clearly derived |
 | L1/L2 advisory coupling is sufficient static protection | **Medium-High** | Static no-arbitrage condition derived (Atlas r073); multi-epoch not yet proven |
-| $150K seed cost to organic flywheel | **Medium** | Lens r073 estimates; assumes Layer 1 operational with adequate oracle resolutions |
+| $15K seed subsidy (50-knower at $1/unit) → organic flywheel; $150K is Phase 1–2 budget envelope, not seed subsidy arithmetic | **Medium** | Lens r073 estimates; seed subsidy corrected to $1/unit in r088/VAL-493; assumes Layer 1 operational with adequate oracle resolutions |
 | ~$182.5K/year proof-of-mechanism SOM at $1/unit (Phase 3 target: $1.8M/year as unit value scales) | **Medium** | Lens r073 sensitivity analysis; repriced to $1/unit per real-world-validation.md r076; highly dependent on unknower WTP validation |
 | Corporate earnings is the optimal first domain | **High** | Lens r073 domain scoring; all 4 criteria score highest vs. alternatives |
 | AI agents as early adopter segment | **Medium** | Scout r073 arXiv reference; emerging market with no production validation yet |

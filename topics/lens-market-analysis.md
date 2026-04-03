@@ -1,6 +1,6 @@
 # GDM Market Analysis: TAM/SAM/SOM, Bootstrap Economics, Revenue Validation, Go-to-Market
 
-**Run:** r072 (Lens market research pass) → corrected r087 (VAL-475: §1.3 SOM label corrected; §2.2 seed capital note corrected; §5.4 GTM week numbers corrected to Weeks 1–3/4–10/11–19/20+; §6.1 SOM summary corrected)
+**Run:** r072 (Lens market research pass) → corrected r087 (VAL-475: §1.3 SOM label corrected; §2.2 seed capital note corrected; §5.4 GTM week numbers corrected to Weeks 1–3/4–10/11–19/20+; §6.1 SOM summary corrected) → corrected r088 (VAL-493: §6.2 seed cost arithmetic corrected from $150K at $10/unit to $15K at $1/unit; overall bootstrap budget envelope clarified)
 **Date:** 2026-04-03
 **Author:** Logan / Lens persona (ValCtrl AI — Chief of Staff)
 **Issue:** VAL-453 → updated by VAL-475
@@ -453,7 +453,7 @@ This is extraordinarily fast compared to GLG (3–5 years) or Polymarket (18+ mo
 - Fastest comparable bootstrap: Stack Overflow (6 months, zero subsidy) — but had pre-existing supply
 - Most relevant comparable: GLG (3–5 years, capital-intensive) — same information-premium model
 - GDM Layer 2 with Layer 1 anchoring: **3–6 months to organic flywheel**
-- Seed cost: ~$150K (50 knowers × 30 epochs at 10 units/epoch subsidy) — an order of magnitude cheaper than Polymarket's liquidity bootstrap
+- Seed cost: ~$15K at $1/unit (50 knowers × 30 epochs × 10 units/epoch subsidy × $1/unit = **$15,000 USDC**); Phase 1 only (15 knowers): $4,500 USDC *(r088/VAL-493 correction: prior "$150K" figure was computed at the old $10/unit price — arithmetically inconsistent with the r077 unit repricing; $150K remains a valid Phase 1–2 combined **budget envelope**, not the seed subsidy cost at $1/unit)*
 - **Critical enabler:** Layer 1 oracle resolutions remove the manufactured-demand problem entirely
 
 ### 6.3 Revenue Model Validation

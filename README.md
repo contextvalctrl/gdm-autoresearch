@@ -32,6 +32,7 @@ gdm-autoresearch/
 | `r085-fine-tune-notes.md` | r085 fine-tune pass — Phase 1 header + §5 title + real-world-validation week corrections (VAL-473) |
 | `r086-fine-tune-notes.md` | r086 fine-tune pass — Phase 1 "Weeks 4–7" → "Weeks 4–10" corrections in real-world-validation + phase0-launch-package (VAL-474) |
 | `r087-fine-tune-notes.md` | r087 fine-tune pass — lens-market-analysis.md: SOM label corrections, seed capital note corrected, §5.4 GTM week numbers corrected to canonical phase timeline (VAL-475) |
+| `r088-fine-tune-notes.md` | r088 fine-tune pass — lens-market-analysis.md §6.2 seed cost arithmetic corrected from $150K (old $10/unit) to $15K at $1/unit; research-synthesis.md §1.1 + confidence table clarified ($150K is budget envelope, not seed subsidy arithmetic) (VAL-493) |
 
 ---
 
