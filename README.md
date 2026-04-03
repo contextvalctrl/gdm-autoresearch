@@ -34,6 +34,8 @@ gdm-autoresearch/
 | `r087-fine-tune-notes.md` | r087 fine-tune pass — lens-market-analysis.md: SOM label corrections, seed capital note corrected, §5.4 GTM week numbers corrected to canonical phase timeline (VAL-475) |
 | `r088-fine-tune-notes.md` | r088 fine-tune pass — lens-market-analysis.md §6.2 seed cost arithmetic corrected from $150K (old $10/unit) to $15K at $1/unit; research-synthesis.md §1.1 + confidence table clarified ($150K is budget envelope, not seed subsidy arithmetic) (VAL-493) |
 | `r089-fine-tune-notes.md` | r089 fine-tune pass — cross-corpus consistency check post-r088/r131; epistemic-bond-v0-spec.md §10 updated with r129–r131 Phase 3 deferred items (LTRP, bounded-liability architecture, DA degraded mode); duplicate footer removed (VAL-494) |
+| `r090-fine-tune-notes.md` | r090 fine-tune pass — cross-corpus consistency check post-r089; epistemic-bond-v0-spec.md Run/Issue header chain updated to include r089/VAL-494; real-world-validation.md footer signature corrected to reflect r085/r086/r090 chain (VAL-500) |
+| `r091-fine-tune-notes.md` | r091 fine-tune pass — cross-corpus consistency check post-r090; epistemic-bond-v0-spec.md footer signature corrected to include r090/VAL-500 + r091/VAL-501 chain entries; real-world-validation.md Run/Issue header chain updated to include r090/VAL-500 + r091/VAL-501 entries (VAL-501) |
 
 ---
 

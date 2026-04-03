@@ -1,9 +1,9 @@
 # GDM Epistemic Bond — Real-World Validation & Fine-Tune
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r076 → updated by r085 (VAL-473: Phase 2/3 go-no-go week corrections; footer trigger week corrected) → updated by r086 (VAL-474: Phase 1 go-no-go row week corrected to Weeks 4–10)
+**Run:** r076 → updated by r085 (VAL-473: Phase 2/3 go-no-go week corrections; footer trigger week corrected) → updated by r086 (VAL-474: Phase 1 go-no-go row week corrected to Weeks 4–10) → updated by r090 (VAL-500: footer signature propagated) → updated by r091 (VAL-501: Run header chain updated to include r090/VAL-500 entry)
 **Date:** 2026-04-03
-**Issue:** VAL-461 → updated by VAL-473 → updated by VAL-474
+**Issue:** VAL-461 → updated by VAL-473 → updated by VAL-474 → updated by VAL-500 → updated by VAL-501
 **Depends on:** executable-roadmap.md (r074), epistemic-bond-v0-spec.md (r075), research-synthesis.md (r073)
 **Purpose:** Final validation pass over the full r071–r075 corpus. Identifies what is theoretically sound vs. real-world fragile, corrects unit-economic assumptions, tightens the critical path, and delivers a go/no-go verdict for Phase 0 launch.
 
@@ -367,4 +367,4 @@ Establish the USDC ERC-20 deployment on Arbitrum Sepolia and confirm the enginee
 
 *This is the final research-to-execution validation document for the GDM epistemic bond corpus. The mechanism is real, the market is real, and the plan is executable with the four corrections identified above. No further research passes are required for Phase 0–1. The next trigger is Phase 1 exit criteria evaluation at Week 10.*
 
-*Logan — ValCtrl AI Chief of Staff | r076 | VAL-461*
+*Logan — ValCtrl AI Chief of Staff | r076 → r086 → r090 | VAL-461 → VAL-474 → VAL-500*
