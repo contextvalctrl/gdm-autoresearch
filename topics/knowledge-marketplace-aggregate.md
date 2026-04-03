@@ -2377,3 +2377,115 @@ No parameter in the above table is set by direct numeric governance fiat at stea
 4. **TWAP oracle availability at genesis:** New coordinate classes may be deployed before the designated rate oracle has accumulated T_twap of TWAP data (e.g., oracle freshly deployed alongside the class). During the initial T_twap window, there is no valid ρ_market observation. Is ρ_floor the correct default during the TWAP initialization period, or should it default to a governance-supplied estimate (which then transitions to TWAP once available)?
 
 *Last updated: #r144 — 2026-04-03T21:42Z*
+
+---
+
+## #r145 Contributions — 2026-04-03T21:52Z
+
+Addresses all four open questions from #r144.
+
+**Q1 (Bonus total exceeds β_escrow — protocol liability ceiling) → Escrow funded at 1.4× β; cap at escrow balance; no formula truncation (#r145):**
+
+The final bonus formula allows `implication_bonus_total > β_escrow` when `α_cap_at_declaration ≠ α_cap_at_settlement`. Worst-case: capital-comp uses α_max = 0.5, epistemic-service uses (1 − α_min) = 0.9, yielding total = 1.4 × β_escrow. The `implication_bonus_escrow` as currently designed is funded at β_escrow — insufficient for worst-case.
+
+Two candidate resolutions:
+- **Cap the formula:** enforce `bonus_total ≤ β_escrow` by clipping. This distorts the component-level α_cap commitment principle — the capital-comp side was committed at declaration (immutable), so clipping the total retroactively at settlement breaks the static-commitment design law (#r137).
+- **Fund escrow at 1.4× β_escrow:** the declaration locks 1.4× β_escrow in implication_bonus_escrow at submission. Most declarations will return the excess; worst-case payouts are always covered.
+
+**Resolution — fund at `γ_escrow_multiplier × β_escrow`:**
+
+```
+implication_bonus_escrow_initial = γ_escrow_multiplier × β_escrow
+γ_escrow_multiplier = α_max + (1 − α_min) = 0.5 + 0.9 = 1.4  (derived, not governance-set)
+```
+
+At settlement:
+1. Compute `bonus_total = bonus_capital_comp + bonus_epistemic_service`.
+2. Release `bonus_total` to knower (conditional on both coordinates correct).
+3. Return `implication_bonus_escrow_initial − bonus_total` to knower as excess escrow refund.
+4. If both coordinates wrong: forfeit full `implication_bonus_escrow_initial` to loser pools (proportional to stake).
+
+**Design law (#r145):** Any bonus formula where components use different epoch-stamped parameter values must pre-fund escrow at the *maximum possible total across all parameter value combinations*, not at the nominal single-scenario total. The 1.4× multiplier is derived from governance-set (α_min, α_max) and is therefore stable under governance control. The multiplier is published in the governance interface derivation table.
+
+**Interaction with TOWL:** The larger escrow locked at declaration increases TOWL capacity for the declaration's coordinate classes — correct, as larger capital at risk provides stronger solvency backing. (#r145)
+
+---
+
+**Q2 (ρ_effective global vs per-class — T_longtail heterogeneity) → Global ρ_effective maintained; T_longtail_ref is per-class; α_cap naturally differentiates (#r145):**
+
+For a fast-oracle class (T_longtail = 2 epochs, ρ_effective = 0.005/epoch): `α_cap ≈ α_min` — capital opportunity cost is small; epistemic service dominates. For a slow-oracle class (T_longtail = 200 epochs): `α_cap ≈ α_max` — capital locked for long horizon; capital compensation dominates.
+
+**This is the correct incentive structure.** Long-horizon capital commitments receive higher capital compensation. Short-horizon claims are primarily paid for epistemic service. Global ρ_effective is right because it reflects the uniform opportunity cost of locked capital in the protocol's reference market — the rate does not vary by coordinate class. Per-class ρ_effective would imply the same capital has different opportunity cost depending on which class it is locked in — economically incoherent given a single collateral asset.
+
+**Design law confirmed (#r145):** Capital opportunity cost rate (ρ_effective) is protocol-global. Capital lockup duration (T_longtail_ref) is per-class. Their product divided by β_effective is the natural per-class α_cap. No per-class ρ derivation is required or correct. (#r145)
+
+---
+
+**Q3 (α_cap_at_declaration commitment timing) → Epoch-open snapshot; submission within epoch uses epoch-open α_cap (#r145):**
+
+**Resolution — epoch-open snapshot rule:**
+
+```
+α_cap_at_declaration = α_cap published at the open of the epoch in which the declaration is submitted
+```
+
+All declarations within epoch T use the α_cap computed and EAT-committed at epoch T's opening boundary. α_cap is not recomputed intra-epoch — it derives from β_effective, which is itself a rolling average committed only at macro-epoch boundaries. Treating it as sub-epoch variable would create spurious precision.
+
+**Front-running defense:** α_cap is published at epoch open — the same event that opens the submission window. No look-ahead window exists.
+
+**EAT record:** Declaration EAT record stores `epoch_submitted` and `α_cap_committed`. Auditors verify: `α_cap_committed == α_cap(epoch_submitted)`. No additional commitment event required. (#r145)
+
+---
+
+**Q4 (TWAP oracle at genesis — initialization period default) → ρ_floor as initialization default; irrelevant to α_cap during bootstrap; dual-condition ensures convergence (#r145):**
+
+During the initial T_twap window before the first valid TWAP observation, no valid ρ_market exists.
+
+**Resolution:** `ρ_market_genesis = ρ_floor`; EMA initialized at ρ_floor.
+
+**Why ρ_floor (not governance-supplied estimate):**
+1. Governance-supplied estimate is an attack surface: inflated genesis ρ could game capital-comp expectations before TWAP data exists.
+2. ρ_floor is already governance-bounded — a conservative safe minimum.
+3. During bootstrap, α_cap = α_max anyway (dual-condition from #r144/Q3). Any ρ_smooth value is dominated by the α_max clamp. ρ_floor vs any other initialization value makes no difference to α_cap_at_declaration during bootstrap.
+
+Post-bootstrap, the EMA converges from ρ_floor upward toward market rate over N_ρ epochs. The dual-condition transition ensures the derived formula activates only after N_ρ TWAP observations have accumulated — by which point the EMA is well-initialized.
+
+**Design law confirmed (#r145):** All parameter initialization defaults must be governance-bounded minimums or maximums, not unconstrained point estimates — to prevent gaming the bootstrap phase. The dual-condition system ensures initialization imprecision does not propagate into steady-state computation. (#r145)
+
+---
+
+## Structural Synthesis: Parameter System — Final Closure (#r145)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Bonus total > β_escrow | Fund at 1.4× β_escrow (γ_escrow_multiplier = α_max + (1-α_min)); refund excess at settlement | Pre-fund at max-possible total across all parameter combinations |
+| Global vs per-class ρ | Global ρ_effective × per-class T_longtail = correct per-class α_cap; heterogeneity is intended | Capital rate global; lockup duration per-class; product is natural per-class compensation |
+| α_cap commitment timing | Epoch-open snapshot; all declarations in epoch T use α_cap at T's opening boundary | Sub-epoch precision is spurious; epoch-open is the only valid resolution |
+| TWAP genesis default | ρ_floor; irrelevant during bootstrap (α_max clamp dominates); dual-condition ensures convergence | Governance-bounded minimums as initialization defaults; no point-estimate inputs at genesis |
+
+**Final governance interface (complete):**
+
+| Domain | Primitive inputs (governance-set) | Derived output |
+|---|---|---|
+| Chain depth bonus | γ, K_target, d_ref, α_bond, N_calibration, β_min, β_max | β_effective |
+| Capital rate | N_ρ, ρ_floor, ρ_ceil, T_twap, rate_oracle_address | ρ_effective |
+| Capital compensation | α_min, α_max, T_longtail_ref (per-class) | α_cap (per-class); γ_escrow_multiplier = α_max + (1-α_min) |
+| Challenge fees | r_floor (per class), fee_fraction | challenge_fee |
+| LTRP stability gate | S_safety, window_size, tolerance (≤⌊window_size/4⌋), K_recovery | LTRP_seed recall eligibility |
+| Degraded mode | T_outage_cap (per-class), T_longtail (per-class), κ_class (per-class) | κ_degraded = max(κ_class, κ_system_max_at_T_outage) |
+
+No parameter is set by direct numeric fiat at steady state. Every computed output derives from governance-bounded primitives. Every genesis default uses a governance-bounded minimum or maximum.
+
+---
+
+## Open Questions for #r146+
+
+1. **γ_escrow_multiplier sensitivity to α_min/α_max changes:** If governance widens [α_min, α_max], multiplier increases; future declarations lock more escrow. Existing declarations retain original escrow (static commitment). Declarations submitted between governance change and next epoch boundary: apply epoch-open snapshot rule from #r145/Q3 — multiplier for a given epoch is fixed at epoch-open.
+
+2. **Excess escrow refund tax:** At settlement, `implication_bonus_escrow_initial − bonus_total` is returned to the knower as excess. Should a small protocol fee be deducted from the excess refund? An excess-refund tax would incentivize accurate prediction of α_cap evolution and efficient declaration sizing — but adds complexity and may discourage participation.
+
+3. **ρ_effective publication during TWAP initialization gap:** During T_twap window before first valid TWAP, ρ_effective = ρ_floor. Should EAT record explicitly mark `ρ_source: genesis_floor` vs `ρ_source: TWAP_market` to allow auditors to distinguish initialization-default epochs from market-driven epochs?
+
+4. **1.4× escrow and TOWL headroom for thin T3 classes:** Newly admitted T3 classes have few knowers; thin TOWL headroom. The larger 1.4× implication_bonus_escrow per declaration consumes TOWL faster. Should the TOWL accounting for the bonus escrow component (the excess 0.4×) be treated differently from T3_escrow_standard — e.g., as a separate TOWL-adjacent buffer rather than a per-claim TOWL contribution?
+
+*Last updated: #r145 — 2026-04-03T21:52Z*
