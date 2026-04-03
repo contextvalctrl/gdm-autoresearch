@@ -1,9 +1,9 @@
 # GDM Epistemic Bond — Phase 0–1 Launch Package
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r078 (VAL-465) → updated r080 (VAL-468) → corrected r081 (VAL-469) → corrected r082 (VAL-470) → corrected r083 (VAL-471)
+**Run:** r078 (VAL-465) → updated r080 (VAL-468) → corrected r081 (VAL-469) → corrected r082 (VAL-470) → corrected r083 (VAL-471) → corrected r084 (VAL-472)
 **Date:** 2026-04-03
-**Issue:** VAL-465 → updated by VAL-468 → updated by VAL-469 → updated by VAL-470 → updated by VAL-471
+**Issue:** VAL-465 → updated by VAL-468 → updated by VAL-469 → updated by VAL-470 → updated by VAL-471 → updated by VAL-472
 **Depends on:** real-world-validation.md (r076/VAL-461), executable-roadmap.md (r077/VAL-462 → r080/VAL-468), epistemic-bond-v0-spec.md (r077/VAL-462), knower-calibration-test.md (r079/VAL-466), phase1-coordinates.md (r079/VAL-466)
 **Purpose:** Final fine-tune and executable consolidation. Everything required to start Phase 0 this week — in one document. Updated in r080 to reflect 30-coordinate / two-wave structure per phase1-coordinates.md r079.
 
@@ -348,7 +348,7 @@ If you finish Phase 1 with T_i ≥ 0.5 (positive credibility score), you're in t
 
 ---
 
-**One-line commitment:** You're participating in a 4-week closed beta. Time: ~10 minutes/day on active earning dates. Capital at risk: up to your staked amount minus subsidy floor. Upside: track record that earns Phase 2 fee revenue.
+**One-line commitment:** You're participating in a 6–7 week closed beta (two earnings waves, 30 total coordinates). Time: ~10 minutes/day on active earning dates. Capital at risk: up to your staked amount minus subsidy floor. Upside: track record that earns Phase 2 fee revenue.
 
 Questions? Contact [BD lead contact].
 
@@ -368,7 +368,7 @@ I'm reaching out because your track record as [sell-side analyst / alt-data fore
 
 We're running a closed beta of an on-chain epistemic bond protocol for corporate earnings. The short version: you stake capital to back probability estimates on earnings outcomes, the protocol scores you on KL-divergence accuracy at settlement, and your track record accrues as an on-chain credential.
 
-**The ask:** 4 weeks, ~10 minutes/day on active earnings dates, $100 USDC registration fee (one-time, non-refundable), stakes of your choice (minimum $50 USDC per claim). Seed subsidy of $10 per epoch guaranteed for Phase 1.
+**The ask:** 6–7 weeks (two earnings waves, 30 coordinates), ~10 minutes/day on active earnings dates, $100 USDC registration fee (one-time, non-refundable), stakes of your choice (minimum $50 USDC per claim). Seed subsidy of $10 per epoch guaranteed for Phase 1.
 
 **Why this matters:** Your expertise currently has no structured monetization path except consulting and directional bets (where the edge gets diluted into price signals). This protocol routes your belief directly to institutional buyers as credentialed information — separate from price impact. It's a new revenue stream for your edge, not a replacement for anything you're already doing.
 

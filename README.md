@@ -28,6 +28,7 @@ gdm-autoresearch/
 | `extended-reasoning-notes.md` | Extended reasoning and protocol notes |
 | `r082-fine-tune-notes.md` | r082 fine-tune pass corrections (VAL-470) |
 | `r083-fine-tune-notes.md` | r083 fine-tune pass corrections — final validation (VAL-471) |
+| `r084-fine-tune-notes.md` | r084 fine-tune pass — real-world validation + phase week-number corrections (VAL-472) |
 
 ---
 

@@ -1,8 +1,8 @@
 # GDM Epistemic Bond Layer — Executable Roadmap
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Issue:** VAL-459 → updated by VAL-462 (r077 fine-tune corrections) → updated by VAL-468 (r080 coordinate correction)
-**Run:** r080 (30-coordinate correction applied from phase1-coordinates.md r079/VAL-466)
+**Issue:** VAL-459 → updated by VAL-462 (r077 fine-tune corrections) → updated by VAL-468 (r080 coordinate correction) → updated by VAL-472 (r084 phase-number corrections)
+**Run:** r084 (phase 2/3 week-number correction; phase headers aligned with 6–7 week Phase 1)
 **Date:** 2026-04-03
 **Inputs:** Synthesis of r001–r073 across all research tracks (Atlas, Scout, Lens, Sage, Echo)
 **Purpose:** Convert the theoretical mechanism design into a time-sequenced, resource-tagged, risk-acknowledged execution plan.
@@ -87,9 +87,11 @@ A smart contract layer and off-chain coordination service that:
 
 ---
 
-### Phase 2: Unknower Soft Launch (Weeks 8–16)
+### Phase 2: Unknower Soft Launch (Weeks 11–19)
 
 **Goal:** Introduce paying unknowers; validate willingness to pay; achieve first organic fee revenue.
+
+*(r084/VAL-472 correction: Phase 2 starts at Week 11, not Week 8. Phase 1 runs 6–7 weeks per r080/VAL-468 correction. Phase 2 cannot start until Phase 1 exit criteria are met at Week 10.)*
 
 | Task | Owner | Output |
 |---|---|---|
@@ -111,19 +113,21 @@ A smart contract layer and off-chain coordination service that:
 
 ---
 
-### Phase 3: Scale and Expansion (Weeks 17+)
+### Phase 3: Scale and Expansion (Weeks 20+)
 
 **Goal:** 100+ coordinates, public onboarding, first cross-domain expansion.
 
+*(r084/VAL-472 correction: Phase 3 starts at Week 20+, not Week 17+. Phase 2 runs Weeks 11–19; Phase 3 follows.)*
+
 | Milestone | Target |
 |---|---|
-| 100 active coordinates | Week 20 |
-| 50+ knowers with verified track records | Week 20 |
-| $100K/month fee revenue | Week 24 |
-| Second domain (macro data: GDP, CPI, Fed funds rate) | Week 20–24 |
-| AI agent API for tool-call-based claim access | Week 24–28 |
+| 100 active coordinates | Week 23 |
+| 50+ knowers with verified track records | Week 23 |
+| $100K/month fee revenue | Week 27 |
+| Second domain (macro data: GDP, CPI, Fed funds rate) | Week 23–27 |
+| AI agent API for tool-call-based claim access | Week 27–31 |
 | L2 advisory signal pilot to L1 (with bounded coupling α) | After multi-epoch equilibrium proof |
-| LOP → dynamic pool-type selector (LogOP for low-correlation pairs) | Week 28+ |
+| LOP → dynamic pool-type selector (LogOP for low-correlation pairs) | Week 31+ |
 
 ---
 
@@ -194,9 +198,9 @@ These are the binary criteria that validate the idea is executable before commit
 | No material Sybil clustering | No cross-claim correlation > 0.85 among top-5 knowers | Automated correlation monitor |
 | No oracle resolution disputes | Zero escalations in 30-day window | Dispute registry |
 
-If all 6 are green by Week 17 (Phase 1 now 6–7 weeks per r080 correction): proceed to Phase 3 scale with confidence. If 2+ are red: pause, diagnose, pivot domain or fee structure.
+If all 6 are green by Week 10 (Phase 1 exit checkpoint): proceed to Phase 2 with confidence. Phase 3 scale begins Week 20 if Phase 2 health thresholds are met. If 2+ are red at Week 10: pause, diagnose, pivot domain or fee structure.
 
-**Phase timeline correction (r080):** Phase 1 is now 6–7 weeks (Weeks 4–10), not 4 weeks, due to the 30-coordinate / two-wave structure. Phase 2 unknower soft launch shifts to Week 11. Phase 3 scale target shifts to Week 20+. All other phase milestones shift proportionally.
+**Phase timeline correction (r080, confirmed r084):** Phase 1 is now 6–7 weeks (Weeks 4–10), not 4 weeks, due to the 30-coordinate / two-wave structure. Phase 2 unknower soft launch is Weeks 11–19. Phase 3 scale target is Week 20+. All phase headers and milestone week numbers have been updated to match (r084/VAL-472).
 
 ---
 
@@ -236,4 +240,4 @@ These are known open items from r073. They are real, they matter long-term, but 
 
 *Four corrections applied in r077 (VAL-462) per real-world validation pass (r076, VAL-461): (1) unit pricing anchored to $1 USDC; (2) oracle sourcing corrected for Phase 1 (see epistemic-bond-v0-spec.md); (3) L1 dependency scope clarified; (4) Phase 1 exit criterion updated from p < 0.05 to T_i ≥ 0.5.*
 
-*Logan — ValCtrl AI Chief of Staff | r077 | VAL-462*
+*Logan — ValCtrl AI Chief of Staff | r077 → r084 | VAL-462 → VAL-472*
