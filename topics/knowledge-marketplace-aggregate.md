@@ -2903,3 +2903,162 @@ It is not LMSR. It is not an orderbook. It is not a batch auction. It is closest
 The mechanism survives its own strongest failure mode (demand-side D(c) revelation) through the GestAlt-specific structural advantage: in prediction market clearing, position size IS the demand signal.
 
 *Last updated: #r148 — 2026-04-03T22:22Z*
+
+---
+
+## #r149 Contributions — 2026-04-03T22:32Z
+
+**Focus: three structural gaps from #r148.**
+
+1. Formalise the escrow-conditioned query (demand-side D(c) revelation partial mitigation, left open in #r148/§9).
+2. Stress-test the "position size IS the demand signal" claim from #r148/§10 — is it actually sufficient?
+3. Identify the clearing-vs-discovery regime split: the mechanism has been designed for one mode; what does it need to be two?
+
+---
+
+### A. Escrow-Conditioned Query — Formal Design (#r149)
+
+**The problem (recap):** Unknowers have private D(c) — the decision-relevant cost of a wrong state estimate. Without revealing D(c), the query fee pool does not correctly signal which coordinates need knower attention. The mechanism routes capital to popular coordinates, not decision-critical ones.
+
+**Resolution — EQ (Escrow-Conditioned Query):**
+
+```
+EQ(agent_a, c, q_fee, q_bonus, q_quality_threshold) where:
+  q_fee      = unconditional fee paid immediately at query submission
+  q_bonus    = conditional bonus paid to active S_cred contributors iff
+               S(c) at resolution is within q_quality_threshold
+  q_quality_threshold = a precision envelope (e.g., "within ε of true value")
+```
+
+**Revelation properties:**
+- `q_fee` is a lower bound on D(c): an agent pays q_fee only if the information is worth at least that.
+- `q_bonus` reveals the agent's *quality sensitivity* — how much they value accuracy rather than any answer. High q_bonus relative to q_fee signals high D(c): the agent cares not just about getting an answer, but about getting the *right* answer.
+- The ratio `q_bonus / q_fee` is a partial revelation of the agent's decision-criticality. An agent indifferent to accuracy (low D(c)) sets q_bonus = 0 and pays q_fee only.
+
+**Why this improves on a plain query fee:**
+
+A plain query fee reveals willingness-to-pay-for-access. An escrow-conditioned query reveals willingness-to-pay-for-accuracy. The second is the signal WED routing needs. A diagnostic that costs $10 regardless of whether it is correct is not the same demand signal as a diagnostic where the expert earns $100 only if they are right.
+
+**Incentive for knowers:** q_bonus flows only to knowers whose claims were active in S_cred when the oracle resolved and whose contributions survived to the accurate state. This focuses knower incentives on the coordinates where unknowers have high quality sensitivity — the highest D(c) coordinates.
+
+**Settlement:** q_bonus is locked in escrow at query submission. At oracle resolution, q_bonus is distributed to active S_cred contributors whose effective_weight was non-zero at the resolution epoch, pro-rata by effective_weight, conditional on S(c) resolution being within q_quality_threshold. If resolution is outside threshold: q_bonus returns to query submitter (refunded). q_fee is non-refundable (it compensates for attention direction, not correctness).
+
+**Failure mode of EQ:** Unknowers who routinely set q_bonus = 0 are not revealing D(c) and the mechanism degrades. Defence: governance can require a minimum q_bonus / q_fee ratio for coordinate activation (≥ 0.5 recommended). Below this threshold, the coordinate's base reward is weighted as low-priority.
+
+**WED routing via EQ:** The mechanism's effective demand signal per coordinate becomes:
+
+```
+effective_D(c) = q_fee(c) + E[q_bonus(c) × Pr(resolution within threshold)]
+```
+
+This is a computable, on-chain, honest-revelation approximation of D(c) × P(c), without requiring private D(c) declaration. Unknowers reveal D(c) through their own incentives, not through governance-forced disclosure. (#r149)
+
+---
+
+### B. "Position Size IS the Demand Signal" — Stress Test (#r149)
+
+**The #r148/§10 claim:** In GestAlt clearing, position size implicitly reveals willingness-to-pay. The D(c) revelation problem is less acute because the bet IS the demand signal.
+
+**This is correct but incomplete.** Two conditions must hold:
+
+**Condition 1 — Position size tracks D(c):** A knower's position size reveals their private information about the outcome probability — not necessarily their decision-relevant loss from a wrong state. A market maker with a 1M USD position may have low D(c) (they hedge automatically) while a retail participant with a 100 USD position may have high D(c) (it represents their savings). LMSR uses position size as an attention signal, not a D(c) signal.
+
+**In GestAlt specifically:** The clearing protocol's job is to establish fair settlement prices for existing positions. D(c) here is not "how bad is a wrong state for my downstream decision" but "how much does counterparty credit risk or collateral accuracy matter to this position." For a large OTC position, D(c) scales with position size AND contract complexity.
+
+**Formalised claim:** In GestAlt clearing, `D(c) ∝ Σ_positions max_loss_per_position_on_c`. This IS revealed on-chain through position registration. Position registration forces D(c) disclosure in a way that general prediction market unknowers cannot.
+
+**Condition 2 — Positions are registered before oracle resolution:** If positions are registered post-oracle (settlement only), no demand signal is available for knower incentives during the information-discovery phase. The mechanism must be in *clearing* mode (positions exist first, oracle confirms second) for position size to substitute for D(c) revelation.
+
+**Failure mode:** In GestAlt operating in *discovery* mode (oracle is live; positions are being formed), position sizes are small and incomplete during the information-discovery phase. The demand signal is weak exactly when knowers are deciding whether to invest in high-quality information.
+
+**Resolution:** GestAlt needs both modes distinguished — see §C below. (#r149)
+
+---
+
+### C. Clearing-vs-Discovery Regime Split (#r149)
+
+**The gap identified:** The mechanism engineering (#r1–#r148) implicitly assumes *discovery mode* — coordinates have uncertain states, unknowers want credible estimates, knowers compete to install the best state. But GestAlt v2.1 is a *clearing protocol* — positions exist, the oracle fires, the protocol settles. These are different information regimes with different optimal mechanism parameters.
+
+**Two regimes:**
+
+| Regime | State of positions | Information flow | WED source | Optimal knower incentive |
+|--------|--------------------|-----------------|------------|--------------------------|
+| **Discovery** | Not yet formed; being priced | Knowers → market price | q_bonus from unknowers (EQ, §A) | Calibrated accuracy over time |
+| **Clearing** | Registered; pending settlement | Oracle → clearing price | Σ max_loss from registered positions | Fast, credible state resolution |
+
+**Key differences:**
+
+1. **Time horizon:** Discovery mode requires long-horizon knower engagement (multi-epoch S_cred accumulation). Clearing mode requires fast, single-epoch resolution credibility (the position settles; long-horizon track record is secondary).
+
+2. **Knower population:** In discovery mode, credibility-weighted aggregate is epistemically optimal (many credible voices converge). In clearing mode, a single authoritative oracle plus dispute mechanism is structurally adequate — the clearing price must be unambiguous, not probabilistically aggregated.
+
+3. **D(c) source:** In discovery mode, D(c) is revealed through EQ mechanism. In clearing mode, D(c) is revealed through registered position max_loss — computable directly.
+
+4. **WED computation in clearing mode:**
+   ```
+   WED_clearing(c) = Σ_positions_on_c | max_loss_if_wrong |
+   ```
+   This is honest, on-chain, and does not require the EQ machinery.
+
+**GestAlt operating model:** GestAlt v2.1 is primarily a clearing protocol — positions exist, oracle fires, protocol settles. The knowledge marketplace mechanism in clearing mode is simpler and more robust:
+
+- No EQ required (D(c) computed from positions).
+- WED_clearing is computable without private revelation.
+- S_cred's role shifts from *best-estimate discovery* to *settlement-price credibility attestation* — a different, narrower epistemic task.
+- TOWL zone management in clearing mode should prioritize speed (fast oracle propagation) over depth (long calibration history).
+
+**Two mode profiles:**
+
+```
+CLEARING_MODE_PROFILE = {
+  N_calibration:          2,            // fast burn-in
+  T_longtail_default:     4 epochs,     // short warranty horizon
+  beta_recency_weight:    gamma_recency^age,  // recency-weighted rolling average
+  implication_bonus_default: 0,         // disabled unless explicitly activated
+  WED_routing:            position_max_loss,  // direct from position registry
+}
+
+DISCOVERY_MODE_PROFILE = {
+  N_calibration:          4,
+  T_longtail_default:     class-dependent,
+  beta_recency_weight:    equal,
+  implication_bonus_default: beta_effective,  // active
+  WED_routing:            EQ_escrow_conditioned_query,
+}
+```
+
+Governance activates a mode profile per coordinate class at registration. Classes can transition from DISCOVERY to CLEARING when a position registry is live on the coordinate.
+
+**Why this matters for the mechanism's failure-mode analysis:** The "strongest reason this idea fails" (D(c) revelation problem, #r148/§9) is a DISCOVERY_MODE problem. In CLEARING_MODE it disappears entirely — D(c) is observable from position max_loss. The mechanism is strictly stronger in GestAlt's primary use case than #r148 suggested. The surviving variant from #r148/§10 is not a fallback — it is the correct production mode for GestAlt v2.1. (#r149)
+
+---
+
+## Structural Synthesis: Mechanism-Reality Alignment (#r149)
+
+Three structural gaps closed:
+
+| Gap | Resolution | Implication |
+|-----|-----------|-------------|
+| D(c) demand-side revelation | EQ: q_fee + q_bonus conditional on accuracy; ratio q_bonus/q_fee ≈ D(c) | Incentive-compatible revelation without private disclosure |
+| "Position size = demand signal" stress test | Valid in clearing mode (D(c) = position max_loss); incomplete in discovery mode | Claim is correct for GestAlt clearing; not general |
+| Discovery vs clearing regime split | Two mode profiles; WED_clearing directly observable; D(c) problem is DISCOVERY_MODE only | GestAlt v2.1 in CLEARING_MODE is strictly stronger than #r148 suggested |
+
+**Updated failure-mode assessment (#r149):**
+
+The mechanism's worst failure (D(c) revelation) is structurally avoidable in GestAlt's primary deployment (clearing). The knowledge marketplace in CLEARING_MODE is not a weaker fallback — it is the natural, robust production form for clearing protocols.
+
+The pure DISCOVERY_MODE form (where WED routing depends on EQ demand-signal revelation) remains a research-stage mechanism requiring further validation of EQ incentive properties before production deployment. EQ is a viable design, but the q_bonus/q_fee minimum ratio governance parameter is a critical attack surface not yet fully closed.
+
+---
+
+## Open Questions for #r150+
+
+1. **EQ q_bonus minimum ratio calibration:** If governance sets the minimum q_bonus/q_fee ratio too low, coordinates receive weak D(c) signal. If too high, unknowers avoid registering queries (friction). What is the principled calibration for this ratio, analogous to the β_effective calibration formula?
+
+2. **Mode transition — DISCOVERY to CLEARING:** When a coordinate class transitions from DISCOVERY to CLEARING (position registry goes live), existing knowers have calibration history under DISCOVERY parameters. Their N_calibration window spans both modes. Should the transition reset the calibration window, or carry over with a mode-weighted rolling average?
+
+3. **WED_clearing observability lag:** WED_clearing = Σ max_loss of registered positions. If positions are registered across multiple epochs (rolling registration), WED_clearing changes each epoch. How should knower incentives update in response to WED_clearing changes — per-epoch recalculation of base reward, or a smoothed WED signal analogous to ρ_smooth?
+
+4. **Implication chains in clearing mode:** CLEARING_MODE_PROFILE sets implication_bonus_default = 0. But some clearing scenarios have structural implication relationships — e.g., a bond default event (A) implies collateral haircut events (B_1, B_2). Should implication chains be opt-in per coordinate class in clearing mode rather than disabled by default?
+
+*Last updated: #r149 — 2026-04-03T22:32Z*
