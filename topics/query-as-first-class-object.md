@@ -1,56 +1,70 @@
-# GDM Run #r69 — 2026-04-03
+# GDM Knowledge Marketplace — #r69
 
-## Pending write to: https://docs.google.com/document/d/1Z1sbL9WgBHTxs-4YWlVZWfJy-ZsHwdPZu6qCuT_42e0/edit
+## Run metadata
+- Run: #r69
+- Date: 2026-04-03
+- Status: BLOCKED on Google Doc write (no gog auth / no Google credentials on host)
+- Prior run recovered from: Google Doc export (txt), last entry was #r68
 
-Last confirmed run in doc: #r68.
+## Net-new reasoning for #r69
+
+**Theme: the conserved quantity problem — what is actually invariant in this mechanism?**
+
+The standing instruction has always asked: "what is the conserved quantity, what is the update rule, what is the source of truth, and why does capital improve epistemics rather than just reallocate PnL?"
+
+After 68 runs, the mechanism has accumulated a very rich state-schema — 10+ typed fields per coordinate — but has never formally named the conserved quantity. This is the gap #r69 addresses.
+
+### 1. Base primitive (#r69 contribution)
+The conserved quantity candidate is **decision-relevant epistemic coverage** (DREC) per coordinate, not capital and not probability mass. Capital in this mechanism is not conserved; it flows from low-information actors (demanders) to high-information actors (updaters, challengers) as payment for a service. What should be conserved — or at least non-decreasing over time — is the coverage of decision-relevant state: the fraction of the coordinate's applicability domain that is maintained inside the contracted error envelope under active warranty.
+
+This has a direct implication: the mechanism is not primarily a market for beliefs; it is a maintenance-of-coverage service. Capital enters only because maintenance has a cost and uncertainty about coverage creates a fee opportunity. The conserved object is "deployed warrant coverage over state space," not probability estimates or trading PnL.
+
+### 2. State model (#r69 contribution)
+The update rule should be: DREC(c, t+1) = DREC(c, t) + coverage_gain(new_update) − coverage_lost(expired_warranty) − coverage_voided(challenger_slash).
+
+An update that replaces stale coverage with fresher coverage does not increase net DREC unless it genuinely extends the domain or narrows the error envelope. A challenger that slashes an incumbent decreases DREC temporarily until a replacement is accepted — this is the cost of correction and should be minimized by making challenges fast and replacement seamless.
+
+This distinguishes the mechanism sharply from LMSR: in LMSR the conserved (or managed) object is the market maker's scoring-rule budget. Here the conserved object is coverage; the market maker's analog is the escrow pool that guarantees replacement continuity.
+
+### 3. Credibility model (#r69 contribution)
+Capital improves epistemics because DREC is expensive to manufacture: observation cadence, access rights, domain expertise, and challenge monitoring all cost real resources. A seller who posts stake is asserting "my coverage is genuine and I will defend it." The stake's epistemic function is to make DREC non-trivial to fake: without liability, anyone can claim coverage. With liability, coverage claims are bounded by the seller's willingness to underwrite them.
+
+The prior runs (#r18, #r22, #r25) identified that liability should scale with authority delta, capacity, and operative stakes. The #r69 addition: liability should also scale with the *area of DREC being claimed* — a large-domain update that covers more of the state space should require proportionally more escrow because the coverage claim is riskier and harder to defend.
+
+### 4. Market roles (#r69 contribution)
+No new roles, but a sharper payment logic: demanders pay proportionally to the DREC value they are consuming (how much of their decision space the coordinate covers, weighted by decision-loss sensitivity). Updaters earn proportionally to DREC delivered and maintained. Challengers earn the DREC recovery premium — the value of restoring coverage that was degraded by a failing incumbent. This framing makes the marketplace a DREC insurance and maintenance system rather than a betting market.
+
+### 5. Settlement model (#r69 contribution)
+When truth resolves: compare the DREC that was under warranty (contracted coverage) against the DREC that was actually delivered (realized coverage inside error envelope). Slash proportionally to coverage gap, not to point error. A seller who maintained wide intervals honestly but whose intervals contained the truth loses nothing; a seller who claimed narrow point coverage that missed loses proportionally to the gap between claimed precision and actual coverage.
+
+Partial observability: grade on sampled coverage verification. If truth is partially observed over a random sample of the coordinate's applicability domain, DREC can be estimated statistically. This is a significant advantage over binary prediction market resolution.
+
+### 6. Attack surface (#r69 contribution)
+The DREC framing opens a new attack: **coverage inflation** — sellers claim wide domains and loose error envelopes to make their warranty appear large while actually providing little information. Mitigant: DREC must be weighted by decision-relevance density (not flat domain area). A seller claiming coverage over a low-decision-density region earns little. This mirrors the issue in insurance markets where policies with huge nominal coverage over irrelevant risks are nearly worthless.
+
+Existing attacks from prior runs still apply. The #r69 addition is that sybil credibility and wash credibility attacks are specifically coverage-inflation variants.
+
+### 7. Better/worse than LMSR/orderbooks (#r69 contribution)
+LMSR manages a probability budget; it does not have a coverage concept. This mechanism manages a DREC budget: it can be explicit about *where* in the state space knowledge is thin, patchy, or stale. That is a stronger epistemic product for decision support because buyers can see the coverage map, not just a price signal. The cost is that DREC is harder to measure than price, and coverage audits require more institutional infrastructure than trade matching.
+
+### 8. Simplest viable mechanism sketch (#r69 contribution)
+Add a `drec_weight` field to each coordinate declaration: this is the buyer-declared decision-relevance density over the coordinate's applicability domain. Payment to the updater = installation fee × drec_weight × coverage_quality_score. Holdback = f(drec_weight, authority_tier, correction_latency). Challenger reward = DREC recovered × drec_weight.
+
+Minimal addition to existing schema: one field + one scoring function. No new roles.
+
+### 9. Strongest reason this fails (#r69 contribution)
+DREC is hard to measure objectively. Decision-relevance density requires the buyer to specify their utility function over state space, which they may not know precisely or may not reveal truthfully (strategic underreporting to reduce fees). Without a credible DREC measurement, the coverage framing collapses back into qualitative judgment.
+
+### 10. Best surviving variant (#r69 contribution)
+Use DREC only as a conceptual anchor for pricing and slashing logic, not as a precisely measured quantity. Approximate it with three coarse buckets: high decision-relevance (auto-binding or action-gating coordinates), medium (decision-support), low (advisory/observatory). Map holdback and slash rates to these buckets. The exact DREC formula is optional; the conceptual shift — that capital is buying coverage, not probability shares — is the durable contribution.
+
+(ref: #r69; integrates conserved-quantity thread from standing instructions; builds on #r1, #r4, #r8, #r9, #r18, #r22, #r25, #r31, #r32, #r33)
 
 ---
 
-## #r69 refinement — the demand side is structurally underspecified; schema capture is the missing attack
+## Pending: Doc write blocked
 
-### 1. Base primitive
-The mechanism has progressively enriched the supply-side product tuple (value grammar, dependency scope, authority tier, revocation path, provenance class, inspection class, revision policy, applicability domain, residual uncertainty, challenge affordability — ref: #r29–#r33, #r36, #r40, #r42, #r52, #r68). But the demand side has a structural gap that prior runs have not addressed: buyers in a knowledge marketplace often cannot fully specify what they want *before* interacting with suppliers. In LMSR, questions are pre-defined. In an orderbook, instruments are listed. In a knowledge marketplace, part of what is being sold is the *definition of the coordinate itself*. A buyer posting "I want to reduce decision-loss around X" cannot produce a fully-typed coordinate spec without knowing what suppliers can actually offer, at what precision class, from what provenance, under what revision policy. The demand side therefore needs its own revelation mechanism, not just a wallet.
+Need gog auth (OAuth credentials for team@valctrl.com) to write #r69 to:
+https://docs.google.com/document/d/1Z1sbL9WgBHTxs-4YWlVZWfJy-ZsHwdPZu6qCuT_42e0/edit
 
-### 2. State model
-The global state vector cannot be pre-populated by buyers alone. It needs a **demand declaration layer** that precedes the coordinate schema layer. Demand declarations are typed differently from coordinates: (decision context, target decision-loss, priority window, acceptable authority classes). These declarations live in the state vector as *open queries* until a schema proposal phase closes them into installed coordinates. Without this, the state vector is supplier-defined and buyer-agnostic — the mechanism fills itself with what suppliers are cheapest to produce, not what buyers most need (#r69).
-
-### 3. Credibility model
-Schema capture is a credibility attack that prior runs' escrow/holdback model does not defend against. A supplier can propose a coordinate schema that (a) looks responsive to the buyer's declared need, (b) is scoped so the supplier can fill it cheaply and accurately, and (c) minimizes the supplier's liability by restricting applicability domain, loosening precision class, or widening residual uncertainty — all while technically satisfying the published rubric. Capital attached to the resulting coordinate buys epistemic-looking authority that does not actually reduce the buyer's decision-loss. Credibility escrow only converts to epistemics if the schema itself was selected to serve buyer decision needs, not supplier fill optimization (#r69).
-
-### 4. Market roles
-A new role is needed: **demand translator / schema broker**. This actor bridges buyer-declared decision context and supplier-proposed coordinate schemas. Their function is not to do research; it is to identify whether a proposed schema genuinely covers the buyer's declared decision loss or whether it is a supplier-convenient redefinition. Compensation is a fraction of the buyer's holdback release when the installed coordinate actually reduces decision-loss as measured at truth resolution — not when the coordinate is accepted. This aligns the translator's incentives with buyer outcome, not with schema volume (#r69).
-
-### 5. Settlement model
-Settlement needs a **demand-loss retrospective** in addition to coordinate accuracy scoring. At resolution: (a) did the installed coordinate's schema cover the buyer's declared decision context? (b) did the filled value reduce the buyer's decision-loss by at least the contracted amount? (c) was the precision class actually necessary for the decision, or was it theater? Schema brokers, schema-proposing suppliers, and fill-providing suppliers are scored separately on these three dimensions. A supplier who correctly fills a schema that was irrelevant to the buyer's decision gets less credit than one whose schema + fill genuinely reduced decision-loss (#r69).
-
-### 6. Attack surface
-**Schema capture** (new — #r69): supplier designs a coordinate that is technically responsive to the buyer's query but scoped to minimize supplier risk while maximizing authority capture. Defense: demand-loss retrospective at settlement; schema broker role with outcome-tied compensation.
-
-**Schema gaming by demand translator**: translator could favor schemas from suppliers who share revenue, or could inflate buyer decision-loss estimates to justify over-purchasing. Defense: translator compensation tied to *realized* decision-loss reduction (post-resolution), not to schema acceptance; multiple brokers allowed to propose competing schema mappings.
-
-**Demand theater**: buyer overstates decision-loss to attract more/cheaper supply. Defense: buyer's holdback contribution is also sized to declared decision-loss, so over-declaration is self-punishing (ref: #r69; extends #r33).
-
-### 7. Why better/worse than LMSR/orderbooks
-LMSR avoids this problem by pre-defining the question. That is both its strength (no schema capture) and its weakness (no adaptation to what buyers actually need). A knowledge marketplace that only operates on pre-defined coordinates is just LMSR with more overhead. The whole point of the mechanism is that buyers can procure state the market hasn't pre-listed. But that advantage is only real if the schema selection process is buyer-outcome-aligned. Without a demand revelation + schema broker phase, the knowledge marketplace will drift toward supplier-defined questions, which is worse than LMSR because it adds complexity without the pre-definition discipline (#r69).
-
-Standard orderbooks are even worse here: instruments are fixed, so demand revelation is impossible by design.
-
-Batch auctions improve somewhat because clearing can aggregate demand before committing to schema, but they still require pre-defined instruments in all standard implementations.
-
-### 8. Simplest viable mechanism sketch
-Add a two-phase process per coordinate:
-
-**Phase 1 — demand declaration**: buyer posts (decision context D, target max decision-loss L, authority classes A, priority window W, budget cap B).
-
-**Phase 2 — schema competition**: suppliers post proposed coordinate schemas S_i that they claim would reduce decision-loss by at least delta_i if filled, with a fill-cost estimate. Schema broker (or multiple brokers) score each S_i against D. Buyer selects the schema-fill pair that maximizes estimated (decision-loss reduction / cost). Selected supplier locks in schema and fills. Broker receives a fraction of holdback contingent on realized decision-loss reduction at settlement.
-
-For routine coordinates (low decision-loss, well-understood domain), Phase 1 is trivial and Phase 2 collapses to the existing typed-coordinate flow. Only high-authority or novel coordinates need full Phase 2 competition.
-
-### 9. Strongest reason this fails
-Decision-loss is often not measurable at truth resolution because: (a) the buyer may have already made the decision using the installed state, (b) the counterfactual (what loss would have occurred without the update) is unobservable, (c) buyers may not be honest about their decision context in Phase 1 because that would expose private strategy. If decision-loss retrospective is unverifiable, schema brokers have no scoring signal and the demand revelation phase collapses into a performative layer.
-
-### 10. Best surviving variant
-Restrict demand-loss retrospective to a coarse binary: did the buyer use the coordinate in a downstream decision, and did that decision turn out in a direction consistent with the installed state? For the rest, use a proxy: schema covers the declared decision domain if it would have changed a canonical test decision under the declared authority class. Coarse binary scoring is less precise but far more measurable and harder to manipulate than continuous decision-loss reconstruction. Reserve full loss-accounting only for high-value contracts where both parties can pre-commit to a logged decision trail (#r69; extends #r25, #r31, #r33).
-
----
-*Status: pending write to Google Doc — gog auth not configured, browser not available.*
+Action for Gaurav: run `gog auth add team@valctrl.com --services docs` on this host, or provide service account JSON.
