@@ -1,9 +1,9 @@
 # EpistemicBond v0 — Technical Specification
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r075
+**Run:** r075 → corrected by r077 (VAL-462) → corrected by r081 (VAL-469)
 **Date:** 2026-04-03
-**Issue:** VAL-460
+**Issue:** VAL-460 → updated by VAL-462
 **Depends on:** executable-roadmap.md (r074), atlas-formal-analysis.md (r072), research-synthesis.md (r073)
 **Purpose:** Bridge the theoretical mechanism design and executable roadmap to concrete engineering artifacts. This document is the handoff to engineering for Phase 0 (testnet deployment, Weeks 1–3).
 
@@ -339,13 +339,19 @@ Per Lens r073 and executable-roadmap.md: corporate earnings is the Phase 1 domai
 
 ### 4.1 Oracle sources (multi-source, v0)
 
-| Source | Access | Data | Latency |
-|---|---|---|---|
-| SEC EDGAR | Free API | 8-K filings with earnings data | ~15 min post-release |
-| Bloomberg Terminal feed | Subscription | EPS actuals vs. consensus | Realtime |
-| Refinitiv/LSEG Eikon | Subscription | EPS consensus estimates | Realtime |
+**Updated in r077 (VAL-462):** Bloomberg Terminal and Refinitiv/LSEG (~$44K–$46K/year combined) are over-engineered for a 15-knower Phase 1 testnet. Replaced with free/low-cost sources.
 
-v0 policy: resolution is triggered only when at least 2 of 3 sources agree. The oracle relay submits a single `resolveOracle()` call with the agreed outcome. If sources disagree after 24 hours, a dispute flag is set and the epoch enters a manual review hold (no auto-resolution in v0).
+| Source | Access | Data | Latency | Cost |
+|---|---|---|---|---|
+| SEC EDGAR (primary) | Free REST API | 8-K filings with earnings data | ~15 min post-release | Free |
+| Nasdaq Data Link / ZACKS | Free tier | EPS actuals + consensus estimates | ~1 hour post-release | Free (≤500 tickers/month) |
+| Alpha Vantage | Free + $50/mo paid | Earnings surprise data | Same-day | $50/month |
+
+**Consensus source:** Wall Street Horizon (~$200/month). Machine-readable earnings estimates and actuals for S&P 500 names. Total Phase 1 oracle cost: ~$250/month ($3K for full Phase 1 period).
+
+v0 policy: resolution is triggered only when SEC EDGAR 8-K confirms the EPS figure AND at least one of the two secondary sources agrees with the beat/miss determination vs. pre-filing consensus. If sources disagree after 24 hours, a dispute flag is set and the epoch enters a manual review hold (no auto-resolution in v0).
+
+**Phase 2 upgrade:** Add Bloomberg or Refinitiv when fee revenue justifies it or institutional unknower clients require higher-grade sourcing.
 
 ### 4.2 Oracle relay address management
 
@@ -389,7 +395,7 @@ Zone C: utilization ≥ 0.90 → new claim submissions blocked; existing claims 
 
 ### 5.2 v0 simplification
 
-In v0 with 15 knowers and 15 coordinates, TOWL utilization is unlikely to reach Zone B. The check should be implemented but is not expected to trigger. Recommend logging utilization per epoch for baseline data.
+In v0 with 15 knowers and 30 coordinates (two waves), TOWL utilization is unlikely to reach Zone B. The check should be implemented but is not expected to trigger. Recommend logging utilization per epoch for baseline data.
 
 ---
 
@@ -446,6 +452,7 @@ Prior to testnet deployment, validate:
 - [ ] **Holdback release timing**: 70% at reveal deadline; 30% only after `settle()` completes. Cannot be withdrawn before.
 - [ ] **Epoch state machine**: Transitions are one-directional (cannot revert to a prior state). `settle()` is idempotent.
 - [ ] **W_max cap enforced**: `computeSPublic()` caps each w_i at `maxCredibilityFraction() * totalWeight`. Verify this is applied before normalization, not after.
+- [ ] **Circuit breaker on reward/slash (added r077)**: `|R_i| ≤ 2 × stake` enforced in `settle()`. Prevents fixed-point log arithmetic edge cases from producing catastrophic slashes. Fuzz-test `_computeReward` with adversarial inputs (pTrue → 0, pTrue → 1, extreme S_prev values).
 
 ---
 
@@ -470,12 +477,14 @@ Minimum viable: Any 15 coordinates with unambiguous binary outcomes (EPS beat/mi
 
 Pre-screening: 10-question historical calibration test on prior earnings calls. Accept only applicants scoring ≥60% accuracy. Reject applicants with <20 qualifying data points (insufficient track record to screen).
 
-### 8.3 Success metrics (Week 8 checkpoint)
+### 8.3 Success metrics (Week 10 checkpoint)
+
+**Updated in r081 (VAL-469):** Checkpoint moved from Week 8 to Week 10 per Phase 1 duration correction (6–7 weeks per r080). Active knower threshold corrected from ≥15 resolved epochs to ≥30 resolved predictions (matching the 30-coordinate two-wave structure).
 
 | Metric | Target | Measurement |
 |---|---|---|
-| Active knowers | ≥10 with ≥15 resolved epochs | On-chain settlement records |
-| T_i differentiation | ≥3 knowers with |T_i| > 0.5 | On-chain T_i values |
+| Active knowers | ≥10 with ≥30 resolved predictions | On-chain settlement records |
+| T_i differentiation | ≥3 knowers with T_i ≥ 0.5 (positive, not absolute) after ≥30 resolved predictions | On-chain T_i values |
 | Sybil signal | No cross-claim correlation > 0.85 among any pair | Off-chain correlation monitor |
 | Oracle disputes | 0 | Dispute registry |
 | Contract uptime | 100% | No stuck epochs; all oracle timeouts handled |
@@ -485,9 +494,9 @@ Pre-screening: 10-question historical calibration test on prior earnings calls. 
 ## 9. v0 Dependencies and Non-Negotiables
 
 ### What this document assumes is already decided:
-- **Layer 1 status**: v0 can run against a staging oracle (Chainlink price feeds as proxy) if L1 is not live. Migration to L1 oracle is clean — only the oracle relay address changes.
-- **Token standard**: v0 can use ETH or a simple ERC-20 as the staking token. Recommend ETH for v0 simplicity; ERC-20 upgrade is straightforward.
-- **Chain choice**: L2-compatible EVM (Arbitrum, Base, or OP Stack) preferred for low gas cost. Do not deploy on Ethereum mainnet in v0.
+- **Layer 1 status (clarified in r077)**: Phase 0–1 runs on a staging oracle (centralized relay: EDGAR + secondary sources), NOT on GestAlt L1. L1 is NOT required for Phase 0–1. L1 migration is triggered when: (a) GestAlt L1 is live on mainnet with ≥30 epochs of production oracle output, AND (b) Phase 1 exit criteria are met. These can proceed in parallel. Only the oracle relay address changes at migration time.
+- **Token standard (updated in r077)**: USDC ERC-20 from day 1. 1 unit = $1 USDC. Use OpenZeppelin `SafeERC20`. Reasons: dollar-denominated accounting, no ETH price volatility for knowers, cleaner institutional presentation. Adds ~50 lines to contract; worth it.
+- **Chain choice**: Arbitrum Sepolia for testnet (better faucet/test infrastructure). Base mainnet for production (lowest gas post-Dencun EIP-4844; Coinbase institutional backing; active DeFi). Do not deploy on Ethereum mainnet in v0.
 
 ### Non-negotiables (cannot defer without breaking the mechanism):
 1. **c_id must be non-refundable** (Atlas r073 Q1 — Sybil floor)
@@ -512,5 +521,8 @@ These are explicitly out of scope for v0 and should not be added before Phase 1 
 ---
 
 *This spec is the Phase 0–1 engineering handoff. Engineering should implement EpistemicBond.sol and the oracle relay against this interface, deploy to testnet, and confirm the sealed-commit/reveal flow works before beginning knower recruitment. Questions or deviations → update this document and create a GitHub Issue.*
+
+*Logan — ValCtrl AI Chief of Staff | r075 | VAL-460*
+f. Engineering should implement EpistemicBond.sol and the oracle relay against this interface, deploy to testnet, and confirm the sealed-commit/reveal flow works before beginning knower recruitment. Questions or deviations → update this document and create a GitHub Issue.*
 
 *Logan — ValCtrl AI Chief of Staff | r075 | VAL-460*

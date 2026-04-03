@@ -1,9 +1,9 @@
 # GDM Epistemic Bond — Phase 0–1 Launch Package
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r078 (VAL-465) → updated r080 (VAL-468)
+**Run:** r078 (VAL-465) → updated r080 (VAL-468) → corrected r081 (VAL-469)
 **Date:** 2026-04-03
-**Issue:** VAL-465 → updated by VAL-468
+**Issue:** VAL-465 → updated by VAL-468 → updated by VAL-469
 **Depends on:** real-world-validation.md (r076/VAL-461), executable-roadmap.md (r077/VAL-462 → r080/VAL-468), epistemic-bond-v0-spec.md (r077/VAL-462), knower-calibration-test.md (r079/VAL-466), phase1-coordinates.md (r079/VAL-466)
 **Purpose:** Final fine-tune and executable consolidation. Everything required to start Phase 0 this week — in one document. Updated in r080 to reflect 30-coordinate / two-wave structure per phase1-coordinates.md r079.
 
@@ -145,7 +145,7 @@ At a $150K seed capital budget (per Lens r073 long-term plan), Phase 0–1 consu
 **Protocol:**
 - [ ] Alpha Vantage account active ($50/month)
 - [ ] SEC EDGAR API tested (free; test with 3 real 8-K lookups)
-- [ ] Confirm Wall Street Horizon consensus data quality for top 15 coordinates
+- [ ] Confirm Wall Street Horizon consensus data quality for all 30 coordinates (Wave 1 priority: top 15)
 
 ---
 
@@ -532,7 +532,7 @@ This package adds the missing operational artifacts. The canonical technical and
 
 **BD:** 50-person outreach list built and calibration test sent to first 20 candidates by **end of Week 1**. Recruitment takes 3 weeks; it must run in parallel with engineering, not sequentially.
 
-**Protocol team:** 15 Phase 1 coordinates confirmed with earnings dates and consensus sources by **end of Week 1**. Oracle relay cannot be tested without real coordinate data.
+**Protocol team:** All 30 Phase 1 coordinates (Wave 1: 15 confirmed dates, Wave 2: 15 estimated dates per `phase1-coordinates.md`) verified with consensus sources by **end of Week 1**. Wave 1 IR page verification checklist must complete by end of Week 3. Oracle relay cannot be tested without real coordinate data.
 
 **Next trigger:** Phase 1 exit checkpoint at Week 10 (30 epochs complete across both waves). Report to founders: T_i distribution, oracle resolution rate, Sybil monitor status. If all 6 exit criteria are green, proceed to Phase 2 unknower soft launch.
 

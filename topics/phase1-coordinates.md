@@ -1,9 +1,9 @@
 # GDM Epistemic Bond — Phase 1 Coordinate List
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r079
+**Run:** r079 → corrected by r081 (VAL-469)
 **Date:** 2026-04-03
-**Issue:** VAL-466
+**Issue:** VAL-466 → updated by VAL-469
 **Depends on:** phase0-launch-package.md (r078/VAL-465), executable-roadmap.md (r077/VAL-462)
 **Purpose:** Concrete, source-verified list of Phase 1 coordinates with real Q1 2026 earnings dates. Also resolves the "15 coordinates / 30 resolutions" reconciliation gap identified in this pass.
 
@@ -218,7 +218,21 @@ For an AMC reporter on April 16:
 | Industrials | 0 | 1 | 1 |
 | **Total** | **15** | **17\*** | **30** |
 
-*\*T (AT&T) and VZ (Verizon) in Wave 2 overlap with Wave 1 timing (late April); they effectively become Wave 1.5. Protocol team can adjust to maintain the clean Wave 1 / Wave 2 boundary if preferred.*
+*\*T (AT&T, est. Apr 23) and VZ (Verizon, est. Apr 21) in the Wave 2 list overlap with the Wave 1 timing window (April 14–May 1). These should be treated as Wave 1 coordinates for contract loading and commit-window purposes, even if they are listed in the Wave 2 planning table. Protocol team should load T and VZ into the contract alongside Wave 1 coordinates (by end of Week 3) and update the sector distribution table accordingly: Wave 1 count increases to 17, Wave 2 count decreases to 13. The 30-coordinate total is unchanged.*
+
+*Revised sector distribution with T and VZ reclassified to Wave 1:*
+
+| Sector | Wave 1 Count | Wave 2 Count | Total |
+|--------|-------------|-------------|-------|
+| Technology | 4 | 4 | 8 |
+| Financials | 5 | 2 | 7 |
+| Communication Services | 4 | 1 | 5 |
+| Consumer Discretionary | 2 | 2 | 4 |
+| Consumer Staples | 0 | 3 | 3 |
+| Energy | 0 | 2 | 2 |
+| Healthcare | 1 | 0 | 1 |
+| Industrials | 0 | 1 | 1 |
+| **Total** | **17** | **13** | **30** |
 
 **Timing distribution:** Approximately 1–3 coordinates resolve per week across the 6–7 week Phase 1 window. This gives knowers consistent weekly resolution feedback and prevents long "dead" periods with no oracle resolutions.
 

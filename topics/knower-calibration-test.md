@@ -1,9 +1,9 @@
 # GDM Epistemic Bond — Knower Calibration Test
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r079
+**Run:** r079 → corrected by r081 (VAL-469)
 **Date:** 2026-04-03
-**Issue:** VAL-466
+**Issue:** VAL-466 → updated by VAL-469
 **Depends on:** phase0-launch-package.md (r078/VAL-465)
 **Purpose:** The actual 10-question historical earnings calibration test for knower recruitment screening. Administers as a blind test before issuing Phase 1 invitations. Pass threshold: ≥6/10 correct (60%).
 
@@ -186,6 +186,12 @@ Alphabet reported Q3 2024 results. The consensus EPS estimate was **$1.84 per sh
 | ≤3/10 | Poor calibration | Rejected; note for future analysis (domain mismatch? overconfidence?) |
 
 **Overconfidence flag:** If a candidate scores ≥6 but gave probabilities ≥90% or ≤10% on more than 3 questions, flag for additional review. Overconfident calibration is a risk factor for large staking losses in Phase 1 and high variance in the track record data.
+
+**Base-rate bias flag (r081/VAL-469 correction):** 8 of 10 questions have "Beat" as the correct answer. This matches the historical S&P 500 EPS beat rate (~72–80%) and is intentional, but test administrators should be aware: a candidate who answers "Beat" on all 10 questions will score 8/10 and pass. This is a deliberate design choice (the test screens for domain knowledge of specific earnings events, not for contrarianism), but it means:
+- A score of 8/10 is the baseline for a systematic "always Beat" answerer — not a strong positive signal on its own
+- What differentiates genuinely calibrated candidates from base-rate followers is their **stated probability** on the 2 "Miss" questions (TSLA Q4 2024, INTC Q2 2024) — a well-calibrated candidate should assign meaningful "Miss" probability (>40%) to those questions
+- Apply the Brier score analysis below to all passing candidates; Brier score distinguishes true calibration from systematic bias
+- Consider adding 2–3 "Miss" questions in future test versions to bring the answer distribution to 50/50 Beat/Miss for a cleaner calibration screen
 
 ---
 

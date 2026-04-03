@@ -1,9 +1,9 @@
 # GDM Research Synthesis: Cross-Agent Integration
 
-**Run:** r073 (Echo — synthesis pass)
+**Run:** r073 (Echo — synthesis pass) → corrected by r077 (VAL-462) → corrected by r081 (VAL-469)
 **Date:** 2026-04-03
 **Author:** Echo (ValCtrl AI — Research Coordinator)
-**Issue:** VAL-455
+**Issue:** VAL-455 → updated by VAL-462 (unit repricing) → updated by VAL-469 (timeline + bootstrap cost corrections)
 **Parent Issue:** VAL-450
 **Inputs consumed:**
 - `fundamental-analysis-epistemic-bond-layer.md` — r071 base analysis (Logan / VAL-450)
@@ -35,7 +35,7 @@ All four research tracks independently confirm the same conclusion: the GDM epis
 - **Scout** surveyed all major prediction markets (Polymarket ~$9B 2024 volume; Augur; Manifold; Metaculus) and oracle networks (Chainlink, Pyth, API3, UMA) and found zero production systems offering bilateral credentialed-belief routing. The design occupies an unoccupied market position.
 - **Sage** reviewed the academic literature (Hanson 2003 LMSR; proper scoring rules from Brier/Good/McCarthy; Bayesian aggregation from DeGroot/Dawid; information asymmetry from Akerlof/Spence/Kyle) and concluded that GDM's novelty is strongest in three specific dimensions: bilateral routing + stake credentialing (not in any prior mechanism), epistemic value separated from directional bet profit (not in LMSR or orderbook PM), and epoch-batch front-run-resistant aggregation (new architectural combination).
 - **Atlas** worked through the four formally open questions from r071 and resolved Q1 (Sybil lower bound), Q2 (L1/L2 coupling conditions), Q3 (provisional timeout → Option C), and Q6 (IC under partial oracle).
-- **Lens** validated the mechanism's market economics: TAM is ~$14B (expert networks + prediction markets + quant research), first-year SOM at $10/unit × 500 coordinates is ~$1.8M, bootstrap cost with Layer 1 anchoring is ~$150K and 3–6 months to organic flywheel.
+- **Lens** validated the mechanism's market economics: TAM is ~$14B (expert networks + prediction markets + quant research), proof-of-mechanism SOM at $1/unit × 500 active coordinates/epoch × 365 days is ~$182.5K/year (path to $1.8M/year as unit value scales with track record depth in Phase 3; the $1.8M figure is the Phase 3 target at higher unit pricing, not a first-year number), bootstrap cost with Layer 1 anchoring is ~$150K and 3–6 months to organic flywheel. *(Updated r078/VAL-465 per real-world-validation.md §2 and §11 corrections — unit repriced to $1 USDC.)*
 
 **Team verdict:** The epistemic bond mechanism is ready to proceed from research to protocol specification, conditional on the remaining open items identified below.
 
@@ -47,9 +47,9 @@ The r071 analysis correctly identified the bootstrap problem as the mechanism's 
 
 1. **Layer 1 anchoring eliminates the manufactured-demand problem.** Layer 1 financial settlement provides oracle resolutions automatically. Track records accrue from day 1 of Layer 1 going live, with no need for artificial demand subsidies. This removes the circular dependency that killed Augur (which had to manufacture both supply and demand from scratch).
 
-2. **Corporate earnings as the optimal first domain.** [Lens] The domain with the highest combined score across epistemic asymmetry (structural; SEC Reg FD), oracle verifiability (unambiguous quarterly EPS/revenue), and institutional willingness-to-pay (GLG charges $1,500–$2,000/hour for equivalent access) is corporate earnings. 30 epochs ≈ 3–4 weeks at 40 US earnings events/week. Track record differentiation is achievable in the shortest possible time.
+2. **Corporate earnings as the optimal first domain.** [Lens] The domain with the highest combined score across epistemic asymmetry (structural; SEC Reg FD), oracle verifiability (unambiguous quarterly EPS/revenue), and institutional willingness-to-pay (GLG charges $1,500–$2,000/hour for equivalent access) is corporate earnings. 30 epochs across 30 coordinates ≈ 6–7 weeks (two waves) at ~2–3 earnings resolutions/week across the Phase 1 coordinate set. Track record differentiation is achievable in the shortest possible time. *(r080/VAL-468 correction: 30 epochs ≠ 3–4 weeks with 30 coordinates; each coordinate resolves once. Phase 1 duration is 6–7 weeks, not 3–4 weeks.)*
 
-3. **Knower bootstrap cost is ~$150K.** [Lens] 50 seed knowers × 10 units/epoch subsidy × 30 epochs = 15,000 units. At $10/unit, $150K in seed capital produces the first generation of track-record-differentiated knowers. This is ~30–50x cheaper than Polymarket's liquidity bootstrap and ~20x cheaper than GLG's early capital deployment.
+3. **Knower bootstrap cost is ~$4,500 USDC (seed subsidy) + ~$9,150 total.** [Lens, updated r077+r081] 15 Phase 1 knowers × $10/epoch subsidy × 30 epochs = $4,500 USDC seed subsidy at $1/unit (corrected from $150K, which was computed at the prior $10/unit pricing). Total Phase 0–1 capital requirement is ~$9,150 USDC + engineering labor (see phase0-launch-package.md §1.5). The $150K seed capital figure from Lens r073 remains valid as a Phase 1–2 combined budget or for a 50-knower expansion, but is not the Phase 1-only requirement at $1/unit. This is ~30–50x cheaper than Polymarket's liquidity bootstrap and ~20x cheaper than GLG's early capital deployment. *(r077+r081 correction: $10/unit → $1/unit repricing applied.)*
 
 4. **AI agent consumers as a parallel demand-side catalyst.** [Scout] A 2025 arXiv paper (Agent Exchange: Shaping the Future of AI Agent Economics) identifies a gap in AI agent economic infrastructure — current protocols (MCP, etc.) lack primitives for agent-level knowledge trading. GDM's query contract structure (explicit cost_of_error, precision class, resolution trigger) maps directly onto AI agent tool-call patterns. This is an early-adopter demand segment not yet addressed by any production protocol.
 
@@ -254,7 +254,7 @@ No outright contradictions between research tracks. The following tensions requi
 | Sybil resistance requires identity fee | **High** | Formal lower bound proof (Atlas r073); identity fee requirement clearly derived |
 | L1/L2 advisory coupling is sufficient static protection | **Medium-High** | Static no-arbitrage condition derived (Atlas r073); multi-epoch not yet proven |
 | $150K seed cost to organic flywheel | **Medium** | Lens r073 estimates; assumes Layer 1 operational with adequate oracle resolutions |
-| ~$1.8M first-year SOM at $10/unit | **Medium** | Lens r073 sensitivity analysis; highly dependent on unknower WTP validation |
+| ~$182.5K/year proof-of-mechanism SOM at $1/unit (Phase 3 target: $1.8M/year as unit value scales) | **Medium** | Lens r073 sensitivity analysis; repriced to $1/unit per real-world-validation.md r076; highly dependent on unknower WTP validation |
 | Corporate earnings is the optimal first domain | **High** | Lens r073 domain scoring; all 4 criteria score highest vs. alternatives |
 | AI agents as early adopter segment | **Medium** | Scout r073 arXiv reference; emerging market with no production validation yet |
 | Track record history is the primary durable moat | **High** | Lens r073 §4.1; confirmed: track records are time-locked and unforkable |
