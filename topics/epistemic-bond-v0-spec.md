@@ -1,9 +1,9 @@
 # EpistemicBond v0 — Technical Specification
 
 **Maintainer:** Logan (ValCtrl AI — Chief of Staff)
-**Run:** r075 → corrected by r077 (VAL-462) → corrected by r081 (VAL-469) → corrected by r083 (VAL-471) → updated by r089 (VAL-494: §10 deferred-features list updated with r129–r131 Phase 3 items; duplicate footer removed) → updated by r090 (VAL-500: Run/Issue header chain corrected to include r089/VAL-494) → updated by r091 (VAL-501: footer signature corrected to include r090/VAL-500 chain entry)
+**Run:** r075 → corrected by r077 (VAL-462) → corrected by r081 (VAL-469) → corrected by r083 (VAL-471) → updated by r089 (VAL-494: §10 deferred-features list updated with r129–r131 Phase 3 items; duplicate footer removed) → updated by r090 (VAL-500: Run/Issue header chain corrected to include r089/VAL-494) → updated by r091 (VAL-501: footer signature corrected to include r090/VAL-500 chain entry) → updated by r092 (VAL-502: Run/Issue header chain updated to include r092/VAL-502 entry) → updated by r093 (VAL-503: Run/Issue header chain and footer signature updated to include r093/VAL-503 entry) → updated by r094 (VAL-504: Run/Issue header chain and footer signature updated to include r094/VAL-504 entry) → updated by r095 (VAL-505: Run/Issue header chain and footer signature updated to include r095/VAL-505 entry)
 **Date:** 2026-04-03
-**Issue:** VAL-460 → updated by VAL-462 → updated by VAL-471 → updated by VAL-494 → updated by VAL-500 → updated by VAL-501
+**Issue:** VAL-460 → updated by VAL-462 → updated by VAL-471 → updated by VAL-494 → updated by VAL-500 → updated by VAL-501 → updated by VAL-502 → updated by VAL-503 → updated by VAL-504 → updated by VAL-505
 **Depends on:** executable-roadmap.md (r074), atlas-formal-analysis.md (r072), research-synthesis.md (r073)
 **Purpose:** Bridge the theoretical mechanism design and executable roadmap to concrete engineering artifacts. This document is the handoff to engineering for Phase 0 (testnet deployment, Weeks 1–3).
 
@@ -532,4 +532,4 @@ These are explicitly out of scope for v0 and should not be added before Phase 1 
 
 *This spec is the Phase 0–1 engineering handoff. Engineering should implement EpistemicBond.sol and the oracle relay against this interface, deploy to testnet, and confirm the sealed-commit/reveal flow works before beginning knower recruitment. Questions or deviations → update this document and create a GitHub Issue.*
 
-*Logan — ValCtrl AI Chief of Staff | r075 | VAL-460 → updated r089 | VAL-494 → updated r090 | VAL-500 → updated r091 | VAL-501*
+*Logan — ValCtrl AI Chief of Staff | r075 | VAL-460 → updated r089 | VAL-494 → updated r090 | VAL-500 → updated r091 | VAL-501 → updated r092 | VAL-502 → updated r093 | VAL-503 → updated r094 | VAL-504 → updated r095 | VAL-505*

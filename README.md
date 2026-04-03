@@ -36,6 +36,10 @@ gdm-autoresearch/
 | `r089-fine-tune-notes.md` | r089 fine-tune pass — cross-corpus consistency check post-r088/r131; epistemic-bond-v0-spec.md §10 updated with r129–r131 Phase 3 deferred items (LTRP, bounded-liability architecture, DA degraded mode); duplicate footer removed (VAL-494) |
 | `r090-fine-tune-notes.md` | r090 fine-tune pass — cross-corpus consistency check post-r089; epistemic-bond-v0-spec.md Run/Issue header chain updated to include r089/VAL-494; real-world-validation.md footer signature corrected to reflect r085/r086/r090 chain (VAL-500) |
 | `r091-fine-tune-notes.md` | r091 fine-tune pass — cross-corpus consistency check post-r090; epistemic-bond-v0-spec.md footer signature corrected to include r090/VAL-500 + r091/VAL-501 chain entries; real-world-validation.md Run/Issue header chain updated to include r090/VAL-500 + r091/VAL-501 entries (VAL-501) |
+| `r092-fine-tune-notes.md` | r092 fine-tune pass — cross-corpus consistency check post-r091; real-world-validation.md footer signature corrected to include r091/VAL-501 + r092/VAL-502 chain entries; epistemic-bond-v0-spec.md Run/Issue header chain + footer signature updated with r092/VAL-502 entry (VAL-502) |
+| `r093-fine-tune-notes.md` | r093 fine-tune pass — cross-corpus consistency check post-r092; real-world-validation.md + epistemic-bond-v0-spec.md Run/Issue header chain and footer signature updated with r093/VAL-503 chain entry (VAL-503) |
+| `r094-fine-tune-notes.md` | r094 fine-tune pass — cross-corpus consistency check post-r093; real-world-validation.md + epistemic-bond-v0-spec.md Run/Issue header chain and footer signature updated with r094/VAL-504 chain entry (VAL-504) |
+| `r095-fine-tune-notes.md` | r095 fine-tune pass — cross-corpus consistency check post-r094; real-world-validation.md + epistemic-bond-v0-spec.md Run/Issue header chain and footer signature updated with r095/VAL-505 chain entry (VAL-505) |
 
 ---
 
