@@ -4062,3 +4062,156 @@ Portability:
 4. **EAT size and historical compaction:** After 155+ runs of protocol engineering, a long-lived production EAT would be enormous. Are there EAT compaction semantics — Merkle root snapshots of resolved epochs with individual record archiving to cold storage — while maintaining the immutability invariant (#r74)?
 
 *Last updated: #r155 — 2026-04-03T23:32Z*
+
+---
+
+## #r156 Contributions — 2026-04-03T23:42Z
+
+Addresses all four open questions from #r155. Adds one net-new structural insight: tiered EAT compaction completes the production deployment architecture.
+
+---
+
+**Q1 (alignment_score_smooth with no shared-coordinate data — dual-condition transition) → N_align_window observations required before replacing base default; one-shot classes carry base default permanently (#r156):**
+
+This is directly analogous to the α_cap dual-condition transition (#r143/Q3): a derived parameter may only replace its genesis default once sufficient data is available to make the derivation reliable.
+
+**Resolution — dual-condition transition for mode_mismatch_discount:**
+
+```
+mode_mismatch_discount(t) =
+    mode_mismatch_discount_base        if n_clearing_resolutions(t) < N_align_window
+    clip(1 − alignment_score_smooth(t), 0.0, 0.5)  otherwise
+```
+
+`n_clearing_resolutions` = count of oracle-resolved events on the linked clearing class with valid S_discovery_at_T_anchor snapshots available in the EAT.
+
+**One-shot clearing classes:** By definition, n_clearing_resolutions = 1. With N_align_window = N_calibration = 4, the condition is never satisfied. `mode_mismatch_discount` is permanently `mode_mismatch_discount_base`. This is correct — one-shot events lack sufficient data to refine the mode-mismatch model. Disclosed at registration: `expected_mode_mismatch_discount: mode_mismatch_discount_base`.
+
+**Transition event:** When `n_clearing_resolutions` first reaches N_align_window, a `parameter_genesis_exit` EAT event is emitted (type: `mode_mismatch_discount_transition`). Forward-looking only.
+
+**Design law confirmed (#r156):** Every self-calibrating derived parameter (alignment_score_smooth, σ_resolve, α_cap, ρ_smooth) transitions from its governance-bounded default only after accumulating N_window valid observations. Until then: conservative default. Transition is a discrete EAT event. (#r156)
+
+---
+
+**Q2 (WINDING_DOWN query fee floor — treasury subsidy) → No floor; T_wind_down_max is the correct mechanism; floor creates perverse incentives (#r156):**
+
+A treasury-funded query fee floor during WINDING_DOWN appears fair — knowers cannot exit escrow and their service has concluded. But it is wrong for three reasons:
+
+1. *Double compensation:* Query fees during ACTIVE phase already priced the full warranty obligation. WINDING_DOWN is the tail of a completed service; floor would compensate a commitment already priced.
+
+2. *Perverse incentive:* Knowers with very long T_longtail gain the most from a floor. This incentivises extending T_longtail declarations beyond their epistemic value to maximise floor income.
+
+3. *Q3 is the correct fix:* The real burden is obligation *duration*, not revenue absence. T_wind_down_max caps duration; that is the correct lever.
+
+**Design law (#r156):** Mechanism rewards are for services delivered, not for obligations incurred. Revenue decline during wind-down is expected. Duration-bounding via T_wind_down_max is the correct response to stranded obligation risk; treasury supplementation is not. (#r156)
+
+---
+
+**Q3 (Natural expiry misalignment — T_wind_down_max) → Capped at max(2 × challenge_window_max, T_longtail_median_class); LTRP assumption for remaining obligations (#r156):**
+
+**Resolution:**
+
+```
+T_wind_down_max = governance-set at shadow-class registration
+  default = max(2 × challenge_window_max_class, T_longtail_median_class)
+  bounds  = [4 × macro_epoch_min_class, T_longtail_max_class]
+```
+
+At T_wind_down_max post-WINDING_DOWN entry:
+1. **Open challenge windows:** LTRP assumption — identical to T_outage_cap mechanics (#r131/Q4).
+2. **Outstanding T_longtail escrow:** Returned to knower (warranty obligation transfers to LTRP).
+3. **credibility_ratio snapshot:** Committed to EAT at transition.
+
+**LTRP_seed adjustment at shadow-class registration:**
+
+```
+LTRP_seed_shadow += wind_down_assumption_factor × expected_T_longtail_tail_exposure
+wind_down_assumption_factor ∈ [0.1, 0.3]  (same parameter as outage_assumed_slash_factor, #r131/Q4)
+```
+
+**Wind-down state machine update (extends #r155/Q3):**
+
+```
+WINDING_DOWN → ARCHIVED:
+  Trigger A: all challenge windows closed + all escrows naturally released
+  Trigger B: T_wind_down_max exceeded (LTRP assumption path)
+  Whichever fires first.
+```
+
+**Design law (#r156):** All time-unbounded post-event obligations require a T_wind_down_max cap at registration. Beyond the cap, remaining obligations transfer to LTRP and escrow returns to knowers. Applies bounded-liability architecture (#r130–#r132) to shadow-class lifecycle. (#r156)
+
+---
+
+**Q4 (EAT size and historical compaction) → Three-tier storage architecture; immutability preserved via CID-chain anchored to Ethereum (#r156):**
+
+The existing EAT design separates on-chain Merkle roots (Ethereum) from full state blobs (Celestia). A third cold-archive tier extends this naturally for long-lived production deployments.
+
+**Three-tier architecture:**
+
+| Tier | Storage | Content | Availability |
+|---|---|---|---|
+| **Ethereum anchor** | On-chain calldata | Per-epoch Merkle root; compaction_event CIDs | Always live |
+| **Celestia warm** | DA blobs | Full records, active + recent N_warm epochs | DA liveness required |
+| **Cold archive** | IPFS / Arweave | Fully resolved epochs beyond N_warm | Retrieved by CID, DA-independent |
+
+**Compaction eligibility (warm → cold):** An epoch E is eligible iff:
+1. Oracle resolution confirmed for all claims in E.
+2. All challenge windows for E are closed.
+3. All escrows for E fully released.
+4. `N_compact_grace = 2 × N_calibration` normal-mode epochs have passed since E closed.
+
+**Compaction execution:**
+1. Protocol compacts warm blob to cold storage.
+2. Cold storage returns a CID.
+3. `compaction_event` EAT event committed to Ethereum: `{ epoch_range, cold_storage_cid, compaction_epoch }`.
+4. Warm Celestia blob may be deleted after Ethereum confirmation.
+
+**Immutability proof chain:**
+
+```
+Ethereum genesis
+  → epoch Merkle root (Ethereum calldata)
+    → full record (Celestia warm OR cold archive by CID)
+      → compaction_event CID (Ethereum calldata)
+```
+
+Four-step dispute verification: cold storage CID → blob retrieval → Merkle inclusion proof → Ethereum anchor. Same trust model as existing dispute mechanism (#r75). No new trust dependencies.
+
+**Key availability benefit:** Cold-archived epochs are more available during DA outage than recent warm epochs. Arweave-pinned blobs are DA-independent. Older EAT history is MORE available in degraded mode than recent history — a structural resilience property.
+
+**Design law (#r156):** EAT immutability = content-addressability of the CID-chain anchored to Ethereum. Physical persistence (Celestia warm / cold archive) is operational. Cold archiving is permissible when: oracle resolved + challenges closed + escrows released + N_compact_grace passed. The CID-chain is the immutability proof; the physical medium is replaceable. (#r156)
+
+---
+
+## Structural Synthesis: Production Architecture Closure (#r156)
+
+| Feature | Resolution | Law |
+|---|---|---|
+| alignment_score_smooth gating | N_align_window required; one-shot carries permanent base default | Every self-calibrating param needs N_window condition |
+| WINDING_DOWN query fee floor | No floor; duration-bounding via T_wind_down_max is correct | Rewards for service delivered, not obligations incurred |
+| T_wind_down_max | max(2 × challenge_window_max, T_longtail_median); LTRP at cap | Bounded-liability applied to shadow-class lifecycle |
+| EAT compaction | Three-tier; CID-chain anchored to Ethereum; cold archive is DA-independent | Immutability = CID-chain, not physical hot-tier persistence |
+
+---
+
+## Cumulative Invariants (additions through #r156)
+
+**Invariant #21 (#r156):** Every self-calibrating derived parameter requires N_window valid observations before replacing its governance-bounded default. One-shot events carry base default permanently — disclosed at registration.
+
+**Invariant #22 (#r156):** WINDING_DOWN is the tail of a completed service. Treasury supplementation during wind-down is prohibited. Duration-bounding via T_wind_down_max is the correct mechanism.
+
+**Invariant #23 (#r156):** EAT immutability is CID-chain anchored to Ethereum. Physical persistence on warm or cold tiers is operational. Cold archiving permissible when: resolved + challenges closed + escrows released + N_compact_grace passed.
+
+---
+
+## Open Questions for #r157+
+
+1. **Cold archive CID liveliness — Arweave vs IPFS:** Arweave guarantees permanent storage via endowment model; IPFS relies on pin-service availability. For mechanism disputes requiring EAT proof, cold archive availability must be non-negotiable. Should the protocol require Arweave over IPFS, or define a multi-provider redundancy requirement?
+
+2. **T_wind_down_max and LTRP_seed joint calibration:** T_wind_down_max and `wind_down_assumption_factor` must be calibrated together. The larger T_wind_down_max is relative to T_longtail, the more tail exposure accumulates in LTRP. Define the joint calibration formula and governance UI presentation.
+
+3. **Cross-coordinate alignment pools for mode_mismatch_discount:** Multiple coordinate classes sharing the same oracle type (e.g., several financial rate coordinates resolved by AAVE) could pool alignment samples. Pooled sample reaches N_align_window faster. Is this epistemically valid — same oracle, different coordinate semantics?
+
+4. **EAT compaction eligibility re-evaluation after governance parameter changes:** If governance oscillates min_chain_weight_fraction and reactivates previously truncated declarations, a "settled" epoch may re-acquire active obligations. Must compaction eligibility be re-evaluated after any governance parameter change that could reactivate resolved claims?
+
+*Last updated: #r156 — 2026-04-03T23:42Z*
