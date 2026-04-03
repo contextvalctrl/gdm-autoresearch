@@ -713,4 +713,124 @@ T3_escrow_longtail = α_longtail × T3_escrow_standard
 
 4. **T3_outage_lockup_cap:** A T3 installation completed one micro-epoch before DA outage has its challenge window tolled for the entire outage duration. For a multi-day outage, this creates unexpected capital lockup on a closed installation. Should there be a T3_outage_lockup_cap: if outage exceeds T_outage_max, release standard escrow and treat the excess window as non-slash-eligible?
 
-*Last updated: #r130 — 2026-04-03T16:52Z*
+*Last updated: #r131 — 2026-04-03T17:52Z*
+
+---
+
+## #r131 Contributions — 2026-04-03T17:52Z
+
+Addresses all four open questions from #r130.
+
+**Q1 (LTRP bootstrapping at genesis) → Governance seed + Phase-1 α_longtail=1.0 until pool self-sufficient (#r131):**
+
+New slow-oracle class has empty LTRP at genesis. Early oracle resolution (before pool accumulates) would leave retroactive slash obligations unsatisfied. Analogous to challenger subsidy pool genesis (#r69 bootstrap protocol): governance seeds the LTRP at class registration.
+
+**Resolution — hybrid seed + Phase-1 escrow hardening:**
+- Governance seeds LTRP at class registration: `LTRP_seed = min(governance_reserve_cap, expected_first_resolution_slash_exposure)`. Expected slash exposure estimated from: oracle_resolution_p50_latency × T3_participation_forecast × avg_stake × expected_miss_rate. Both oracle_resolution_p50_latency and expected_miss_rate are governance-submitted at registration; subject to retrospective correction (governance bears loss if estimates are off).
+- Phase-1 bootstrap epoch uses `α_longtail = 1.0` — all T3 escrow is longtail during Phase 1; zero standard release until LTRP reaches self-sufficiency threshold.
+- Self-sufficiency threshold: `LTRP_balance ≥ LTRP_seed × 2`. When crossed, α_longtail reverts to class-formula value and governance seed begins recovery.
+- Governance seed recovery: prorated from LTRP contributions as pool grows; fully recovered before any longtail distribution to knowers.
+
+**Design law (#r131/Q1):** Any coordinate class feature with unbounded retroactive liability requires a coverage seed at genesis (consistent with #r130 pool-reserve design principle). Governance seed is recoverable — it is a loan to the mechanism, not a subsidy. (#r131)
+
+---
+
+**Q2 (LTRP and TOWL capacity) → LTRP is a protocol-level buffer; does NOT count toward per-claim TOWL (#r131):**
+
+TOWL capacity accounting requires per-claim escrow attribution (established through #r70/#r71). LTRP is a shared coordinate-class pool: contributions from many claims, not individually attributable. Mixing pool-level reserves into per-claim TOWL accounting would break the attribution model.
+
+**Resolution — separate LTRP buffer layer, not TOWL-counted:**
+
+LTRP does NOT contribute to per-claim TOWL capacity calculations. Standard-escrow-only TOWL remains the operative model (conservative — no credit for pool reserves).
+
+LTRP is reported as a protocol-level buffer in a separate `LTRP_status` output alongside TOWL zone reports:
+```
+LTRP_status(class_i) = {
+  pool_balance:         current LTRP balance
+  seed_recovered_pct:  governance seed recovery progress
+  coverage_ratio:       pool_balance / (open_T3_longtail_exposure × α_longtail)
+  sufficiency_flag:     GREEN | YELLOW | RED
+}
+```
+
+TOWL Zone transitions remain driven by standard escrow only. LTRP underpins retroactive slash capacity independently.
+
+**Why not count LTRP toward TOWL:** When standard escrow releases (T3 installation fully warranted), TOWL capacity drops. This is correct — the installation obligation is over. LTRP covers only the residual long-tail retroactive slash risk, which is a separate, lower-severity liability category from in-warranty claims. Conflating them would artificially inflate Zone A headroom and mask real TOWL risk.
+
+**New design law (#r131/Q2):** Pool-level shared reserves create a protocol-level buffer, reported separately from TOWL. No pool contribution ever counts as per-claim TOWL capacity. This principle applies to all future shared-pool features. (#r131)
+
+---
+
+**Q3 (Provisional score front-running at DA restore) → One-epoch epistemic bridge at DA restore (#r131):**
+
+On DA restore, degraded_mode_provisional scores are refined at the next macro-epoch boundary. Between DA restore event and that boundary, participants who submitted high-quality claims during the outage may predict their score will improve and adjust positions accordingly. The attack window = 1 micro-epoch (DA restore → macro-epoch close).
+
+**Analysis of predictability:** An individual claimant knows their own claim quality but not others'. Net score landscape shift is unpredictable in the aggregate. However, if a coordinated group of knowers submitted high-quality claims during outage, they have collective knowledge of the upward shift in their credibility scores and can collectively front-run the refined S_cred publication.
+
+**Mitigation: one-epoch epistemic bridge (#r131):**
+
+On DA restore, the first post-restore macro-epoch runs with `κ_bridge = max(κ_class, 1.5)` — a partially-elevated decay even though DA is live. This has two effects:
+1. Refined provisional scores are published at the start of the bridge epoch but their effective_weight is reduced.
+2. The clearing feed remains at slightly-stale S_cred (consistent with #r71 one-epoch buffer) — the buffer absorbs the refinement.
+
+By the second post-restore macro-epoch, bridge epoch is closed, κ returns to κ_class, and refined scores propagate at full weight. The bridge epoch converts the DA-restore event from a single discontinuous score step into a two-epoch ramp.
+
+**Note:** One-epoch buffer from #r71/Q4 provides some dampening but is insufficient alone — it prevents S_cred-to-clearing front-running but not credibility-score front-running affecting future claim weight. The bridge epoch closes this residual gap.
+
+**Interaction with κ_degraded (#r129):** Bridge epoch κ_bridge ≥ 1.5 applies only when κ_degraded was active immediately prior. If outage was very short (< 1 micro-epoch), κ_degraded was never triggered and bridge epoch is skipped (no meaningful provisional state accumulated). Trigger condition: bridge epoch required iff degraded_mode_provisional scores were published during the outage (at least one macro-epoch boundary passed in degraded mode). (#r131)
+
+---
+
+**Q4 (T3_outage_lockup_cap) → LTRP assumption of locked challenge window at T_outage_max (#r131):**
+
+A T3 installation whose challenge window is tolled across a full multi-day DA outage faces unexpected indefinite capital lockup — challenge window purpose (dispute-with-evidence) is already suspended during outage. Tolling preserves dispute integrity but imposes unbounded capital cost on knowers.
+
+**Resolution — T3_outage_lockup_cap with LTRP assumption:**
+
+If outage duration ≥ `T_outage_cap = max(2 × challenge_window_class, T_longtail / 3)`:
+1. Standard escrow is released on normal schedule from T_outage_cap forward (challenge window does not resume for that installation).
+2. Protocol marks the installation as `challenge_window_outage_expired = true`.
+3. Retroactive slash obligation for such installations transfers to LTRP from T_outage_cap forward.
+
+`T_outage_cap` is a per-class parameter, set at registration alongside `T_longtail`. Default: `2 × challenge_window_length`.
+
+**LTRP sufficiency impact:** This increases LTRP's effective coverage obligation. At class registration, governance must account for T3 installations whose challenge windows may be LTRP-assumed in the expected-miss-rate calculation for LTRP_seed. Specifically: `outage_assumed_slash_factor` is added to LTRP_seed formula:
+
+```
+LTRP_seed_adjusted = LTRP_seed × (1 + outage_assumed_slash_factor)
+outage_assumed_slash_factor ∈ [0.1, 0.3] (governance, per class)
+```
+
+**Why not just keep challenge window tolled indefinitely:** Tolling was designed for dispute integrity, not to create an instrument for indefinite lockup. The challenge window is already purposeless during DA outage. Bounded tolling (up to T_outage_cap) is sufficient for the dispute-integrity goal while capping capital lockup risk.
+
+**Interaction with LTRP genesis (#r131/Q1):** T_outage_lockup_cap obligation feeds back into LTRP_seed sizing — the two parameters must be calibrated together at class registration. Governance UI should surface both, warn on any configuration where LTRP_seed < expected_outage_slash_exposure. (#r131)
+
+---
+
+## Structural Synthesis: Bounded-Liability Architecture (#r131)
+
+Three distinct time-horizon liability patterns now fully specified:
+
+| Liability horizon | Mechanism | Capital treatment | TOWL |
+|---|---|---|---|
+| In-warranty (fast oracle) | Standard escrow release + challenge window | Per-claim, TOWL-counted | Yes |
+| Long-tail (slow oracle) | LTRP via T3_escrow_longtail | Pool-level, TOWL-separate | LTRP buffer |
+| Outage-suspended (extended DA failure) | LTRP assumption at T_outage_cap | Pool-level, TOWL-separate | LTRP buffer |
+
+Each tier has a bounded individual lockup horizon. Each tier has a pool-level backstop. The mechanism has no infinite-lockup obligations for any individual participant. Governance seeds each pool at class registration; seeds are loans recovered as pools self-fund.
+
+**Design law synthesis (#r131):** Every mechanism feature introducing time-unbounded individual liability MUST be decomposed into: (1) a bounded individual lockup window, and (2) a protocol-level shared pool absorbing residual liability after that window. This is now a formal first-class mechanism invariant, building on the #r130 design law. (#r131)
+
+---
+
+## Open Questions for #r132+
+
+1. **LTRP multi-class spillover:** LTRP is per-coordinate-class (#r130). If a claim is multi-class (implication chains spanning different classes), which class's LTRP absorbs the retroactive slash? Proportional split by α_longtail contribution per class? Or primary class only?
+
+2. **Bridge epoch + implication bonus interaction:** During the bridge epoch, effective_weight is reduced by κ_bridge. Implication bonus β is calibrated relative to base slot reward. If base slot reward drops (lower effective weight → lower query fee payout during bridge), does β_effective drift out of bounds and trigger the clamp? Should the bridge epoch be excluded from the N_calibration rolling window?
+
+3. **Governance seed miscalibration recovery:** If oracle_resolution_p50_latency submitted at registration is materially wrong (e.g., class turns out to resolve 10× faster than estimated), LTRP_seed is over-allocated and governance recovery is delayed. Is there a governance recall mechanism — can governance reduce LTRP_seed proactively if pool is clearly over-seeded?
+
+4. **T3_outage_cap interaction with T3 provisional install FSM (#r71):** A T3 provisional install (claim in pending oracle state) whose oracle window overlaps with a DA outage — does T_provisional_max tolling interact with T_outage_cap? Both are tolled independently; they could produce additive lockup. Define the maximum combined tolled lockup explicitly.
+
+*Last updated: #r131 — 2026-04-03T17:52Z*
