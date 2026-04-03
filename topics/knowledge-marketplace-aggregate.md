@@ -2613,3 +2613,112 @@ With the γ_escrow_excess classification, the escrow taxonomy from #r133 gains a
 4. **ρ_effective and the combined α_cap formula at the extremes of T_longtail_ref:** For extremely long T_longtail (e.g., T_longtail_ref = 1000 macro-epochs at ρ_effective = 0.005), α_cap = (0.005 × 1000) / β_effective = 5.0 / β_effective. At β_effective = 2.5 (β_max), α_cap = 2.0 — well above α_max = 0.5. The clamp absorbs this correctly (α_cap = α_max). But the clamp-binding duration would be permanent for very long T_longtail classes — governance would always see the β_effective clamp alert for these classes. Is there a T_longtail_ref governance ceiling to prevent extreme lockup horizons from permanently pinning α_cap at α_max?
 
 *Last updated: #r146 — 2026-04-03T22:02Z*
+
+---
+
+## #r147 Contributions — 2026-04-03T22:12Z
+
+Addresses all four open questions from #r146.
+
+**Q1 (ρ_source during bridge epoch — ρ_smooth and β_effective independence) → Independent smoothers; ρ_smooth advances normally during bridge (#r147):**
+
+β_effective uses a rolling average of epoch-level base slot rewards (#r76/Q3). This input is suppressed during bridge epochs (κ_bridge artificially reduces effective_weight → reduces base reward → distorts the average). Therefore bridge epochs are excluded from the β_effective rolling window (#r132/Q2).
+
+ρ_smooth uses TWAP observations of a DeFi market rate (#r143/Q1, #r144/Q1). This input is sourced from an independent oracle (e.g., AAVE USDC supply APY TWAP on Ethereum mainnet) — not derived from epoch reward data. DA availability is the only prerequisite; bridge epoch status is not relevant.
+
+**Resolution:** ρ_smooth advances normally during bridge epochs. ρ_source = `TWAP_market` throughout the bridge epoch (DA is live; TWAP observations are available). No bridge-epoch exclusion for ρ_smooth.
+
+**Design law (#r147):** Each rolling window excludes epochs where its *specific input type* is distorted. Independent input streams from different oracle sources are not excluded on behalf of each other. Any new smoothed parameter must declare its input source and its specific distortion condition at feature design time.
+
+**Interaction with α_cap during bridge:** β_effective is published from the most recent N_calibration normal-mode window (pre-bridge value, shorter window if needed). ρ_smooth uses the current bridge-epoch TWAP. The resulting α_cap may differ slightly from the pre-outage value; published with `ρ_source: TWAP_market` and `β_effective_source: N_calibration_window_short` for auditor visibility. Transient asymmetry — resolves within one bridge epoch. (#r147)
+
+---
+
+**Q2 (γ_escrow_excess and debt withholding) → Proportional scaling with β_escrow_net; no separate withholding policy (#r147):**
+
+γ_escrow_excess is defined as `0.4 × β_escrow` (γ_escrow_multiplier − 1 = 0.4, from #r145/Q1). It is not an independent capital commitment — it is a multiplicative overlay on β_escrow.
+
+**Resolution:** Debt withholding applies to β_escrow at rate `debt_withholding_rate` (#r134/Q2). γ_escrow_excess scales automatically:
+
+```
+β_escrow_net        = β_escrow × (1 − debt_withholding_rate)
+γ_escrow_excess_net = 0.4 × β_escrow_net
+implication_bonus_escrow_net = 1.4 × β_escrow_net
+```
+
+The maximum bonus total at settlement:
+```
+bonus_total_max ≤ (α_max + (1 − α_min)) × β_escrow_net = 1.4 × β_escrow_net = implication_bonus_escrow_net
+```
+
+γ_escrow_excess remains correctly sized relative to the withheld β_escrow_net. No under-funding risk. No separate withholding formula required.
+
+**Design law (#r147):** A pre-funding buffer defined as a fixed multiple of a nominal escrow component inherits the same withholding/scaling treatment as the nominal component. No independent withholding formula for any (multiplier − 1) × nominal_escrow pre-funding construct is required or appropriate. (#r147)
+
+---
+
+**Q3 (Zone C and β_escrow mid-life — release deferral vs installation throttling) → Lifecycle-stage separation: Zone C throttles new installations; existing outflows follow class-local deferral rule (#r147):**
+
+Two orthogonal Zone C effects on implication declarations:
+
+1. **New installations (Zone C throttling):** Zone C throttles new T3 claim installations (#r71). New implication declarations cannot enter active-warrant state during Zone C. No new β_escrow is locked for throttled declarations.
+
+2. **Existing mid-life declarations (class-local outflow deferral):** The class-local Zone C outflow deferral rule (#r134/Q4, extended to β_escrow per #r146) defers *releases* from existing implication_bonus_escrow during class-level Zone C. This defers the bonus payment timing without changing the bonus amount.
+
+**Resolution:** No contradiction — Zone C operates at two lifecycle stages independently. Zone C deferral is an operational timing rule, not a retroactive change to declared terms. The declaration's core terms (α_cap_at_declaration, β_escrow_net, lockup horizon) are unchanged. On Zone C exit, deferred releases are processed in EAT timestamp order at the first macro-epoch boundary.
+
+**Anti-retroactive protection:** Zone C deferral cannot change the *amount* of bonus owed. If a class remains in Zone C indefinitely, the bonus deferral accrues without expiry. The amount is protected; only timing is affected.
+
+**Design law (#r147):** Zone C has two orthogonal operational modes: (1) new-installation throttling (forward-looking, blocks new lockup), (2) existing-escrow outflow deferral (operational timing, defers not denies). Zone C defers; it never reduces. Amount is protected; timing is operational. (#r147)
+
+---
+
+**Q4 (T_longtail_ref saturation — α_cap permanently clamped at α_max) → Registration warning flag; β_clamp recurring alert suppressed; no hard block (#r147):**
+
+The saturation threshold:
+```
+T_longtail_alpha_sat = (α_max × β_max) / ρ_floor
+```
+
+At recommended defaults (α_max=0.5, β_max=2.5, ρ_floor=0.002):
+```
+T_longtail_alpha_sat = (0.5 × 2.5) / 0.002 = 625 macro-epochs
+```
+
+For classes where T_longtail_class > T_longtail_alpha_sat, α_cap is permanently clamped at α_max regardless of β_effective.
+
+**Resolution — registration-time warning flag, no hard block:**
+
+At class registration, if `T_longtail_class > T_longtail_alpha_sat`, the protocol emits a `T_longtail_alpha_saturation` warning in the registration EAT event with fields: `T_longtail_alpha_sat_value`, `T_longtail_submitted`, consequence string, and `permanent_β_clamp_alert: true`.
+
+The registration is NOT blocked. A very slow oracle class (e.g., decadal epidemiological outcomes, multi-year litigation) may legitimately require T_longtail > T_longtail_alpha_sat; permanent α_cap = α_max (maximum capital compensation) is the correct incentive for multi-year capital lockup. Governance accepts this as an explicit design choice.
+
+**β_effective clamp recurring alert suppression:** For saturated classes, the β_effective clamp alert (#r129/Q4) would permanently fire regardless of calibration quality. This is noise. For classes with `T_longtail_alpha_saturation.flag = true`, the β_effective clamp recurring alert is suppressed at the governance alert layer — replaced by the single at-registration acknowledgment. The clamp is still enforced mechanically; only the alert is silenced.
+
+**Design law (#r147):** Governance parameters that permanently saturate derived outputs should emit a one-time registration warning, not a recurring operational alert. Saturation is a legitimate extreme-value policy choice with defined and accepted consequences — not a miscalibration. Document at registration; silence the noise. (#r147)
+
+---
+
+## Structural Synthesis: Mechanism Parameter System — Complete (#r147)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| ρ_smooth during bridge epoch | Advances normally; independent of β_effective rolling window | Each smoother excludes only its own distorted input epochs |
+| γ_escrow_excess debt withholding | Proportional scaling with β_escrow_net; no separate policy | Pre-funding multiples inherit nominal's withholding treatment |
+| Zone C vs existing mid-life escrow | Two orthogonal modes: new-installation throttle + existing outflow deferral | Zone C defers, never denies; amount protected; timing is operational |
+| T_longtail_ref saturation | Registration warning; β_clamp alert suppressed; no hard block | Permanent saturation is policy, not error; document once at registration |
+
+**Complete mechanism design invariant set (#r147, accumulated across #r1–#r147):**
+
+1. **Conserved quantity (WED):** Mechanism minimises Warranted Epistemic Debt. Capital routes to high-D×A×P coordinates. (#r69)
+2. **Bounded individual liability:** Every unbounded lockup → bounded window + protocol pool backstop. (#r130–#r132)
+3. **Escrow orthogonality:** TOWL (financial) and credibility_ratio (epistemic) channels never cross-contaminate. (#r144)
+4. **Epoch-indexed vs wall-clock deadlines:** Explicit classification at feature design time; epoch-indexed auto-freeze; wall-clock explicit toll. (#r137–#r139)
+5. **Static escrow, dynamic epistemic:** Capital committed at declaration fixed; S_cred contribution dynamically re-derived each epoch. (#r137)
+6. **Pre-fund at maximum possible:** Bonus escrow funded at 1.4× β_escrow. Excess returned in full without tax. (#r145, #r146)
+7. **All parameters derived from primitives:** No steady-state parameter is governance-set by direct numeric fiat. (#r144, #r145)
+8. **Exceptional-mode calibration exclusion:** Only distorted-input epochs excluded from each specific rolling window. Independent inputs advance normally. (#r132, #r147)
+9. **Zone C defers, never denies:** Zone C may defer escrow release timing; bonus amount is always protected. (#r147)
+10. **Saturation is policy, not error:** Parameters that permanently saturate derived outputs → one-time registration warning; recurring operational alerts suppressed. (#r147)
+
+*Last updated: #r147 — 2026-04-03T22:12Z*
