@@ -2244,3 +2244,136 @@ With #r143, all primary bonus and calibration parameters now have:
 4. **`parameter_genesis_exit` timing and in-flight declarations:** When α_cap transitions from α_max to derived formula, in-flight declarations (submitted during Phase-1/bootstrap with α_cap = α_max locked in their escrow computation) should be grandfathered at α_max for their full duration, or should they immediately switch to derived α_cap? Grandfathering is more predictable; immediate switch is more capital-efficient for the protocol.
 
 *Last updated: #r143 — 2026-04-03T21:32Z*
+
+---
+
+## #r144 Contributions — 2026-04-03T21:42Z
+
+Addresses all four open questions from #r143.
+
+**Q1 (ρ_market oracle source governance) → TWAP-based single source + EMA double-smoothing; multi-source not required (#r144):**
+
+The concern: a spot-sampled DeFi rate (e.g., AAVE USDC supply APY) can be flash-driven to extreme values within a single epoch, distorting ρ_smooth and hence α_cap. The standard defense is multi-source median, but this adds oracle aggregation complexity.
+
+**Resolution — TWAP-sourced single oracle + EMA layering:**
+
+```
+ρ_market(t) = TWAP(reference_rate_oracle, T_twap)
+T_twap = max(24h, micro_epoch_length × 2)
+```
+
+The 24h TWAP eliminates within-epoch manipulation: maintaining an artificially inflated/depressed rate across a full TWAP window requires holding the capital position for 24h+, at a cost that far exceeds any achievable α_cap distortion benefit. The outer EMA smoother (N_ρ = 12 macro-epochs, #r143/Q1) then eliminates multi-epoch drift manipulation — a sustained distortion attempt must maintain the fake rate for 12 epochs to move α_cap by more than a few percentage points.
+
+**Why multi-source median is not required:** The TWAP + EMA combination provides double-layer time-averaging protection that is structurally equivalent to multi-source spatial averaging in terms of manipulation resistance. Adding source diversity without time-averaging would be less effective (individual source rates can still be manipulated spot). The governance-settable ρ_floor and ρ_ceil clamps provide the final backstop regardless.
+
+**Oracle source specification:** The rate oracle is governance-registered at class genesis alongside the staleness_window and κ parameters. Protocol defaults to a recognized DeFi lending protocol rate (e.g., AAVE V3 USDC supply APY on Ethereum mainnet). Alternative rate sources require governance proposal. Single trusted source is sufficient given the TWAP + EMA + clamp triple defense.
+
+**Governance interface addition:** (N_ρ, ρ_floor, ρ_ceil, **T_twap**, rate_oracle_address) → ρ_effective computed. T_twap is per-class (short-macro-epoch classes may use shorter TWAP floors; minimum T_twap = max(24h, 2 × micro_epoch_length) holds). (#r144)
+
+---
+
+**Q2 (`partial_forfeiture_pending` and B-side TOWL capacity) → TOWL unchanged; epistemic signal propagates via credibility_ratio only (#r144):**
+
+After a successful A-coordinate partial challenge, the declaration enters `partial_forfeiture_pending`. B-side escrow remains intact. The question: should B's TOWL contribution be discounted to reflect the knower's demonstrated A-side unreliability?
+
+**Analysis:** Two channels carry epistemic reliability signals in the mechanism:
+
+1. **Financial channel (TOWL):** The escrow commitment is the financial warranty. It is the capacity of the knower's locked capital to cover B's warranty obligation. A wrong A-claim does not reduce B-side escrow — the capital is still locked and still backs B.
+
+2. **Epistemic channel (credibility_ratio + w_a):** A wrong A-claim updates the knower's credibility_ratio track record downward. This reduces `w_a = C_a × log(1 + k_a)` for all future B-contributions. S_cred weight for B's coordinate is already lower from the next epoch forward. The epistemic signal propagates correctly through the existing mechanism.
+
+**Resolution:** B-side TOWL contribution is unchanged during `partial_forfeiture_pending`. The escrow is intact; the warranty is intact. Retroactively discounting TOWL for a neighbouring coordinate failure would conflate the financial and epistemic channels — creating a compound penalty where one event simultaneously reduces both epistemic influence (via credibility_ratio) and financial warranty capacity (via TOWL discount). This double-counting is incorrect and could cascade: TOWL capacity reduction triggers Zone C stress, which triggers further throttling, based on a wrong A-claim that is entirely irrelevant to B's financial backing.
+
+**Design law confirmed and extended (#r144):** The orthogonality of TOWL (financial) and credibility_ratio (epistemic) is not merely a separation-of-concerns preference — it is a stability requirement. Conflating the channels creates recursive stress amplification where an epistemic failure causes a financial solvency signal. Every mechanism feature must route epistemic quality signals through credibility_ratio and financial solvency signals through TOWL. No cross-channel leakage. (#r144)
+
+---
+
+**Q3 (EMA initialization — stay at α_max until N_ρ epochs, or rely on convergence?) → Both conditions required before α_cap transitions; α_max during entire bootstrap (#r144):**
+
+The EMA's built-in convergence provides decreasing variance over time, but the first few observations carry disproportionate weight in an early EMA. If early ρ_market observations happen to be abnormally low (loose capital market at genesis), derived α_cap would undershoot the opportunity-cost floor before the EMA has representative data.
+
+**Analysis:** The asymmetry matters:
+- α_max = 0.5 (default) is the *most protective* setting for declarants. A premature switch to derived α_cap during EMA initialization could produce α_cap < α_min if early ρ_market values are anomalous.
+- This is not a temporary nuisance — declarations made during the initialization window earn `bonus_capital_comp = α_cap_at_declaration × β_escrow × ...`. Under the static-commitment rule from Q4 below, a declaration made during under-initialized EMA carries that α_cap for its capital-comp component forever.
+
+**Resolution:** α_cap remains at α_max until BOTH conditions are simultaneously satisfied:
+1. ≥ N_calibration normal-mode macro-epochs closed (β_effective is stable, #r76/Q3)
+2. ≥ N_ρ ρ_market TWAP observations accumulated (ρ_smooth is past initialization window, #r143/Q1)
+
+This is structurally identical to the dual-condition α_cap transition established in #r143/Q4. The two conditions must be stated explicitly as a conjunction, not an either-or.
+
+**Practical consequence:** For a new coordinate class with macro_epoch = 1h, N_calibration = 4, N_ρ = 12: both conditions are met after max(4, 12) = 12 normal-mode macro-epochs. At a 1h macro-epoch cadence, this is 12 hours — a fast transition. For macro_epoch = 1 week, the transition takes max(4, 12) = 12 weeks — ensuring the EMA is genuinely representative before locking in the derived formula.
+
+**Epoch-indexed countdown:** The N_ρ counter advances only on normal-mode macro-epochs with a valid TWAP observation (no DA outage, no bridge epoch). Degraded-mode epochs do not advance the ρ_smooth initialization counter — consistent with the general rule that exceptional-mode epochs do not advance calibration windows (#r132/Q2). (#r144)
+
+---
+
+**Q4 (`parameter_genesis_exit` and in-flight declarations — grandfather or immediate switch) → Split treatment per bonus component; static commitment rule applies (#r144):**
+
+The bonus settlement formula has two components with fundamentally different update rules under the #r137 static-escrow/dynamic-epistemic design law:
+
+- `bonus_capital_comp`: compensates for capital *already locked*. This is a function of the economic commitment made at declaration time.
+- `bonus_epistemic_service`: compensates for ongoing epistemic service rendered over the claim's active life. This is a forward-looking evaluation computed at settlement.
+
+**Resolution — component-level α_cap commitment:**
+
+```
+bonus_capital_comp = α_cap_at_declaration × β_escrow × min(1, time_locked / T_longtail_ref)
+
+bonus_epistemic_service = (1 − α_cap_at_settlement) × β_escrow × (Σ eff_weight / Σ base_weight)
+```
+
+- `α_cap_at_declaration`: the α_cap value published in the EAT at the epoch the declaration was submitted. For declarations submitted during bootstrap (before `parameter_genesis_exit`), this is α_max = 0.5. This value is immutably committed to the EAT at declaration time and never changes.
+- `α_cap_at_settlement`: the α_cap value published in the EAT at the oracle resolution epoch. This is the current derived value — forward-looking.
+
+**Rationale:** The capital-comp component compensates for opportunity cost on capital *already locked* under the terms known at declaration. Changing α_cap retroactively for this component would violate the knower's commitment-time expectations — equivalent to changing an interest rate on a fixed-term deposit after lock-in. The epistemic-service component evaluates *current service*, which naturally uses current parameters.
+
+**Note on formula consistency:** The total bonus uses a split α_cap: capital-comp uses `α_cap_at_declaration`, epistemic-service uses `(1 − α_cap_at_settlement)`. These do not sum to 1 when the two α_cap values differ — the fractions overlap or leave a gap. This is intentional: the two components serve different economic purposes and are not required to partition the total bonus to exactly β_escrow. The maximum possible total bonus remains bounded by β_escrow × (max capital-comp ratio + max epistemic-service ratio) ≤ β_escrow × (α_max + (1 − α_min)) = β_escrow × 1.4 (at extremes). Governance must account for this when setting β_min/β_max to avoid protocol insolvency on bonus payments. Recommended addition to governance alert: if `α_cap_at_declaration − α_cap_at_settlement > 0.2` for ≥ 10% of active declarations in a window, flag for governance review (parameter drift may be distorting bonus incentives).
+
+**EAT record:** The declaration EAT record stores `α_cap_committed = α_cap_at_declaration`. The settlement EAT record stores `α_cap_settlement` and both component values. Bonus computation is fully auditable. (#r144)
+
+---
+
+## Structural Synthesis: Parameter Derivation Stack — Final Closure (#r144)
+
+With #r144, the parameter derivation stack is complete and all cross-parameter interactions are specified:
+
+| Feature | Resolution | Law |
+|---|---|---|
+| ρ_market manipulation defense | TWAP (24h) + EMA (N_ρ = 12) + clamp; no multi-source needed | Double time-averaging is equivalent to spatial multi-source for slowly-varying rate |
+| B-side TOWL during partial forfeiture | Unchanged; epistemic signal via credibility_ratio only | TOWL/credibility_ratio channel orthogonality is a stability requirement, not preference |
+| α_cap EMA initialization | Both N_calibration AND N_ρ required; α_max throughout both initialization windows | Dual-condition transition; partial initialization is unsafe for static-committed capital-comp |
+| In-flight declarations at genesis_exit | `α_cap_at_declaration` static for capital-comp; `α_cap_at_settlement` dynamic for epistemic-service | Static-commitment design law (#r137) applies at component level |
+
+**Bonus formula final form:**
+```
+bonus_capital_comp     = α_cap_at_declaration × β_escrow × min(1, time_locked / T_longtail_ref)
+bonus_epistemic_service = (1 − α_cap_at_settlement) × β_escrow × (Σ eff_weight / Σ base_weight)
+implication_bonus_total = bonus_capital_comp + bonus_epistemic_service
+```
+
+**Complete governance interface (final):**
+
+| Domain | Primitive inputs (governance-set) | Derived output (computed) |
+|---|---|---|
+| Chain depth | γ, K_target, d_ref, α_bond, N_calibration, β_min, β_max | β_effective |
+| Capital rate | N_ρ, ρ_floor, ρ_ceil, T_twap, rate_oracle_address | ρ_effective (via TWAP + EMA + clamp) |
+| Capital comp | (ρ_effective, T_longtail_ref) → α_cap formula; α_min, α_max | α_cap_at_declaration (static at commit); α_cap_at_settlement (live) |
+| Challenge fees | r_floor (per class), fee_fraction | challenge_fee (single/cross-class) |
+| LTRP stability | S_safety, M_stable (window_size, tolerance), K_recovery | LTRP_seed recall eligibility |
+
+No parameter in the above table is set by direct numeric governance fiat at steady state. All are derived from principled primitives or bounded by governance-set clamps.
+
+---
+
+## Open Questions for #r145+
+
+1. **α_cap split sum exceeds 1.0 — protocol bonus liability ceiling:** The final bonus formula allows `bonus_total > β_escrow` when `α_cap_at_declaration > α_cap_at_settlement` (capital-comp uses higher α, epistemic-service uses lower (1 − α)). At extremes, total bonus approaches β_escrow × 1.4. The protocol's implication_bonus_escrow is funded at `β_escrow` — not at 1.4× β_escrow. Does the settlement contract need to fund `implication_bonus_escrow` at 1.4× β_escrow to cover worst-case payouts, or should the formula be capped such that total bonus ≤ β_escrow?
+
+2. **ρ_effective and per-class T_longtail_ref:** α_cap is per-coordinate-class (it depends on T_longtail_class). ρ_effective is protocol-global (one EMA across all classes). For a protocol with both fast-oracle classes (T_longtail = 2 epochs) and slow-oracle classes (T_longtail = 200 epochs), a global ρ_effective produces wildly different α_cap values per class. Should ρ_effective remain global (simpler; consistent borrowing cost) or should each class derive its own ρ_effective (accurate; complex)?
+
+3. **Commitment of α_cap_at_declaration — when exactly?** The declaration EAT record stores `α_cap_committed`. At what point in the submission flow is this committed? If α_cap changes at a macro-epoch boundary and a declaration is submitted near that boundary (within the same epoch), which value is used — the α_cap at epoch open or the most recently computed value? This determines how declaration submission timing interacts with α_cap update events.
+
+4. **TWAP oracle availability at genesis:** New coordinate classes may be deployed before the designated rate oracle has accumulated T_twap of TWAP data (e.g., oracle freshly deployed alongside the class). During the initial T_twap window, there is no valid ρ_market observation. Is ρ_floor the correct default during the TWAP initialization period, or should it default to a governance-supplied estimate (which then transitions to TWAP once available)?
+
+*Last updated: #r144 — 2026-04-03T21:42Z*
