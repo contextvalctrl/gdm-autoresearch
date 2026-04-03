@@ -1774,3 +1774,94 @@ The bounded-liability architecture, escrow taxonomy, deadline catalog, and reser
 4. **Position counter persistence across governance threshold oscillations (#r139/Q2 adversarial case):** If min_chain_weight_fraction oscillates, contributors are truncated and reactivated. Their sequence position is preserved through reactivation. But if a contributor has been truncated for many epochs and all other contributors at that depth have churned (declarations expired), could the reactivating contributor return with a first-position claim that is stale (their original information was submitted years prior)? The position is preserved but the epistemic claim may no longer reflect current knowledge. A staleness discount on reactivating-contributor S_cred weight (beyond κ-based decay) may be warranted.
 
 *Last updated: #r139 — 2026-04-03T20:52Z*
+
+---
+
+## #r140 Contributions — 2026-04-03T21:02Z
+
+Addresses all four open questions from #r139.
+
+**Q1 (Zone C challenger reward pool solvency during mass-simultaneous challenges) → Per-challenge self-funding cap; challenger_pool as pre-payment buffer only (#r140):**
+
+Each challenge's reward is sourced first from that challenge's own slash proceeds at a capped fraction `r_challenger_cap` (governance-settable, default 0.25, bounded [0.1, 0.4]). The shared `challenger_pool` makes up only the gap between `r_floor` and `r_challenger_cap × slash` for small-slash cases.
+
+Priority order for a single challenge:
+```
+slash_proceeds:
+  → challenger_reward = min(r_challenger_cap × slash, r_floor_per_class)
+  → LTRP top-up (up to GREEN threshold gap)
+  → loser pool (remainder)
+challenger_pool top-up = max(0, r_floor − r_challenger_cap × slash)
+```
+
+For large slashes, pool draw is zero. Mass-challenge Zone C cannot deplete the pool faster than per-challenge top-up bounds allow. No per-challenge Zone C cap is needed — the fraction cap and floor model already bound pool exposure.
+
+**challenger_pool solvency monitoring:** Pattern from LTRP_status applied: coverage_ratio alert at YELLOW; if RED, `r_floor` temporarily degrades to `r_challenger_cap × avg_slash` (self-funding only; no pool draw) until governance replenishes. Challengers are never blocked; floor guarantee degrades temporarily during RED. (#r140)
+
+---
+
+**Q2 (Position-based vs credibility-weighted corroboration for reactivating contributors) → Position model maintained; orthogonality with S_cred weighting is the correct design (#r140):**
+
+Position ordering determines implication bonus distribution. Credibility weighting (w_a) determines S_cred influence. These serve orthogonal purposes and must not be coupled.
+
+Coupling would open an attack surface: a well-resourced adversary could suppress a competitor's credibility_ratio (via competing correct claims on other coordinates, diluting their log-score) to demote their sequence priority on a specific implication chain. Decoupling closes this. A reactivating contributor with lower credibility already earns lower S_cred influence via the weight formula — the epistemic output is correctly discounted without touching position rights. (#r140)
+
+---
+
+**Q3 (Bridge epoch length — per-class vs globally fixed) → "1 macro-epoch" is always per-class; prior implicit assumption made explicit (#r140):**
+
+```
+bridge_epoch_length(class_i) = 1 × macro_epoch_length(class_i)
+```
+
+No globally fixed duration. For a class with macro_epoch = 1h: bridge = 1h. For macro_epoch = 1 week: bridge = 1 week. The bridge epoch's purpose is one full S_cred → clearing feed propagation cycle; "one propagation cycle" is precisely one macro-epoch of the relevant class. A global fixed bridge would be too short for slow classes and unnecessarily conservative for fast ones.
+
+**Multi-class implication declarations:** Bridge epoch applies per-class independently. Clearing feed for class A uses A's bridge duration; for class B uses B's. No synchronization required between classes at bridge close.
+
+**Catalog update** (extending #r138 table):
+
+| Timer | Index type | Length |
+|---|---|---|
+| Bridge epoch duration | Epoch-indexed, per-class | 1 × macro_epoch_length(class_i) |
+
+Supersedes any "globally fixed" reading of #r131. (#r140)
+
+---
+
+**Q4 (Stale reactivating contributor — position counter persistence through threshold oscillations) → Already mitigated by κ-based staleness decay; no additional mechanism required (#r140):**
+
+For any claim with age_i ≫ staleness_window_i:
+```
+effective_weight ≈ base_weight × max(0, 1 − (age_i / staleness_window_i)^κ_i) → 0
+```
+
+S_cred influence is near-zero regardless of sequence position. Query fee share is also near-zero (pro-rata to effective_weight). The stale contributor's implication bonus is preserved (position-based, conditional on correct resolution) — this is appropriate reward for the original first-mover identification of the structural relationship. It does not distort the live state vector because the S_cred contribution is already bounded to zero by the staleness model.
+
+Governance threshold oscillation that selectively advantages a stale first-position contributor is publicly auditable via EAT (#r136/Q4 `parameter_rollback` records). No mechanism-level block is needed beyond auditability + staleness decay.
+
+**Design law confirmed (#r140):** Sequence position preservation through reactivation is safe when combined with staleness decay. Any mechanism feature that preserves a long-horizon commitment (position, credibility history, escrow) MUST have a corresponding time-decay or expiry on its epistemic output. When the decay exists, preservation of rights records is safe. (#r140)
+
+---
+
+## Structural Synthesis: Mechanism Closure State After #r140 (#r140)
+
+| Feature | Resolution | Confirming interaction |
+|---|---|---|
+| Zone C challenger reward pool | Self-funding fraction cap; shared pool is top-up buffer only | Bounded per-challenge exposure; no mass-drain risk |
+| Position vs credibility-weighted corroboration | Position model maintained; orthogonal to w_a | Decoupling closes adversarial credibility-position attack |
+| Bridge epoch length | Per-class (1 × macro_epoch_length); globally fixed reading superseded | Aligns with per-class macro-epoch framework (#r72) |
+| Stale reactivating contributor | Bounded by staleness decay alone; no additional mechanism | Position preservation + κ-decay are correct paired design |
+
+---
+
+## Open Questions for #r141+
+
+1. **Minimum viable challenge threshold:** During challenger_pool RED, reward floor degrades to self-funding only (`r_challenger_cap × slash`). For very small slashes, this may fall below economic incentive. Should a minimum slash magnitude gate challenge admission — below which challenges are not accepted — to avoid trivial-challenge noise clogging the mechanism?
+
+2. **Implication bonus vs epistemic contribution at resolution:** A stale first-position contributor resolves correct and earns full β bonus, but contributed near-zero S_cred signal. The bonus reward theory is "first to identify a structural relationship" (supports full bonus regardless of staleness) vs "epistemic contribution at resolution time" (supports staleness-discounted bonus). Which theory is correct, and does the answer depend on whether the bonus is framed as retrospective-information-credit or as forward-looking-epistemic-service?
+
+3. **Asymmetric per-class bridge state in cross-class implication declarations:** If class A (short macro_epoch) exits its bridge epoch while class B (long macro_epoch) is still in bridge, A's S_cred contribution to the cross-class declaration is live at κ_class(A) while B's S_cred weight is still suppressed at κ_bridge(B). Is this asymmetric state consistent, or does the cross-class declaration need a coordination rule (e.g., both classes must exit bridge before the combined declaration's implication bonus can be earned)?
+
+4. **Bonus reward theory — retrospective vs prospective:** Connects to Q2 above. The mechanism so far treats implication bonus as a retrospective reward for having correctly identified a structural relationship. An alternative: treat it as a prospective payment for epistemic service rendered to the clearing system during the claim's active life. Under the prospective model, a claim with near-zero active effective_weight delivered near-zero prospective service and should earn a staleness-discounted bonus. This is a deeper architectural question about what the bonus is paying for — resolve before implementing the bonus settlement contract.
+
+*Last updated: #r140 — 2026-04-03T21:02Z*
