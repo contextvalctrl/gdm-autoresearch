@@ -3211,6 +3211,147 @@ Settlement flow:
 
 ---
 
+## #r152 Contributions — 2026-04-03T23:02Z
+
+Addresses all four open questions from #r151. Adds one net-new structural insight: CLEARING_MODE as the natural production form closes two additional attack surfaces from DISCOVERY_MODE that were previously open.
+
+---
+
+**Q1 (S_mechanism vs S_oracle divergence — soft credibility recalibration) → oracle_override_weight parameter; divergence enters credibility_ratio at reduced weight (#r152):**
+
+An oracle override is not a knower quality failure in an individual instance. But systematic divergence — a knower whose S_cred contributions consistently differ from oracle final values — is a real miscalibration signal. The resolution must be calibrated between "no signal" (knower is never informed of divergence) and "full slash" (oracle override = quality failure).
+
+**Resolution — reduced-weight oracle override contribution to credibility_ratio:**
+
+```
+credibility_ratio_update_weight:
+  normal_claim_resolution:   weight = 1.0  (standard log-score)
+  oracle_settlement_override: weight = w_override (governance-settable, default 0.3, bounded [0.0, 0.6])
+```
+
+When an `oracle_settlement_override` fires, each knower whose claim contributed to S_mechanism(c) at T_anchor receives a log-score entry in their calibration history at weight `w_override`. If S_mechanism(c) was close to oracle_price: log-score is positive → small positive credibility_ratio update. If S_mechanism(c) was far from oracle_price: log-score is negative → small negative credibility_ratio update.
+
+**Properties:**
+1. A single override carries 0.3× the credibility signal of a normal resolved claim — minor effect on any individual override.
+2. Persistent divergence on the same coordinate class accumulates. After N override events, the knower's credibility_ratio reflects N × 0.3× log-score adjustments. A systematically wrong knower degrades over time without being slashed.
+3. Setting `w_override = 0` fully decouples oracle overrides from credibility tracking — valid policy choice for governance that treats oracle authority as categorically external.
+4. Upper bound `w_override ≤ 0.6` enforced at contract level: oracle override signals must not dominate credibility_ratio over normal resolved claims.
+
+**No slash, no capital event.** The soft signal is purely track-record-based. This preserves the oracle-authority/knower-attestor duality (#r151) while allowing the calibration layer to absorb persistent divergence patterns.
+
+**EAT record:** `oracle_settlement_override` event includes: `credibility_updates: [ {knower_a, log_score_delta, weight: w_override} for each active contributor ]`. (#r152)
+
+---
+
+**Q2 (SFP in DISCOVERY_MODE — is `oracle_settlement_override` CLEARING_MODE only?) → Yes; SFP and `oracle_settlement_override` are CLEARING_MODE-only constructs (#r152):**
+
+In pure DISCOVERY_MODE, there is no position registry and no T_finality event anchored to position settlement. Oracle resolution fires and knowers' calibration records are updated through the standard log-scoring path. There is no settlement price to contest, no pre-T_anchor position to register, and no financial stake differential between S_mechanism(c) and oracle_confirmed_value that creates SFP challenge incentives.
+
+**Resolution — formal mode scoping:**
+
+```
+oracle_settlement_override:   CLEARING_MODE only
+Settlement Freeze Protocol:   CLEARING_MODE only
+T_finality event:             CLEARING_MODE only
+challenge_type: settlement_finality:  CLEARING_MODE only
+
+DISCOVERY_MODE oracle resolution path:
+  oracle fires → standard log-score update → credibility_ratio updated → S(c) updated
+  No SFP, no challenge window, no settlement routing
+```
+
+**Consequence for DISCOVERY_MODE challenge design:** In DISCOVERY_MODE, all challenges are epistemic-type only. The `challenge_type` field in the challenge EAT record is always `epistemic` when `class_mode = DISCOVERY`. CLEARING_MODE classes may have both `epistemic` and `settlement_finality` challenge types.
+
+**Mode-scoping design law (#r152):** Features tied to the settlement-price lifecycle (SFP, `oracle_settlement_override`, `T_finality`, settlement_finality challenge type) must be explicitly scoped to CLEARING_MODE at feature design. DISCOVERY_MODE retains the simpler, oracle-as-calibration-update path. Any future feature that introduces a settlement dimension must declare its mode scope. (#r152)
+
+---
+
+**Q3 (`post_anchor_gaming` flag and Zone C auto-clear — attack path closed) → Zone C suspends auto-clear for settlement-finality flag reviews (#r152):**
+
+The attack path: adversary registers position during T_grace post-T_anchor → position flagged as `post_anchor_gaming` → governance is in Zone C (bandwidth stressed) → does not review within 1 macro-epoch → flag auto-clears → adversarial challenge proceeds.
+
+This attack leverages Zone C governance bandwidth degradation to force a challenge through that would otherwise be reviewed and blocked. It is most dangerous precisely when Zone C creates the highest financial pressure for settlement manipulation.
+
+**Resolution — Zone C suspends auto-clear for settlement-finality flag reviews:**
+
+```
+auto_clear_rule:
+  normal mode:   auto-clear after 1 macro-epoch of no governance action
+  Zone C mode:   auto-clear suspended; flag remains pending until Zone C exits
+                 THEN: auto-clear resumes standard 1 macro-epoch countdown
+```
+
+**Challenge right of flagged position during Zone C:** The flagged position's settlement-finality challenge right is deferred (not void) while Zone C is active. The challenge deadline advances from T_challenge_window_close at the same rate as other Zone C deferrals (#r151/Q1).
+
+**Non-Zone-C governance inaction:** If governance fails to review outside Zone C for > 1 macro-epoch, auto-clear fires as designed. The attack path only exists during Zone C — the standard auto-clear operates correctly in normal mode.
+
+**Legitimate grace-period registrant protection:** A legitimate counterparty caught in T_grace during Zone C also has their challenge right deferred — but they are not blocked. When Zone C exits: (1) flag enters 1-macro-epoch auto-clear countdown, (2) governance can review, (3) if governance clears or auto-clear fires, challenge proceeds normally. Legitimate parties only face additional delay (Zone C duration + 1 macro-epoch), not permanent exclusion.
+
+**EAT record:** `post_anchor_gaming` flag events record `auto_clear_suspended_zone_c: true/false` at flag creation. When Zone C exits, an `auto_clear_resumed` EAT event is emitted for all suspended flags. (#r152)
+
+---
+
+**Q4 (Failed SFP challenge fee routing — `challenger_pool` vs `settlement_reserve`) → Default: single `challenger_pool`; CLEARING_MODE classes may opt-in to dedicated `settlement_reserve` (#r152):**
+
+**Analysis:**
+
+Arguments for single pool:
+- `challenger_pool` already funds challengers on success and absorbs failed-challenge fees. Adding a second reserve doubles governance overhead (seeding, Zone C gating, coverage monitoring) for a feature distinction that matters operationally only if SFP challenge volume is significant.
+- Most CLEARING_MODE coordinate classes will have low SFP challenge frequency (settlement is typically uncontested). Dedicated reserve is over-engineered for rare events.
+
+Arguments for dedicated reserve:
+- SFP failed-challenge fees represent settlement-gaming costs, not epistemic quality costs. Mixing them into `challenger_pool` means epistemic challengers' reward pool is fed partly by settlement-manipulation forfeitures — a semantic coupling that complicates pool health monitoring and governance accountability.
+- If SFP volumes are large (high-stakes clearing events), pool contamination could inflate `challenger_pool` in ways unrelated to epistemic challenge quality.
+
+**Resolution — default single pool with opt-in separation:**
+
+```
+Default (all CLEARING_MODE classes): SFP failed-challenge fees → `challenger_pool`
+  Simplest, no new reserve overhead.
+
+Opt-in at class registration: `settlement_reserve_enabled = true`
+  SFP failed-challenge fees → `settlement_reserve` (class-specific)
+  settlement_reserve governed by same rules as challenger_pool:
+    class-local Zone C gating, governance seed at registration, coverage monitoring
+  Opted-in classes report `settlement_reserve_status` separately from `LTRP_status`
+```
+
+**`settlement_reserve` as reserve category:** If opt-in is exercised, `settlement_reserve` is a class-local escrow-flow-sourced reserve — Zone C gated (#r137 design law: escrow-flow-sourced → class-gated). It does not count toward TOWL (pool-reserve design law, #r131/Q2). It is a fifth reserve category available to CLEARING_MODE classes that opt in.
+
+**Design law (#r152):** When two challenge types share a pool by default, pool separation is opt-in with full governance overhead inherited. Opt-in creates a named reserve category subject to the full reserve taxonomy. Default shared pools minimize overhead for common cases; separation is available for high-stakes classes that need clean accounting. (#r152)
+
+---
+
+## Net-New Structural Insight: CLEARING_MODE Closes Two DISCOVERY_MODE Attack Surfaces (#r152)
+
+The mode-scoping work from #r149–#r152 reveals that CLEARING_MODE is not merely a simplified form of the mechanism — it is a structurally superior threat model for two specific attacks that remain open in DISCOVERY_MODE:
+
+**Attack 1 — WED routing gaming:**
+In DISCOVERY_MODE, D(c) must be revealed via EQ escrow-conditioned queries (q_bonus/q_fee ratio). An adversary who controls the demand signal (e.g., a single large unknower) can manipulate which coordinates appear decision-critical by inflating q_bonus on low-stakes coordinates.
+In CLEARING_MODE: D(c) = Σ_positions |max_loss_if_wrong|. This is on-chain, position-registrar-verified, and cannot be inflated without registering real positions with real loss exposure. The attack requires real capital at risk, making it economically self-defeating.
+
+**Attack 2 — Calibration gaming through oracle selection:**
+In DISCOVERY_MODE, knowers optimise their credibility_ratio by selecting coordinates with predictable oracle resolutions (easy-to-be-right coordinates). High-D(c) coordinates may have uncertain oracles; knowers avoid them.
+In CLEARING_MODE: WED_clearing(c) directly ties base reward to registered position exposure. High-exposure clearing coordinates generate higher base rewards regardless of oracle predictability, anchoring knower incentives to where capital is actually at risk, not where oracle outcomes are easiest to predict.
+
+**Summary:** CLEARING_MODE replaces the EQ demand-signal machinery with on-chain position registry observation — simpler, more manipulation-resistant, and stronger epistemic incentive alignment. DISCOVERY_MODE is appropriate for exploratory or non-financial knowledge markets where no position registry exists. GestAlt v2.1 in CLEARING_MODE is the production-grade deployment of this mechanism. (#r152)
+
+---
+
+## Open Questions for #r153+
+
+1. **w_override calibration basis:** The default `w_override = 0.3` is reasoned but not formally derived. Analogous to σ_resolve governing min_q_bonus_ratio (#r150/Q1), could w_override be derived from the observed frequency of oracle overrides per coordinate class? If oracle overrides are rare (strong alignment between S_mechanism and oracle), w_override can be higher (more signal per event). If overrides are frequent (weak alignment), w_override should be lower to avoid credibility_ratio domination by noisy authority events.
+
+2. **Mode coexistence — single coordinate class in dual mode:** Can a coordinate class operate in both DISCOVERY_MODE and CLEARING_MODE simultaneously? Example: a new class with early exploratory participants (DISCOVERY) and a small position registry being bootstrapped (CLEARING). The mode transition (#r150/Q2) assumes a clean one-way switch. Is mixed-mode operation ever valid?
+
+3. **Zone C suspension of auto-clear — maximum deferral horizon:** Zone C may persist for multiple consecutive epochs in a stressed market. If auto-clear is suspended for the entire Zone C duration, a legitimate grace-period registrant's challenge right could be deferred indefinitely. Should there be a maximum Zone C auto-clear suspension horizon (e.g., 5 macro-epochs), after which auto-clear fires regardless of Zone C status?
+
+4. **settlement_reserve opt-in and LTRP interaction:** If a CLEARING_MODE class opts into `settlement_reserve`, it now has five class-specific pool categories: LTRP, challenger_pool, implication_bonus_escrow, debt_retirement_reserve (governance-global), and settlement_reserve. At class registration, governance must seed each pool appropriately. Is there a consolidated registration parameter for "total pool capital at genesis" distributed across pool categories by governance, or must each pool be seeded independently?
+
+*Last updated: #r152 — 2026-04-03T23:02Z*
+
+---
+
 ## #r151 Contributions — 2026-04-03T22:52Z
 
 Addresses all four open questions from #r150. Adds one net-new structural insight: the oracle-authority/knower-attestor duality as a formal design primitive.
