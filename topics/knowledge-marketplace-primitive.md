@@ -224,4 +224,127 @@ The product sold is: *a credibility-audited, privately delivered belief update*.
 
 ---
 
+---
+
+## R2 Additions — 2026-04-03
+
+### 2a. Incentive Compatibility — Proof Sketch (#r2)
+
+**Claim**: In SCM (§8), truthful reporting is a Bayes-Nash equilibrium under quadratic scoring.
+
+**Setup**: Informant i has private signal `s_i` which is a noisy observation of `θ*`. Their posterior is `P(θ*|s_i)` with mean `μ_i` and variance `v_i`. They choose reported claim `θ_i`.
+
+**Argument**:
+- Expected payout from W-pool: `E[W * (σ_i*R_i / Σσ*R) * (1 - (θ_i - θ*)² / max_err²)]`
+- The score is maximized in expectation when `θ_i = E[θ*|s_i] = μ_i`
+- This follows directly from the standard proper scoring rule result: for any proper scoring rule S(θ_i, θ*), `E[S(θ_i, θ*)] ≤ E[S(μ_i, θ*)]` with equality iff `θ_i = μ_i`
+- The stake-slash term `σ_i * (1 - score_i)` is also minimized in expectation by truth
+- Therefore combined `E[net_i]` is maximized by `θ_i = μ_i`
+
+**Caveat**: This holds for each informant *in isolation*. Strategic interaction between informants is not captured — if informant i can observe others' claims before posting, they can defect toward a consensus that maximizes their accuracy score against the aggregate rather than against truth. This is the herding problem. (#r2)
+
+**Defense against herding**: The claim window must close without informants observing each other's claims during posting. Sealed commitments + simultaneous reveal (as in PSS) enforces independent elicitation. This is why PSS is strictly better incentive-theoretically than the open-claim version in §8. (#r2, supersedes open-claim design in §8 as preferred structure)
+
+---
+
+### 2b. PSS Does Not Fully Solve the Free-Rider Problem (#r2)
+
+The r1 §10 PSS variant claims private delivery preserves D's payment incentive. This needs pressure-testing.
+
+**Scenario**: Two demanders D1 and D2 want the same θ*. D1 pays W; D2 waits. After resolution, D2 observes the oracle θ* directly and infers informant quality from the public slash/payout outcomes.
+
+**What D2 got for free**: Not the pre-resolution private prediction, but the post-resolution accuracy audit of each informant. Over time, D2 builds a reputation map of informants without paying. In future rounds, D2 will know which informants to weight highly and can free-ride on the credibility-building that D1's payments funded.
+
+**This is not just the standard free-rider problem — it is a temporal free-rider**. The product that degrades is not the prediction itself but the *reputation scoring infrastructure*. D1 pays to generate informant reputation data that D2 exploits in future rounds. (#r2)
+
+**Partial fix**: Reputation data is gated — informant history is only visible to staked participants (agents who have paid at least one W in the last N rounds). This makes reputation-access rivalrous, not free. (#r2)
+
+**Stronger fix**: Move to a *subscription model*. D pays a recurring W for access to the reputation-weighted aggregation service. Single-question pricing degrades to free-riding; subscriptions create alignment between D's continued interest and funding the reputation infrastructure. (#r2)
+
+---
+
+### 2c. Multi-Variable θ Extension (#r2)
+
+r1 treated θ as a scalar. Real systems have vector-valued state: `θ = (θ_1, θ_2, ..., θ_m)`.
+
+**Problem**: Informants have heterogeneous expertise. Informant A has signal on θ_1 but not θ_3. If they post a full vector claim, they are forced to fabricate values for variables they don't observe, polluting the aggregate.
+
+**Sparse claim mechanism**: Informants post *partial claims* — `(θ_j, σ_j)` for any subset of variables j. Stake is component-specific. State update is per-component:
+
+```
+S_new[j] = Σ_{i: j ∈ claim_i} θ_{i,j} * σ_{i,j} * R_{i,j} / Σ σ * R (per component)
+```
+
+Reputation `R_{i,j}` is tracked *per variable* per informant, not globally. An informant who is excellent at θ_1 and random at θ_3 accumulates high `R_{i,1}` and regresses toward 1.0 for `R_{i,3}`.
+
+**Key property**: Per-component reputation prevents cross-variable contamination of credibility. Informants are incentivized to only stake on variables where they have genuine signal. (#r2)
+
+**Open problem**: Correlated variables. If θ_1 and θ_2 are strongly correlated, an informant with signal on θ_1 has indirect signal on θ_2. The mechanism should detect this and allow informants to stake on implied components — or alternatively, compress the state vector via PCA and let informants claim on latent dimensions. This is an active research question. (#r2)
+
+---
+
+### 2d. Reputation Bootstrapping — Concrete Proposal (#r2)
+
+r1 flagged this as an open problem. Here is a concrete design:
+
+**Phase 0 — Genesis pool**: At protocol launch, N "seeded informants" are selected from an application pool. They receive a *genesis reputation bond* — a locked deposit (not stake) that serves as a reputational anchor. Their R is initialized at `R_genesis > 1` (e.g. 1.5) based on vetted track record. This is off-chain trust injected once.
+
+**Phase 1 — Cold start via calibration markets**: New (unproven) informants must first stake on publicly resolvable calibration questions — questions where the truth is known ex-ante to the protocol but not revealed to the informant. These are drawn from a library of past resolved events with delayed reveal dates. Accurate performance on calibration questions raises R from 1.0 toward 2.0 in a small number of rounds. (#r2)
+
+**Phase 2 — Decay and refresh**: Reputation decays toward 1.0 at rate δ per epoch if no claims are filed. This prevents reputation hoarding from a hot-streak followed by inactivity exploiting accumulated R in a future high-stakes claim. (#r2)
+
+**Sybil resistance property**: Reputation is not transferable. A high-R informant cannot sell their R to another agent. R is bound to the signing key + staking history. Creating a new sybil key resets R to 1.0. The economic value of R is only realized by the agent who built it, which makes R-building a costly (time+capital) investment not easily bootstrapped with new identities. (#r2)
+
+---
+
+### 2e. Design Space Positioning — Where Does SCM/PSS Sit? (#r2)
+
+A sharper characterization of the mechanism family:
+
+```
+Mechanism         | Conserved quantity  | Update trigger          | Information product       | Settlement
+------------------|---------------------|-------------------------|---------------------------|----------
+LMSR              | Cost function bound | Any capital flow        | Continuous probability    | PnL on positions
+Orderbook PM      | Order book depth    | Matched counterparty    | Market price              | P&L on fills
+Batch auction     | Aggregate demand    | Batch close             | Clearing price            | Position at uniform price
+Scoring rules     | Protocol budget     | Submitted report        | Elicited forecast         | Scoring payout
+SCM (§8)          | Total staked        | Asserted claim          | Credibility-weighted state| Stake redistribution
+PSS (§10/r2)      | Subscription pool   | Committed+revealed      | Private advisory + audit  | Stake + subscription fee
+```
+
+**Key distinctions**:
+- LMSR/orderbook/batch: capital moves price; price is the output. SCM/PSS: assertion moves state; credibility-audited belief is the output.
+- Scoring rules (Hanson's peer prediction, Bayesian truth serum) are the closest cousin. SCM is a *capital-backed scoring rule market with a demand side*. The demand side (D's payment W) is what scoring rules lack.
+- The canonical information market (Arrow-Debreu securities) maximizes allocative efficiency. SCM maximizes epistemic efficiency — getting the best available private signal into the aggregate. These are not the same objective. (#r2)
+
+**Revised framing**: SCM is not a prediction market. It is a *credibility-bonded epistemic auction*. The auctioned good is a credible state update. The auctioneer is the scoring rule. Capital is the bond that makes the auction work, not the primary exchange medium. (#r2)
+
+---
+
+### 2f. Killing the Weak Variants (#r2)
+
+r1 described three implicit design variants. Explicit kill analysis:
+
+**Variant A — Open-claim SCM (§8 as written)**: KILLED. Herding incentive breaks truthfulness. Informants observe each other's claims and anchor toward a median rather than posting independent signals. Replace with sealed-commit structure (PSS). (#r2)
+
+**Variant B — Public state-update PSS**: KILLED by temporal free-rider problem (§2b). If state vector updates are public post-resolution, reputation data is free. Subscription gating on reputation access is required for D's payment to remain incentive-compatible. (#r2)
+
+**Variant C — PSS with reputation gating + subscription**: SURVIVES. Core mechanism: sealed commit, private delivery to subscriber, per-component reputation, subscription-gated reputation access, stake-slash on resolution. This is the strongest surviving variant. (#r2)
+
+---
+
+### Updated Open Problems for #r3+
+
+1. **Correlation detection for wash-credibility** (carry from r1): How do you identify a cluster of sybil accounts building correlated fake reputation? Requires a correlation penalty on the effective-R computation.
+
+2. **Oracle staking mechanism**: How are oracle providers incentivized? They face the same credibility problem as informants, with the added risk that oracle manipulation directly impacts informant payoffs. A meta-oracle (oracle of oracles) collapses into infinite regress — need a termination condition.
+
+3. **Equilibrium welfare comparison**: Does PSS generate higher social welfare than LMSR on the same underlying information structure? Requires formal model. Prior expectation: PSS is better for asymmetric, private-signal environments; LMSR is better for shallow-information, many-agent environments where the crowd signal is strong.
+
+4. **Latency problem**: PSS delivers information after claim window closes. For time-sensitive questions, this may make the mechanism useless by the time D receives the aggregate. Explore: rolling claim windows, streaming PSS with partial early revelation, or express-lane claims at higher cost.
+
+5. **Composability**: Can SCM/PSS serve as a credibility oracle for an on-chain protocol? If GestAlt uses PSS to update its own state vector before batch auction clearing, does the credibility bond structure transfer any security guarantees to the clearing layer? (#r2)
+
+---
+
 *This document is cumulative. Each run adds net-new synthesis only. Superseded ideas are updated in-place with run reference tags.*

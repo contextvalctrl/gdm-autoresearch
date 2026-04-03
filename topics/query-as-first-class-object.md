@@ -1,70 +1,28 @@
-# GDM Knowledge Marketplace — #r69
-
-## Run metadata
-- Run: #r69
-- Date: 2026-04-03
-- Status: BLOCKED on Google Doc write (no gog auth / no Google credentials on host)
-- Prior run recovered from: Google Doc export (txt), last entry was #r68
-
-## Net-new reasoning for #r69
-
-**Theme: the conserved quantity problem — what is actually invariant in this mechanism?**
-
-The standing instruction has always asked: "what is the conserved quantity, what is the update rule, what is the source of truth, and why does capital improve epistemics rather than just reallocate PnL?"
-
-After 68 runs, the mechanism has accumulated a very rich state-schema — 10+ typed fields per coordinate — but has never formally named the conserved quantity. This is the gap #r69 addresses.
-
-### 1. Base primitive (#r69 contribution)
-The conserved quantity candidate is **decision-relevant epistemic coverage** (DREC) per coordinate, not capital and not probability mass. Capital in this mechanism is not conserved; it flows from low-information actors (demanders) to high-information actors (updaters, challengers) as payment for a service. What should be conserved — or at least non-decreasing over time — is the coverage of decision-relevant state: the fraction of the coordinate's applicability domain that is maintained inside the contracted error envelope under active warranty.
-
-This has a direct implication: the mechanism is not primarily a market for beliefs; it is a maintenance-of-coverage service. Capital enters only because maintenance has a cost and uncertainty about coverage creates a fee opportunity. The conserved object is "deployed warrant coverage over state space," not probability estimates or trading PnL.
-
-### 2. State model (#r69 contribution)
-The update rule should be: DREC(c, t+1) = DREC(c, t) + coverage_gain(new_update) − coverage_lost(expired_warranty) − coverage_voided(challenger_slash).
-
-An update that replaces stale coverage with fresher coverage does not increase net DREC unless it genuinely extends the domain or narrows the error envelope. A challenger that slashes an incumbent decreases DREC temporarily until a replacement is accepted — this is the cost of correction and should be minimized by making challenges fast and replacement seamless.
-
-This distinguishes the mechanism sharply from LMSR: in LMSR the conserved (or managed) object is the market maker's scoring-rule budget. Here the conserved object is coverage; the market maker's analog is the escrow pool that guarantees replacement continuity.
-
-### 3. Credibility model (#r69 contribution)
-Capital improves epistemics because DREC is expensive to manufacture: observation cadence, access rights, domain expertise, and challenge monitoring all cost real resources. A seller who posts stake is asserting "my coverage is genuine and I will defend it." The stake's epistemic function is to make DREC non-trivial to fake: without liability, anyone can claim coverage. With liability, coverage claims are bounded by the seller's willingness to underwrite them.
-
-The prior runs (#r18, #r22, #r25) identified that liability should scale with authority delta, capacity, and operative stakes. The #r69 addition: liability should also scale with the *area of DREC being claimed* — a large-domain update that covers more of the state space should require proportionally more escrow because the coverage claim is riskier and harder to defend.
-
-### 4. Market roles (#r69 contribution)
-No new roles, but a sharper payment logic: demanders pay proportionally to the DREC value they are consuming (how much of their decision space the coordinate covers, weighted by decision-loss sensitivity). Updaters earn proportionally to DREC delivered and maintained. Challengers earn the DREC recovery premium — the value of restoring coverage that was degraded by a failing incumbent. This framing makes the marketplace a DREC insurance and maintenance system rather than a betting market.
-
-### 5. Settlement model (#r69 contribution)
-When truth resolves: compare the DREC that was under warranty (contracted coverage) against the DREC that was actually delivered (realized coverage inside error envelope). Slash proportionally to coverage gap, not to point error. A seller who maintained wide intervals honestly but whose intervals contained the truth loses nothing; a seller who claimed narrow point coverage that missed loses proportionally to the gap between claimed precision and actual coverage.
-
-Partial observability: grade on sampled coverage verification. If truth is partially observed over a random sample of the coordinate's applicability domain, DREC can be estimated statistically. This is a significant advantage over binary prediction market resolution.
-
-### 6. Attack surface (#r69 contribution)
-The DREC framing opens a new attack: **coverage inflation** — sellers claim wide domains and loose error envelopes to make their warranty appear large while actually providing little information. Mitigant: DREC must be weighted by decision-relevance density (not flat domain area). A seller claiming coverage over a low-decision-density region earns little. This mirrors the issue in insurance markets where policies with huge nominal coverage over irrelevant risks are nearly worthless.
-
-Existing attacks from prior runs still apply. The #r69 addition is that sybil credibility and wash credibility attacks are specifically coverage-inflation variants.
-
-### 7. Better/worse than LMSR/orderbooks (#r69 contribution)
-LMSR manages a probability budget; it does not have a coverage concept. This mechanism manages a DREC budget: it can be explicit about *where* in the state space knowledge is thin, patchy, or stale. That is a stronger epistemic product for decision support because buyers can see the coverage map, not just a price signal. The cost is that DREC is harder to measure than price, and coverage audits require more institutional infrastructure than trade matching.
-
-### 8. Simplest viable mechanism sketch (#r69 contribution)
-Add a `drec_weight` field to each coordinate declaration: this is the buyer-declared decision-relevance density over the coordinate's applicability domain. Payment to the updater = installation fee × drec_weight × coverage_quality_score. Holdback = f(drec_weight, authority_tier, correction_latency). Challenger reward = DREC recovered × drec_weight.
-
-Minimal addition to existing schema: one field + one scoring function. No new roles.
-
-### 9. Strongest reason this fails (#r69 contribution)
-DREC is hard to measure objectively. Decision-relevance density requires the buyer to specify their utility function over state space, which they may not know precisely or may not reveal truthfully (strategic underreporting to reduce fees). Without a credible DREC measurement, the coverage framing collapses back into qualitative judgment.
-
-### 10. Best surviving variant (#r69 contribution)
-Use DREC only as a conceptual anchor for pricing and slashing logic, not as a precisely measured quantity. Approximate it with three coarse buckets: high decision-relevance (auto-binding or action-gating coordinates), medium (decision-support), low (advisory/observatory). Map holdback and slash rates to these buckets. The exact DREC formula is optional; the conceptual shift — that capital is buying coverage, not probability shares — is the durable contribution.
-
-(ref: #r69; integrates conserved-quantity thread from standing instructions; builds on #r1, #r4, #r8, #r9, #r18, #r22, #r25, #r31, #r32, #r33)
+# GDM Knowledge Marketplace — Run #r69
+# Staged for append to: https://docs.google.com/document/d/1Z1sbL9WgBHTxs-4YWlVZWfJy-ZsHwdPZu6qCuT_42e0/edit
 
 ---
 
-## Pending: Doc write blocked
+#r69 refinement — demand aggregation / the collective-action gap in coordinate procurement
 
-Need gog auth (OAuth credentials for team@valctrl.com) to write #r69 to:
-https://docs.google.com/document/d/1Z1sbL9WgBHTxs-4YWlVZWfJy-ZsHwdPZu6qCuT_42e0/edit
+The mechanism has treated demand as if a single buyer or a pre-coordinated buyer pool posts budget for each coordinate. But many of the most epistemically valuable coordinates are collectively wanted: each individual demander would benefit from accurate maintained state, but no single actor will unilaterally fund the full maintenance cost when others will free-ride on their payment. LMSR sidesteps this by letting open speculative trading implicitly subsidize market making; a knowledge marketplace that requires explicit demand posting has no equivalent automatic subsidy unless the procurement design handles multi-demander coordination directly.
 
-Action for Gaurav: run `gog auth add team@valctrl.com --services docs` on this host, or provide service account JSON.
+1. Base primitive: the exchanged object now has a demand-side structure too, not only a supply-side one. For broadly useful coordinates, the primitive is not just "buyer posts budget, seller maintains state under liability" but "a pool of partial-budget pledges — each conditional on sufficient aggregate funding — unlocks a maintained-state contract from a seller." Without this, the mechanism can only fund coordinates whose value concentrates in one buyer's hands enough to unilaterally justify the cost.
+
+2. State model: the global state vector should carry a demand structure per coordinate in addition to the schema fields accumulated across prior runs. For each coordinate: who has pledged budget (optionally blinded to other pledgers), what aggregate threshold unlocks procurement, and what happens to pledge escrow if the threshold is not met. The demand-aggregation rule is part of the coordinate definition, not an exogenous assumption.
+
+3. Credibility model: capital improves epistemics at the demand side only if pledges are credibly committed. A weak pledge mechanism — where demanders can free-ride by pledging a token amount and coasting on others — reproduces the public-goods problem inside the mechanism. Strong design: pledges are held in escrow, released back if threshold fails within a claim window, and burned if the demander misrepresents usage scope or reliance class in ways that let them appropriate private value while billing it as shared demand. Assurance contracts (à la dominant assurance) are one structural option: the auctioneer partially subsidizes failed rounds to make honest pledging individually rational.
+
+4. Market roles: add a demand aggregator or pledge pool coordinator role distinct from the buyer, updater, and challenger. This role can be mechanical (automated escrow clearing) or held by a protocol-defined contract. The coordinator does not install state; it clears procurement and routes budget to the winning seller contract. Note this role is different from a batch-auction market maker — it is not matching informed sellers against each other or against uninformed buyers; it is bundling dispersed demand into a fundable service contract.
+
+5. Settlement model: demand-aggregation failure is its own settlement class. If the funding threshold is not reached, pledges return (possibly with a small subsidy to honest pledgers per dominant assurance logic). If the threshold is reached, the coordinator installs the maintenance contract and distributes access rights to all pledgers per their dissemination scope. If truth reveals that individual pledgers secretly captured the state and should have paid a private-value price, they are slashable on the same credibility escrow logic as updaters.
+
+6. Attack surface: demand-side attacks are as dangerous as supply-side ones. (a) Fake demand: sock-puppet pledgers run up apparent demand to trigger procurement at sub-threshold cost, then extract the installed state privately. Defense: pledge identity verification or stake-weighted demand with sybil-resistant pledge size floors. (b) Demand suppression: buyers who would benefit coordinate to suppress pledging in hopes the auctioneer funds the coordinate as a public good anyway. Defense: strict no-free-ride: no pledge, no reliance right. (c) Threshold gaming: a single large buyer pledges just below threshold repeatedly, fishing for other pledgers to push them over without committing real budget. Defense: reveal aggregate pledge totals but not individual pledge amounts; use sealed-pledge first rounds. (d) Pledge manipulation: knowing the threshold, a sophisticated buyer pledges last to force through a coordinator they prefer while extracting subsidy from dominant assurance design. Defense: randomize or delay announcement of how close the pool is to threshold.
+
+7. Why better or worse than LMSR/orderbooks: LMSR's core strength here is implicit demand aggregation through open trading — speculative volume cross-subsidizes liquidity for broadly interesting questions even when no single actor is the obvious buyer. A knowledge marketplace is structurally weaker on this dimension unless demand-aggregation is explicit and well-designed. The tradeoff: LMSR's implicit cross-subsidy also funds noise, speculation, and coordinated manipulation. An explicit pledge mechanism procures exactly what demanders contractually want, with typed maintenance obligations, at the cost of needing coordination before any state is installed. Orderbooks are the worst of both worlds here: wide-interest markets are often illiquid because no one is obligated to make markets, while the knowledge marketplace at least lets demanders pool budget explicitly.
+
+8. Simplest viable mechanism sketch: add a demand pool per coordinate alongside the existing supply-side schema. Demanders post sealed pledges by a close time T_demand. If aggregate pledges ≥ R_min (minimum viable maintenance budget derived from expected seller cost + challenge reserve), the coordinator opens the supplier selection round. Sellers submit contracts for that coordinate; the coordinator picks the winner by the existing dominance rules. Procurement budget = aggregate pledges, routed net of coordinator fee. Failed rounds return pledges plus a small bonus (funded by a protocol subsidy pool, which earns from slash income on successful contracts). Each pledger gets a reliance right proportional to their pledge share. Non-pledgers may buy access to installed state at a secondary price, with proceeds flowing to the pledge pool as partial reimbursement.
+
+9. Strongest reason this idea fails: demand pooling reintroduces the oracle problem on the demand side — who verifies that pledgers have genuine need versus are themselves gaming the procurement? And dominant assurance mechanisms can be attacked by a well-capitalized adversary who pledges enough to trigger the subsidy, collects it, then repeats. The mechanism becomes an adversarial subsidy extraction game rather than a knowledge procurement system.
+
+10. Best surviving variant: restrict multi-demander pooling to coordinates where downstream reliance is observable and verifiable — e.g. on-chain systems that actually read the installed coordinate into protocol logic, or enterprise subscribers whose API calls are logged. In those cases, pledge credibility is partly proven by integration dependency: if you never call the coordinate, your pledge is suspect. Restrict dominant-assurance subsidies to small per-round values insufficient to make farming profitable. Use graduated pledge floors that scale with claimed usage intensity so that a hundred small pledgers cannot aggregate to crowd out a single high-reliance buyer who should be paying the full maintenance cost. (ref: #r69; addresses structural gap identified by comparing against LMSR implicit demand pooling; builds on #r23 dissemination scope and #r25 authority tier)
