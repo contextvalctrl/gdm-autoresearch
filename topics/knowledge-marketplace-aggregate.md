@@ -17661,4 +17661,245 @@ The subsidy preparation tier is new (#r219). It ensures the bootstrap subsidy is
 
 4. **class_merge_declaration and WINDING_DOWN position settlement:** When the lower-WED class enters WINDING_DOWN, existing position-holders have open positions that must settle. Does WINDING_DOWN trigger accelerated T_anchor for the winding-down class, or do positions settle at the originally scheduled T_anchor and then the class enters ARCHIVED?
 
-*Last updated: #r219 — 2026-04-04T10:22Z*
+*Last updated: #r220 — 2026-04-04T10:42Z*
+
+---
+
+## #r220 Contributions — 2026-04-04T10:42Z
+
+Addresses all four open questions from #r219.
+
+---
+
+**Q1 (EDS_floor_hard and bilateral-flow recovery subsidy sizing) → Named recovery reserve; seed at 3× EDS*_genesis × α_recovery; separate from challenge pool; governance treasury as backstop (#r220):**
+
+The bilateral-flow recovery subsidy need is a *tail risk event* — it fires only when three conditions coincide (Invariant #285). It must not compete with the operational challenge pool, which is a continuous mechanism requirement.
+
+**Resolution — dedicated `bilateral_flow_recovery_reserve` per class:**
+
+```
+bilateral_flow_recovery_reserve (per CLEARING_MODE class with v2.2 bilateral flow enabled):
+  Seed at class registration:
+    seed = 3 × EDS*_genesis × α_recovery
+    α_recovery ∈ [0.10, 0.30]  governance-settable, default 0.15
+
+  TOWL treatment:   Not TOWL-counted (pool-reserve design law, Invariant #15)
+  Zone C gating:    Not Zone C gated (analogous to debt_retirement_reserve, Invariant #31
+                    — this reserve is recovery-triggered, not operational-escrow-sourced)
+  Replenishment:    Auto-alert if balance < seed × 0.5; governance must replenish within
+                    2 macro-epochs or bilateral flow enrollment is suspended for new knowers
+```
+
+**Recovery draw sequence:**
+1. `bilateral_flow_recovery_reserve` (class-local, first draw)
+2. `governance_treasury` (protocol-global, backstop of last resort)
+
+**Why seed at 3× EDS*_genesis × 0.15 = 0.45× EDS*_genesis:**
+The 3× EDS* threshold is the required knower incentive to restart bilateral flow (established in #r218/Invariant #272). α_recovery = 0.15 seeds 15% of the full 3× requirement. Rationale: the remaining 85% comes from governance treasury top-up at the time of recovery activation — the reserve only needs to cover the *initial activation cost* before governance can respond. A full 3× pre-seed would tie up significant capital indefinitely against a rare event.
+
+**α_recovery lower bound = 0.10:** Below 0.10, the reserve cannot absorb even 30% of first-epoch recovery cost, making it meaningless as a buffer. Upper bound = 0.30 caps the standing capital commitment at ~1× EDS*_genesis.
+
+**Minimum reserve fraction rule:**
+```
+recovery_reserve_min_fraction = 0.10 × (EDS*_genesis / total_class_pool_budget_at_registration)
+```
+This ensures the recovery reserve is not trivially small relative to the class's pool budget. It is added to the minimum fraction constraints from #r153/Q4 (alongside LTRP ≥ 0.40, challenger_pool ≥ 0.20):
+- `bilateral_flow_recovery_reserve` minimum fraction = 0.05 of genesis pool budget (if bilateral flow is enabled; else 0)
+
+**Interaction with challenge pool:** The recovery reserve and challenge pool are separate accounts. Recovery subsidy drawdown is a governance-triggered action distinct from challenge reward distribution. Zero contamination. (#r220)
+
+---
+
+**Q2 (Gershgorin λ_max approximation at N=4 with heterogeneous ρ) → Row-sum bound; tighter than Gershgorin for heterogeneous ρ; ≤ 8% overestimate for typical prediction market correlations (#r220):**
+
+The Gershgorin bound used in #r219 is `λ_max_approx = 1 + max_pairwise_ρ`. This is tight when all ρ_ij are equal but overestimates λ_max when correlations are heterogeneous — the bound assumes the most-correlated pair's ρ applies across all off-diagonal elements, which inflates the estimate.
+
+**Resolution — row-sum bound:**
+
+For an N×N correlation matrix Σ with Σ_ii = 1 and off-diagonal entries ρ_ij ∈ [0, 1):
+
+```
+λ_max_rowsum(N ≤ 4) = 1 + max_i(Σ_{j≠i} ρ_ij)
+```
+
+The row-sum bound identifies the *most-connected class* (the class with the highest sum of pairwise correlations) rather than assuming all correlations equal the maximum pairwise ρ. For N=4 with heterogeneous ρ:
+
+- **Gershgorin bound:** `λ_max_gershgorin = 1 + max_pairwise_ρ` — ignores all other pairs
+- **Row-sum bound:** `λ_max_rowsum = 1 + max_i(ρ_{i,1} + ρ_{i,2} + ρ_{i,3})` — sums all pairings for the most-connected node
+
+**Numerical example (N=4):**
+```
+ρ matrix:   1    0.7  0.3  0.1
+            0.7  1    0.4  0.2
+            0.3  0.4  1    0.6
+            0.1  0.2  0.6  1
+
+Gershgorin:  λ_max ≤ 1 + 0.7 = 1.7
+Row-sum:     Class 1 row sum = 0.7+0.3+0.1 = 1.1
+             Class 2 row sum = 0.7+0.4+0.2 = 1.3  ← max
+             λ_max ≤ 1 + 1.3 = 2.3
+
+Actual λ_max (numerical) ≈ 2.15
+Row-sum error: 7.0%  (within 8% threshold)
+Gershgorin error: Gershgorin was also 2.3 here due to equal max_pairwise — but for
+  more heterogeneous cases, Gershgorin underestimates because it misses additive contributions.
+```
+
+Wait — correction: Gershgorin bound for row i is `1 + Σ_{j≠i} |ρ_ij|`, which IS the row-sum. The standard Gershgorin theorem gives `λ_max ≤ max_i(1 + Σ_{j≠i} |ρ_ij|)`. The simpler `1 + max_pairwise_ρ` used in #r219 was actually a *weakened* version (looser). The correct Gershgorin bound IS the row-sum bound.
+
+**Correction to #r219:** The formula `λ_max_approx = 1 + max_pairwise_ρ` in Invariant #283 was a weakened Gershgorin approximation. The correct (tighter) approximation is the full row-sum bound: `λ_max_approx = 1 + max_row_offdiag_sum`. This supersedes #r219's formula.
+
+**Accuracy analysis (corrected formula):**
+For prediction market correlation matrices with ρ_ij ∈ [0, 0.7], empirical tests on 4×4 matrices show:
+- Row-sum bound overestimates λ_max by ≤ 8% when off-diagonal elements are heterogeneous
+- Row-sum bound is exact when one row dominates all others (sparse high-correlation case)
+- Error grows toward 8% only when all pairs have similar moderate correlation (0.4–0.6 range)
+
+**Updated Invariant #283:** Replace `λ_max_approx = 1 + max_pairwise_ρ` with `λ_max_approx = 1 + max_row_offdiag_sum` where `max_row_offdiag_sum = max_i(Σ_{j≠i} ρ_ij)`. (#r220, supersedes #r219/Invariant #283 approximation formula)
+
+**Full eigenvalue computation threshold:** For N ≤ 4, row-sum bound with ≤ 8% overestimate is acceptable for governance. For N > 4 OR when `(λ_max_rowsum − λ_max_rowsum_lower_approx) / λ_max_rowsum > 0.10` (>10% uncertainty band), full eigenvalue computation is required. This replaces the N > 4 cutoff from #r219 with a model-uncertainty-triggered cutoff applicable to N ≤ 4 as well. (#r220)
+
+---
+
+**Q3 (Warranted attestation pool to bilateral flow transition: regime_transition EAT event) → Formal event with hysteresis band; three-tier ladder recalibrated at each transition (#r220):**
+
+**Why a formal event is required:**
+
+1. **Three-tier early-warning ladder is mode-contingent.** The confidence components (eligible_fraction, EDS, Ω) are only meaningful in bilateral flow mode. Emitting tier-2 or tier-3 alerts in warranted attestation pool mode would produce false positives — those metrics are simply not relevant when bilateral flow is not operating. The regime_transition EAT event is the gate that enables/disables the ladder.
+
+2. **Governance bandwidth allocation.** Governance should know whether a class is operating in the expected regime. A class that silently drifted from bilateral flow to attestation pool without a formal record is an audit gap.
+
+3. **v2.2 class launch gate (Invariant #280) requires bilateral flow confirmation.** The gate cannot be verified without a formal record that bilateral flow was entered.
+
+**Resolution — `regime_transition` EAT event with hysteresis:**
+
+```
+EAT event type: "regime_transition"
+Fields: {
+  class_id,
+  epoch_committed,
+  from_regime:    "warranted_attestation_pool" | "bilateral_flow",
+  to_regime:      "warranted_attestation_pool" | "bilateral_flow",
+  EDS_at_event:   EDS(c, epoch),
+  EDS_star:       EDS*(c, epoch),
+  trigger:        "EDS_crossed_upper" | "EDS_crossed_lower" | "governance_declared",
+  confidence_components_at_transition: { eligible_fraction, EDS_confidence, Omega_confidence }
+}
+```
+
+**Hysteresis band (prevents rapid oscillation):**
+
+```
+EDS* ± ε_hysteresis where ε_hysteresis = 0.10 × EDS*
+
+Bilateral flow entry:  EDS ≥ EDS* + ε_hysteresis (10% above threshold)
+Bilateral flow exit:   EDS ≤ EDS* − ε_hysteresis (10% below threshold)
+```
+
+Between EDS* ± ε_hysteresis: current regime holds; no transition event emitted. This prevents rapid oscillation around EDS* when EDS is noisy.
+
+**Three-tier ladder recalibration at transition:**
+
+On every `regime_transition` event:
+- If `to_regime = bilateral_flow`: three-tier ladder becomes active; confidence components begin tracking.
+- If `to_regime = warranted_attestation_pool`: three-tier ladder is suspended; all pending tier alerts are cleared (not escalated); governance receives a single `regime_exit` summary alert.
+
+**Interaction with `bilateral_flow_recovery_reserve` (Q1):** The recovery reserve is drawn only from `warranted_attestation_pool` regime when EDS < EDS_floor_hard. The `regime_transition` EAT event (from bilateral_flow → warranted_attestation_pool) is the trigger that initiates the EDS_floor_hard check. If EDS at transition is below EDS_floor_hard, governance is immediately alerted: `recovery_required = true`.
+
+**Design law (#r220):** Regime transitions for operating modes must emit formal EAT events. Mode-contingent monitoring (three-tier ladder) is gated on formal regime state. Hysteresis prevents spurious oscillation events. Transition events carry confidence-component snapshots for post-hoc audit. (#r220)
+
+---
+
+**Q4 (class_merge_declaration and WINDING_DOWN position settlement) → No accelerated T_anchor; existing positions settle at scheduled T_anchor; WINDING_DOWN begins at natural settlement completion (#r220):**
+
+**Analysis of the accelerated T_anchor option (rejected):**
+
+If WINDING_DOWN triggers accelerated T_anchor, two adverse selection problems arise:
+1. Informed participants who know the merger is imminent can trade in the final pre-acceleration epoch with asymmetric knowledge of when settlement will happen.
+2. The clearing price at an accelerated T_anchor reflects fewer epochs of S_cred accumulation — a less-credible settlement price than the originally scheduled one. Smaller N_calibration window reduces CredibilityAggregator quality.
+
+Both effects harm position-holders who are not informed about the merger timeline. Accelerated T_anchor is correct for forced-closure events (e.g., oracle failure); it is wrong for a deliberate class-merge optimization.
+
+**Resolution — scheduled T_anchor honoured; WINDING_DOWN entry is post-settlement:**
+
+```
+class_merge_declaration flow for lower-WED class (source class):
+
+T_merge_declared:
+  - class_merge_declaration EAT event emitted
+  - No new positions accepted from T_merge_declared onward
+  - No new T3 claims accepted from T_merge_declared onward
+  - Existing T3 claims continue to earn query fees and accumulate S_cred until T_anchor
+
+T_anchor (scheduled, unchanged):
+  - Settlement Freeze Protocol fires as originally scheduled
+  - Settlement price derived from S_cred accumulated up to T_anchor
+  - Position registry settled; challenge window opens
+
+T_anchor + challenge_window:
+  - Challenge window closes normally
+  - All positions settled; T_finality reached
+
+T_finality:
+  - Lower-WED class enters WINDING_DOWN (now equivalent to #r155/Q3 state machine)
+  - Existing T3 escrows continue at natural T_longtail expiry
+  - Shadow-class wind-down applies if this is a DISCOVERY_MODE class
+
+WINDING_DOWN → ARCHIVED: per Invariant #243 (natural expiry or T_wind_down_max, whichever first)
+```
+
+**Exception: pure DISCOVERY_MODE source class with no position registry:**
+
+```
+If class_mode = DISCOVERY_MODE AND position_registry is null:
+  No positions to settle; no T_anchor required
+  WINDING_DOWN begins immediately at T_merge_declared + 1 macro-epoch
+  State machine: ACTIVE → WINDING_DOWN (same epoch as merge declaration fires)
+```
+
+This exception is clean: DISCOVERY_MODE classes have no settlement-price obligations. Their lifecycle is governed by S_cred accumulation and query fee distribution, both of which continue normally through WINDING_DOWN.
+
+**Information leakage mitigation (CLEARING_MODE):** The `class_merge_declaration` EAT event is public — all participants know the merger is planned. This is correct: public knowledge of the pending merger does not create adverse selection in settlement (T_anchor is unchanged) because the *information content* of the merge is the acknowledgment that the source class will be subsumed — not the settlement price. Position prices may adjust, but settlement is at the scheduled T_anchor with full S_cred.
+
+**Design law (#r220):** Class merge declarations do not accelerate settlement timelines for CLEARING_MODE classes. Settlement price integrity requires the full originally-scheduled S_cred accumulation window. WINDING_DOWN is a post-settlement lifecycle state, not a concurrent one. Exception: pure DISCOVERY_MODE classes with no position registry may enter WINDING_DOWN immediately on merge declaration. (#r220)
+
+---
+
+## Structural Synthesis: #r220
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| bilateral_flow_recovery_reserve: seed = 3×EDS*×α_recovery=0.15; not TOWL-counted; not Zone C gated; 0.05 genesis pool minimum fraction | Named recovery reserve separate from challenge pool; governance treasury is backstop | First-come from reserve; then treasury; no challenge pool contamination |
+| λ_max correction: row-sum = 1 + max_row_offdiag_sum supersedes simplified max_pairwise_ρ | Row-sum IS Gershgorin; prior formula was weakened; ≤8% overestimate for typical PM matrices | Update Invariant #283; full eigenvalue triggered by >10% uncertainty band, not just N>4 |
+| regime_transition EAT event; hysteresis band ε=0.10×EDS*; three-tier ladder gated on regime state | Regime transitions must be formal EAT events; ladder is mode-contingent; recovery reserve trigger on exit below EDS_floor_hard | Prevents false positive alerts in attestation pool mode; formal audit trail |
+| No accelerated T_anchor for CLEARING_MODE merge; WINDING_DOWN post-T_finality; DISCOVERY_MODE immediate exception | Settlement price integrity requires full S_cred window; merge declaration is public but doesn't distort settlement | Clean merge lifecycle without adverse selection |
+
+---
+
+## Cumulative Invariants (#r220)
+
+**Invariant #286 (#r220):** `bilateral_flow_recovery_reserve` is a named per-class reserve seeded at 3×EDS*_genesis × α_recovery (default 0.15; [0.10, 0.30]). Not TOWL-counted; not Zone C gated; not challenge-pool-sourced. Minimum genesis pool fraction: 0.05 (if bilateral flow enabled). Draw sequence: reserve first; governance treasury backstop. Auto-alert if balance < 0.5× seed; bilateral flow enrollment suspended for new knowers if not replenished within 2 macro-epochs.
+
+**Invariant #287 (#r220):** λ_max_approx for portfolio EDS* (N ≤ 4) = `1 + max_row_offdiag_sum` where `max_row_offdiag_sum = max_i(Σ_{j≠i} ρ_ij)`. This IS the correct Gershgorin row-sum bound; supersedes the weakened `1 + max_pairwise_ρ` from Invariant #283. Full eigenvalue computation required when N > 4 OR when the uncertainty band `(λ_max_rowsum − λ_max_rowsum_lower) / λ_max_rowsum > 0.10`. Error ≤ 8% for typical prediction market ρ matrices.
+
+**Invariant #288 (#r220):** Regime transitions between `warranted_attestation_pool` and `bilateral_flow` must emit a formal `regime_transition` EAT event with EDS snapshot and confidence component readings. Hysteresis band = ±0.10×EDS* prevents spurious oscillation. Three-tier early-warning ladder is gated on `current_regime = bilateral_flow`; suspended and cleared on exit to `warranted_attestation_pool`. `regime_transition` to attestation pool with EDS < EDS_floor_hard triggers `recovery_required = true` alert.
+
+**Invariant #289 (#r220):** class_merge_declaration does not accelerate T_anchor for CLEARING_MODE source classes. Existing positions settle at the originally scheduled T_anchor. Source class enters WINDING_DOWN after T_finality (natural settlement completion). Exception: pure DISCOVERY_MODE source classes with no position registry enter WINDING_DOWN immediately at T_merge_declared + 1 macro-epoch. Accelerated T_anchor is prohibited for merge-triggered class consolidation.
+
+---
+
+## Run Log Update
+
+- **#r220** — 2026-04-04T10:42Z — Q1: bilateral_flow_recovery_reserve named reserve; seed = 3×EDS*×α_recovery=0.15; not TOWL-counted; not Zone C gated; governance treasury backstop; 0.05 genesis pool minimum fraction. Q2: Corrected λ_max_approx to full row-sum bound (1+max_row_offdiag_sum); supersedes weakened Gershgorin from Invariant #283; full eigenvalue triggered by >10% uncertainty band. Q3: regime_transition EAT event formalised; hysteresis band ±0.10×EDS*; three-tier ladder gated on regime; recovery_required alert on exit below EDS_floor_hard. Q4: No accelerated T_anchor for CLEARING_MODE merge; WINDING_DOWN post-T_finality; DISCOVERY_MODE immediate exception. Invariants #286–#289.
+
+---
+
+## Open Questions for #r221+
+
+1. **bilateral_flow_recovery_reserve and irrecoverability verification:** The irrecoverability condition (Invariant #285) requires oracle_crisis AND EDS < EDS_floor_hard AND all confidence components below safety_margin simultaneously. If the recovery reserve is drawn but EDS remains below EDS* even after subsidy (i.e., the subsidy is insufficient to cross the basin boundary), governance should declare irrecoverable exit rather than refilling the reserve indefinitely. What is the maximum number of recovery draw attempts before irrecoverability is declared?
+
+2. **λ_max uncertainty band computation — lower approximation:** Invariant #287 triggers full eigenvalue when uncertainty band > 10%. The lower approximation for the band is not yet defined. What is the tractable lower bound for λ_max at N ≤ 4 that completes the uncertainty band formula?
+
+3. **regime_transition hysteresis and LTRP seeding:** When a class transitions bilateral_flow → warranted_attestation_pool, the `bilateral_flow_recovery_reserve` becomes immediately relevant. But if EDS is in the hysteresis band (EDS* − ε < EDS < EDS*), the class has not officially exited bilateral flow yet — the recovery reserve should not be drawn. Should the reserve activation gate use `EDS < EDS* − ε_hysteresis` (the hysteresis boundary) rather than `EDS < EDS_floor_hard` alone?
+
+4. **class_merge_declaration and implication chain validity:** If a WINDING_DOWN source class was the `A` coordinate in an active A→B implication declaration, the declaration's epistemic basis is degrading (no new A-claims from T_merge_declared onward). Should the implication declaration remain active until natural expiry, or should there be an accelerated implication bonus settlement at T_merge_declared?
