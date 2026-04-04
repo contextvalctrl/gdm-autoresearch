@@ -14,6 +14,7 @@
 - **#r133** — 2026-04-03T19:52Z
 - **#r135** — 2026-04-03T20:12Z — Debt retirement absorption cap (lifetime-escrow-anchored); toll-stacking doubling ceiling for implication_bonus_escrow; M_stable evaluation-boundary parameter activation; debt withholding scope — capital-at-risk only, contingent rewards exempt — `implication_bonus_escrow` as fourth first-class escrow category (protocol reserve, not TOWL-counted, bilateral lockup ceiling); Zone C epochs included in calibration (not excluded, flagged only); M_stable majority-window tolerance (1-of-5, non-consecutive); A-side conditional partial release for cross-class implication declarations with clawback obligation; escrow taxonomy complete.
 - **#r141** — 2026-04-03T21:12Z — Challenge submission fee replaces slash-gate (spam filter, never blocks small-stake challenge); bifurcated implication bonus: capital-comp (α_cap × β_escrow, staleness-insensitive) + epistemic-service (staleness-discounted via Σ eff_weight); cross-class bridge asymmetry confirmed consistent — no coordination rule; bonus settlement contract design-complete.
+- **#r160** — 2026-04-04T00:22Z — v2.1→v2.2 additive deployment (coordinate-class-level version pinning; no forced migration); atomic StateFreeze transaction for S_cred at T_anchor; Demo Day one-paragraph narrative vs Polymarket; epistemically-live threshold (1 challenger per 5 T3 installs, absolute floor 3); v2.1 production-readiness gate (6 criteria); Invariants #36–#38.
 
 ---
 
@@ -4777,3 +4778,183 @@ This is a buildable, auditable, Demo-Day-defensible scope. The remaining mechani
 4. **Minimum viable challenger population for v2.1 launch:** The mechanism depends on challengers detecting wrong warranted installations. What is the minimum challenger participation threshold before the v2.1 mechanism can be considered epistemically live?
 
 *Last updated: #r159 — 2026-04-04T00:12Z*
+
+---
+
+## #r160 Contributions — 2026-04-04T00:22Z
+
+Addresses all four open questions from #r159.
+
+**Q1 (v2.1 → v2.2 upgrade path — live clearing classes + new DISCOVERY_MODE) → Additive deployment; v2.1 classes pin to v2.1 contract set; v2.2 introduces parallel registry with opt-in migration window (#r160):**
+
+The core constraint: live v2.1 CLEARING_MODE classes have active TOWL escrows, challenge windows, and position registry integrations. An in-place contract upgrade that changes the CredibilityAggregator or CoordinateRegistry risks disrupting live settlements.
+
+**Resolution — additive parallel deployment with coordinate-class-level versioning:**
+
+```
+v2.1 contract set: {CoordinateRegistry_v1, ClaimEscrow_v1, CredibilityAggregator_v1,
+                    SettlementEngine_v1, EATManager_v1}
+
+v2.2 contract set: {CoordinateRegistry_v2, ClaimEscrow_v2, CredibilityAggregator_v2,
+                    SettlementEngine_v2, EATManager_v2}  — separate deployed addresses
+
+v2.2 adds: DISCOVERY_MODE support, implication chain contracts, shadow-class lifecycle,
+           three-tier archive interface
+```
+
+**Per-class version pinning:**
+
+At registration, each coordinate class declares `contract_version: v2.1 | v2.2`. v2.1 classes always use v2.1 contracts for their full lifecycle. No v2.1 class is retroactively migrated. v2.2 classes may reference v2.1 clearing class position data (read-only, cross-version reference) but settle through v2.2 contracts.
+
+**Migration window (optional, not forced):**
+
+A v2.1 class may *elect* to migrate to v2.2 during a `migration_window` (governance-declared, 8 macro-epoch duration). Conditions for migration election:
+1. All current challenge windows closed.
+2. No T3 provisional installs pending.
+3. Governance approval from both multisig sets (v2.1 and v2.2 deployers).
+
+If migration is elected, the class's active S_cred history is imported to v2.2 CredibilityAggregator_v2 as a genesis prior (analogous to shadow-class genesis prior, attenuated at α_prior_base × (1 − v2_migration_discount), where v2_migration_discount = 0.10 — same-mode same-class migration has low mismatch). LTRP and escrow balances transfer in-kind.
+
+**EAT continuity:** v2.1 EAT and v2.2 EAT are separate Merkle root sequences, both anchored to Ethereum calldata. A `contract_migration` EAT event on the v2.1 chain records the migration; the v2.2 chain's genesis event references the v2.1 class ID. Cross-version audit is possible via these cross-references.
+
+**Why additive is safer than in-place upgrade:** In-place upgrade requires storage layout compatibility between v2.1 and v2.2 contracts. CLEARING_MODE settlement is financially irreversible; a storage migration bug during an active settlement epoch would be catastrophic. Additive deployment with class-level version pinning bounds the blast radius of any v2.2 contract defect to v2.2 classes only. (#r160)
+
+---
+
+**Q2 (5-contract concurrency safety — S_cred at T_anchor, cross-contract call ordering) → T_anchor freeze is a single atomic StateFreeze transaction; CredibilityAggregator and SettlementEngine share a read-only snapshot, not a live reference (#r160):**
+
+The safety concern: if SettlementEngine reads S_cred from CredibilityAggregator at T_anchor but another transaction simultaneously updates S_cred, the settlement capture is non-deterministic.
+
+**Resolution — StateFreeze atomic transaction:**
+
+```
+T_anchor flow:
+  1. Oracle fires (external event or governance-triggered).
+  2. SettlementEngine calls CoordinateRegistry.freezeForSettlement(class_id, epoch):
+       CoordinateRegistry atomically:
+         a. Reads S_cred from CredibilityAggregator (snapshot)
+         b. Writes snapshot to SettlementEngine.candidate_price storage slot
+         c. Emits T_anchor EAT event with: S_mechanism_snapshot, epoch, block_hash
+         d. Marks class as settlement_frozen = true
+       All in a single EVM transaction — no interleaving.
+  3. From T_anchor onward: CredibilityAggregator continues accepting new claims
+     (new claims do not affect settlement_frozen S_cred snapshot; they advance S_cred
+     for the next clearing epoch only).
+  4. SettlementEngine reads candidate_price from its own storage slot — no live reference
+     to CredibilityAggregator after T_anchor.
+```
+
+**Key invariant:** SettlementEngine.candidate_price is written once (atomically at T_anchor) and never updated until T_finality closes the settlement epoch. It is a local storage copy, not a pointer to CredibilityAggregator state.
+
+**Re-entrancy safety:** CoordinateRegistry.freezeForSettlement does not call back into CredibilityAggregator after the snapshot read. The cross-contract interaction is one-way, one-shot. Standard checks-effects-interactions pattern applies.
+
+**EQ q_bonus snapshot coupling (per #r151/Q4):** q_bonus effective_weight snapshots are taken in the same atomic T_anchor transaction — CredibilityAggregator.getEffectiveWeightSnapshot is called once during the freeze and committed to EATManager alongside the S_cred snapshot.
+
+**Design law (#r160):** Cross-contract settlement state capture must always be atomic (single transaction, no interleaving). Settlement-critical reads must be snapshotted to local storage at T_anchor, not left as live cross-contract references. One-way, one-shot cross-contract calls at the settlement boundary prevent concurrent update races. (#r160)
+
+---
+
+**Q3 (Demo Day narrative — one paragraph, investor-facing, no mechanism jargon) (#r160):**
+
+> Most prediction markets are zero-sum: for every dollar won, someone loses a dollar, and the only signal they produce is what the crowd currently believes. GestAlt is different. It is a clearing protocol for institutional event-contract positions where the question is not "what does the crowd think?" but "what is the credible best estimate of this variable, backed by real capital at risk?" Participants who post accurate state estimates earn ongoing fees from institutions who need those estimates to settle their positions. Participants who post wrong estimates lose their posted collateral. Over time, the protocol learns who has reliable information and weights them accordingly — so the clearing price reflects the judgment of the most credible contributors, not just the most capital. Compared to Polymarket, where anyone can move the market with enough money, GestAlt's clearing price is harder to manipulate precisely because capital alone is not enough — you need a track record of being right.
+
+**Framing notes:**
+- Avoids "scoring rule," "LMSR," "S_cred," "TOWL."
+- Anchors to institutional use case (clearing, not entertainment betting).
+- Distinguishes on credibility-weighting vs capital-weighting without naming the mechanism.
+- Last sentence lands the competitive differentiation cleanly against Polymarket. (#r160)
+
+---
+
+**Q4 (Minimum viable challenger population — epistemically live threshold) → 1 independent challenger per 5 active warranted T3 installations; auto-alert below threshold; bootstrap subsidy for challenger_pool genesis (#r160):**
+
+The challenger population is the epistemic enforcement layer. Without challengers, wrong warranted installations persist unchallenged, S_cred degrades, and the mechanism loses its quality guarantee. The question is the minimum live challenger density before the mechanism is epistemically trustworthy.
+
+**Formal threshold derivation:**
+
+Each warranted T3 installation has expected error rate `ε_T3 ∈ [0, 1]` (governance-estimated at class registration; default 0.1 for a well-calibrated class). For the challenger pool to maintain epistemic live status, the expected number of successful challenges in any epoch must be ≥ 1:
+
+```
+E[challenges] = ε_T3 × N_T3_active × P(challenger_detects | wrong_install)
+
+P(challenger_detects | wrong_install) ≈ 1 - (1 - p_individual_detect)^N_challengers
+```
+
+For P(challenger_detects | wrong_install) ≥ 0.8 (80% detection probability) with p_individual_detect = 0.5 (individual challenger has 50% chance of detecting a single wrong installation):
+
+```
+N_challengers ≥ log(1 - 0.80) / log(1 - 0.50) = log(0.20) / log(0.50) ≈ 2.3 → ceil → 3
+```
+
+Per 5 active warranted installations (N_T3_active / 5 ratio keeps the denominator tractable):
+
+```
+min_challenger_density = 1 challenger per 5 active T3 installations
+min_challenger_count_absolute = max(3, floor(N_T3_active / 5))
+```
+
+**Epistemically live status:**
+
+```
+epistemically_live(class_i) =
+  active_challenger_count(class_i, epoch_t) ≥ min_challenger_count_absolute(class_i)
+```
+
+Where `active_challenger_count` = number of unique addresses who have submitted at least 1 successful challenge in the trailing N_calibration normal-mode macro-epochs.
+
+**Governance action below threshold:**
+
+1. Auto-alert: `epistemic_liveness_warning` when count < 1.5× min (approaching threshold).
+2. `epistemically_live = false`: T3 new installations throttled to 50% of normal TOWL capacity (new high-warranty claims still permitted but at half pace; existing claims unaffected).
+3. Challenge pool bootstrap subsidy: if challenger_pool balance < 3× r_floor_per_class (too thin to attract challengers), governance auto-seeds the pool from governance treasury (analogous to genesis bootstrap, #r69).
+
+**Why this does NOT degrade to an orderbook watch-tower:** A watch-tower in LMSR monitors prices and corrects arbitrage. A challenger in this mechanism monitors warranted-state quality and earns slash proceeds. The challenger population is endogenous: as wrong claims accumulate (low epistemically-live epochs), slash opportunities increase, attracting more challengers. The mechanism self-corrects toward the threshold, but requires a minimum seed to activate the positive-feedback loop.
+
+**v2.1 launch gate:** GestAlt v2.1 should not go live on any coordinate class until that class achieves `epistemically_live = true` for at least 2 normal-mode macro-epochs. This is the operational readiness gate. (#r160)
+
+---
+
+## Structural Synthesis: v2.1 Production Readiness Criteria (#r160)
+
+GestAlt v2.1 is production-ready on a coordinate class when ALL of the following are satisfied:
+
+| Gate | Criterion | Source |
+|------|-----------|--------|
+| Solvency | TOWL zone A or B | #r71 |
+| Epistemic liveness | active_challenger_count ≥ min for ≥2 epochs | #r160/Q4 |
+| DA liveness | Normal mode (not degraded) | #r75 |
+| Oracle readiness | Oracle registered, tested, and TWAP data available | #r144 |
+| EAT operational | Merkle roots live on Ethereum; Celestia warm tier live | #r75 |
+| Settlement contract audit | SettlementEngine + ClaimEscrow audited pre-deployment | Solvency-first mandate |
+
+**v2.1 five-contract launch checklist (adds operational gates to invariant list):**
+
+1. CoordinateRegistry: coordinate class registered, mode=CLEARING_MODE, staleness + κ set
+2. ClaimEscrow: LTRP seeded at ≥ LTRP_seed_minimum; escrow pool live
+3. CredibilityAggregator: S_cred initialized (uniform prior); epoch buffer live
+4. SettlementEngine: position registry integrated; SFP parameters set; Zone C deferral active
+5. EATManager: Ethereum calldata live; Celestia warm tier live; degraded-mode state machine active
+
+---
+
+## Cumulative Invariants (additions through #r160)
+
+**Invariant #36 (#r160):** v2.1→v2.2 upgrade is additive (parallel deployment). v2.1 classes pin to v2.1 contracts for their full lifecycle. No forced migration.
+
+**Invariant #37 (#r160):** Settlement state capture (S_cred at T_anchor) must be a single atomic transaction. Local storage copy at T_anchor; no live cross-contract references after freeze.
+
+**Invariant #38 (#r160):** GestAlt v2.1 does not go live on any coordinate class until `epistemically_live = true` for ≥2 consecutive normal-mode macro-epochs (minimum 1 challenger per 5 active T3 installations; absolute floor 3 challengers).
+
+---
+
+## Open Questions for #r161+
+
+1. **Cross-version S_cred reference for v2.2 shadow-class referencing v2.1 clearing class:** In the additive deployment model, a v2.2 shadow-class may reference a v2.1 clearing class position registry as its WED_clearing source. Define the cross-contract read interface — is it a direct EVM call (creates v2.1 contract dependency in v2.2 code) or a governance-registered registry adapter?
+
+2. **epistemically_live 50% throttle interaction with TOWL Zone C:** Both conditions can suppress new T3 installations simultaneously. Should the combined suppression be additive (50% × Zone-C-rate) or the more restrictive floor (whichever is lower)?
+
+3. **Demo Day narrative calibration:** The Q3 paragraph positions against Polymarket. Should there be a distinct one-paragraph variant positioned against Kalshi (regulatory-grade event contracts) and Betfair (exchange-style, liquidity-depth)? Sarthak to review for Demo Day framing needs.
+
+4. **Five-contract audit scope for v2.1 launch:** SettlementEngine + ClaimEscrow are identified as audit-required. Should CredibilityAggregator also be in audit scope (it contains the credibility_ratio update logic, which is the most attack-surface-rich component for track-record manipulation)?
+
+*Last updated: #r160 — 2026-04-04T00:22Z*
