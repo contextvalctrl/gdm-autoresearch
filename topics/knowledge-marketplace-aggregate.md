@@ -11778,4 +11778,255 @@ The question is correct as a *difference* question but not as a *mechanism-found
 
 4. **v2.2 thread creation:** Create `/topics/knowledge-marketplace-v22.md` with the five founding questions from #r192/Q4 as the genesis entry, run #r1 of that thread.
 
-*Last updated: #r192 — 2026-04-04T05:42Z*
+*Last updated: #r193 — 2026-04-04T05:52Z*
+
+---
+
+## #r193 Contributions — 2026-04-04T05:52Z
+
+**Phase: audit-readiness closure — relational constraint checklist, Zellic brief, W_MAX derivation, and v2.2 thread genesis.**
+
+---
+
+### Q1 (Relational constraint completeness checklist — contract-enforced vs governance-convention) (#r193)
+
+The GovernanceParams contract must enforce all constraints where a valid individual parameter value can, in combination with another valid individual parameter, produce a mechanically broken state. Convention-only constraints are acceptable only where a violation is self-defeating (the parameter change hurts the setter) or where detection is guaranteed by other contract logic before the broken state can be exploited.
+
+**Contract-enforced (hard, revert on violation):**
+
+| Constraint | Parameters | Source | Enforcement point |
+|---|---|---|---|
+| `tolerance ≤ ⌊window_size / 4⌋` | tolerance, window_size | #r134/Q3 | `setParam(tolerance)` AND `setParam(window_size)` |
+| `γ_corr_cross ≤ γ_corr` | γ_corr_cross, γ_corr | #r130/Q2 | `setParam(γ_corr_cross)` AND `setParam(γ_corr)` |
+| `β_min ≤ β_max` | β_min, β_max | #r129/Q4 | `setParam(β_min)` AND `setParam(β_max)` |
+| `α_min ≤ α_max` | α_min, α_max | #r144/Q3 | `setParam(α_min)` AND `setParam(α_max)` |
+| `α_min ≥ 0.0`, `α_max ≤ 0.5` | α_min, α_max | #r144/Q3 | absolute bounds at param update |
+| `w_override_base ≤ 0.6` | w_override_base | #r154/Q3 | `setParam(w_override_base)` |
+| `γ ∈ (0, 1)` (chain depth discount) | γ | #r73/Q4 | absolute bounds at param update |
+| `fee_fraction ∈ [0.05, 0.25]` | fee_fraction | #r141/Q1 | absolute bounds |
+| `window_size ≥ 4` | window_size | #r134/Q3 | absolute bounds |
+| `ρ_floor ≤ ρ_ceil` | ρ_floor, ρ_ceil | #r143/Q1 | `setParam(ρ_floor)` AND `setParam(ρ_ceil)` |
+| `T_provisional_max ≤ 3 × T_oracle_window` | T_provisional_max, T_oracle_window (per-class) | #r71/Q1 | `registerClass(...)` |
+| `T_longtail ≥ T_outage_cap` | T_longtail, T_outage_cap (per-class) | #r132/Q4 | `registerClass(...)` |
+
+**Governance-convention only (not contract-gated):**
+
+| Constraint | Reason convention is sufficient |
+|---|---|
+| `K_target ∈ [0.40, 0.50]` | K_target is an economic tuning parameter; outside-range values degrade bonus calibration but produce no broken invariant. Clamp on β_effective (β_min/β_max) is the safety net. |
+| `N_calibration ≥ 2` | Soft calibration quality floor. A value of 1 is epistemically weak but not mechanically broken. |
+| `T_twap ≥ 24h` | Oracle-source quality heuristic; TWAP of any length is technically valid for ρ_smooth formula. |
+| `α_bond ∈ (0, 1)` | Implication bond fraction. Zero disables implication bonus entirely (valid policy). One over-stakes but doesn't break the formula. |
+| `N_WED ∈ [4, 12]` | EMA smoothing window for WED_clearing. Choice affects volatility but not correctness. |
+
+**Implementation note:** GovernanceParams must check **both directions** on any relational constraint: setting `γ_corr` to a value below current `γ_corr_cross` must revert, and setting `γ_corr_cross` to a value above current `γ_corr` must also revert. Single-direction checks are incomplete.
+
+**Audit scope annotation:** The relational constraint enforcement is part of the GovernanceParams audit scope (#r161/Q4). The auditor must verify (a) all 12 contract-enforced constraints are present and checked both directions where applicable, and (b) no missing constraint pair exists (i.e., no pair of parameters whose joint violation could break a mechanism invariant that is not listed above). (#r193)
+
+---
+
+### Q2 (Zellic engagement brief — 1-page technical briefing document) (#r193)
+
+```
+GESTALT v2.1 SECURITY REVIEW — TECHNICAL BRIEF FOR ZELLIC
+
+Project: GestAlt v2.1 (ValCtrl)
+Review target: 4 Solidity contracts + GovernanceParams
+Code freeze: 2026-04-21
+Requested start: 2026-04-28
+Deadline: 2026-06-02 (Demo Day: 2026-06-16)
+
+--- MECHANISM CONTEXT ---
+
+GestAlt v2.1 is a warranted-state clearing protocol. It is NOT an AMM, lending protocol,
+or standard prediction market. The core primitive is a "credible claim" — a capital-staked
+assertion about the value of a coordinate variable, backed by slashable escrow. If the claim
+is correct at oracle resolution, the claimer earns fees. If wrong, escrow is slashed.
+
+A "Settlement Freeze Protocol" produces a settlement price for institutional event-contract
+positions. Oracle authority is separate from knower attestation: oracle overrides do NOT
+slash the knower (oracle authority ≠ quality failure). This is a novel two-type interaction
+not found in standard DeFi oracle patterns.
+
+--- 4-CONTRACT SCOPE ---
+
+1. CredibilityAggregator_v1
+   Central state: credibility_ratio (log-score history), S_cred (credibility-weighted aggregate),
+   epoch buffer (one-epoch delay between S_cred update and clearing feed release)
+   
+2. ClaimEscrow_v1
+   Standard escrow lockup/release; LTRP routing; slash flows
+
+3. SettlementEngine_v1
+   Settlement Freeze Protocol; Zone C deferral; settlement_finality challenge type;
+   oracle_settlement_override (NO-SLASH path — non-standard, high audit priority)
+
+4. GovernanceParams_v1
+   Hard bounds enforcement; relational constraint checks (12 constraints, see attached checklist);
+   time-lock implementation
+
+5. OracleManager_v1 (supporting, lighter scope)
+   oracle_settlement_override routing; oracle authority distinction from slash path
+
+--- FOUR HIGHEST-RISK CODE PATHS ---
+
+1. credibility_ratio log-score update in CredibilityAggregator_v1
+   Risk: fixed-point precision loss allows wrong claim to escape penalty.
+   Verify: minimum penalty is non-zero for any non-trivial stake.
+
+2. W_MAX cap enforcement in CredibilityAggregator_v1.commitEpochBuffer()
+   Risk: sequential cap creates processing-order manipulation surface.
+   Verify: simultaneous cap (all knowers capped in one pass before normalisation);
+   single renormalisation pass; no re-entrancy on commitEpochBuffer.
+
+3. T_anchor atomic StateFreeze in SettlementEngine_v1 / CoordinateRegistry_v1
+   Risk: concurrent S_cred update during T_anchor freezes non-deterministic settlement price.
+   Verify: CoordinateRegistry.freezeForSettlement() is a single atomic transaction;
+   SettlementEngine reads from local storage copy after T_anchor, not live CredibilityAggregator reference.
+
+4. oracle_settlement_override no-slash path in SettlementEngine_v1
+   Risk: type confusion — attacker invokes oracle_settlement_override to escape a deserved slash.
+   Verify: oracle_settlement_override can ONLY be called by OracleManager_v1 (access control);
+   it NEVER reduces escrow; zone_at_T_anchor field is write-once and cannot be retroactively altered
+   to bypass SFP Zone C deferral.
+
+--- ORACLE DUALITY (NON-STANDARD) ---
+
+Two epistemically distinct settlement roles:
+- Knower (attestor): credibility-weighted aggregate → candidate settlement price S_mechanism(c)
+- Oracle (authority): external registry → final definitive value via oracle_settlement_override
+
+A successful oracle override does NOT slash the knower. This is intentional and critical.
+Slashing on oracle override would collapse the mechanism's participation incentive.
+The auditor must verify this is enforced, not just documented: no code path in
+oracle_settlement_override modifies escrow balances.
+
+--- REFERENCE DOCUMENTS ---
+
+- Mechanism invariants #1–#159 (attached, 159 formal invariants)
+- 10-point framework summary (Section 8 of aggregate doc, run #r148)
+- v2.1 minimal feature scope (run #r159, Q4)
+- Relational constraint checklist (run #r193, Q1)
+
+--- TIMELINE ---
+
+2026-04-07: Engagement confirmation requested
+2026-04-21: Code freeze
+2026-04-28: Audit start
+2026-06-02: Report delivery
+2026-06-16: Demo Day
+```
+
+(#r193)
+
+---
+
+### Q3 (W_MAX value — percentage of active weight vs fixed token vs TOWL-derived) (#r193)
+
+W_MAX has been defined semantically throughout (prevents single-agent S_cred dominance) but never formally bounded. Three candidate formulations:
+
+**Option A — Fixed percentage of total active credibility weight:**
+```
+W_MAX = w_max_pct × Σ_a w_a(epoch)
+w_max_pct = governance-settable ∈ [0.05, 0.25], default 0.10
+```
+*Properties:* Scale-invariant. W_MAX grows with market participation. A market with 10 knowers gives each 10% cap; one with 100 knowers gives each 10% cap. Single-agent dominance consistently bounded regardless of total participation.
+*Problem:* W_MAX is not known until after all claims are submitted. Cannot be used as a fixed escrow-sizing input at claim submission time.
+
+**Option B — Fixed token amount (absolute):**
+```
+W_MAX = W_MAX_tokens (governance-set, per coordinate class)
+```
+*Properties:* Simple, predictable at claim submission. Knowers know before submitting whether they will be capped.
+*Problem:* Not scale-invariant. As a market grows, W_MAX becomes relatively less binding. A fixed W_MAX that is meaningful at 10 knowers becomes irrelevant at 1000 knowers.
+
+**Option C — TOWL zone A headroom derived:**
+```
+W_MAX = w_max_towl_pct × TOWL_zone_A_capacity / N_active_knowers
+w_max_towl_pct = 0.20 (governance-settable, bounded [0.10, 0.40])
+```
+*Properties:* Ties epistemic weight cap to financial capacity. A knower cannot have more epistemic influence than their proportional share of the solvency backing. 
+*Problem:* TOWL zone A capacity fluctuates; W_MAX becomes volatile. Knowers cannot predict their cap.
+
+**Resolution — Option A with epoch-open snapshot (#r193):**
+
+W_MAX = `w_max_pct × Σ_a w_a_at_epoch_open` — computed once at epoch boundary open and held fixed for the entire epoch. This combines the scale-invariance of Option A with the predictability requirement: knowers can observe the epoch-open total weight (published to EAT) and know their cap for the current epoch before submitting claims.
+
+```
+W_MAX(class_i, epoch_t) = w_max_pct × total_active_weight_at_epoch_open(class_i, t-1)
+  where total_active_weight = Σ_a min(C_a × log(1 + k_a), pre-cap) from prior epoch
+  epoch-open snapshot published in EAT at epoch boundary
+  held constant for duration of epoch t
+```
+
+**Setting w_max_pct = 0.10 (default) — derivation:**
+
+For single-agent dominance prevention, we need: even if one agent has W_MAX influence, the remaining agent pool can collectively outvote them when they are wrong. With W_MAX = 10%, an adversarial knower at the cap controls 10 / (10 + 90) = 10% of S_cred weight — insufficient to materially shift S_cred unless the remaining 90% of weight is also wrong or absent. A 10% single-agent cap is consistent with classical Byzantine fault tolerance intuitions (dominance requires > 1/3 to overcome honest majority; 10% is well within safe range for honest-majority assumptions).
+
+**Hard bounds for w_max_pct:**
+- `w_max_pct ≥ 0.05`: floor prevents W_MAX from being so small that every participant is perpetually capped, collapsing S_cred weight to uniform (loses credibility differentiation entirely).
+- `w_max_pct ≤ 0.25`: ceiling prevents W_MAX from being so large that a single high-credibility agent dominates (at 25%, one agent can control 25/75 = 33% of renormalised weight — close to Byzantine threshold).
+
+**Contract enforcement:** `w_max_pct ∈ [0.05, 0.25]` is a hard bound in GovernanceParams. W_MAX is recomputed at each epoch open and emitted to EAT — auditors and participants can verify it each epoch. (#r193)
+
+---
+
+### Q4 (v2.2 thread creation) (#r193)
+
+Created `/topics/knowledge-marketplace-v22.md` with the five founding questions from #r192/Q4 as the genesis entry. That document is separate from this aggregate; this entry records the creation event.
+
+**Thread initialised with:**
+- Run #r1 entry in knowledge-marketplace-v22.md
+- Five founding questions (from #r192/Q4)
+- Cross-reference to parent thread (this document, run #r192)
+- Mode: DISCOVERY_MODE mechanism design
+- Scope: strictly the D(c) revelation problem as the founding primitive; no reuse of CLEARING_MODE conclusions unless explicitly derived from DISCOVERY_MODE first principles
+
+**Cross-reference record:**
+```
+knowledge-marketplace-v22.md genesis:
+  parent_thread:   knowledge-marketplace-aggregate.md
+  parent_run_ref:  #r192/Q4
+  first_question:  "What is the minimal mechanism for incentive-compatible D(c) revelation
+                   in DISCOVERY_MODE, and is it strictly better than LMSR?"
+  created_at:      #r193 (2026-04-04T05:52Z)
+```
+
+(#r193)
+
+---
+
+## Structural Synthesis: Full Audit-Readiness (#r193)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Relational constraint checklist | 12 hard-enforced constraints; 5 convention-only; both directions for relational checks | Hard gates where joint violation breaks mechanism; convention where self-defeating |
+| Zellic engagement brief | 1-page technical brief covering mechanism context, 4-contract scope, 4 highest-risk paths, oracle duality | Auditors briefed on non-standard oracle duality before engagement; 4-path focus |
+| W_MAX formal value | Option A (percentage); epoch-open snapshot for predictability; w_max_pct=0.10, bounds [0.05, 0.25] | Scale-invariant; epoch-open snapshot gives knowers predictable cap before submission |
+| v2.2 thread creation | knowledge-marketplace-v22.md created with 5 founding questions; D(c) revelation as first primitive | DISCOVERY_MODE starts from deepest unsolved problem, not from CLEARING_MODE delta |
+
+---
+
+## Cumulative Invariants (additions through #r193)
+
+**Invariant #160 (#r193):** Relational parameter constraints are enforced in both directions at parameter-update time. Any governance transaction that would violate a relational constraint — regardless of which parameter is being changed — reverts. Twelve constraints are contract-enforced; five are governance-convention.
+
+**Invariant #161 (#r193):** W_MAX = w_max_pct × total_active_weight_at_epoch_open; w_max_pct ∈ [0.05, 0.25], default 0.10. Epoch-open snapshot is published to EAT; W_MAX is fixed for the duration of each epoch. Simultaneous cap + single renormalisation pass enforced (#r192/#r156).
+
+---
+
+## Run Log Update
+
+- **#r193** — 2026-04-04T05:52Z — Relational constraint checklist (12 hard-enforced, 5 convention, bidirectional checks); Zellic engagement brief (1-page, oracle duality explanation, 4 code paths); W_MAX formal derivation (Option A, w_max_pct=0.10, epoch-open snapshot, bounds [0.05, 0.25]); v2.2 thread created (knowledge-marketplace-v22.md, 5 founding questions, D(c) revelation as first primitive). Invariants #160–#161.
+
+---
+
+## Open Questions for #r194+
+
+1. **Audit brief delivery channel:** Should the Zellic brief be delivered as a public GitHub document (transparent, auditor can verify against code later) or as a private NDA-covered briefing (protects mechanism details pre-launch)? ValCtrl policy for pre-launch competitive IP disclosure?
+
+2. **knowledge-marketplace-v22.md Q1 resolution (first DISCOVERY_MODE run):** Begin the DISCOVERY_MODE research thread. First question: Is EQ escrow-conditioned query the minimal mechanism for incentive-compatible D(c) revelation, or is a subsidised scoring rule (governance-declared base reward, no unknower payment) sufficient while being strictly epistemically inferior to LMSR?
+
+3. **W_MAX and new class bootstrap:** At Phase-1 genesis, total_active_weight_at_epoch_open = 0 (no prior claims). W_MAX is undefined. Resolution: during bootstrap epoch, use W_MAX = k_a_max_single_stake × w_max_pct — the maximum individual stake that can be submitted in one claim. This effectively imposes a flat per-claim weight cap during bootstrap that converges to the dynamic formula once a full epoch of claims exists.
+
+4. **GovernanceParams audit scope confirmation:** The 12 relational constraints from Q1 — confirm these are to be in-scope for the Zellic engagement. Do all 12 require an explicit test case in the audit, or are some sufficiently simple that the auditor's manual inspection is sufficient without a dedicated PoC?
