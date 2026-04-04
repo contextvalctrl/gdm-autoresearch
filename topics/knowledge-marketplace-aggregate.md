@@ -19507,3 +19507,198 @@ Phase 4 — Decommission:
 4. **COMMITTEE model vs standard T3 coexistence at a single coordinate class:** Can a single class simultaneously host standard T3 knowers and COMMITTEE participants? Or is COMMITTEE a class-level mode flag replacing T3 mechanics entirely? If coexistent, how does S_cred aggregation weight the two populations?
 
 *Last updated: #r228 — 2026-04-04T12:32Z*
+
+---
+
+## #r229 Contributions — 2026-04-04T12:42Z
+
+Addresses all four open questions from #r228. Net-new first-principles angle: the **COMMITTEE vs T3 coexistence question** doubles as a broader question about the mechanism's identity — is it a credibility-attestation protocol or a structured deliberation protocol, and can these co-occupy a class?
+
+---
+
+### Q1 (CPA_cycle_flag governance review SLA — innocent-until-reviewed vs blocked-until-cleared) → N_calibration-epoch review window; blocked-until-cleared by default; default-proceed exception only if governance is provably unavailable (#r229)
+
+**The design choice is between two failure modes:**
+
+- *Innocent-until-reviewed:* If governance does not act in time, the flagged address gets grace. Upside: no accidental blocking of legitimate participants; downside: adversary who repeatedly exonerates-then-re-clusters exploits the review latency to obtain grace windows on new classes before governance catches up.
+
+- *Blocked-until-cleared:* If governance does not act in time, the block holds. Upside: adversary gets no benefit from review latency; downside: legitimate participants with accidental cluster history remain blocked through governance inaction.
+
+**The asymmetry:** The cost of a false block (legitimate participant delayed N_calibration epochs from grace window entry) is bounded and recoverable — they enter at STANDARD_CREDIBILITY, which is not disqualifying. The cost of a false allow (adversary gains grace windows on multiple new classes during review latency) is potentially large and systemic — it seeds multiple classes with biased S_cred before the compound failure is detectable.
+
+**Resolution — blocked-until-cleared with N_calibration-epoch review deadline:**
+
+```
+CPA_cycle_review_protocol(address_A):
+  At n_CPA_cycles(A) > CPA_cycle_flag_threshold:
+    EAT event: CPA_cycle_flag { address_A, n_cycles, flag_epoch }
+    grace_window_blocked_until_reviewed = true
+    governance_review_deadline = flag_epoch + N_calibration
+
+  Governance review options within N_calibration epochs:
+    1. CLEAR: governance determines cycles are innocent; grace_window_blocked = false
+    2. QUARANTINE: governance determines cycles are adversarial; manual approval required
+    3. NO ACTION: after N_calibration epochs: grace block maintained; not escalated to quarantine
+```
+
+**Why NO ACTION → maintain block (not quarantine):** Automatic escalation to quarantine on governance inaction would create a governance-inaction-as-weapon: anyone could flag a legitimate address at a busy governance period and force quarantine through inaction. The block is a softer outcome — it removes the grace window shortcut (optional) but does not permanently impair earned credibility_ratio.
+
+**Why NO ACTION → maintain block (not release):** Defaulting to innocent-until-reviewed is only safe if review SLA is guaranteed. Governance availability is not guaranteed. The default must protect the protocol, not the registrant.
+
+**Design law (#r229):** Blocked-until-cleared is the correct default when false-allow costs are systemic and false-block costs are bounded and recoverable. Governance inaction cannot create automatic quarantine — that weaponises the flag mechanism. Block persists until explicit governance action. (#r229)
+
+---
+
+### Q2 (Δ_abstain reduction and expanding abstention budgets — windfall or intentional benefit?) → Intentional and correct; budget expansion is consistent with static-commitment; no cap required (#r229)
+
+**The scenario:** Governance corrects Δ_abstain from 0.05 to 0.035. Committees near threshold with budget = (ratio − θ_min) / 0.05 = 6 epochs expand to budget = (ratio − θ_min) / 0.035 ≈ 8.6 epochs.
+
+**Analysis — why this is intentional:**
+
+The Δ_abstain reduction occurs because the empirical wrong-claim floor is lower than previously estimated. The original Δ_abstain was set too high relative to actual wrong-claim penalties. Committees drained faster than the structural model required.
+
+Budget expansion is the correct retroactive rebalancing — partial compensation for excessive drain under the over-strict parameter. Capping the budget at pre-correction levels would lock in the historical over-drain, which is worse.
+
+**The static-commitment analogy:** Static-commitment design law (#r137) prohibits retroactively worsening commitments. Parameter corrections that benefit participants flow through naturally — no cap needed.
+
+**Strategic exploitation concern:** Could a committee abstain strategically just before a reduction to convert precarity into comfortable budget? Not feasible: (a) reduction is empirically triggered — unpredictable to individual committees; (b) requires N_calibration resolutions to establish floor; (c) the committee cannot influence the empirical wrong-claim floor without submitting wrong claims (which penalises credibility_ratio more severely than any budget gain).
+
+**Design law (#r229):** Δ_abstain reduction causes proportional budget expansion. This is the correct, intentional parameter-correction benefit consistent with static-commitment. No cap required; strategic exploitation infeasible. (#r229)
+
+---
+
+### Q3 (Queue drain timing during DA outage in the freeze window) → Phase 3 tolls to first normal-mode epoch post-T_freeze; no events lost; batched drain required for large queues (#r229)
+
+**Two sub-cases:**
+
+**Sub-case A: DA outage begins before T_freeze:** Epoch E boundary commit cannot be written. T_freeze does not fire. Old CredibilityAggregator retains write auth. Upgrade is effectively paused until normal mode resumes. No intervention needed — the upgrade-freeze is a normal-mode mechanism and resumes naturally on DA recovery.
+
+**Sub-case B: DA outage begins after T_freeze but before T_freeze + 1:**
+T_freeze fired (write auth removed from old contract, pending write queue populated). Phase 3 cannot execute in degraded mode — no epoch boundaries commit. Pending writes accumulate in old contract's local queue.
+
+On DA recovery:
+```
+"T_freeze + 1" semantics:
+  = first normal-mode epoch boundary after T_freeze (not wall-clock)
+
+Phase 3 fires on first normal-mode epoch post-T_freeze:
+  new_CredibilityAggregator: write_auth granted
+  Pending queue drained (includes all CPA detections during the outage window)
+  No events lost — old contract queued detections regardless of DA status
+```
+
+**Why old contract can queue during Sub-case B:** CPA detection logic runs in CredibilityAggregator's computation layer, not dependent on DA (DA is required for EAT commits; local computation continues). Old contract detects and queues; cannot write to registry (write auth frozen).
+
+**Queue drain alongside challenge windows:** Both Phase 3 and challenge window expiry toll in normal-mode epochs independently. No interaction.
+
+**Maximum queue depth:** Long DA outages produce large pending-write queues. Phase 3 drain must support batching:
+
+```
+new_CredibilityAggregator:
+  function drainAll() → processes full queue in single call (risk: gas limit exceeded)
+  function drainNextN(uint256 n) → processes N items; caller iterates until queue empty
+  drainNextN is the primary interface; drainAll is a gas-efficiency shortcut for small queues
+```
+
+**Design law (#r229):** Upgrade-freeze Phase 3 is a normal-mode operation. DA outage delays but does not break it. "T_freeze + 1" is the first normal-mode epoch post-freeze. Queue depth is the only operational concern; batched drain support is required. (#r229)
+
+---
+
+### Q4 (COMMITTEE vs T3 coexistence at a single class — mutual exclusion resolution) → COMMITTEE is a class-level mode flag; T3 and COMMITTEE are mutually exclusive; three epistemic primitives; cross-mode via implication chains only (#r229)
+
+**Why they cannot coexist in the same S_cred aggregation:**
+
+T3 knowers contribute to S_cred via CredibilityAggregator batch integration (private signal revelation). COMMITTEE participants produce oracle_declared via credibility-weighted median (expert deliberation). If both contribute to the same class:
+
+1. oracle_declared is partially derived from T3-S_cred → committee endogeneity (Invariant #301) re-introduced even with commit-reveal, because T3-S_cred is a second input to the committee's decision context.
+2. The log-score scoring model for T3 is "accuracy relative to oracle truth" — but oracle truth for a mixed class is partially the T3-S_cred itself → circular definition.
+3. No consistent oracle authority / knower attestor duality (#r151) is possible if oracle truth is a mixture of T3 and COMMITTEE contributions.
+
+**Resolution — class_oracle_mode as immutable class-level flag:**
+
+```
+class_oracle_mode ∈ { AUTOMATED | COMMITTEE | HYBRID_EXTERNAL }
+
+AUTOMATED:
+  S_cred from T3 knowers via CredibilityAggregator batch integration
+  COMMITTEE participants: NOT PERMITTED
+  oracle_declared: automated external source (price feed, on-chain event, Chainlink)
+  T3 escrow + slash + log-score fully operational
+  GS bilateral-flow active in v2.2
+
+COMMITTEE:
+  S_cred from COMMITTEE credibility-weighted median votes
+  T3 installations: NOT PERMITTED
+  oracle_declared: committee credibility-weighted median
+  No T3 escrow/slash/log-score; Δ_abstain and committee credibility mechanics apply
+  Bilateral-flow in COMMITTEE mode is a v2.3 question (not yet specified)
+
+HYBRID_EXTERNAL (v2.1 default):
+  oracle_declared: independent external source (no S_cred feedback)
+  S_cred updates from T3 knowers
+  No endogeneity (oracle is independent of S_cred)
+  Standard CLEARING_MODE pattern from v2.1; bilateral-flow applies to T3 side
+```
+
+**Two-class bridge for cross-mode aggregation:**
+
+If a COMMITTEE class needs a T3 financial-signal input, committee members may *observe* a correlated AUTOMATED class's S_cred as exogenous context — but cannot participate in that class or submit its S_cred as a COMMITTEE vote. The cross-class implication chain (A→B) is the mechanism for bonus compensation when A-side knowledge informs B-side decisions.
+
+**class_oracle_mode immutability gate:** Required at registration (no default). Immutable after epistemically_live = true. Mode change requires full class wind-down + new registration.
+
+**Three epistemic primitives taxonomy:**
+
+| Primitive | Mode | Source of truth | Capital function |
+|---|---|---|---|
+| Private signal revelation | AUTOMATED | Dispersed private knowledge | Commitment + calibration |
+| Expert deliberation | COMMITTEE | Structured expert judgment | Reputation gate + abstention penalty |
+| External oracle settlement | HYBRID_EXTERNAL | Independent automated source | Settlement authority only |
+
+The founding cron's bilateral-flow analysis applies exclusively to AUTOMATED mode. COMMITTEE emerged as a necessary extension for coordinates where dispersed private signals are unavailable or insufficient.
+
+**Design law (#r229):** COMMITTEE and T3 mechanics are mutually exclusive at the class level. Mixing would re-introduce oracle endogeneity (Invariant #301). Oracle/knower duality requires mode separation. Cross-mode information flows are permitted via implication chains as external context, not direct S_cred participation. Mode is immutable post-epistemically_live. (#r229)
+
+---
+
+## Structural Synthesis: #r229
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| CPA_cycle_flag SLA | Blocked-until-cleared; N_calibration review; NO ACTION → block maintained (not quarantine, not release) | False-allow cost > false-block cost; adversary gains nothing from governance latency |
+| Δ_abstain reduction budget expansion | Intentional benefit; consistent with static-commitment; no cap; exploitation infeasible | Parameter corrections flow through; static-commitment prohibits worsening only |
+| Queue drain during DA outage | Phase 3 tolls to first normal-mode epoch; queue accumulates without loss; batched drainNextN required | Upgrade-freeze is normal-mode; DA outage delays but does not break it |
+| COMMITTEE vs T3 coexistence | Mutually exclusive mode flags; three-primitive taxonomy; implication chains as sole cross-mode channel | Mixing re-introduces oracle endogeneity; oracle/knower duality requires mode separation |
+
+---
+
+## Cumulative Invariants (#r229)
+
+**Invariant #324 (#r229):** CPA_cycle_flag governance review: governance has N_calibration epochs to CLEAR or QUARANTINE. Default on no-action: grace_window_blocked maintained (not released, not escalated to quarantine). Automatic escalation to quarantine on governance inaction is prohibited — governance inaction cannot be weaponised against legitimate participants.
+
+**Invariant #325 (#r229):** Δ_abstain reduction causes proportional budget expansion on existing committees. This is the correct, intentional parameter-correction benefit consistent with static-commitment design law. No cap on budget expansion; no grandfather required. Strategic exploitation infeasible due to empirical-trigger unpredictability.
+
+**Invariant #326 (#r229):** Upgrade-freeze Phase 3 (write-auth transfer + queue drain) is a normal-mode operation. DA outage between T_freeze and T_freeze + 1 does not lose events — old contract queues CPA detections regardless of DA state. Phase 3 executes on the first normal-mode epoch boundary post-T_freeze. Batched `drainNextN(N)` support required for large queues from extended outages.
+
+**Invariant #327 (#r229):** class_oracle_mode is a required immutable registration field (AUTOMATED | COMMITTEE | HYBRID_EXTERNAL). T3 and COMMITTEE mechanics are mutually exclusive within a class. Mixing would re-introduce oracle endogeneity (Invariant #301). Cross-mode information flows are permitted via implication chains as external context only — not as direct S_cred participation. Mode change after epistemically_live = true requires full class wind-down + new registration.
+
+**Invariant #328 (#r229):** Three epistemic primitives in GestAlt: (1) Private signal revelation (AUTOMATED) — bilateral flow primitive; capital = commitment + calibration; (2) Expert deliberation (COMMITTEE) — structured deliberation primitive; capital = reputation gate + abstention accountability; (3) External oracle settlement (HYBRID_EXTERNAL) — settlement primitive; capital has no epistemic function. The founding cron's bilateral-flow analysis applies exclusively to AUTOMATED mode.
+
+---
+
+## Run Log Update
+
+- **#r229** — 2026-04-04T12:42Z — Q1: CPA_cycle_flag → blocked-until-cleared; N_calibration review SLA; no-action → block maintained (not quarantine, not release); governance inaction cannot be weaponised. Q2: Δ_abstain reduction → budget expansion is intentional, consistent with static-commitment; no cap; exploitation infeasible due to empirical trigger. Q3: Phase 3 queue drain tolls to first normal-mode epoch; DA outage delays but queues don't lose events; batched drainNextN for large queues. Q4: COMMITTEE and T3 are mutually exclusive class-level mode flags; oracle endogeneity prohibits mixing; three-primitive taxonomy (AUTOMATED/COMMITTEE/HYBRID_EXTERNAL); implication chains as sole cross-mode channel. Invariants #324–#328.
+
+---
+
+## Open Questions for #r230+
+
+1. **HYBRID_EXTERNAL and bilateral-flow in v2.2:** HYBRID_EXTERNAL is the v2.1 default (external oracle + T3 attestation). In v2.2 bilateral-flow, EQ demand signal D(c) is needed for the GS resolution loop. In HYBRID_EXTERNAL mode, T3 knowers generate D(c) via q_bonus commitments. Is HYBRID_EXTERNAL's GS bilateral-flow analysis equivalent to AUTOMATED mode with an external rather than committee oracle? Or does the external oracle's independence from S_cred create asymmetries in the Phase 2 maintenance incentive?
+
+2. **class_oracle_mode correction before epistemically_live = true:** If class_oracle_mode is set incorrectly at registration, wind-down + re-registration is expensive. Is there a governance correction window before epistemically_live = true during which class_oracle_mode can be updated without triggering full wind-down?
+
+3. **COMMITTEE S_cred convergence profiles:** S_cred convergence profiles (SMOOTH_DELTA, QUIESCENT_WINDOW, BINARY_ANCHOR) were designed for T3 batch claim integration. Are they applicable to COMMITTEE classes (where S_cred is produced by committee vote, not CredibilityAggregator), or does COMMITTEE mode produce a structurally different S_cred update function?
+
+4. **CPA_cycle block and v2.2 bootstrap knower density:** If high-credibility knowers are CPA-cycle-blocked, their absence from grace windows reduces effective knower pool for new class bootstrapping. At v2.2 launch, could systematic blocking of high-credibility flagged knowers push a class below the EDS* threshold?
+
+*Last updated: #r229 — 2026-04-04T12:42Z*
