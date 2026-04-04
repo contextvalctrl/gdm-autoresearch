@@ -23573,3 +23573,185 @@ Applies to: AUTOMATED and HYBRID_EXTERNAL classes during high-consensus epochs; 
 4. **De-meaned CPA and low-participation classes (k_min = 3):** In a class with only 3 active knowers, `mean_B_epoch` is computed from three values. De-meaning a group of three produces cross-pair correlations highly sensitive to outliers; the common factor is poorly estimated from three points. Define a minimum participation threshold below which de-meaned CPA is suspended and replaced by a simpler individual-threshold monitor.
 
 *Last updated: #r247 — 2026-04-04T15:52Z*
+
+---
+
+## #r248 Contributions — 2026-04-04T16:12Z
+
+Addresses all four open questions from #r247. Net-new structural observation: **de-meaned correlation is not a plug-in replacement for the existing CPA threshold — it is a different random variable with a lower variance, requiring a tighter threshold to preserve detection power.** The threshold portability assumption is wrong; recalibration is mandatory.
+
+---
+
+### Q1 (Invariants #311–#316 CPA update — de-meaned correlation threshold recalibration) → Threshold is NOT portable; de-meaned correlation has lower variance in high-consensus epochs; recalibrate via null-distribution simulation; interim conservative tightening to 0.65× CPA_correlation_threshold (#r248)
+
+**The portability failure:**
+
+Level correlation `corr(B_a, B_b)` = de-meaned correlation + mean-interaction term:
+
+```
+corr(B_a, B_b) = corr(B_a − mean_B, B_b − mean_B) + (mean_B² contribution)
+```
+
+In high-consensus epochs, the mean interaction term is large — level correlation is inflated by the shared consensus signal even for genuinely independent knowers. The original CPA_correlation_threshold was calibrated against this inflated level distribution. De-meaned correlation's null distribution (for independent knowers) has lower mean and lower variance than level correlation's null distribution.
+
+If the same threshold T is applied to de-meaned correlation, false positive rate drops — the detector becomes less sensitive, passing manipulation as genuine consensus. This is the opposite of the intent.
+
+**Recalibration methodology:**
+
+```
+Null distribution simulation:
+  Generate N_sim = 10,000 synthetic knower pairs with independent Gaussian claim processes.
+  Compute de_meaned_corr(a, b) across simulated epochs spanning both high- and low-consensus regimes.
+  Identify T_demeaned such that P(de_meaned_corr > T_demeaned | independent) = alpha_CPA_false_positive_target.
+  alpha_CPA_false_positive_target: governance-set; default 0.05 (5% false positive rate)
+
+Protocol bootstrap (pre-simulation data):
+  CPA_correlation_threshold_demeaned = CPA_correlation_threshold_original x 0.65
+  [Conservative interim tightening; 0.65x accounts for typical mean interaction deflation]
+  Replaces original CPA threshold immediately.
+
+Post-N_calibration empirical update:
+  Once >= N_calibration x N_classes_active resolved epoch pairs exist for null distribution sampling:
+    Run simulation against observed null distribution; update CPA_correlation_threshold_demeaned.
+    parameter_genesis_exit EAT event.
+```
+
+**Protocol-wide application (Invariants #311–#316 update):**
+
+All CPA detection logic across all oracle modes replaces `corr(B_a, B_b)` with `corr(B_a - mean_B_epoch, B_b - mean_B_epoch)`. The threshold transitions from `CPA_correlation_threshold_original` to `CPA_correlation_threshold_demeaned` (default: 0.65x interim; empirical post-calibration) at the same epoch this invariant activates. Transition is atomic at epoch boundary.
+
+**Design law (#r248):** De-meaned correlation requires its own threshold calibration. The 0.65x interim tightening is not a permanent value — it is a conservative prior pending null-distribution simulation. Any mechanism change to the CPA correlation base statistic requires accompanying threshold recalibration. Threshold portability across correlation transformations is never assumed. (#r248)
+
+---
+
+### Q2 (`B_side_thinning_alert` and unknower q_bonus refund option) → Opt-out q_bonus refund within 1 epoch of alert; partial refund = q_bonus_committed x (1 - q_retraction_fee); q_retraction_fee = 0.10 default; prevents demand signal gaming (#r248)
+
+**First-principles analysis:**
+
+An unknower posts q_bonus commitment as proof of genuine decision-need. When knower supply thins sharply, the epistemic product the unknower is paying for degrades: fewer credibility-diverse contributors means S_cred confidence interval widens and the state estimate becomes less useful for decision-making.
+
+**Resolution — opt-out with partial refund:**
+
+```
+Trigger: B_side_thinning_alert fires at epoch close for class_B, epoch_t
+  -> All active unknower q_bonus commitments on class_B enter 1-epoch refund window.
+
+Refund election:
+  Unknower may submit refund_election within epoch_t+1 (1 epoch window).
+  Partial refund: q_bonus_returned = q_bonus_committed x (1 - q_retraction_fee)
+  q_retraction_fee: governance-set per class at registration; default 0.10; bounds [0.05, 0.25]
+  Non-electing unknowers: q_bonus continues as committed; paid out at T_anchor normally.
+
+q_retraction_fee destination:
+  -> protocol_maintenance_reserve (not to knowers; prevents knowers gaming thinning to extract fees).
+
+Secondary q_bonus commitment cap:
+  If retraction_rate_epoch > retraction_surge_threshold x 2 (default 0.50):
+    New q_bonus commitments on class_B PAUSED for epoch_t+1.
+    Pause lifts at epoch_t+2 regardless.
+```
+
+**Why 1 epoch window (not immediate):** Unknowers need time to assess whether thinning is temporary (knowers will reinstall next epoch) or permanent (class is abandoned). A 1-epoch delay provides this without enabling within-epoch cascade dynamics.
+
+**Design law (#r248):** Supply collapse entitles unknowers to partial refund; delay prevents cascade; fee prevents gaming. New commitment pause at 2x surge threshold prevents re-entry into a near-empty demand-supply mismatch. (#r248)
+
+---
+
+### Q3 (Governance suspension at p_smooth <= 0.50 — existing unknower EQ early exit) → Suspension gives unknowers automatic 2-epoch early-exit option with same q_retraction_fee mechanism; simultaneous events merge to 2-epoch window (#r248)
+
+**Why this is distinct from B_side_thinning_alert:**
+
+Installation suspension (Invariant #395) signals that A is unlikely to enter its upstream range — a probability signal, not a supply shock. Existing knower claims remain active. Unknowers holding q_bonus commitments face demand for a state estimate whose oracle trigger may never fire.
+
+**Resolution:**
+
+```
+Trigger: implication_class_high_miss_risk EAT event (p_smooth <= 0.50)
+  -> All active unknower q_bonus commitments on class_B enter 2-epoch refund window.
+     (2 epochs vs 1: probability signal is slower-moving; more deliberation time appropriate)
+
+Refund election: same q_retraction_fee mechanics (Q2 above); fee = 0.10 default.
+Non-electing unknowers: q_bonus continues.
+
+Recovery: if p_smooth > 0.60 (hysteresis) before window closes:
+  EAT: `implication_high_miss_risk_cleared`. Refund window closes at originally scheduled epoch.
+
+Simultaneous B_side_thinning_alert + implication_class_high_miss_risk:
+  2-epoch window governs; fees do not stack; single election covers both events.
+```
+
+**Design law (#r248):** Unknower early-exit rights attach to any significant negative epistemic signal. Supply shock -> 1-epoch window. Probability collapse -> 2-epoch window. Windows merge when simultaneous; fees do not compound. (#r248)
+
+---
+
+### Q4 (De-meaned CPA and low-participation classes — minimum participation threshold) → k_cpa_demeaned_min = 5; below: individual Z-score deviation monitor replaces CPA (#r248)
+
+**The statistical problem:**
+
+With k = 3 active knowers, de-meaning creates a sample with only 2 degrees of freedom. Cross-pair de-meaned correlations are artificially elevated by construction — false positive rates may exceed 50%.
+
+**Resolution:**
+
+```
+k_cpa_demeaned_min: governance-set; default 5; bounded [4, 10]
+
+Below k_cpa_demeaned_min: individual deviation monitor
+  deviation_score(a) = |B_claim_a - S_cred_prior| / sigma_S_cred_prior  [Z-score]
+  Trigger: >= floor(k x 0.67) knowers simultaneously at correlated Z-score extreme
+  EAT: `cpa_thin_market_flag` (governance alert only; no CPA penalty)
+
+At or above k_cpa_demeaned_min: full de-meaned CPA (Invariant #396).
+Transition: immediate at epoch boundary when k crosses k_cpa_demeaned_min.
+```
+
+**Design law (#r248):** De-meaned CPA requires minimum k >= k_cpa_demeaned_min (default 5; ensures >= k-1 = 4 degrees of freedom). Thin markets are epistemically riskier and statistically harder to police — this is a declared scope constraint, not a mechanism failure. (#r248)
+
+---
+
+## Net-New Structural Observation: Symmetry of Supply and Demand Release Clauses (#r248)
+
+Across Q2 and Q3, a general principle emerged: mechanism commitment structures must have symmetric release triggers for supply shocks and probability shocks on both supply and demand sides.
+
+- Supply shock (knower retraction surge) -> unknower demand release [Q2, resolved]
+- Probability signal shock (p_smooth floor breach) -> unknower demand release [Q3, resolved]
+- Demand collapse (unknower mass q_bonus refund) -> knower early retraction? [open for #r249]
+
+If unknowers mass-exit via q_bonus refund after a B_side_thinning_alert, surviving knowers face a class with no meaningful demand signal. They have committed escrow for a state estimate no one is paying for. The symmetric release — knower retraction option on demand collapse — is a structural open question. (#r248)
+
+---
+
+## Structural Synthesis: #r248
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| CPA threshold portability at de-meaned | NOT portable; 0.65x interim tightening; null-simulation calibration post-N_calibration | Threshold must be calibrated jointly with the correlation statistic |
+| B_side_thinning unknower refund | 1-epoch opt-out window; q_retraction_fee = 0.10; fee to reserve; new commitment pause at 2x surge | Supply collapse entitles partial refund; delay prevents cascade; fee prevents gaming |
+| Suspension and existing unknower EQ | 2-epoch opt-out window from implication_class_high_miss_risk; same fee; windows merge if simultaneous | Probability collapse triggers same partial release; no fee stacking |
+| De-meaned CPA thin-market floor | k_cpa_demeaned_min = 5; below: individual Z-score deviation monitor; above: full de-meaned CPA | Statistical validity requires >= k-1 = 4 DoF; thin markets declared scope constraint |
+| Symmetric release clauses | Supply shock -> unknower release: resolved. Demand shock -> knower release: open for #r249. | Supply/demand release symmetry is a general mechanism design requirement |
+
+---
+
+## Cumulative Invariants (#r248)
+
+**Invariant #398 (#r248):** CPA correlation threshold for de-meaned base (Invariant #396) is NOT portable from the original level-correlation threshold. Interim: `CPA_correlation_threshold_demeaned = CPA_correlation_threshold_original x 0.65`. Post-N_calibration: empirical null-distribution simulation (N_sim = 10,000 synthetic independent pairs; alpha = 0.05 false positive target) updates to empirical threshold. Transition to empirical threshold at epoch boundary (atomic); EAT `parameter_genesis_exit`. Invariants #311-#316 and Invariant #396 use this threshold.
+
+**Invariant #399 (#r248):** B_side_thinning_alert unknower refund: 1-epoch opt-out window from alert epoch; refund = q_bonus_committed x (1 - q_retraction_fee); q_retraction_fee governance-set per class [0.05, 0.25] default 0.10; fee to protocol_maintenance_reserve. Non-electing unknowers continue normally. New q_bonus commitments PAUSED for 1 epoch if retraction_rate_epoch > 2x retraction_surge_threshold. Pause lifts at epoch+2.
+
+**Invariant #400 (#r248):** `implication_class_high_miss_risk` EAT event triggers 2-epoch q_bonus refund window for existing unknower commitments on class_B; same q_retraction_fee mechanics as Invariant #399. Recovery signal `implication_high_miss_risk_cleared` emitted if p_smooth > 0.60 before window closes; window closes at originally scheduled epoch regardless. Simultaneous B_side_thinning_alert + implication_class_high_miss_risk: 2-epoch window governs; fees do not stack; single election covers both events.
+
+**Invariant #401 (#r248):** De-meaned CPA requires k >= k_cpa_demeaned_min (default 5; bounded [4, 10]). Below threshold: individual deviation monitor — deviation_score(a) = |B_claim_a - S_cred_prior| / sigma_S_cred_prior; trigger when >= floor(k x 0.67) knowers simultaneously show correlated Z-score extreme. EAT: `cpa_thin_market_flag` (governance alert only). Transition between monitors immediate at epoch boundary. Thin markets are a declared CPA detection scope constraint.
+
+---
+
+## Open Questions for #r249+
+
+1. **Symmetric release: demand collapse -> knower early retraction option:** When unknower q_bonus commitments drop below a minimum demand threshold (q_bonus_active_count < q_bonus_min_viable, or q_bonus_committed_total < q_bonus_floor), should knowers receive a symmetric early retraction option with partial penalty? Define the demand threshold, trigger mechanism, and whether knower early exit is at the same fee level as unknower early exit.
+
+2. **CPA_correlation_threshold_demeaned null-simulation — data source choice:** The null distribution is from N_sim = 10,000 synthetic Gaussian pairs. Real claim processes are non-Gaussian and show macro-epoch correlation even for independent knowers. Should the null distribution use (a) parametric Gaussian simulation or (b) block-bootstrap from historical claim pairs confirmed non-coordinated? Option (b) is more realistic but requires a validated non-coordinated claim dataset.
+
+3. **q_retraction_fee destination — protocol_maintenance_reserve vs challenger_pool:** Q2 resolved fee to protocol_maintenance_reserve (prevents knowers gaming thinning). But challenger_pool is the canonical destination for epistemic-signal-related penalties (Invariant #388). Is maintenance_reserve correct for unknower q_retraction_fees, or should it follow the challenger_pool pattern?
+
+4. **Invariant #398 interim 0.65x tightening and false negative risk:** The 0.65x interim was reasoned without formal basis. If actual deflation ratio is higher (e.g., 0.80x in low-consensus epochs), the interim is too tight — generating false positives against legitimate high-consensus knowers. Define sensitivity analysis: at what range of actual deflation ratios does 0.65x produce acceptable false-positive and false-negative rates versus the level-correlation baseline?
+
+*Last updated: #r248 — 2026-04-04T16:12Z*
