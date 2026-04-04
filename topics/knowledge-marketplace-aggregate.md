@@ -26014,3 +26014,124 @@ Family D remains the surviving architecture; this run tightens it into a 3-layer
 4. **Family D + migration:** when a coordinate migrates from Discovery→Validation, should cluster membership transfer (`w_c`, `Σ_res` history) be hard reset, smooth transfer, or weighted blend to avoid both discontinuity and exploitative membership gaming?
 
 *Last updated: #r261 - 2026-04-04T18:32Z*
+## #r262 Contributions — 2026-04-04T18:42Z
+
+This run resolves the four #r262 open questions. It keeps the comparison goal explicit: **knowledge market as constrained information utility flow**, with no reversion to continuous pricing or matching. Families are re-scored accordingly.
+
+### Q1 (Backstop governance interaction) → Hierarchical `L_v` governance with per-cluster hard shares (global-cap, cluster-cap, emergency override) (#r262)
+
+A single global `L_v` is too coarse; one niche cluster can drain capacity and crowd out unrelated classes. Conversely, per-class governance creates fragmentation and opaque favoritism. Use a two-level allocation:
+
+1. **Global base cap `L_v_global`**: hard protocol ceiling for all liquidity backstop calls per epoch.
+2. **Cluster caps `L_v_cluster`**: each cluster receives a fixed share `w_c` of `L_v_global` with `Σ w_c = 1`.
+3. **Class share ceilings `L_v_class,max(c)`**: soft per-class guardrails tied to class risk score and resolved reserve exposure.
+
+Call rule per epoch/class:
+
+`L_v_call,eff(c) = min( L_v_cluster(c), L_v_class,max(c), q_rev_cap_t(c), R_prim_available(c) )`.
+
+If a class exhausts share repeatedly (`>k` consecutive epochs), it loses call priority until `U_cluster` / drawdown normalizes. This prevents one class from absorbing entire LP capacity while preserving class-specific continuity.
+
+**Governance split:** cluster caps are set by committee only for clusters explicitly using a dedicated backstop budget line; untouched clusters remain at global default shares. Cross-cluster drift is automatic and auditable (`w_c` updates only on cadence, with rationale recorded in EAT).
+
+Design law (#r262): `L_v` calls are bounded by `L_v_call,eff(c) = min(L_v_cluster(c), L_v_class,max(c), q_rev_cap_t(c), R_prim_available(c))`; it is allocated in layers and can only hard-cap local extraction, not increase any class payout.
+
+### Q2 (Penalty decay tuning) → Safe operating envelope for `δ_decay` and `osc_penalty_bump` (`osc_penalty` not welfare-dominant) (#r262)
+
+Define welfare-loss dominance ratio (worst-case):
+
+`ρ_w = (E[osc_penalty_bump]) / (E[long-run discovery surplus lost due to conservative mode over H_switch·τ epochs])`.
+
+To avoid penalty becoming welfare-dominant in normal operation, require:
+
+`0 < δ_decay ≤ 0.30` (per-epoch decay rate),
+`0.5 ≤ osc_penalty_bump ≤ 2.0 × max_cycle_gain_bound`,
+`osc_penalty_floor >= osc_bound` from #r260,
+
+with dynamic clipping:
+
+`osc_penalty_bump_t = min( osc_penalty_cap, max(osc_penalty_floor, β_osc · σ_A^{-1}(DD_t) · q_rev_cap_state/ b̂_claim ))`
+
+where `σ_A` is observed residual adversary capital leverage and `β_osc` is governance-gated but bounded [0.5, 5.0].
+
+**Stability rule:** if `δ_decay > 0.30` then `osc_penalty` becomes inert under moderate churn and invites oscillation arbitrage. If `δ_decay < 0.05` plus large `osc_penalty_bump`, oscillation penalties can stack into systemic drag. Keep defaults in a narrow band and clamp by real-time `osc_penalty_cap` from `DD_t` and `H_switch`.
+
+Design law (#r262): penalty decay and bump are set to keep `ρ_w` near 1 under stress and < 0.2 under calm states.
+
+---
+
+### Q3 (Compressed-root verifiability) → Witness budget and challenge window to prove tuple claims without full download (#r262)
+
+Use epoch-state roots over classes plus transition snapshots:
+
+- Build per-epoch **class-state Merkle root** over fixed 1:N canonical tuple keys (`zone_state`, `ρ_obs`, `C`, `U_t`, `q_rev_cap`, switches).
+- Keep transition snapshots in an append-only transition log keyed by `(epoch, class, transition_id)`.
+
+Verifier model:
+- O(log N) witness for any class-state tuple at epoch `t`.
+- To dispute semantic transitions, fetch transition leaf hashes for window `[t-Δ, t+Δ]`.
+- `Δ` minimum challenge window default 3 epochs; after `2Δ+1`, no challenge for that transition (finality).
+
+This is sufficient because transitions are the only rule-changing events; deterministic kernels replay in-between states.
+
+Design law (#r262): integrity scales logarithmically, dispute resolution scales with disputed transitions only, not total history.
+
+### Q4 (Family D + migration: cluster membership transfer) → Weighted membership blend with cooldown, anti-gaming eligibility gate (#r262)
+
+Hard-resetting cluster state on migration creates discontinuity; full carry causes lock-in. Use bounded blend:
+
+`w_c,new = (1-η_mig)·w_dest + η_mig·w_src`,
+
+`η_mig = clip( n_norm / (n_norm + n_anchor), 0, 0.25 )`.
+
+`n_norm` = normalized active-resolution window on destination track; `n_anchor` = governance anchor.
+
+Per migration event, clamp η≤0.25 and enforce cooldown `M_mig_min` epochs between migrations per class.
+
+**Anti-gaming clause:** if migration occurs earlier than `M_mig_min` since prior migration, migration is accepted but applies `η_mig = 0` for `M_penalty` epochs (no transfer impact) to prevent transfer arbitrage.
+
+Design law (#r262): migration transfers only partial cluster memory through bounded smoothing and cooldown; continuity without share teleportation.
+
+---
+
+### Net-new design verdict after #r262
+
+**Family D (Twin-Layer with constrained controls + backstop) remains the only viable non-orderbook/LMSR family.**
+
+- Family A remains only in high-observability / high-source-entropy windows; otherwise holdover + capped payouts.
+- Family B/C remain rejected (redistribution-equivalent and single-source trust).
+- Family E (stochastic adjudication market) rejected because it reintroduces endogenous quote competition and breaks credibility-transfer primitive.
+
+(Ref: #r258–#r261 foundations; #r262 closes remaining #r262 governance/verification/transfer open questions.)
+
+## Structural Synthesis: #r262
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Backstop governance split | 3-tier allocation (`L_v_global`,`L_v_cluster`,`L_v_class`) with deterministic priority | One class cannot absorb LP capacity; allocation is risk-layered |
+| Oscillation tuning | `δ_decay ∈ [0.05,0.30]`, `osc_penalty_bump` bounded by cycle-gain envelope, `ρ_w` target | Penalties stay economically meaningful and decay when safe |
+| Witness depth | Merkle roots + 3-epoch challenge window + transition log | Verifiability without full history dump |
+| Migration membership | Bounded blend transfer `η_mig≤0.25` + cooldown + holdback | Prevents discontinuity and migration-driven cluster-share gaming |
+
+## Cumulative Invariants (additions through #r262)
+
+**Invariant #457 (Hierarchical backstop allocation):** class backstop usage is bounded by `L_v_call,eff(c) = min(L_v_cluster(c), L_v_class,max(c), q_rev_cap_t(c), R_prim_available(c))`. Cluster shares `w_c` are explicit and cadence-updated via EAT.
+
+**Invariant #458 (Penalty envelope):** `0.05 ≤ δ_decay ≤ 0.30`; `osc_penalty_bump` and `osc_penalty_floor` satisfy cycle-loss dominance (`osc_penalty_floor >= osc_bound`, #r260) and keep welfare-loss ratio `ρ_w` within bounds (not dominant in calm regimes).
+
+**Invariant #459 (Verifiability depth):** Per-epoch state roots plus transition snapshots; O(log N) witness for state proof and O(k) transition reconstruction for disputes within challenge window `Δ=3`; past window = final for transition disputes.
+
+**Invariant #460 (Migration transfer):** On track migration, cluster membership transfer uses `w_c,new = (1-η_mig)w_dest + η_mig w_src` with `η_mig≤0.25`, cooldown `M_mig_min`, and temporary `η=0` anti-gaming window `M_penalty` when migrations are rapid.
+
+## Run Log Update
+
+- **#r262** — 2026-04-04T18:42Z — Resolved all #r262 questions by formalizing hierarchical backstop allocation, bounded oscillation-penalty regime, logarithmic verifiability model, and bounded migration memory transfer with cooldown/anti-gaming. Re-confirmed Family D as the surviving mechanism. Added invariants #457–#460 and updated all prior Family-E/Family-A boundary conditions.
+
+## Open Questions for #r263+
+
+1. **Post-finality proof windows:** should an expired transition remain challengeable with fraud-proof commitments if multiple classes allege global schedule drift, or is finality hard at `2Δ+1`?
+2. **Backstop carry-forward policy:** can unused `L_v_cluster` capacity carry forward one epoch, and if so must it be capped to avoid intertemporal hoarding against expected shock windows?
+3. **Auto-tuned `δ_decay`:** can `δ_decay` be set by observed oracle-noise proxy (e.g., realized misspecification half-life) while retaining closed-form welfare bounds on `ρ_w`?
+4. **Migration anti-sybil control:** should `η_mig` decay with destination class age and penalize repeated source clusters to prevent coordinated cross-cluster sybil migration loops?
+
+*Last updated: #r262 - 2026-04-04T18:42Z*
