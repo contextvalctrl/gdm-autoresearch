@@ -4437,3 +4437,159 @@ The compaction-eligibility problem is a specific instance of a broader pattern: 
 4. **LTRP single vs per-class instance for shadow-class wind-down:** Shadow-class LTRP obligation at T_wind_down_max routes to which LTRP? The shadow-class has its own LTRP (registered at shadow-class genesis). At ARCHIVED transition, outstanding obligations transfer to the shadow-class LTRP. But if the shadow-class LTRP is under-funded (thin class), obligations could exceed it. Should the clearing-class LTRP serve as a backstop for shadow-class wind-down obligations, given they share a coordinate?
 
 *Last updated: #r157 — 2026-04-04T00:00Z*
+
+---
+
+## #r158 Contributions — 2026-04-04T00:02Z
+
+Addresses all four open questions from #r157.
+
+**Q1 (Arweave unavailability at compaction time) → Retry SLA with N_arweave_retry_epochs; `arweave_mirror_failed` flag triggers IPFS-only fallback; no compaction blocked (#r158):**
+
+Arweave mirroring is a durability enhancement for post-compaction audit permanence, not a precondition for mechanism operation. Blocking compaction until Arweave confirms would subordinate an on-chain settlement mechanism to an external storage network — a liveness-over-safety inversion.
+
+**Resolution — non-blocking retry with SLA:**
+
+```
+arweave_retry_sla:
+  N_arweave_retry_epochs = 3 macro-epochs  (governance-settable, bounded [2, 8])
+
+  At compaction execution:
+    1. Epoch compacted; compaction_event EAT committed with arweave_tx_id = null (pending).
+    2. Protocol submits Arweave transaction; sets arweave_retry_deadline.
+    3. On Arweave confirmation within deadline:
+         update compaction_event with arweave_tx_id (first-write completion of pending field).
+    4. On deadline expiry without confirmation:
+         emit `arweave_mirror_failed` EAT event; governance alerted; epoch remains IPFS-compacted.
+         arweave_status: failed_open -> retries at each macro-epoch boundary indefinitely
+         until confirmed or governance issues `arweave_mirror_closed` to end retry.
+```
+
+**arweave_status enum (full schema):**
+```
+arweave_status ∈ {
+  not_required,     // DISCOVERY_MODE or governance opt-out; null by design
+  pending,          // CLEARING_MODE mandatory; Arweave tx submitted, not yet confirmed
+  confirmed,        // Arweave tx confirmed; arweave_tx_id populated
+  failed_open,      // Retry SLA expired; retrying
+  failed_closed     // Governance explicitly closed retry; IPFS-only permanent
+}
+```
+
+Compaction is never blocked. `arweave_status: pending` is a valid compacted state. The EAT arweave_tx_id field is a declared-pending field at compaction_event creation; its first-write completion (when Arweave confirms) is not a mutation of prior committed content — consistent with EAT immutability (#r74).
+
+**Design law (#r158):** External storage availability must never be a liveness precondition for on-chain settlement mechanisms. External dependencies are best-effort with retry SLAs; mechanism operations proceed independently. (#r158)
+
+---
+
+**Q2 (market_structure_tier assignment — objective criteria vs governance discretion) → Objective volume threshold; challenge mechanism for incorrect declarations (#r158):**
+
+Pure governance discretion creates a gaming surface: a thin-class registrant inflates tier to access a richer alignment pool, borrowing calibration credibility from liquid classes.
+
+**Resolution — objective eligibility with governance certification:**
+
+```
+tier_eligibility(class_i, proposed_tier_T):
+  TIER_1: 30d_avg_position_volume ≥ V_TIER1_min (e.g., $10M USD, governance-set)
+          AND oracle_address in governance-approved oracle registry
+  TIER_2: V_TIER2_min ≤ 30d_avg_position_volume < V_TIER1_min
+          AND oracle_address in approved oracle registry
+  TIER_3: default (any class not meeting TIER_1/TIER_2)
+  GOVERNANCE_CUSTOM: explicit governance vote; not subject to volume criteria
+```
+
+New classes always start TIER_3 (no 30d history). Tier upgrade after N_upgrade_epochs = 4 normal-mode epochs of position data. Tier downgrade if volume falls below threshold for N_downgrade_epochs consecutive normal-mode epochs.
+
+**Mid-pool tier downgrade — forward exclusion only:** EAT immutability precludes retroactive removal of committed alignment samples. From the downgrade epoch forward, the class contributes to TIER_3 standalone pool only. Prior TIER_1 samples remain in the TIER_1 pool history (already committed to EAT; cannot be removed). N_align_window is re-evaluated from the downgrade epoch for both the downgraded class and the TIER_1 pool.
+
+**Challenge mechanism for incorrect tier declarations:** Any participant may post a `tier_dispute` with on-chain volume evidence and tier_dispute_fee ≥ r_floor_TIER3. Successful challenge: class downgraded; pool membership updated from downgrade epoch. Failed challenge: fee to challenger_pool.
+
+**Design law (#r158):** Governance-declared categorical assignments with material incentive consequences must be anchored to objectively verifiable on-chain metrics. Governance certifies; the market challenges incorrect certifications. Subjective-only tier assignments are prohibited. (#r158)
+
+---
+
+**Q3 (invalidation_impact_disclosure — hard gate or advisory) → Risk-calibrated: HARD_GATE for min_chain_weight_fraction and κ; advisory for all others; emergency bypass with retroactive disclosure obligation (#r158):**
+
+Hard gate for all parameter changes risks blocking emergency corrections. Advisory for all reduces accountability to near-zero.
+
+**Resolution — proportionate gate:**
+
+```
+parameter → disclosure mode:
+  min_chain_weight_fraction:  HARD_GATE
+  κ (staleness decay exponent): HARD_GATE
+  All others:                   ADVISORY (disclosure committed to EAT; proposal not blocked)
+```
+
+HARD_GATE: proposal must include non-empty `compaction_invalidation_impact: { n_epochs_reset, affected_classes, estimated_delay_macro_epochs }`. Contract verifies field present; content accuracy is governance accountability, not contract validation.
+
+**Emergency bypass:** k-of-n multisig override bypasses HARD_GATE. Recorded as `emergency_param_change` EAT event. Retroactive `compaction_invalidation_impact` disclosure required within 2 macro-epochs, committed as a new EAT amendment event (first-write addition, not mutation of prior record).
+
+**Emergency override + in-flight stale-disclosure proposal:** If an emergency bypass fires for parameter P, any pending governance proposal for P with disclosure based on the pre-emergency state is auto-invalidated at the next governance execution attempt. The contract checks: current parameter value != parameter value at proposal submission time → revert with `stale_proposal_invalidated` error. Governance must resubmit with updated disclosure if the change is still needed.
+
+**Design law (#r158):** Disclosure mandates are proportionate to the parameter's oscillation-risk class. Emergency bypass is always available for high-impact parameters; retroactive disclosure obligation preserves accountability. Stale proposals are invalidated automatically when the parameter has changed since proposal submission. (#r158)
+
+---
+
+**Q4 (Shadow-class LTRP — clearing-class as backstop) → Bilateral opt-in at pair registration; Zone C gates the backstop transfer at clearing-class level (#r158):**
+
+Automatic cross-pool backstop violates per-class LTRP independence (#r132/Q1). Resolution: explicit bilateral opt-in.
+
+**Registration:**
+```
+shadow_clearing_pair_registration:
+  backstop_agreement: { shadow_class_id, clearing_class_id, backstop_fraction ∈ [0.0, 0.5] }
+
+  Effect if backstop_fraction > 0:
+    clearing_LTRP_backstop_cap = backstop_fraction × clearing_LTRP_balance_at_T_wind_down
+    Both classes' LTRP_seed computations include expected backstop obligation.
+    Shadow LTRP_seed is NOT reduced — backstop is a tail-of-tail valve, not a primary guarantee.
+```
+
+Default (no backstop declared): shadow-class wind-down deficit absorbed by `debt_retirement_reserve` (governance backstop of last resort). Disclosed at registration.
+
+**Zone C interaction with backstop transfer:**
+The backstop transfer is a clearing-class LTRP outflow triggered at T_wind_down_max. Per the design law from #r134/Q4: class-local escrow outflows are gated at the coordinate-class level. The clearing-class LTRP is a class-local reserve of the clearing class.
+
+- If clearing class is in Zone C at T_wind_down_max: backstop transfer is deferred (class-level Zone C gating applies).
+- T_wind_down_max expiry tolls during Zone C deferral — shadow-class does not archive until backstop transfer resolves or Zone C exits.
+- If Zone C persists beyond N_max_suspension (#r153/Q3) = 5 macro-epochs: `crisis_backstop_deferred` EAT event; shadow-class achieves ARCHIVED status with debt_retirement_reserve absorbing the deficit instead. Clearing-class obligation cancelled (crisis override).
+
+**Rationale for crisis cancellation:** Requiring shadow-class to wait indefinitely for clearing-class Zone C exit would chain two independent lifecycle objects via a solvency condition — exactly the cross-pool contamination the bilateral backstop was designed to limit. Crisis cancellation honours the intent (backstop is best-effort) while preserving shadow-class lifecycle independence.
+
+**Design law (#r158):** Cross-class LTRP backstops require bilateral opt-in and are subject to Zone C gating at the clearing-class level. Crisis-duration Zone C (>N_max_suspension) cancels the backstop; debt_retirement_reserve absorbs the deficit. Cross-pool contamination under normal Zone C is deferred, not permanent. (#r158)
+
+---
+
+## Structural Synthesis: Production Deployment Architecture — Final Closure (#r158)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Arweave unavailability | Non-blocking retry SLA; arweave_status enum; IPFS-only fallback is valid | External storage ≠ liveness precondition |
+| Tier assignment gaming | Objective volume threshold; challenge mechanism; forward-exclusion on downgrade | Governance certifies; market challenges; EAT immutability → forward-only exclusion |
+| Disclosure gate proportionality | HARD_GATE for min_chain_weight_fraction and κ; advisory others; emergency bypass + retroactive | Proportionate to oscillation risk; stale proposals auto-invalidated |
+| Cross-class LTRP backstop | Bilateral opt-in; Zone C deferred; crisis (>N_max_suspension) cancels + debt_retirement absorbs | Per-class independence; Zone C defers not denies; crisis = governance backstop of last resort |
+
+**Cumulative Invariants added (#r158):**
+
+**Invariant #28:** External storage is never a liveness precondition. Best-effort retry SLAs; mechanism proceeds independently. (#r158)
+
+**Invariant #29:** Governance-declared categorical assignments anchored to objectively verifiable on-chain metrics. Subjective-only tier assignments prohibited. (#r158)
+
+**Invariant #30:** Disclosure mandates proportionate to parameter oscillation-risk class. High-risk → HARD_GATE with emergency bypass + retroactive obligation. (#r158)
+
+**Invariant #31:** Cross-class LTRP backstops require bilateral opt-in; Zone C defers; crisis cancels with debt_retirement_reserve absorbing deficit. (#r158)
+
+---
+
+## Open Questions for #r159+
+
+1. **arweave_status `failed_closed` governance action:** When governance issues `arweave_mirror_closed` to end Arweave retry, should the epoch be treated as permanently IPFS-only for dispute purposes, or should governance be required to acknowledge the Arweave-absence risk explicitly (e.g., by committing a `arweave_absence_acknowledged` record alongside the close action)?
+
+2. **Tier upgrade timing and alignment pool continuity:** A class that upgrades from TIER_3 to TIER_1 mid-lifecycle gains access to the TIER_1 pool's richer alignment history. From the upgrade epoch, the class contributes to TIER_1 pool. But its own alignment_score_smooth was computed from TIER_3 standalone data. Should there be a N_blend_epochs transition where both pools contribute to the class's mode_mismatch_discount derivation?
+
+3. **`stale_proposal_invalidated` and governance quorum replay:** A governance proposal that is auto-invalidated due to stale parameter context (#r158/Q3) may have required significant quorum participation to reach execution. Should the invalidation refund the proposal's governance participation bonds (if any), or treat the failed execution as a governance cost of the emergency bypass?
+
+4. **Mechanism completeness and GestAlt v2.1 mapping:** The mechanism design is now complete (Invariants #1–#31; 10-point framework answered in #r148; clearing/discovery modes in #r149–#r158). What is the canonical minimal subset of this mechanism that is necessary and sufficient to implement GestAlt v2.1 clearing? Identify which invariants and mechanism features can be deferred to v2.2+ without compromising the v2.1 solvency-first mandate.
+
+*Last updated: #r158 — 2026-04-04T00:02Z*
