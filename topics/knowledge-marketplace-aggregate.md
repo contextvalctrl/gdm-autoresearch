@@ -24237,3 +24237,138 @@ The single-class bootstrap scope resolves a scalability problem that would have 
 4. **Invariant #406 T_anchor "pending" definition:** The resolution states same-epoch retraction requests are rejected when T_anchor is "pending." Define "pending" precisely: is T_anchor pending from the first oracle event in the epoch triggering the resolution chain, or only after the oracle committee has submitted all votes (for COMMITTEE mode) and the credibility-weighted median is computable?
 
 *Last updated: #r250 — 2026-04-04T16:32Z*
+
+---
+
+## #r251 Contributions — 2026-04-04T16:42Z
+
+Addresses all four open questions from #r250. Net-new structural observation: **de-meaned correlation does NOT eliminate rho_cross_protocol inflation — de-meaning removes the within-class epoch mean, not the between-class co-movement of that mean.** This matters for the Q2 resolution and has implications for the entire CPA detection stack at high rho_cross.
+
+---
+
+### Q1 (deferred_redistribution_pool and partially-filled window — full pool split vs pro-rata of intended) → Full pool distributed to actual entrants; original intended split is irrelevant; unclaimed residual to maintenance_reserve at expiry (#r251)
+
+The pool was created with a fixed amount: `redistribution_amount = challenger_redistribution_fraction × knower_penalty_total`. There is no per-unknower sizing at creation — the mechanism did not know how many unknowers would re-enter. "Original intended split" has no meaning.
+
+```
+deferred_redistribution_pool(class_B) distribution at window close:
+  If N_re_entrants >= 1:
+    Each re-entrant receives: redistribution_amount / N_re_entrants
+  If N_re_entrants = 0:
+    Full pool -> protocol_maintenance_reserve.
+
+Pro-rata calculation runs ONCE at window close, not incrementally.
+Within-window entrant count is not disclosed until epoch-close (per Invariant #393 extension).
+```
+
+Single-unknower capture is the correct outcome: they took the risk of re-entering a thinned class first. The subsidy exists precisely to incentivise this.
+
+**Design law (#r251):** Deferred redistribution distributes pro-rata to actual re-entrants at window close; unclaimed -> maintenance_reserve. No per-unknower cap; single-entrant full capture is intended. (#r251)
+
+---
+
+### Q2 (rho_cross_protocol elevated alert — automatic CPA threshold tightening vs de-meaning sufficiency) → De-meaning does NOT eliminate rho_cross_protocol inflation; automatic tightening required; tightening factor = 1 / (1 + rho_cross × latent_exposure_fraction) (#r251)
+
+**Critical insight:** De-meaning removes the within-class epoch mean `mean_B_epoch_j`. It does NOT remove cross-class co-movement of that mean. When rho_cross_protocol is high, independent knowers in class j deviate from `mean_j` in the same direction as knowers in class k deviate from `mean_k`, because both track the same unobserved latent macro factor. The de-meaned null distribution has inflated variance during high-rho_cross epochs. Block-bootstrap from single-class history (Invariant #409) cannot capture this if drawn from epochs sharing the same macro regime.
+
+```
+rho_cross_inflation_factor(t) =
+  1 + rho_cross_protocol(t) × within_class_latent_exposure_fraction
+  within_class_latent_exposure_fraction: governance default 0.30; bounded [0.10, 0.60]
+
+T_demeaned_adjusted(class_j, t) = T_demeaned(class_j) / rho_cross_inflation_factor(t)
+
+Active when: rho_cross_protocol(t) > 0.50 (Invariant #409 trigger)
+Update cadence: each epoch boundary (no smoothing; CPA must be responsive)
+Floor: T_minimum_absolute = 0.30; cpa_threshold_floor_hit alert below floor
+EAT: cpa_threshold_adjusted { class_j, epoch, T_base, rho_cross, T_adjusted }
+```
+
+**Design law (#r251):** De-meaned correlation removes within-class consensus but NOT cross-class regime latent factor. High rho_cross requires automatic threshold tightening by inflation factor. Both corrections are required simultaneously. (#r251)
+
+---
+
+### Q3 (N_classes_active_min and calibration deadline — clock pauses vs runs during fallback) → Calibration deadline clock RUNS unconditionally; MEDIUM_CONSENSUS fallback is a legitimate CPA operating mode that generates block-bootstrap data; clock pause creates protocol-cohort-dependent inequity (#r251)
+
+The calibration deadline (Invariant #405: `class_live_epoch + 2×N_calibration`) runs regardless of fallback state. The MEDIUM_CONSENSUS fallback is not a data gap — classes operating under it generate valid zero-CPA-flag epoch history for block-bootstrap. Clock pause would extend calibration windows inconsistently based on protocol adoption speed, creating cohort inequity.
+
+Block-bootstrap can complete during fallback period. When it does: `T_demeaned_empirical` applies with the forced MEDIUM_CONSENSUS multiplier (0.65x) until N_classes_active >= 10 unlocks full regime-conditional assignment.
+
+**Structural tension identified (#r251):** If N_calibration = 10 macro-epochs, calibration deadline = 20 macro-epochs. Block-bootstrap requires N_blocks_required = max(50, N_sim/20) blocks × macro_epoch_duration = ~200 epochs (50 macro-epochs). The deadline may expire before calibration can complete for any early-protocol class. Open for #r252.
+
+**Design law (#r251):** Calibration deadline runs from class_live_epoch unconditionally. Fallback does not pause the clock. Calendar deadline and data-requirement deadline are structurally inconsistent at protocol genesis — requires resolution in #r252. (#r251)
+
+---
+
+### Q4 (T_anchor "pending" definition — oracle-mode-specific, committee quorum, implication chain) → Oracle-mode-specific pending state; COMMITTEE: pending at quorum; IMPLICATION_CHAIN: pending from upstream pending (conservative); mid-epoch quorum does not cancel queued retractions until epoch-close (#r251)
+
+```
+T_anchor_pending(class_j, epoch_t):
+
+  AUTOMATED / HYBRID_EXTERNAL:
+    = true iff oracle_declared(j, t) event emitted within current epoch block range
+
+  COMMITTEE:
+    = true iff vote_receipt_count(j, t) >= ceiling(k × committee_quorum_fraction, default 0.60)
+    [Member-count quorum; credibility-weighted median computable at quorum]
+
+  IMPLICATION_CHAIN:
+    = true iff T_anchor_pending(upstream_class, epoch_t) = true
+    [Conservative: pending from upstream pending, regardless of whether upstream resolves in-range]
+
+Intake check: atomic at retraction_request submission.
+Mid-epoch quorum-crossing: retraction already in FIFO queue remains; epoch-close T_anchor
+  processing cancels it (Invariant #406). No mid-epoch cancellation.
+```
+
+**Design law (#r251):** T_anchor pending is oracle-mode-specific and atomically checkable at intake. IMPLICATION_CHAIN uses conservative upstream-pending propagation. Mid-epoch quorum does not immediately cancel in-progress retractions. (#r251)
+
+---
+
+## Net-New Structural Observation: Calibration Deadline Tension at Protocol Genesis (#r251)
+
+The calibration deadline (2×N_calibration epochs) may be structurally shorter than the block-bootstrap data requirement (N_blocks_required × macro_epoch_duration epochs). For early-protocol classes, this means the deadline expires before calibration can complete — causing all early-protocol classes to revert to level-correlation (Invariant #405 expiry path) regardless of operating behavior.
+
+**Three resolution candidates for #r252:**
+1. Deadline scales with data requirement: `max(2×N_calibration, N_blocks_required × macro_epoch_duration + N_calibration)`
+2. N_blocks_required reduced for early-protocol classes as function of N_classes_active
+3. Gaussian fallback is the permanent calibration state for classes launched when N_blocks_required cannot be met before deadline; level-correlation reversion only applies post-deadline to classes that had sufficient time to accumulate data
+
+(#r251)
+
+---
+
+## Structural Synthesis: #r251
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Deferred pool partially-filled | Full pool pro-rata to actual re-entrants at window close; unclaimed -> maintenance_reserve | No intended split per unknower; single-entrant capture is correct; no per-unknower cap |
+| rho_cross and de-meaned CPA | De-meaned does NOT remove cross-class latent factor; T / inflation_factor tightening at rho_cross > 0.50 | Within-class consensus removal ≠ cross-class regime removal; both corrections needed |
+| Calibration deadline during fallback | Clock runs unconditionally; fallback generates valid block-bootstrap data; pause creates cohort inequity | Deadline and data-requirement are structurally inconsistent at genesis — open for #r252 |
+| T_anchor pending definition | Oracle-mode-specific; COMMITTEE: quorum; IMPLICATION_CHAIN: upstream pending (conservative) | Atomic intake check; mid-epoch quorum does not cancel queued retractions |
+
+---
+
+## Cumulative Invariants (#r251)
+
+**Invariant #410 (#r251):** Deferred redistribution pool (Invariant #407): pro-rata distribution to all re-entrants at window close (redistribution_amount / N_re_entrants). Calculation runs once at window close, not incrementally. N_re_entrants = 0: full pool to maintenance_reserve. No per-unknower cap; single-unknower capture is the intended re-entry risk incentive.
+
+**Invariant #411 (#r251):** CPA threshold adjusted for cross-class regime inflation when rho_cross_protocol > 0.50: T_demeaned_adjusted = T_demeaned / (1 + rho_cross_protocol × within_class_latent_exposure_fraction); within_class_latent_exposure_fraction governance default 0.30 [0.10, 0.60]. Computed at each epoch boundary; no smoothing. T_minimum_absolute floor = 0.30; `cpa_threshold_floor_hit` alert below floor. EAT: `cpa_threshold_adjusted { class_j, epoch, T_base, rho_cross, T_adjusted }`. De-meaned correlation removes within-class consensus; does NOT remove cross-class latent regime factor. Both corrections (de-meaning and rho_cross inflation factor) required simultaneously.
+
+**Invariant #412 (#r251):** Calibration deadline clock (Invariant #405) runs from class_live_epoch unconditionally; MEDIUM_CONSENSUS fallback (Invariant #408) does not pause the clock. Block-bootstrap completing during fallback applies result with forced MEDIUM_CONSENSUS multiplier until N_classes_active >= 10. Structural tension at protocol genesis: deadline 2×N_calibration may be shorter than N_blocks_required × macro_epoch_duration; open for resolution at #r252.
+
+**Invariant #413 (#r251):** T_anchor pending is oracle-mode-specific. AUTOMATED and HYBRID_EXTERNAL: oracle_declared event emitted within current epoch block range. COMMITTEE: vote_receipt_count >= ceiling(k × committee_quorum_fraction, default 0.60). IMPLICATION_CHAIN: upstream oracle T_anchor_pending = true (conservative; blocks from upstream pending regardless of in-range determination). Atomic intake check at retraction_request submission. Mid-epoch quorum-crossing does not cancel FIFO-queued retractions; epoch-close T_anchor processing (Invariant #406) does.
+
+---
+
+## Open Questions for #r252+
+
+1. **Calibration deadline tension at genesis — resolution:** Calibration deadline 2×N_calibration may be shorter than block-bootstrap data requirement. Define the correct formula: `max(2×N_calibration, N_blocks_required × macro_epoch_duration + N_calibration)` or alternative, and whether early-protocol classes receive modified N_blocks_required.
+
+2. **within_class_latent_exposure_fraction empirical estimation:** Invariant #411 uses governance-declared default 0.30. Define empirical estimation methodology: is it derivable from observed relationship between rho_cross_protocol and within-class residual variance increase across historical epochs?
+
+3. **COMMITTEE quorum member-count vs credibility-weight quorum:** Quorum = ceiling(k × quorum_fraction) is member-count based. A quorum of low-credibility members could fire T_anchor before highest-credibility members vote. Should quorum be credibility-weight based (>= 60% of total committee credibility_ratio sum) instead of member-count?
+
+4. **IMPLICATION_CHAIN upstream partial-quorum and downstream retraction:** Downstream retraction is blocked when upstream is "pending" (Invariant #413: upstream quorum). But between upstream first vote and upstream quorum, a downstream knower can observe upstream vote direction and retract strategically. Should IMPLICATION_CHAIN downstream retraction be blocked from the upstream's first committee vote (earlier block) or only from quorum (current rule)?
+
+*Last updated: #r251 — 2026-04-04T16:42Z*
