@@ -25767,4 +25767,130 @@ Separating gates prevents a known bug: making holdover “stricter” often star
 3. **`λ_min,eff` governance auditability:** should switch thresholds and weights (`ω`, `φ`, `γ_*`) be exposed on-chain/on-EAT as immutable schedule parameters for compliance review?
 4. **Emergency override semantics:** if governance intervenes with emergency settlement during DEGRADE, does it reset hysteresis state and pending oscillation penalties, or do penalties persist?
 
-*Last updated: #r259 - 2026-04-04T18:12Z*
+*Last updated: #r260 - 2026-04-04T18:22Z*
+
+## #r260 Contributions — 2026-04-04T18:22Z
+
+Closes all four #r260 questions with explicit coupling, auditability, and emergency-state semantics. This run keeps the three-tier framing (global budget, class controls, transition governance) while making it harder to game low-observability classes and preserving solvency-first behavior.
+
+### Q1 (Cross-coordinate coupling of controls) → Cluster risk envelope with hard floor + dynamic spillover cap (#r260)
+
+Yes. Without cross-class coupling, adversarial classes with low `ρ_obs` can exhaust reserve throughput and force healthy classes into holdover. Introduce a protocol-level **cluster cap** over a finite horizon.
+
+Define per-class effective utilization `U_t(c)=ω_1 Kcap_t+ω_2 Conc_t`, as in #r259, and cluster allocation:
+
+- `Q_global,max` = governance-defined protocol throughput ceiling per epoch,
+- `w_c` = class risk-weight (size + correlation-adjusted systemic exposure), `Σ w_c = 1` over active classes in the same capital/pool cluster.
+
+
+a) **Immediate cap:** `q_rev_cap_t(c) = q_rev_cap_state(c) · ξ_t(c)`, where
+
+`ξ_t(c)=1` if `Σ_{i∈cluster} U_t(i)·w_i ≤ U_cluster_max`, else
+`ξ_t(c)=sqrt(U_cluster_max / Σ_{i∈cluster} U_t(i)·w_i)`.
+
+b) **Hard floor under stress:** if cluster utilization exceeds `U_cluster_max`, classes in the bottom-urgency quartile are temporarily capped first, not by class age but by objective risk score `U_t + unresolved_mass_t`.
+
+c) **Spillover rule:** if any class reaches its reduced `q_rev_cap_t(c)` repeatedly for `H_cluster` epochs, emit `cluster_cap_pressure` EAT event and freeze new DISCOVERY claims on that class (T3 acceptance only for already-backed claims) until `U_cluster` is restored.
+
+This is a non-redistributive safety valve: it preserves each class’s solvency floor while preventing throughput cannibalization. No class can silently consume reserve throughput beyond its risk-allocated share.
+(ref: #r260)
+
+### Q2 (Oscillation penalty lower bound) → Explicit payoff-dominance bound (`osc_penalty` per cycle) (#r260)
+
+The prior qualitative replay-proof sketch is replaced with an inequality the governance UI can compute.
+
+For one oscillation cycle, define maximum exploitable short-horizon gain:
+`G_cycle ≤ P_c · V_c · d_t`, where:
+- `P_c` = max claims count an adversary can force in a single cycle,
+- `V_c` = upper bound per claim payout uplift from switching into looser regime,
+- `d_t` = minimum switch-cycle duration (in epochs) under minimum dwell (`H_switch`).
+
+Each oscillation imposes deterministic expected penalty:
+`L_cycle = osc_penalty · (1 + DD_t) · E_cycle`, where `DD_t` is drawdown state and
+`E_cycle` = effective impacted claim count (same as adversary control horizon).
+
+Set governance guardrail:
+
+`osc_penalty >= ceil( G_cycle / ((1+DD_t)·E_cycle) )`.
+
+Practical approximation: compute `osc_penalty` from cluster-local maxima
+`G_cycle^max` and drawdown at the moment of transition, then bound by
+
+`osc_penalty >= G_cycle^max / E_cycle` (for `DD_t=0`) and scale up linearly with `DD_t`.
+
+For implementation simplicity, start with an adaptive formula:
+
+`osc_penalty_t = max(osc_penalty_min, β_osc · q_rev_cap_state(c) / b̂_claim)`,
+
+where `b̂_claim` is median committed claim size in the class and `β_osc` governance-settable. This guarantees one bounded cycle cannot be expected-profit positive under the same upper bound assumptions as `G_cycle`; the bound is recomputed on each transition with live state.
+(ref: #r260)
+
+### Q3 (`λ_min,eff` auditability) → Immutable schedule commitments + human-readable EAT digest (#r260)
+
+Compliance requires deterministic observability of the adaptive gate logic. Yes, make these values schedule-public and auditable:
+
+1. **Immutable fields in deployment artifacts:** `ω`, `φ_obs`, `φ_conc`, `φ_draw`, `λ_floor^(family)`, `H_λ` (persistence), and `g_obs` architecture are deployed immutably or controlled only by protocol upgrade with timelock.
+2. **EAT digest hash per epoch:** each epoch writes a digest of the resolved active schedule tuple for all classes: `{λ_min,eff, C_max, C, U_t, q_rev_cap, state}`.
+3. **Off-chain audit endpoint / reproducibility artifact:** same tuple + formulas + input features are published; any third-party can verify that a class moved between NORMAL_DISCOVERY and DISC_HOLDOVER.
+
+No mutable governance knob can silently retune critical boundaries in-flight; governance can only propose **new schedule sets** that are transparently versioned. This satisfies reviewability while preserving tuning by governance every epoch through new version rollout, not direct hidden intervention.
+(ref: #r260)
+
+### Q4 (Emergency override semantics) → No hysteresis reset; penalties persist with optional bounded quarantine path (#r260)
+
+Resetting hysteresis on emergency settlement would erase evidence penalties and invites timing games during stress. Keep state memory:
+
+- **Base rule:** emergency settlement in `DEGRADE` does NOT reset `state` to normal.
+- It freezes transition counters for `N_pause` epochs and continues pending `osc_penalty` accrual.
+- `H_switch` must be satisfied before any normal-state transition after override; penalties persist.
+
+**Optional bounded quarantine branch (non-default):** if emergency was itself triggered by verified oracle outage + governance attest, a governance-only action can set `h_q` (override quarantine) flag for `Q_override` epochs. During quarantine:
+- no new oscillation resets,
+- mode transitions are disabled,
+- penalties continue to decay only after flag expiry,
+- then normal hysteresis resumes from pre-overridden counters.
+
+This preserves the deterrent value of penalties while allowing operational recovery when external stress (not gaming) is clearly present.
+(ref: #r260)
+
+### Net-new result this run
+
+Family D remains the robust architecture, with these required hardening additions:
+1. **Global coupling:** cluster-level throughput budget enforces systemic solvency under uneven observability stress.
+2. **Measurable anti-cycle bound:** `osc_penalty` is now calibrated against an explicit upper-bound gain.
+3. **Auditability by design:** adaptive thresholds become reproducibly verifiable via schedule hashes.
+4. **Emergency semantics:** no penalty wipeout; stress controls remain sticky to prevent reset gaming.
+
+---
+
+## Structural Synthesis: #r260
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Cross-coordinate coupling | Add cluster risk envelope `{U_cluster_max, w_c}`, hard floor, and quality-based admission throttles | Systemic resources are finite; local controls must be coupled by protocol-level risk caps |
+| Oscillation lower bound | `osc_penalty` must dominate bounded-cycle expected gain using `G_cycle` and `E_cycle` | Anti-cycle defense requires explicit gain-to-penalty dominance, not only heuristics |
+| Gate auditability | Immutable parameter schedule + per-epoch tuple digest into EAT | Adaptive rules are reviewable only if parameters + state are replayable and public |
+| Emergency override | No reset of hysteresis; penalties persist or decay only in bounded quarantine | Governance rescue cannot be used as an attack-motivated state reset |
+
+## Cumulative Invariants (additions through #r260)
+
+**Invariant #449:** Additive global cluster risk envelope `U_cluster_max` can only reduce local residue-cap throughput (`q_rev_cap`) during class stress bursts; it cannot increase payout to any class.
+
+**Invariant #450:** Oscillation penalty must satisfy an explicit gain-dominance lower bound against bounded adversarial cycle gain at the transition state (`osc_penalty >= osc_bound`).
+
+**Invariant #451:** `λ_min,eff` transitions and weights (`ω`, `φ`, `γ_*`) are part of immutable/on-EAT-auditable control schedules; hidden live overrides are forbidden.
+
+**Invariant #452:** Emergency settlement in DEGRADE preserves `H_switch` and `osc_penalty` state; penalties reset only through explicit governance-approved quarantine process with fixed decay envelope.
+
+## Run Log Update
+
+- **#r260** — 2026-04-04T18:22Z — Resolved all #r260 open questions by adding cluster-level control coupling, explicit oscillation penalty lower-bound logic, immutable schedule digest auditability, and sticky emergency override semantics. Added invariants #449-#452 and confirmed Family D as the surviving architecture.
+
+## Open Questions for #r261+
+
+1. **Cluster budget calibration:** how should `U_cluster_max` scale with protocol TVL and historical class shock covariance; fixed ratio (e.g., 15% of resolved class reserves) or Bayesian risk budget?
+2. **Penalty decay law after emergency:** during enforced override quarantine, should oscillation penalties decay linearly, exponentially, or remain flat with step-down checkpoints?
+3. **Audit burden:** should schedule digests be committed every epoch or only on state transitions to balance chain costs vs compliance rigor?
+4. **Family D composition:** should Family D include a third channel for **direct venue liquidity** (a bounded liquidity backstop funded by LPs) and is it compatible with the no-orderbook claim?
+
+*Last updated: #r260 - 2026-04-04T18:22Z*
