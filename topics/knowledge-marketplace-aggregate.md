@@ -22788,3 +22788,253 @@ This distribution is oracle-type-specific. Deterministic on-chain oracles have n
 4. **IMPLICATION_CHAIN as a first-class oracle mode:** Invariant #379 references class_oracle_mode == IMPLICATION_CHAIN. This was introduced implicitly but never added to the oracle mode enum alongside AUTOMATED | COMMITTEE | HYBRID_EXTERNAL (Invariant #327). Define IMPLICATION_CHAIN as a fourth oracle mode: registration requirements, upstream chain validation at registration, and T_anchor firing logic when upstream class resolves.
 
 *Last updated: #r243 — 2026-04-04T15:12Z*
+
+---
+
+## #r244 Contributions — 2026-04-04T15:22Z
+
+Addresses all four open questions from #r243. Net-new structural observation: **IMPLICATION_CHAIN as a fourth oracle mode closes the oracle taxonomy** — the mechanism now has a complete, non-overlapping set of oracle modes that covers all legitimate class types.
+
+---
+
+### Q1 (Expected oracle loss metric and Zone C integration — separate Zone C_oracle vs folded TOWL weighting) → Separate Zone C_oracle ceiling; orthogonal to operational Zone C; distinct remediation response (#r244)
+
+**First-principles analysis of the two options:**
+
+*Option A — Fold EL_oracle into TOWL weighting:* TOWL_effective(class_i) = TOWL(class_i) × (1 + EL_oracle(oracle_type_i) × concentration_factor). Zone C fires when Σ TOWL_effective / EDS* > Zone_C_threshold. This conflates two distinct risk types: (1) operational over-extension (too many outstanding epistemic obligations for current capital) and (2) correlated oracle failure risk (concentrated oracle type may fail simultaneously, unrecoverable). When Zone C fires in Option A, the protocol cannot distinguish which risk is dominant without decomposing the TOWL vector — a diagnostics problem under stress.
+
+*Option B — Separate Zone C_oracle ceiling:* Zone C (operational) unchanged. New Zone C_oracle fires independently on oracle loss concentration.
+
+**Resolution — Option B:**
+
+```
+Zone C_oracle definition:
+  expected_oracle_loss = Σ_{oracle_type t} TOWL_backed(t) × EL_oracle(t)
+
+  Zone C_oracle:       expected_oracle_loss / EDS* > Z_oracle_ceiling
+  Z_oracle_ceiling:    governance-set; default 0.05; bounded [0.02, 0.15]
+
+EAT events:
+  At each epoch: oracle_loss_metric { epoch, expected_oracle_loss, EDS_star, ratio }
+  At threshold crossing: zone_c_oracle_entered { epoch, oracle_type_breakdown }
+
+Remediation (Zone C_oracle, distinct from Zone C):
+  NOT a general T3 installation throttle (that would be Zone C remediation).
+  Instead: oracle-type-specific new installation freeze:
+    For each oracle_type t contributing >30% of expected_oracle_loss:
+      new T3 installations on classes backed by type t: FROZEN
+      (existing installations unaffected; no position unwind)
+  Freeze lifts when expected_oracle_loss / EDS* drops below 0.8 × Z_oracle_ceiling (hysteresis)
+```
+
+**Why oracle-type-specific freeze (not general throttle):** Zone C_oracle represents concentration risk in a *specific* oracle type — the appropriate remediation is to stop adding more exposure to that oracle type. A general throttle (Zone C style) would also freeze installations on *unrelated* oracle types, diluting the risk signal and penalising well-diversified classes.
+
+**Interaction with Zone C:** Both Zone C and Zone C_oracle may be active simultaneously. When both are active, the more restrictive installation gate applies. Zone C_oracle oracle-type freeze does not release during Zone C recovery — it resolves independently.
+
+**Design law (#r244):** Expected oracle loss is a separate solvency metric with a separate zone ceiling. Zone C (operational over-extension) and Zone C_oracle (correlated oracle failure risk) are orthogonal. Remediation for Zone C_oracle is oracle-type-specific new installation freeze, not a general throttle. Simultaneous activation takes the more restrictive gate. (#r244)
+
+---
+
+### Q2 (Rehabilitation window dirty epoch — single reset vs cumulative tolerance) → Sliding dirty-epoch tolerance within each rolling N_calibration window; floor(N_calibration × 0.10) tolerance; rolling window resets on window advancement, not on each epoch (#r244)
+
+**First-principles problem with single-dirty reset:**
+
+Requiring N_calibration consecutive clean epochs with a single-dirty reset is equivalent to requiring 0% error rate over the window — stricter than the calibration model itself (which gives η_realized ≥ η_threshold, not η_realized = 1.0). A class recovering from committee degradation will have residual noise. Requiring perfection creates an impossible recovery standard for classes with genuine but imperfect improvement.
+
+**Resolution — sliding dirty-epoch tolerance:**
+
+```
+dirty_tolerance = floor(N_calibration × dirty_tolerance_fraction)
+dirty_tolerance_fraction: governance-set ∈ [0.05, 0.20]; default 0.10
+[At N_calibration = 10: dirty_tolerance = 1; at N_calibration = 20: dirty_tolerance = 2]
+
+Rehabilitation scoring (rolling N_calibration window):
+  At each epoch e, evaluate the most recent N_calibration epochs:
+    clean_count = number of alignment events = 1
+    dirty_count = N_calibration - clean_count
+
+  if dirty_count ≤ dirty_tolerance:
+    rehabilitation_score += 1  (window passes)
+    if rehabilitation_score >= N_calibration:
+      → exit independence_degraded [requires N_calibration consecutive passing windows]
+  else:
+    rehabilitation_score = 0  (any window with excess dirty resets)
+
+Total maximum rehabilitation period:
+  2 × N_calibration epochs for rolling window fill + N_calibration window passes
+  → caps at ~2 × N_calibration (not 3 × N_calibration as in Invariant #378)
+  If not achieved within 3 × N_calibration total epochs: → DELIST_PENDING
+```
+
+**Why rolling window, not epoch-by-epoch consecutive count:**
+
+Rolling window evaluation smooths over single oracle anomalies (extreme events, data feed lag) that would be false signals of committee degradation. An epoch where the oracle itself had an anomaly — not the committee — should not reset the rehabilitation counter. The rolling window with tolerance handles this correctly.
+
+**Dirty tolerance and DELIST_PENDING calibration:** dirty_tolerance_fraction = 0.10 means up to 10% of epochs in any window can be alignment failures without resetting. This is stricter than the normal calibration criterion but more lenient than a zero-tolerance consecutive count. The 3 × N_calibration total expiry from Invariant #378 is preserved — rehabilitation must complete before this total clock expires.
+
+**Design law (#r244):** Dirty-epoch tolerance = floor(N_calibration × dirty_tolerance_fraction, default 0.10). Rehabilitation uses a rolling N_calibration window; window passes when dirty_count ≤ tolerance. N_calibration consecutive passing windows required to exit. Total 3 × N_calibration epoch expiry unchanged. This supersedes Invariant #378's single-dirty-reset formulation. (#r244)
+
+---
+
+### Q3 (EL_oracle bootstrap for COMMITTEE — estimation methodology before N resolved epochs exist) → Tiered bootstrap: sub-category severity model priors → cross-protocol analogous data → empirical; governance-declared severity parameters; Bayesian update cadence (#r244)
+
+**Bootstrap stages:**
+
+**Stage 0 — Pre-protocol deployment (no resolved epochs):**
+
+```
+EL_oracle_bootstrap(COMMITTEE_sub_category) =
+    (1 - historical_independence_rate_sub_category)         [P_failure prior]
+    × E[S_failure_model]                                    [modelled severity]
+
+E[S_failure_model] parameters (governance-declared at initial deployment):
+  P_targeted_manipulation:     0.60  [most common committee oracle failure mode]
+  P_systemic_outage:           0.25
+  P_permanent_death:           0.15
+  severity_targeted:           1 / max(1, N_classes_registered_this_type)
+  severity_outage:             0.30 × (1 - recovery_rate_estimate)  [default recovery_rate = 0.70]
+  severity_death:              1.0 × (1 - LTRP_coverage_fraction)   [default LTRP = 0.60]
+
+E[S_failure_model] = P_targeted × severity_targeted + P_systemic × severity_outage + P_death × severity_death
+```
+
+At genesis (N_classes = 1 of a given sub-category), severity_targeted = 1.0 (single-class failure). As more classes register, severity_targeted decreases — diversification naturally reduces EL_oracle within a sub-category.
+
+**Stage 1 — Cross-protocol analogous data (if available at deployment):**
+
+If analogous external oracle performance data exists (e.g., historical performance of expert panel oracles in comparable domains), governance may initialise severity parameters from that dataset via a Tier 2 structural audit. This lowers the EL_oracle estimate from Stage 0 conservatism.
+
+**Stage 2 — Empirical (after N_calibration resolved epochs × min_classes_for_empirical):**
+
+```
+EL_oracle_empirical(oracle_type_id) activated when:
+  N_resolved_class_epochs >= N_calibration × min_classes_for_empirical
+  min_classes_for_empirical: governance-set; default 3
+
+EL_oracle_empirical = P_failure_empirical × E[S_failure_observed]
+```
+
+Transition: when Stage 2 activates, alpha_concentration_supplement updates to empirical EL_oracle on the quarterly cadence (Invariant #376).
+
+**Governance documentation requirement:** Stage 0 severity parameters are declared explicitly in the oracle_type_registry governance proposal for new COMMITTEE sub-categories. Not defaults — governance must attest each parameter.
+
+**Design law (#r244):** EL_oracle bootstrap is three-stage: modelled severity priors (Stage 0) → cross-protocol analogous data (Stage 1) → empirical (Stage 2 at N_cal × 3 class-epochs). severity_targeted auto-decreases as sub-category portfolio diversifies. Quarterly calibration at each quarterly re-audit. (#r244)
+
+---
+
+### Q4 (IMPLICATION_CHAIN as a fourth oracle mode — formal definition) → Fourth oracle mode with formal registration requirements, upstream validation, T_anchor cascading, and scope constraints (#r244)
+
+**Oracle mode enum extension (supersedes Invariant #327 partial):**
+
+```solidity
+enum ClassOracleMode {
+  AUTOMATED,           // Existing: automated data feed; external
+  COMMITTEE,           // Existing: credibility-weighted committee oracle
+  HYBRID_EXTERNAL,     // Existing: bilateral flow with external anchoring
+  IMPLICATION_CHAIN    // New (#r244): oracle_declared derived from upstream class resolution
+}
+```
+
+**Registration requirements for IMPLICATION_CHAIN classes:**
+
+```
+Required fields:
+  upstream_class_id:              bytes32   (oracle_mode != IMPLICATION_CHAIN unless depth < 4)
+  upstream_oracle_range:          [lo_A, hi_A]
+  downstream_claimed_range:       [lo_B, hi_B]
+  effective_oracle_independence:  P_oracle_independent(A) × γ_oracle^(chain_depth - 1)
+                                  must satisfy registration gate (Invariant #379)
+  chain_depth:                    uint8; verified against upstream at registration
+  T_deferral_max_if_upstream_miss: [N_calibration, 5 × N_calibration]
+
+Contract-enforced upstream validation:
+  - upstream_class_id exists and is epistemic_live or epistemic_live_degraded
+  - upstream chain_depth < 4
+  - effective_oracle_independence >= gate threshold
+  - upstream oracle_mode != IMPLICATION_CHAIN (prevents circular chains)
+```
+
+**T_anchor cascading:**
+
+```
+T_anchor(B) fires when:
+  oracle_declared(A, T_anchor_A) ∈ [lo_A, hi_A]
+  → B settlement epoch = T_anchor_A + 1  (one epoch processing lag)
+  → oracle_declared(B) = whether S_cred(B) ∈ [lo_B, hi_B]
+
+oracle_declared(A) ∉ [lo_A, hi_A]:
+  B T_anchor deferred → next A resolution in upstream_range
+  Max deferral: T_deferral_max_if_upstream_miss
+  After expiry: all B-side claims forfeit
+  EAT: implication_chain_upstream_miss { class_B, T_anchor_A, oracle_declared_A }
+```
+
+**Scope constraints:**
+
+- IMPLICATION_CHAIN classes may not have oracle_type = CRYPTOGRAPHIC_DELIVERY
+- TOWL contribution counted normally against EDS*
+- Zone C_oracle contribution uses effective_oracle_independence as adjusted EL_oracle
+- implication_escrow_factor default 1.25× base escrow minimum
+- τ_bonus eligibility relative to T_anchor(A) — not a separate B-side clock
+
+**Design law (#r244):** IMPLICATION_CHAIN is the fourth and final oracle mode. Registration requires upstream validation, chain depth ≤ 4, effective_oracle_independence ≥ gate. T_anchor cascades from upstream + 1 epoch. Upstream range miss defers up to T_deferral_max_if_upstream_miss, then forfeit. Circular chains prohibited. (#r244)
+
+---
+
+## Net-New Structural Observation: Oracle Mode Taxonomy Closure (#r244)
+
+With IMPLICATION_CHAIN formalised, the oracle mode taxonomy is now complete and non-overlapping:
+
+| Mode | Oracle source | Truth type | External independent source required |
+|---|---|---|---|
+| AUTOMATED | Data feed (on-chain or reputable external) | Point or interval from exogenous data | Yes |
+| COMMITTEE | Credibility-weighted expert panel vote | Credibility-weighted median | Yes (committee independent of knowers) |
+| HYBRID_EXTERNAL | Bilateral flow with external anchoring | External anchor corrects S_cred | Yes |
+| IMPLICATION_CHAIN | Upstream class oracle resolution | Conditional implication truth | Yes (inherits from upstream; degrades with depth) |
+
+Every legitimate class type has exactly one applicable oracle mode. Classes that cannot satisfy any mode's requirements are outside the mechanism's scope (Invariant #379). No new modes can be defined without revising the mechanism's epistemic primitive. (#r244)
+
+---
+
+## Structural Synthesis: #r244
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Expected oracle loss + Zone C | Separate Zone C_oracle (Z_oracle_ceiling 0.05 × EDS*); oracle-type-specific freeze; orthogonal to operational Zone C | EL risk = separate solvency metric; oracle-specific remediation |
+| Dirty-epoch tolerance | Rolling N_calibration window; floor(N_cal × 0.10) tolerance; N_calibration passing windows to exit; 3×N_cal expiry | Rolling tolerance beats consecutive-clean for robustness to oracle anomaly epochs |
+| EL_oracle COMMITTEE bootstrap | Three-stage: modelled priors → cross-protocol data → empirical at N_cal × 3; severity_targeted decreases with portfolio size | Governance-attested severity parameters; diversification naturally reduces EL_oracle |
+| IMPLICATION_CHAIN oracle mode | Fourth oracle mode; depth ≤ 4; T_anchor cascades + 1 epoch; upstream miss defers to T_deferral_max then forfeit | Closes oracle taxonomy; inherits effective_oracle_independence with γ_oracle decay |
+
+---
+
+## Cumulative Invariants (#r244)
+
+**Invariant #381 (#r244):** Zone C_oracle: expected_oracle_loss = Σ_{t} TOWL_backed(t) × EL_oracle(t); entered when expected_oracle_loss / EDS* > Z_oracle_ceiling (default 0.05; bounded [0.02, 0.15]). Remediation: oracle-type-specific new T3 installation freeze for types contributing >30% of expected_oracle_loss. Freeze lifts at ratio < 0.8 × ceiling (hysteresis). Zone C and Zone C_oracle are orthogonal; simultaneous activation takes the more restrictive gate. EAT: `oracle_loss_metric` each epoch; `zone_c_oracle_entered` on threshold crossing.
+
+**Invariant #382 (#r244):** Rehabilitation dirty-epoch tolerance (supersedes Invariant #378 single-dirty-reset): dirty_tolerance = floor(N_calibration × dirty_tolerance_fraction; default 0.10; bounded [0.05, 0.20]). Rolling N_calibration window passes when dirty_count ≤ dirty_tolerance. N_calibration consecutive passing windows required to exit independence_degraded. Any window with dirty_count > dirty_tolerance resets consecutive-window counter to 0. Total expiry: 3 × N_calibration epochs; DELIST_PENDING_IRRECOVERABLE on expiry.
+
+**Invariant #383 (#r244):** EL_oracle bootstrap for COMMITTEE sub-categories: Stage 0 — governance-declared severity model priors (P_targeted = 0.60, P_systemic = 0.25, P_death = 0.15; severity_targeted = 1/N_classes, severity_outage = 0.30 × (1 - recovery_rate), severity_death = 1.0 × (1 - LTRP_fraction); all parameters governance-attested at oracle_type_registry entry); Stage 1 — cross-protocol analogous data if available (Tier 2 structural audit); Stage 2 — empirical, activates at N_calibration × 3 class-epochs resolved; alpha_concentration_supplement updates quarterly.
+
+**Invariant #384 (#r244):** IMPLICATION_CHAIN is the fourth oracle mode (extending Invariant #327). Registration: upstream_class_id (oracle_mode ≠ IMPLICATION_CHAIN unless depth < 4); upstream_oracle_range [lo_A, hi_A]; downstream_claimed_range [lo_B, hi_B]; effective_oracle_independence ≥ registration gate; chain_depth ≤ 4; T_deferral_max_if_upstream_miss ∈ [N_calibration, 5 × N_calibration]. T_anchor(B) = T_anchor(A) + 1 when oracle_declared(A) ∈ upstream_range. Upstream miss defers; expiry at T_deferral_max → all B-side claims forfeit. implication_escrow_factor default 1.25×. Circular chains prohibited.
+
+**Invariant #385 (#r244):** Oracle mode taxonomy is closed and non-overlapping at four modes: AUTOMATED, COMMITTEE, HYBRID_EXTERNAL, IMPLICATION_CHAIN. Every legitimate coordinate class satisfies exactly one mode. Classes satisfying no mode are outside mechanism scope (Invariant #379 hard gate). No fifth oracle mode can be defined without revising the mechanism's epistemic primitive (scalar attested claim against exogenous truth).
+
+---
+
+## Run Log Update
+
+- **#r244** — 2026-04-04T15:22Z — Q1: Zone C_oracle as separate solvency metric (Z_oracle_ceiling default 0.05); oracle-type-specific installation freeze on breach; orthogonal to operational Zone C. Q2: Rolling dirty-epoch tolerance (floor(N_cal × 0.10)); rolling N_calibration window; N_calibration consecutive passing windows to exit; single-dirty-reset of Invariant #378 superseded. Q3: EL_oracle COMMITTEE bootstrap: three-stage (modelled severity priors → cross-protocol → empirical at N_cal × 3); severity_targeted auto-decreases as sub-category portfolio diversifies. Q4: IMPLICATION_CHAIN formalised as fourth oracle mode; chain depth ≤ 4; T_anchor cascades from upstream + 1 epoch; upstream miss defers to T_deferral_max_if_upstream_miss then forfeit; implication_escrow_factor 1.25×; circular chains prohibited. Net-new: oracle mode taxonomy closed — four modes, non-overlapping, complete. Invariants #381–#385.
+
+---
+
+## Open Questions for #r245+
+
+1. **Zone C_oracle + Zone C simultaneous active — priority tiebreak on remediation:** When both Zone C and Zone C_oracle are active, current rule is "more restrictive gate applies." Define the full simultaneous-active protocol: does the general throttle apply ON TOP of the oracle-type freeze, or does the oracle-type freeze substitute for the general throttle while Zone C_oracle is active?
+
+2. **implication_escrow_factor derivation — 1.25× vs variance-based:** The 1.25× implication_escrow_factor is a governance default. Should it be derived from the additional variance introduced by conditioning on an upstream outcome? If B|A has variance V_B|A and unconditional B has variance V_B, the additional epistemic complexity factor could be V_B / V_B|A (lower information about B given A → higher escrow).
+
+3. **T_deferral_max_if_upstream_miss and B-side claim capital lock:** A B-side claim on a slow-resolving A class could lock capital for up to 5 × N_calibration epochs awaiting a valid upstream range hit. Should B-side claims have an independent early exit mechanism (retraction with partial escrow penalty) or is full lock-up correct given implication complexity?
+
+4. **IMPLICATION_CHAIN and CPA detection:** CPA clustering detects co-movement of S_cred among knowers on the same class. For IMPLICATION_CHAIN classes, knowers' claims are conditional on A's outcome — genuine common knowledge about B|A may appear as coordination. Define a CPA detection adjustment for IMPLICATION_CHAIN classes that distinguishes structural correlation (shared conditioning on A) from adversarial coordination.
+
+*Last updated: #r244 — 2026-04-04T15:22Z*
