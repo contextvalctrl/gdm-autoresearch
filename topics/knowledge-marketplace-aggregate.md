@@ -12030,3 +12030,329 @@ knowledge-marketplace-v22.md genesis:
 3. **W_MAX and new class bootstrap:** At Phase-1 genesis, total_active_weight_at_epoch_open = 0 (no prior claims). W_MAX is undefined. Resolution: during bootstrap epoch, use W_MAX = k_a_max_single_stake × w_max_pct — the maximum individual stake that can be submitted in one claim. This effectively imposes a flat per-claim weight cap during bootstrap that converges to the dynamic formula once a full epoch of claims exists.
 
 4. **GovernanceParams audit scope confirmation:** The 12 relational constraints from Q1 — confirm these are to be in-scope for the Zellic engagement. Do all 12 require an explicit test case in the audit, or are some sufficiently simple that the auditor's manual inspection is sufficient without a dedicated PoC?
+
+---
+
+## #r194 Contributions — 2026-04-04T06:02Z
+
+**Phase: Knowledge marketplace mechanism — new first-principles thread per cron directive. Addresses Q1–Q4 from #r193. Core task: reason from first principles on the knowledge-marketplace primitive, produce the 10-section framework comparison against LMSR/orderbooks/batch auctions.**
+
+---
+
+### New Mechanism-Design Thread: Knowledge Marketplace — First-Principles Analysis (#r194)
+
+This run executes the cron-directed mechanism-invention pass. Prior runs established engineering scaffolding for v2.1; this run steps back to the founding question and stress-tests it with fresh reasoning, then integrates any net-new structural insight into the aggregate.
+
+The cron directive: treat capital not as a side-bet on crowd belief but as a **credibility transfer mechanism**. Exchange is bilateral flow between high-information zones and low-information zones. Mechanism must reward credible information transfer, not prediction-market matching.
+
+---
+
+#### Section 1 — Base Primitive: What Is Being Exchanged? (#r194)
+
+Prior answer (from #r148, §1): A credible state estimate — a (claim, escrow, identity) tuple where escrow is forfeitable and identity carries a track record.
+
+**Net-new refinement (#r194):**
+
+The prior answer conflates the *object of exchange* with the *verification mechanism*. Separate them:
+
+- **Object of exchange:** A resolution commitment — a knower's public assertion `(coordinate, value, epoch)` that binds their capital to a specific outcome.
+- **What the buyer receives:** Not just a price signal but a *warranty*: "this estimate has a creditworthy guarantor who will forfeit capital if wrong."
+- **What makes it non-trivial:** The warranty is non-transferable between parties but transferable in consequence — the unknower who queries the knower pool receives the epistemic benefit of forfeiture risk without taking on any of the credit exposure.
+
+**Distinction from standard PM:** In a standard PM, the "buyer" acquires a position in a side-bet. In the knowledge marketplace, the "buyer" (unknower) acquires a *certified estimate* — the forfeiture consequence stays with the seller (knower) regardless of whether the unknower uses the estimate. The unknower does not bear credit risk; the knower does.
+
+**This is the structural break from LMSR:** LMSR moves a shared belief vector toward truth by taxing position-takers who move the market away from probability one. The knowledge marketplace doesn't move a shared belief vector — it certifies that a specific knower's estimate is warrant-backed. The aggregate (S_cred) is a derivative of individual warranties, not a market-clearing price.
+
+**Conserved quantity restatement (#r194):** Epistemic debt (WED) is the system's conserved quantity — the aggregate liability of all outstanding warranties. WED cannot decrease without an oracle resolution event (warranty discharge or slash). This is tighter than prior formulations: WED is explicitly conserved *between* oracle resolutions, not just tracked.
+
+---
+
+#### Section 2 — State Model: Global State Vector and Update Rule (#r194)
+
+Prior answer: S_cred as a credibility-weighted aggregate; WED as warrant liabilities; CredibilityAggregator tracks the update.
+
+**Net-new structural insight (#r194):**
+
+There are two distinct global state vectors that have been conflated throughout the thread:
+
+- **S_epistemic:** The best available estimate of the coordinate's true value. Updated by new claims. The object knowers compete to influence.
+- **S_settlement:** The value at which positions settle. Frozen at T_anchor. Must not be updateable post-freeze. Always a lagged version of S_epistemic (one-epoch buffer).
+
+In LMSR, S_epistemic = S_settlement (the market price IS the settlement proxy). In the knowledge marketplace, they must be explicitly separated because:
+
+1. **Manipulation surface:** If S_epistemic and S_settlement are the same object, an adversary can influence settlement by injecting noise just before T_anchor.
+2. **Incentive structure:** Knowers should be rewarded for accurate S_epistemic contributions over the full pre-anchor period, not just the last update before T_anchor.
+3. **Oracle authority:** The oracle resolves against ground truth, not against S_settlement. Oracle override changes S_settlement without retroactively penalising S_epistemic contributors. This is only coherent if they are different state variables.
+
+**State update rule (formal):**
+
+```
+S_epistemic(t+1) = F(S_epistemic(t), {new_claims(t)}, {credibility_ratios(t)})
+  where F is the W_MAX-capped credibility-weighted update
+
+S_settlement(t) = S_epistemic(t - T_epoch_buffer)
+  frozen at T_anchor; immutable until oracle resolution
+
+WED(t+1) = WED(t) + Σ_{new_claims(t)} escrow_i - Σ_{discharged(t)} escrow_j
+  conserved between oracle resolutions
+```
+
+**Why this was implicit:** The one-epoch buffer (T_epoch_buffer = 1 epoch, #r71) already enforces the separation. But the language conflated S_epistemic (the live estimate) with S_cred (the settlement input). The correct naming: S_cred IS S_settlement. S_epistemic is what the CredibilityAggregator epoch-buffer holds before commitment.
+
+**Contract addition:** CredibilityAggregator_v1 should expose both:
+- `getLiveS_epistemic(classId)` — real-time, uncommitted (informational only; never used for settlement)
+- `getCommittedS_cred(classId, epoch)` — committed, immutable S_settlement input
+
+This is a naming fix, not a logic change — the epoch buffer already enforces the separation. (#r194)
+
+---
+
+#### Section 3 — Credibility Model: How Capital Converts to Trustworthy Information (#r194)
+
+Three-question pressure test:
+
+**Q3a: Does capital actually prove conviction, or does it just impose a penalty?**
+
+Capital proves conviction IF AND ONLY IF the knower has private information that the market price underestimates. If the knower is purely noise-trading, the escrow penalty is a deterrent but not a conviction signal. The log-score update correctly models this: a random knower achieves near-zero log-score gain; credibility_ratio converges to floor.
+
+**Gap (#r194):** The credibility_ratio floor (default 1000 bps = 10%) means even a maximally wrong knower retains 10% of a neutral knower's weight in the W_MAX cap calculation. The mechanism relies on the honest-majority assumption for the remaining 90% of credibility weight to dominate. This is an explicit design assumption that auditors should verify holds in adversarial thin-pool scenarios.
+
+**Q3b: Is W_MAX + log-score strictly better than pure stake-weighting?**
+
+Yes, but only asymptotically. In bootstrap epochs (Phase 1), all credibility_ratios are at initialisation — the system IS pure stake-weighting (LMSR). The log-score advantage materialises only after N_calibration resolved epochs. Confirms Phase-1 plutocracy finding from #r187/Finding 4.
+
+**Q3c: Is there a simpler alternative?**
+
+Prediction-market profits as a credibility proxy fails for GestAlt's purpose: PM profits scale with capital, not accuracy. The log-score model achieves capital-normalised accuracy tracking — a small-stake expert earns the same credibility_ratio update as a large-stake expert for the same accuracy. No simpler alternative achieves this. (#r194)
+
+---
+
+#### Section 4 — Market Roles: Two Unknower Subtypes Not Previously Distinguished (#r194)
+
+**Unknower Type A — Passive consumer:** Reads S_cred directly (via oracle feed, EAT, or contract read). Pays no query fee. Receives the aggregate estimate as a public good. Does not reveal D(c).
+
+**Unknower Type B — Active asker:** Posts an escrow-conditioned EQ query paying `q_fee + q_bonus_escrow` for a coordinated estimate. The q_bonus is conditional on knower accuracy vs eventual oracle outcome. Reveals D(c) through willingness to pay.
+
+**Payment flow summary:**
+
+| Mode | Unknower type | Knower revenue source | D(c) revealed? |
+|---|---|---|---|
+| CLEARING_MODE | Type A (passive) | fee_fraction on all warranted claims | No — D(c) = position registry |
+| DISCOVERY_MODE | Type B (active EQ) | q_fee + q_bonus per targeted query | Yes — via q_bonus escrow size |
+
+The bilateral payment flow in DISCOVERY_MODE is the mechanism's proof-of-demand: if no unknower pays, no coordinate receives knower attention. Type A passive free-riding is a feature, not a bug: it increases S_cred's network utility and attractiveness to institutional Type B players. (#r194)
+
+---
+
+#### Section 5 — Settlement Model: Partial Observation in DISCOVERY_MODE (#r194)
+
+Three DISCOVERY_MODE settlement cases:
+
+**Case D1 — Fast oracle:** Use Settlement Freeze Protocol unchanged. Common case for classes approaching commercial viability.
+
+**Case D2 — Slow oracle (N >> N_calibration epochs):** Settlement deferred. Knowers earn q_fee revenue each epoch (ongoing payment for maintaining accurate S_epistemic). At eventual oracle resolution, log-score updates fire. The mechanism rewards longevity-weighted accuracy. This is strictly superior to LMSR for slow-oracle classes: LMSR has no fee-for-ongoing-accuracy primitive.
+
+**Case D3 — Oracle never fires:** Class retired. All escrows returned. No log-score update. Credibility_ratios unchanged. Governance decision after T_discovery_max elapses.
+
+**New invariant candidate (#r194):** For DISCOVERY_MODE Case D2, ongoing q_fee must sustain knower participation. Governance must set `q_fee_min(class_i)` per epoch as a minimum participation-sustaining payment. If q_fee_min is not met (insufficient EQ demand), class degrades to passive-consumption mode (Type A only; S_epistemic updates continue at reduced quality). (#r194)
+
+---
+
+#### Section 6 — Attack Surface: Knowledge Marketplace-Specific (#r194)
+
+**A — Credibility laundering:** Accumulate high credibility_ratio on easy-predict class, then cross-claim on hard class where private information is low.
+
+**Verification (#r194):** CredibilityAggregator_v1 `knowerRecords` is keyed by `(classId, address)`, not `(address)` alone. Cross-class credibility laundering is structurally impossible under the current spec. Confirm to Zellic as a positive verification item. (#r194)
+
+**B — Bilateral flow spoofing (wash-credibility):** Adversary operates as both knower AND unknower paying EQ that routes fees back to themselves.
+
+**Defence (#r194):** Self-query prohibition: `require(msg.sender != knower_address, "no self-query")` in ClaimEscrow or EQ escrow contract. One-line defence not previously stated in any prior run. **Add to Zellic audit brief as a specific check.** (#r194)
+
+**C — Cheap talk through passive Type A consumption:** Sophisticated institution reads S_cred for free, hedges in a separate market (e.g., Kalshi), captures epistemic surplus without paying q_fee. Classic free-rider problem.
+
+**Mechanism response (#r194):** Acceptable and expected. Type A free-riding creates no negative externality on mechanism quality (S_epistemic maintained by active knowers). The mechanism's sustainability depends on Type B unknowers and CLEARING_MODE fee_fraction revenue — not on preventing Type A free-riding. (#r194)
+
+---
+
+#### Section 7 — Comparison Against LMSR/Orderbooks/Batch Auctions (#r194)
+
+**Against LMSR:**
+
+*Decisive advantage:* LMSR rewards only being on the correct side at resolution. The knowledge marketplace rewards accurate S_epistemic maintenance across every epoch. For slow-oracle DISCOVERY_MODE classes, this is a fundamental mechanism superiority.
+
+*Decisive disadvantage:* LMSR provides a closed-form market-maker price: any order filled at known cost. The knowledge marketplace provides no guaranteed liquidity. If no credible knower exists for a coordinate, S_epistemic is undefined. LMSR fails gracefully (thin markets, worse prices); knowledge marketplace fails hard (no credible knower pool = no mechanism output).
+
+**Against orderbook PM:**
+
+Same decisive advantage as vs LMSR. Different disadvantage: orderbook PM requires a counterparty for every trade; the knowledge marketplace does not. But the PM orderbook's adversarial structure is epistemically valuable — adversarial bidding sharpens price discovery. The knowledge marketplace replaces adversarial bidding with oracle arbitration.
+
+**Against batch auctions (CLEARING_MODE):**
+
+The knowledge marketplace IS the pre-settlement price discovery layer; the batch auction is the settlement layer. Framing them as alternatives is a category error. The knowledge marketplace generates the epistemic content; the batch auction settles it.
+
+**Conserved quantity comparison:**
+
+| Mechanism | Conserved quantity | Source of truth |
+|---|---|---|
+| LMSR | Market cost function | Bayesian crowd belief (circular) |
+| Orderbook PM | Open interest | Adversarial bidding |
+| Batch auction | Allocated positions per epoch | Clearing price at T_anchor |
+| Knowledge marketplace | Epistemic debt (WED) | External oracle resolution (independent of S_cred) |
+
+The knowledge marketplace is the only mechanism where the source of truth is explicitly separated from the mechanism's own price output. S_cred is an approximation of truth; the oracle IS truth. This separation is the mechanism's epistemic integrity guarantee. (#r194)
+
+---
+
+#### Section 8 — Simplest Viable Mechanism Sketch (#r194)
+
+```
+Actors: K knowers, U unknowers, one oracle per coordinate.
+
+State:
+  credibility_ratio(k) ∈ [floor, 1.0] for each knower k — starts at floor
+  S_estimate(coord) = Σ_k credibility_ratio(k) × claim(k,coord) / Σ_k credibility_ratio(k)
+  escrow(k, coord) = staked capital forfeitable if claim(k,coord) is wrong at oracle resolution
+
+Operations:
+  1. stake(coord, value, amount):
+       knower k posts claim(k,coord)=value; locks escrow(k,coord)=amount
+  2. query(coord):
+       unknower u pays fee_rate × S_estimate(coord) to read certified estimate
+       fee distributed to active k proportional to credibility_ratio(k)
+  3. resolve(coord, oracle_value):
+       for each k with claim(k,coord):
+         credibility_ratio(k) updated via log-score delta
+         escrow returned (correct) or slashed (wrong, proportional to error magnitude)
+         fee_rate scales inversely with Σ_k credibility_ratio(k) — uncertain coordinates cost more to query
+```
+
+**Why this is better than LMSR's minimal mechanism:** LMSR requires a market maker subsidy (cost function loss funded externally). The knowledge marketplace fee loop is self-sustaining if query demand exists — no external subsidy for steady-state operation.
+
+**Why this fails in simplest form:** The slash threshold is subjective. Setting it too high punishes good-faith knowers on hard coordinates; too low fails to enforce warranty. The v2.1 log-score update rule (continuous calibration adjustment) is the necessary improvement. The minimal sketch is pedagogically correct but not production-safe. (#r194)
+
+---
+
+#### Section 9 — Strongest Reason This Idea Fails (#r194)
+
+Updated strongest failure mode after 194 runs:
+
+**The mechanism requires a credible knower pool that does not naturally exist at genesis.**
+
+LMSR can launch with zero participants — the cost function defines the market. The knowledge marketplace cannot launch without N_epistemically_live credible knowers — without them, S_epistemic is undefined, the fee loop produces no revenue.
+
+This is a cold-start failure more severe than AMM liquidity bootstrapping. You cannot buy calibration; you can only earn it through oracle resolutions. The epistemically_live gate (#r160/Q4) correctly prevents premature launch — but also means there is a period where the mechanism cannot serve any coordinate class.
+
+**Surviving mitigation:** The calibration_warmup_oracle (#r187/Finding 4) addresses this for classes with historical oracle-resolved analogs. For genuinely novel coordinate classes with no historical analog, the bootstrapping problem is unresolved. This is the correct residual failure mode. (#r194)
+
+---
+
+#### Section 10 — Best Surviving Variant If the Raw Idea Is Wrong (#r194)
+
+**Hybrid LMSR bootstrap with knowledge marketplace overlay:**
+
+```
+Phase 1 (LMSR bootstrap):
+  Standard LMSR with AMM-style subsidy funds N_bootstrap epochs.
+  Any participant can trade. Capital-weighted. No credibility tracking.
+  Purpose: establish liquidity; attract participants; generate oracle-resolved epochs.
+
+Phase 2 (credential accumulation):
+  After N_bootstrap epochs: track log-scores for all Phase-1 participants.
+  Assign initial credibility_ratios from Phase-1 accuracy.
+  LMSR subsidy declines by decay_rate per epoch.
+
+Phase 3 (knowledge marketplace steady state):
+  epistemically_live threshold reached.
+  LMSR subsidy removed. Fee loop sustains.
+  S_epistemic replaces LMSR price as canonical estimate.
+```
+
+**Net-new clarity (#r194):** The shadow-class architecture is not just a v2.2 engineering feature — it IS the mechanism's structural answer to Section 9's cold-start failure. The raw knowledge marketplace idea fails without LMSR bootstrapping; the surviving variant is the hybrid mechanism; the hybrid mechanism is the DISCOVERY_MODE → CLEARING_MODE lifecycle already in the spec. The architecture independently converged on the right answer. (#r194)
+
+---
+
+## Addressing Open Questions from #r193 (#r194)
+
+### Q1 (Audit brief delivery channel) → Private NDA; public post-deployment (#r194)
+
+GestAlt v2.1 is pre-launch competitive IP. NDA-covered briefing for Zellic during audit engagement. After v2.1 goes live (post-audit, post-Demo Day), publish engineering handoff documents as public documentation. Audit firm's public report (summary only) acceptable post-deployment.
+
+**Design law (#r194):** Mechanism spec documents are confidential until deployment. Audit firms sign NDA as pre-engagement condition. Technical transparency happens at deployment, not at audit start. (#r194)
+
+### Q2 (DISCOVERY_MODE EQ necessity vs subsidised scoring rule) → EQ is necessary for demand-routing at scale; subsidy sufficient for Day 1 (#r194)
+
+A governance-declared D(c) subsidy achieves discovery quality IF AND ONLY IF governance can accurately price D(c) for every coordinate class. This works for the first few high-visibility institutional classes; it fails at scale for the long tail of novel coordinates.
+
+EQ escrow-conditioned queries are the minimal mechanism for *demand-revealed* D(c): unknowers pay proportional to actual decision stakes, routing knower attention correctly. EQ is not necessary for Day 1; it is necessary for the long-tail scaling thesis. The governance subsidy bootstraps the first N_demo classes; EQ sustains the mechanism at scale. (#r194)
+
+### Q3 (Bootstrap W_MAX when total_active_weight = 0) → Bootstrap W_MAX = k_a_max_single_stake × w_max_pct; auto-transitions at first commitEpochBuffer (#r194)
+
+```
+W_MAX_bootstrap(class_i) = governance.k_a_max_single_stake(class_i) × w_max_pct
+
+Transition:
+  if total_active_weight_at_epoch_open(class_i, t-1) > 0:
+    W_MAX(class_i, t) = w_max_pct × total_active_weight_at_epoch_open(class_i, t-1)
+  else:
+    W_MAX(class_i, t) = W_MAX_bootstrap(class_i)
+
+EAT event: W_MAX_transition emitted at first non-zero epoch.
+```
+
+Note: k_a_max_single_stake should be immutable after class registration — it is an escrow-sizing input and retrospective adjustment is a manipulation surface. (#r194)
+
+### Q4 (Zellic audit PoC scope — all 12 relational constraints?) → High-risk pairs get dedicated PoC; others get manual inspection (#r194)
+
+**Require dedicated adversarial PoC (3 bidirectional high-risk pairs, 6 test cases total):**
+1. `tolerance ≤ ⌊window_size / 4⌋` — violation causes LTRP oscillation instability
+2. `γ_corr_cross ≤ γ_corr` — violation creates negative chain-depth bonus (incentive inversion)
+3. `ρ_floor ≤ ρ_ceil` — violation causes ρ_effective formula breakdown
+
+Both directions for each pair must be covered — setting either parameter to violate the constraint must revert.
+
+**Manual inspection sufficient (9 remaining):** `β_min ≤ β_max`, `α_min ≤ α_max`, `α bounds`, `w_override_base ≤ 0.6`, `γ ∈ (0,1)`, `fee_fraction bounds`, `window_size ≥ 4`. Violations cause range errors or incentive degradation, not mechanism inversions. (#r194)
+
+---
+
+## Structural Synthesis: Run #r194
+
+Four net-new structural insights:
+
+1. **S_epistemic / S_settlement naming separation** — existing epoch-buffer separation was correct but incompletely named; clarifies auditor briefings and oracle authority duality framing.
+2. **Section 10 closure: shadow-class IS the hybrid mechanism** — v2.2 shadow-class architecture independently converged on the correct answer to the knowledge marketplace cold-start failure.
+3. **Type A / Type B unknower taxonomy** — passive consumption vs active EQ is the key distinction between CLEARING_MODE and DISCOVERY_MODE economics. Type A free-riding is a feature.
+4. **Cross-class credibility laundering structurally closed** — `knowerRecords` key is `(classId, address)`. Confirmed. Add to Zellic brief as positive verification item.
+
+---
+
+## Cumulative Invariants (additions through #r194)
+
+**Invariant #162 (#r194):** S_epistemic (live CredibilityAggregator epoch-buffer estimate) and S_settlement (committed S_cred frozen at T_anchor) are distinct state variables. Auditors must verify no code path allows S_settlement to be updated after T_anchor StateFreeze.
+
+**Invariant #163 (#r194):** Cross-class credibility laundering is structurally precluded: `knowerRecords` is keyed by `(classId, address)`, not `(address)` alone. Audit positive verification: confirm no code path aggregates credibility_ratio across class IDs.
+
+**Invariant #164 (#r194):** Self-query prohibition: an address cannot simultaneously be the knower on a coordinate AND the payer of an EQ query on the same coordinate in the same epoch. Enforce as `require(msg.sender != knower_address)` in ClaimEscrow or EQ escrow contract.
+
+**Invariant #165 (#r194):** Bootstrap W_MAX = k_a_max_single_stake(class_i) × w_max_pct. Auto-transitions to dynamic formula (w_max_pct × total_active_weight_at_epoch_open) at first non-zero epoch boundary. EAT event W_MAX_transition emitted at transition. k_a_max_single_stake is immutable after class registration.
+
+**Invariant #166 (#r194):** The shadow-class architecture (DISCOVERY_MODE → CLEARING_MODE lifecycle) is the mechanism's structural answer to the knowledge marketplace cold-start failure mode. The LMSR-bootstrap → credential-accumulation → knowledge-marketplace steady-state transition is implemented by ShadowClearingPairRegistry and is not optional — it is the necessary bootstrapping sequence for genuinely novel coordinate classes.
+
+---
+
+## Run Log Update
+
+- **#r194** — 2026-04-04T06:02Z — New mechanism-design pass: 10-section first-principles framework analysis of the knowledge marketplace (S_epistemic/S_settlement naming separation; Type A/B unknower taxonomy; Section 10 shadow-class IS the hybrid mechanism; cross-class credibility laundering structurally closed). Q1–Q4 from #r193: NDA audit brief delivery; EQ necessity (demand-routing, not day-1 necessity); bootstrap W_MAX anchored to k_a_max_single_stake; Zellic audit PoC scope (3 bidirectional high-risk + 9 manual). Invariants #162–#166.
+
+---
+
+## Open Questions for #r195+
+
+1. **S_epistemic naming rollout:** Update CredibilityAggregator_v1 interface spec (#r183/Q1) to expose `getLiveS_epistemic()` vs `getCommittedS_cred()`. Confirm naming-only change — no logic change.
+
+2. **Type B unknower EQ mechanics in CLEARING_MODE:** Do Type B unknowers exist in CLEARING_MODE? Are there institutional participants who would pay an EQ query on a CLEARING_MODE coordinate (beyond passive Type A feed)? If yes, what does EQ escrow routing look like when D(c) is already observable via position registry?
+
+3. **k_a_max_single_stake immutability after registration:** Confirm immutable after class registration as escrow-sizing input. If adjustable post-registration, bootstrap W_MAX is a manipulation surface.
+
+4. **Zellic brief addendum:** Add Invariants #162–#164 (self-query prohibition, cross-class credibility laundering verification, S_epistemic/S_settlement audit items) to Zellic engagement brief pre-engagement technical pack.
+
+*Last updated: #r194 — 2026-04-04T06:02Z*
