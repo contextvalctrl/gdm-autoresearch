@@ -16576,3 +16576,188 @@ This is not an edge case — it is the typical institutional profile. A market m
 4. **Dual-role challenger suppression — detection:** The mechanism lacks a way to detect if a position-holder is deliberately *not* challenging a wrong warranted installation that benefits their position. Wrong installations that persist long enough may reflect challenger suppression by dual-role actors. Is there a detection heuristic (e.g., a wrong installation that oracle eventually overrides but was not challenged before T_finality is flagged for retroactive governance review of challenger composition)?
 
 *Last updated: #r214 — 2026-04-04T09:32Z*
+
+---
+
+## #r215 Contributions — 2026-04-04T09:42Z
+
+Addresses all four open questions from #r214. Net-new first-principles angle: the mechanism's conserved-quantity completeness — are WED, S_cred, and credibility_ratio sufficient, or is there a hidden fourth quantity?
+
+---
+
+### Q1 (Position-adjusted EDS weighting — formal design) → Option B: raw + position-adjusted EDS published in parallel; no suppression of position-holder bids; downstream interpretation is separable (#r215)
+
+**Why Option C (exclude position-holder bids entirely) is wrong:**
+
+A position-holder on a correlated class may have *both* a strategic interest and genuine epistemic demand for S_cred(A). Excluding their bid removes real demand signal. Position-holding does not disqualify genuine uncertainty about A's value.
+
+**Why Option A (inverse-correlation weighting) is premature:**
+
+Cross-class correlation (ρ_matrix) is unreliable at genesis (PHASE_A, Invariant #232). Inverse-correlation weighting requires a well-calibrated ρ_matrix to be meaningful. At bootstrap, it would either be noise-amplifying or trivially equivalent to Option B at full weight (ρ ≈ 0 assumed → weight ≈ 1).
+
+**Resolution — Option B: dual EDS series, no suppression:**
+
+```
+EDS_raw(c, t) = rolling_median_q_bonus(c, t)  [all unknower bids; unchanged]
+
+EDS_adjusted(c, t) = rolling_median_q_bonus_adjusted(c, t)
+  where q_bonus_adjusted(u, c) = q_bonus(u, c) × (1 − ρ_hat(u, c))
+
+  ρ_hat(u, c) = max_j { ρ_matrix(c, c_j) × is_position_holder(u, c_j) }
+    (largest correlation to any class where unknower u holds a registered position)
+
+EAT event includes both: { EDS_raw, EDS_adjusted, epoch }
+```
+
+**Properties:**
+- Unknowers with no correlated positions: EDS_adjusted = EDS_raw (full weight)
+- Unknowers with ρ_hat = 0.8 on a correlated class: EDS_adjusted = 0.20 × q_bonus (heavily discounted)
+- EDS_threshold_high governance gate uses EDS_adjusted (more conservative); informational displays show both
+
+**PHASE_A bootstrap:** ρ_hat is zero for all unknowers (no cross-class history); EDS_adjusted = EDS_raw. Transition to empirical ρ_hat at PHASE_B (same transition as Invariant #232). This is self-consistent.
+
+**Why Option B is superior to Option A:** Option B is Option A with the calibration transition already built in — identical to Option A during PHASE_B with a well-calibrated ρ_matrix. During PHASE_A, Option B degrades gracefully to unweighted EDS. Option A's "formal weighting" without the PHASE transition is just a parameter claiming precision it doesn't have.
+
+**Design law (#r215):** EDS is published as two series (raw and position-adjusted). EDS_adjusted uses ρ_hat weighting derived from the position registry and ρ_matrix. Governance gates and W_demand_adjusted(t) use EDS_adjusted. EDS_raw is available for protocol transparency. Position-holder bids are not excluded — they are weighted. During PHASE_A, ρ_hat = 0 and the two series are identical. (#r215)
+
+---
+
+### Q2 (Non-self-distribution implementation — submitter address propagation) → New query registry in CredibilityAggregator; submitter stored per query-epoch; O(1) lookup at fee distribution (#r215)
+
+**Architecture question:** T5 QUERY flows through CoordinateRegistry (state check) → CredibilityAggregator (fee computation + S_cred lookup). The submitter address is available at the CoordinateRegistry call frame but may not propagate to the fee distribution step in CredibilityAggregator.
+
+**Resolution — minimal-footprint query registry in CredibilityAggregator:**
+
+```solidity
+// CredibilityAggregator_v1:
+mapping(bytes32 => address) public querySubmitter;
+  // key: keccak256(classId, epoch, query_nonce, msg.sender)
+
+function queryWithFee(classId, epoch, q_bonus, query_nonce) external payable {
+    bytes32 qKey = keccak256(abi.encode(classId, epoch, query_nonce, msg.sender));
+    querySubmitter[qKey] = msg.sender;
+    for (each knower a in active_contributors(classId, epoch)) {
+        if (a == msg.sender) continue;   // non-self-distribution
+        share_a = w_a / total_w_excluding_submitter;
+        fee_pool[a] += share_a * (q_fee_base + q_bonus);
+    }
+}
+```
+
+Gas cost: one additional storage write (querySubmitter) + one equality check per knower iteration. O(N_knowers) unchanged asymptotic cost; one extra comparison per loop.
+
+**Design law (#r215):** Non-self-distribution requires a lightweight query registry (submitter per query key) in CredibilityAggregator. O(1) storage write at query time; O(1) lookup per knower-distribution iteration. No new contract required. (#r215)
+
+---
+
+### Q3 (Cross-source carry-over — order dependency and simultaneous archiving) → Simultaneous archiving uses proportional split; sequential uses first-in-ceiling approach; EAT-sequence tie-breaking (#r215)
+
+**The race condition:** If shadow classes A and B both archive in the same epoch, and their combined carry-over exceeds the ceiling, block ordering creates a first-mover advantage.
+
+**Resolution — epoch-boundary batch proportional scaling:**
+
+```
+At epoch boundary, CredibilityAggregator processes all shadow-class archives for epoch t:
+  Step 1: collect all pending carry-overs arriving in epoch t for clearing class X per knower a
+  Step 2: compute total_carry_over_a = Σ_i carry_over_a_i
+  Step 3: if total_carry_over_a > ceiling:
+              scale_factor = ceiling / total_carry_over_a
+              apply scale_factor to all carry_over_a_i simultaneously
+  Step 4: apply scaled carry-overs atomically at epoch boundary
+
+"Simultaneous" = all archives included in the same epoch-boundary settlement batch (same epoch number, regardless of block).
+Archives in different epochs: sequential first-in-ceiling.
+Same-epoch same-block tie-breaking: EAT event sequence order within epoch.
+```
+
+**Design law (#r215):** Archives arriving in the same epoch-boundary batch are proportionally scaled together (no first-mover advantage). Archives in different epochs use first-in-ceiling sequentially. Epoch-boundary batch composition is determined by EAT event sequence order within the epoch. (#r215)
+
+---
+
+### Q4 (Dual-role challenger suppression — detection heuristic) → Post-hoc oracle override flagging + challenger composition audit; governance advisory; neutral challenger pool for v2.2 (#r215)
+
+**Why pre-hoc prevention is structurally impossible:**
+
+A rational position-holder who benefits from a wrong installation has no mechanism-visible incentive to challenge. The mechanism cannot distinguish "chose not to challenge" from "did not detect the error."
+
+**Post-hoc detection heuristic:**
+
+```
+unchallenged_override_flag(classId, epoch) = true  iff:
+  (1) oracle resolution overrides candidate_price by > δ_threshold
+      δ_threshold = 2 × σ_resolve_history_median(classId)  [material override]
+  (2) No valid challenger registered during challenge window
+  (3) Total position-holder stake on classId in epoch ≥ position_concentration_threshold
+
+EAT event: unchallenged_override_incident { classId, epoch, override_magnitude,
+                                             challenger_count, position_concentration }
+```
+
+**Governance review trigger:** Cross-reference potential challengers (knowers whose claims were within δ_threshold of oracle truth) with position-holder registry. If N_potential_challengers_who_did_not_challenge are all position-holders who benefited from the wrong installation: governance advisory of likely suppression.
+
+**Structural mitigation — neutral challenger pool (v2.2):** For high-position-concentration classes, governance registers a protocol-operated neutral challenger funded from protocol treasury. Neutral challenger automatically challenges any installation deviating > δ_threshold from running S_cred. Challenger reward covers operational cost; treasury covers bond requirement only.
+
+**Design law (#r215):** Dual-role challenger suppression cannot be prevented pre-hoc. Post-hoc detection via unchallenged_override_flag enables governance review. For high-concentration classes, neutral challengers funded by protocol treasury are the structural mitigation (v2.2). Governance advisory is the correct epistemic posture — intent cannot be proven. (#r215)
+
+---
+
+### Net-New First-Principles Pass: Conserved-Quantity Completeness (#r215)
+
+**The three-quantity system (Invariant #197):**
+
+| Quantity | Nature | Conservation |
+|---|---|---|
+| WED | Financial liability | Monotone-nondecreasing within epoch; decreases only at RESOLVE/LTRP |
+| S_cred | Epistemic state estimate | Epoch-updated; not conserved |
+| credibility_ratio | Track-record bridge | Monotone-updatable at RESOLVE; bounded by W_max |
+
+**Candidates for a hidden fourth quantity — all rejected:**
+
+- **Total epistemic precision (inverse variance of S_cred):** Resets per epoch at oracle resolution. Not conserved.
+- **Credibility Capital Stock (CCS = Σ credibility_ratio × stake):** Changes with every resolution. Not conserved.
+- **Protocol Epistemic Surplus (PES = aggregate squared error):** A welfare KPI, not a conserved quantity. Already captured in W(t) accuracy term.
+- **Epistemic Capital Density (ECD = Σ credibility_ratio × escrow):** Monotone-decreasing at resolution (not conserved; knowers who are correct recover escrow, removing it from the at-risk pool). Useful as wealth-distribution fairness metric only.
+
+**The positive closure result:**
+
+> The knowledge marketplace mechanism's invariant-generating structure is complete at (WED, S_cred, credibility_ratio). WED is the solvency-conservative financial quantity. S_cred is the epistemic output. credibility_ratio is the bridge (maps financial accountability to epistemic weight). No additional quantity is needed or available for the mechanism's core guarantees.
+
+Additional metric quantities (W(t), EDS, ECD, σ_oracle) serve governance evaluation and signal functions but are not mechanism invariants.
+
+**One candidate that was nearly a fourth quantity:** EDS could have been a conserved resource if q_bonus were burned rather than redistributed. A burn mechanism would make "epistemic demand capital" a monotone-decreasing conserved quantity like WED. The decision to redistribute (non-self-distribution, Q1 of this run) was correct: conservation would have destroyed knower fee incentives. EDS is correctly a signal process, not a conserved resource.
+
+**DAG propagation and completeness:** Derived S_cred from DAG propagation (#r204) has no associated WED (no direct escrow) and no direct credibility_ratio update path. But Invariant #217 excludes propagated S_cred from settlement eligibility. The three-quantity completeness claim holds for settlement-eligible S_cred. Propagated S_cred is explicitly marked informational and sits outside the mechanism's settlement invariant structure — it does not weaken the completeness claim; it is defined out of scope by design.
+
+---
+
+## Cumulative Invariants (#r215)
+
+**Invariant #262 (#r215):** EDS is published as two series: EDS_raw (all bids) and EDS_adjusted (ρ_hat-weighted by inverse correlation to position-holder's correlated classes). Governance thresholds and W_demand_adjusted use EDS_adjusted. EDS_raw preserved for transparency. During PHASE_A (ρ_hat = 0), EDS_raw = EDS_adjusted.
+
+**Invariant #263 (#r215):** Non-self-distribution is implemented via a per-query submitter mapping in CredibilityAggregator (key: keccak256(classId, epoch, query_nonce, msg.sender)). Fee distribution loop skips the submitter. O(1) storage per query; O(1) check per distribution iteration.
+
+**Invariant #264 (#r215):** Shadow-class archives arriving in the same epoch-boundary batch are processed with proportional scaling (simultaneous; no first-mover advantage). Archives in different epochs use first-in-ceiling sequential processing. Epoch-boundary batch composition is determined by EAT event sequence order within the epoch.
+
+**Invariant #265 (#r215):** Dual-role challenger suppression cannot be prevented pre-hoc. Post-hoc detection: unchallenged_override_flag fires when oracle override exceeds 2× σ_resolve median AND no challenger registered AND position concentration exceeds threshold. Governance review is advisory. For high-concentration classes, protocol-funded neutral challenger pool is the structural mitigation (v2.2).
+
+**Invariant #266 (#r215):** The mechanism's invariant-generating structure is complete at three quantities: WED (financial solvency), S_cred (epistemic output), credibility_ratio (track-record bridge). No fourth conserved quantity exists or is required. Metric quantities (W(t), EDS, ECD, σ_oracle) serve governance and signal functions but are not mechanism invariants. EDS is correctly a signal process (redistributed fees) not a conserved resource (burned fees) — burning would destroy knower incentives. DAG-propagated S_cred is informational-only (Invariant #217) and lies outside the settlement invariant structure; the completeness claim is unaffected.
+
+---
+
+## Run Log Update
+
+- **#r215** — 2026-04-04T09:42Z — Q1: EDS dual-series (raw + adjusted) via ρ_hat weighting; PHASE_A: identical series; governance gates use adjusted; raw preserved. Q2: Non-self-distribution via per-query submitter mapping in CredibilityAggregator; O(1); no new contract. Q3: Simultaneous archive proportional scaling at epoch-boundary batch; sequential archives first-in-ceiling; EAT-sequence tie-breaking within epoch. Q4: Post-hoc unchallenged_override_flag (material override + no challenger + position concentration); governance-advisory; neutral challenger pool structural mitigation for v2.2 high-concentration classes. Net-new: Three-quantity completeness analysis — WED/S_cred/credibility_ratio sufficient; four candidates rejected; positive closure result; EDS correctly a signal not conserved resource; DAG-propagated S_cred out of scope by design (Invariant #217). Invariants #262–#266.
+
+---
+
+## Open Questions for #r216+
+
+1. **EDS_adjusted ρ_hat staleness:** ρ_hat derives from ρ_matrix which updates empirically (PHASE_B). If ρ_matrix update cadence is slow (N_calibration epochs between updates), EDS_adjusted will use outdated correlation weights. Should EDS_adjusted be recomputed retroactively when ρ_matrix updates, or is point-in-time consistency sufficient?
+
+2. **Neutral challenger pool treasury model:** Protocol-funded neutral challengers consume treasury capital for bond requirements. The challenger reward comes from slashed knower escrow (not treasury). Specify the treasury interaction: what exactly is the treasury funding — bond, operational gas, or a floor guarantee when no valid installation exists to slash?
+
+3. **Epoch-boundary simultaneous archive batch definition — same epoch vs same governance-settlement batch:** "Same epoch-boundary batch" was defined as same epoch number. If governance runs settlement batches at N-epoch intervals (not every epoch), two archives in the same governance-batch but different epochs could be treated as simultaneous or sequential. Clarify the definitive grouping unit.
+
+4. **Three-quantity completeness under oracle failure:** If oracle never resolves (Case D3), credibility_ratio_shadow gets partial update (γ_oracle_absent, Invariant #205). WED is partially released via LTRP. S_cred persists as last committed value. Under persistent oracle failure across all classes, all three quantities degrade toward degenerate states. Is there a fourth "structural health" quantity — e.g., fraction of classes with oracle-anchored credibility_ratio updates in the last N_calibration epochs — that the mechanism should conserve or monitor to detect protocol-wide oracle failure?
+
+*Last updated: #r215 — 2026-04-04T09:42Z*
