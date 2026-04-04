@@ -24899,4 +24899,235 @@ Whenever a mechanism feature has a degraded-mode state (level-correlation, MEDIU
 
 4. **Post-recovery contiguous window and epoch granularity for slow-oracle classes:** For a COMMITTEE class resolving once per macro-epoch, does N_calibration mean N_calibration macro-epoch resolutions, or N_calibration × macro_epoch_duration finer-grained epochs? A slow-oracle class might need years of monthly resolutions to satisfy the service floor on this interpretation.
 
-*Last updated: #r254 — 2026-04-04T17:12Z*
+*Last updated: #r255 — 2026-04-04T17:22Z*
+
+---
+
+## #r255 Contributions — 2026-04-04T17:22Z
+
+Addresses all four open questions from #r254. Net-new structural insight: **`calibration_ratio` is both a quality-gate metric and a credibility mechanism input — these two uses have different exclusion requirements, requiring a split definition.**
+
+---
+
+### Q1 (calibration_ratio and degraded-mode epoch exclusion — full-lifetime vs gated exclusion) → Dual-use split: `calibration_ratio_gated` excludes degraded-mode epochs (bonus/status eligibility); `calibration_ratio_full` includes all resolved epochs (credibility weighting in S_cred aggregation); separate audit trail (#r255)
+
+**The dual-use problem:**
+
+`calibration_ratio` currently serves two distinct functions:
+
+| Use | Function | Correct exclusion policy |
+|---|---|---|
+| Quality gate | Gate for T3 admission, bonus eligibility, service floor | Exclude degraded-mode — mechanism was degraded, not the knower |
+| S_cred credibility weight | Weight knower's S_cred contribution in aggregation | Include all resolved epochs — full track record is epistemically relevant |
+
+For credibility weighting, excluding degraded-mode epochs is epistemically *wrong*: a knower who maintained correct claims during degraded-mode conditions has demonstrated robustness — their full track record is informative about their epistemic quality. Artificially inflating their ratio by excluding near-zero-weight episodes would overstate their credibility in normal-mode aggregation.
+
+**Resolution — formal split:**
+
+```
+calibration_ratio_full(knower_a) =
+    Σ_all_resolved_epochs [alignment_event(a, e) × base_weight(e)]
+    / Σ_all_resolved_epochs base_weight(e)
+
+calibration_ratio_gated(knower_a) =
+    Σ_normal_mode_resolved_epochs [alignment_event(a, e) × eff_weight(e)]
+    / Σ_normal_mode_resolved_epochs eff_weight(e)
+
+    Where normal_mode_resolved_epoch(e) = true iff:
+      oracle_resolution_mode(class_j, e) = NORMAL
+      (i.e., not level-correlation fallback, MEDIUM_CONSENSUS fallback, or independence_degraded)
+```
+
+**Usage assignments:**
+
+- `calibration_ratio_full`: S_cred credibility weighting (η_effective in aggregation); COMMITTEE independence posterior (Invariant #375, Invariant #382 — intentionally includes all history)
+- `calibration_ratio_gated`: T3 admission gate; implication bonus eligibility (Invariant #423); service floor checks (Invariant #424); all status-transition quality checks
+
+**Transition for existing classes:** At activation of this invariant, EAT records split historical computation for all existing knowers. Retroactive split is backward-compatible: classes using `calibration_ratio_full` in existing logic remain unaffected; quality-gate logic transitions to `calibration_ratio_gated`.
+
+**Why not always gated:** If a knower has 80% of their resolved epochs during degraded-mode, `calibration_ratio_gated` is computed from only 20% of their history — potentially N < N_calibration normal-mode epochs. In this case `calibration_ratio_gated` = INSUFFICIENT (same rule as post-recovery service floor, Invariant #424). The gated version requires at least N_calibration normal-mode resolved epochs; below this threshold, quality gates are treated as not-yet-satisfied rather than defaulting to the full ratio.
+
+**Design law (#r255):** `calibration_ratio` has a dual split: `_full` for epistemic weighting (inclusive of all history); `_gated` for quality-gate eligibility (normal-mode epochs only; N_calibration minimum). The split resolves the tension between accurate credibility representation (inclusive) and just epistemic performance assessment (degraded-mode excluded). (#r255)
+
+---
+
+### Q2 (null-override upgrade path — dynamic delegation vs locked at registration) → Effective value locks at registration; null = "captured governance default at class_live_epoch"; governance changes do not retroactively apply to existing null-override classes (#r255)
+
+**The dynamic delegation failure:**
+
+If null = "always current governance default," then a governance vote changing `anti_snipe_blocks_default_COMMITTEE` from 250 to 350 retroactively changes the operating behavior of all registered COMMITTEE classes with null override. This creates:
+
+1. **Predictable manipulation window:** Anyone who knows a governance vote is pending can time retraction submissions relative to the expected effective-value change.
+2. **Inconsistency with existing vote accumulations:** Mid-life changes to anti_snipe_delay during active T_anchor vote accumulation create undefined ordering.
+3. **Violation of Invariant #427's immutability intent:** "Immutable for class lifetime" applies to all anti_snipe_delay values, not just explicit overrides.
+
+**Resolution — registration capture:**
+
+```
+At class registration:
+  if anti_snipe_delay_blocks_override == null:
+    effective_anti_snipe_delay_blocks(class_j) = anti_snipe_blocks_default_{oracle_mode_j}
+    captured at class_live_epoch governance parameter values
+    committed to EAT as a resolved value, not a reference to the governance parameter
+
+Governance changes to anti_snipe_blocks_default_{mode}:
+  Apply only to classes registered AFTER the governance change takes effect.
+  Existing classes: effective_anti_snipe_delay_blocks unchanged.
+  EAT: governance_parameter_update { parameter, old_value, new_value, effective_from_epoch }
+       classes_affected: only new registrations
+```
+
+**Symmetry with other immutable-at-registration parameters:**
+
+This matches the existing treatment of `implication_escrow_factor` (Invariant #387: locks at declaration epoch), `retraction_fraction_base` (Invariant #388: governance-set per class at registration), and `q_retraction_fee` (Invariant #399: per class at registration). Registration is the universal lock point for all class-lifetime parameters.
+
+**One exception — governance-default intent:** Some classes may have deliberately selected null as "use protocol judgment forever" — an explicit delegation. These classes cannot opt into retroactive updates without a class upgrade path. If governance wants to push an anti_snipe change to existing classes: class parameter_update EAT event with governance justification required per class (ADVISORY type); class maintainer must acknowledge.
+
+**Design law (#r255):** Governance default values are captured and locked at class registration. Null override = "use mode default at registration time," not a live governance delegate. Post-registration governance changes to defaults apply only to new registrations. Existing classes that want the new default require an explicit per-class parameter update with governance justification. (#r255)
+
+---
+
+### Q3 (T_anchor deferral at mode-switch — maximum deferral count) → Hard limit N_deferral_max = N_calibration deferral epochs; after: governance emergency fallback to MEMBER_COUNT_ONLY for single-fire; no indefinite deferral (#r255)
+
+**Why indefinite deferral is unacceptable:**
+
+HYBRID_DUAL_THRESHOLD may never be achievable if committee credibility differentiation is insufficient or if high-credibility members are systematically absent. Indefinite deferral = class epistemic lock: unknowns accumulate; settled capital is permanently withheld; calibration_ratio track records are never updated. This is an operational failure mode regardless of the mechanism's correctness.
+
+**Why the limit must be bounded and predictable:**
+
+A knower who knows T_anchor deferral has a limit N_deferral_max would accumulate information about the resolution over N_deferral_max epochs, allowing strategic late-stage retraction or claim updates. The limit should be disclosed at registration (deterministic) — but bounded tightly enough to constrain the information-accumulation advantage.
+
+**Resolution:**
+
+```
+t_anchor_deferral_max(class_j) = N_calibration epochs
+[governance-settable at class registration; bounded [1, N_calibration]; default N_calibration]
+
+At each deferred epoch:
+  EAT: t_anchor_deferred_mode_switch { class_id, epoch, deferral_count, max_deferral }
+
+At deferral_count = t_anchor_deferral_max:
+  EAT: t_anchor_deferral_exhausted { class_id, epoch }
+  Governance action triggered:
+    Option A (preferred): governance vote to ADD qualified committee member
+      with initial credibility_weight >= credibility_quorum_threshold_gap
+      [closes the gap to satisfy credibility-weight quorum]
+    Option B (emergency single-fire): governance may invoke `committee_emergency_settle`
+      which fires T_anchor under MEMBER_COUNT_ONLY for this single resolution only
+      requires governance supermajority (>= 2/3 of protocol governance votes)
+      EAT: committee_emergency_settle_invoked { class_id, epoch, governance_vote_fraction }
+      credibility_ratio tracks this resolution with flag `emergency_settle: true`
+      [does not count toward calibration_ratio_gated — emergency mode resolution]
+    Option C (delist): governance may declare class DELIST_PENDING if T_anchor cannot fire
+      within further N_calibration epochs after deferral_max
+
+No indefinite automatic extension. Deferral_max is a hard governance deadline.
+```
+
+**Design law (#r255):** T_anchor deferral has a hard governance deadline of N_calibration epochs. After exhaustion: add qualified committee member, invoke emergency single-fire supermajority, or initiate delist. Indefinite deferral is operationally equivalent to class failure. Emergency settlements are flagged and excluded from `calibration_ratio_gated`. (#r255)
+
+---
+
+### Q4 (N_calibration definition for slow-oracle classes — resolved oracle events vs fine-grained epochs) → N_calibration is defined in oracle resolution units; for slow-oracle classes the calibration clock is data-clock-aligned; wall-clock epoch count is never the gating unit (#r255)
+
+**The structural argument:**
+
+Invariant #418 established that the calibration clock (N_calibration) and data clock (N_blocks_required) are structurally independent. The tension here is: for features that should track mechanism maturity (calibration clock), N_calibration counts "enough operational experience." For a slow-oracle class with monthly resolutions, 12 monthly resolutions = 12 oracle events; N_calibration = 12 requires one year. This is correct — the mechanism has 12 data points, not a year of wall-clock operation, and those 12 data points is what makes N_calibration meaningful.
+
+**Resolution — oracle-resolution-unit definition:**
+
+```
+N_calibration(class_j) = oracle resolution events for class_j
+  For AUTOMATED / HYBRID_EXTERNAL: typically 1 oracle event per macro-epoch
+    -> N_calibration ≈ macro-epochs (current implied interpretation confirmed)
+  For COMMITTEE classes resolving monthly: 1 oracle event per month
+    -> N_calibration monthly oracle resolutions
+  For IMPLICATION_CHAIN: 1 oracle event per upstream in-range resolution
+    -> N_calibration upstream in-range events
+
+class_calibration_epoch(class_j) =
+    N_calibration oracle resolution events since class_live_epoch
+    (not N_calibration wall-clock or fine-grained epochs)
+```
+
+**Slow-oracle minimum floor:** If `oracle_resolution_frequency < 1 per N_calibration fine-grained epochs`, the class enters "calibration-slow" state at registration:
+
+```
+calibration_slow_flag(class_j) = true iff oracle_resolution_frequency < threshold_slow
+    threshold_slow: governance-set; default 1 oracle event per N_calibration fine-grained epochs
+
+Effects of calibration_slow_flag:
+  - Service floor minimum contribution: N_calibration oracle resolutions
+    (not N_calibration fine-grained epochs; same logic)
+  - Calibration deadline (Invariant #414): expressed in oracle resolution events, not epochs
+    -> calibration_deadline = max(2×N_calibration, N_blocks_required + N_calibration)
+       where units are oracle resolution events
+  - EAT: calibration_slow_class { class_id, oracle_resolution_frequency, calibration_expected_epochs }
+```
+
+**Implication for COMMITTEE monthly classes:**
+
+A class resolving monthly with N_calibration = 12: calibration deadline = max(24, N_blocks_required + 12) oracle resolutions. If N_blocks_required = 50 blocks: deadline = max(24, 62) = 62 monthly resolutions ≈ 5.2 years. This correctly reflects the data scarcity of slow-oracle classes.
+
+**Governance calibration:** At class registration, `calibration_expected_epochs` is published to EAT so unknowers know the class's calibration timeline. This transparency is a feature: knowers and unknowers choose their participation with full knowledge of calibration horizon.
+
+**Design law (#r255):** N_calibration is defined in oracle resolution units, not wall-clock or fine-grained epoch counts. For slow-oracle classes, the calibration timeline correctly stretches — mechanism maturity requires the data, not the passage of time. Calibration deadlines for slow-oracle classes are expressed in oracle resolution events; `calibration_expected_epochs` published at registration for transparency. (#r255)
+
+---
+
+## Net-New Structural Insight: calibration_ratio Split Generalises to All Dual-Use Track Records (#r255)
+
+The dual split of `calibration_ratio` exposes a general mechanism design principle:
+
+**When a metric serves both epistemic weighting (must be inclusive) and eligibility gating (must exclude degraded-mode), the metric must be split.** A single unified metric optimised for one use case will be systematically wrong for the other.
+
+General rule: For any knower-level track record metric:
+- If used for **S_cred weighting**: use full history (all resolved epochs). Degraded performance is informative about epistemic quality.
+- If used for **eligibility gates** (admission, bonus, status transitions): use normal-mode-only epochs with N_calibration minimum. Mechanism degradation is not the knower's epistemic signal.
+
+**Corollary check — COMMITTEE independence posterior (Invariant #375, #382):** Uses `η_realized` = binary alignment history across all epochs. This feeds into S_cred credibility weighting (full history). The retained-degraded-history of COMMITTEE independence posterior is the correct exception (Invariant #428) and is consistent with the general rule: it is used for credibility weighting, not gating. The split applies.
+
+**Application scope:** Any future mechanism metric combining weighting and gating functions should be explicitly split at design time. (#r255)
+
+---
+
+## Structural Synthesis: #r255
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| calibration_ratio degraded-mode exclusion | Dual split: `calibration_ratio_full` (all epochs, S_cred weighting); `calibration_ratio_gated` (normal-mode only, eligibility gates; N_calibration minimum) | Metrics serving both weighting and gating must be split; unified metric is wrong for one use case |
+| Null-override upgrade path | Effective value locked at registration; governance changes apply only to new registrations; existing null-override classes require explicit per-class parameter update | Registration is the universal lock point; null = captured default at class_live_epoch |
+| T_anchor deferral max | N_calibration hard limit; after: add qualified member, emergency supermajority single-fire (MEMBER_COUNT_ONLY, flagged, excluded from calibration_ratio_gated), or DELIST_PENDING | Indefinite deferral = class failure; hard limit forces governance action; emergency settlements are flagged |
+| N_calibration for slow-oracle classes | Oracle resolution units; calibration clock = oracle events not wall-clock; slow-oracle flag; calibration_expected_epochs published at registration | N_calibration measures data, not time; slow-oracle classes transparently disclose calibration horizon |
+
+---
+
+## Cumulative Invariants (#r255)
+
+**Invariant #429 (#r255):** `calibration_ratio` is split into two metrics. `calibration_ratio_full(a)` = Σ[alignment(a,e) × base_weight(e)] / Σ[base_weight(e)] over ALL resolved epochs; used for S_cred credibility weighting and COMMITTEE independence posterior (Invariants #375, #382). `calibration_ratio_gated(a)` = Σ[alignment(a,e) × eff_weight(e)] / Σ[eff_weight(e)] over normal-mode-only resolved epochs (oracle_resolution_mode = NORMAL); used for T3 admission gates, bonus eligibility (Invariant #423), service floor checks (Invariant #424), and all status-transition quality checks. `calibration_ratio_gated` requires >= N_calibration normal-mode resolved epochs; below this threshold: INSUFFICIENT (quality gates treat as not-yet-satisfied). Historical retroactive split committed to EAT on invariant activation.
+
+**Invariant #430 (#r255):** anti_snipe_delay_blocks effective value locks at class registration (captured governance default at class_live_epoch). Null override = mode default as of registration epoch; not a live governance delegate. Governance changes to anti_snipe_blocks_default_{mode} apply only to classes registered after the change epoch. Existing null-override classes require explicit per-class ADVISORY parameter_update with governance justification to adopt new default. EAT: `governance_parameter_update { parameter, old_value, new_value, effective_from_epoch }` with classes_affected = new registrations only.
+
+**Invariant #431 (#r255):** T_anchor deferral hard limit: t_anchor_deferral_max = N_calibration epochs (governance-settable at registration [1, N_calibration]). At exhaustion: EAT `t_anchor_deferral_exhausted`; governance must act within further N_calibration epochs via one of: (A) add qualified committee member closing credibility-weight gap; (B) `committee_emergency_settle` supermajority (>= 2/3 governance votes), firing T_anchor under MEMBER_COUNT_ONLY for single resolution, flagged `emergency_settle: true`, excluded from `calibration_ratio_gated`; or (C) DELIST_PENDING. No indefinite automatic extension.
+
+**Invariant #432 (#r255):** N_calibration is defined in oracle resolution units for all classes. For slow-oracle classes (oracle_resolution_frequency < 1 per N_calibration fine-grained epochs): `calibration_slow_flag = true`; all N_calibration references (service floor minimum, calibration deadline) are in oracle resolution event counts, not wall-clock or fine-grained epoch counts. `calibration_expected_epochs` (estimated wall-clock equivalence) published in EAT at registration. Calibration deadline (Invariant #414) expressed in oracle resolution events: max(2×N_cal, N_blocks_required + N_cal) oracle resolution events from class_live_epoch.
+
+---
+
+## Run Log Update
+
+- **#r255** — 2026-04-04T17:22Z — Q1: calibration_ratio split into `calibration_ratio_full` (all epochs; S_cred weighting) and `calibration_ratio_gated` (normal-mode only; N_calibration minimum; quality-gate eligibility); resolves Invariant #428 dual-use tension. Q2: Null override locks at registration; governance default changes apply to new classes only; existing null-override classes require explicit ADVISORY per-class update. Q3: T_anchor deferral hard limit = N_calibration epochs; exhaustion triggers governance action (add member / emergency supermajority / delist); emergency settlements flagged and excluded from calibration_ratio_gated. Q4: N_calibration is oracle-resolution-unit-denominated; slow-oracle flag; calibration_expected_epochs published at registration for transparency; calibration deadline in oracle events. Net-new: calibration_ratio dual-use split generalises — metrics serving both weighting and eligibility gating must be split; unified metric is systematically wrong for one use. Invariants #429–#432.
+
+---
+
+## Open Questions for #r256+
+
+1. **calibration_ratio_gated and INSUFFICIENT state — fallback to calibration_ratio_full for admission gates:** When `calibration_ratio_gated` = INSUFFICIENT (fewer than N_calibration normal-mode resolved epochs), what is the T3 admission gate behavior? Block entirely (wait for N_calibration epochs), use `calibration_ratio_full` as a conservative fallback, or use a governance-declared genesis prior?
+
+2. **committee_emergency_settle credibility tracking:** Emergency settle resolutions are flagged and excluded from `calibration_ratio_gated`. Are they also excluded from `calibration_ratio_full` (making them invisible to S_cred weighting as well), or included in `calibration_ratio_full` with the `emergency_settle: true` flag as a modifier?
+
+3. **calibration_slow_flag and interaction with Zone C_oracle:** A slow-oracle class that is `calibration_slow_flag = true` accumulates TOWL obligations between oracle resolutions. Does Zone C_oracle's expected_oracle_loss calculation for this class need to account for the extended inter-resolution window (more TOWL accumulates before the next oracle event can affect EL_oracle recalibration)?
+
+4. **N_calibration oracle-resolution-unit definition and IMPLICATION_CHAIN upstream miss:** IMPLICATION_CHAIN N_calibration counts upstream in-range events. An upstream range miss (A misses upstream_oracle_range) does not advance the downstream class's calibration clock. For a volatile upstream class, downstream calibration may effectively never advance. Define the maximum ratio of upstream misses to in-range events before the class is flagged calibration_slow.
+
+*Last updated: #r255 — 2026-04-04T17:22Z*
