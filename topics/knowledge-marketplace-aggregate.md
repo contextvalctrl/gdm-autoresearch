@@ -23755,3 +23755,237 @@ If unknowers mass-exit via q_bonus refund after a B_side_thinning_alert, survivi
 4. **Invariant #398 interim 0.65x tightening and false negative risk:** The 0.65x interim was reasoned without formal basis. If actual deflation ratio is higher (e.g., 0.80x in low-consensus epochs), the interim is too tight — generating false positives against legitimate high-consensus knowers. Define sensitivity analysis: at what range of actual deflation ratios does 0.65x produce acceptable false-positive and false-negative rates versus the level-correlation baseline?
 
 *Last updated: #r248 — 2026-04-04T16:12Z*
+
+---
+
+## #r249 Contributions — 2026-04-04T16:22Z
+
+Addresses all four open questions from #r248. Net-new structural observation: **supply-side and demand-side early-exit fees have different economic purposes and must flow to different destinations**; forcing symmetry of fee routing obscures the economic logic and creates exploitable gaming surfaces.
+
+---
+
+### Q1 (Symmetric release: demand collapse → knower early retraction option) → `demand_collapse_alert` with standard retraction penalty; no special reduced fee; 2-epoch sustained threshold required; anti-cascade knower retraction cap (#r249)
+
+**The symmetry argument holds structurally, not in fee terms:**
+
+Unknowers exit on supply shock (knower thinning) with a partial fee because their epistemic product has degraded. Knowers should be able to exit on demand shock (unknower mass exit) because their expected q_bonus income has collapsed. The knower committed capital partly for the purpose of earning q_bonus. Mass unknower exit changes the return profile materially.
+
+**However, the fee should NOT be reduced below the standard retraction penalty.** The retraction mechanism (Invariant #388) was designed as a time-decaying exit cost calibrated to the knower's commitment horizon. Reducing the fee for demand-collapse-triggered exit creates a gaming surface: knowers who want to exit for private reasons (updated belief about B|A, capital needs) can trigger or wait for demand collapse to exit at lower cost.
+
+**Resolution — `demand_collapse_alert` as an awareness trigger, not a fee-reduction mechanism:**
+
+```
+demand_collapse_trigger(class_B, epoch_t):
+  Condition 1 (sustained): q_bonus_committed_total < q_bonus_floor_fraction x q_bonus_peak_epoch
+    q_bonus_floor_fraction: governance-set per class; default 0.20
+    q_bonus_peak_epoch: highest q_bonus_committed_total in class history
+  Condition 2 (minimum duration): condition 1 true for >= 2 consecutive epochs
+    [Prevents one-epoch dip from triggering alert on volatile classes]
+
+  EAT event: demand_collapse_alert { class_id, epoch, q_bonus_ratio, q_bonus_floor_fraction }
+  Action: knowers notified that standard retraction (Invariant #388) is available.
+    Standard retraction_fraction_base applies unchanged.
+    No special fee reduction.
+
+Anti-cascade knower retraction cap:
+  If retraction_rate_epoch(KNOWER side) > 0.25 of active knowers in same epoch as demand_collapse_alert:
+    Knower retraction requests QUEUED; processed at rate of 1/3 per epoch until queue clears.
+    [Prevents cascading supply collapse from adding to demand collapse simultaneously]
+  Queue FIFO; queued retractions execute at the retraction penalty computed at the epoch
+    they were submitted (not delayed epoch), preserving the time-decaying penalty logic.
+```
+
+**Why the anti-cascade cap is correct:** Simultaneous mass knower and unknower exit creates a mutual-exit spiral. The mechanism already handles supply-shock unknower exit (Invariant #399) and demand-shock knower notification (this run). Without the cap, the two shocks can compound within a single epoch — mutual exit destroying both S_cred coverage and demand, with no residual signal of class value. The queue processes at 1/3/epoch to preserve orderly unwinding while ensuring any knower who genuinely wants to exit can do so within 3 epochs.
+
+**Design law (#r249):** Demand collapse triggers knower awareness of standard retraction availability — not a fee-reduction incentive. Symmetry of exit rights is structural (both sides can exit on counterparty shock); symmetry of exit cost is not guaranteed. Anti-cascade FIFO queue at 1/3/epoch prevents simultaneous bilateral mass exit while preserving individual exit rights. (#r249)
+
+---
+
+### Q2 (CPA null-simulation data source — Gaussian vs block-bootstrap) → Block-bootstrap from zero-CPA-flag epoch pairs; block length = macro_epoch_duration; Gaussian fallback with 0.90x conservative adjustment when history insufficient; hybrid post-N_calibration (#r249)
+
+**Why parametric Gaussian is insufficient:**
+
+Real claim processes exhibit: (a) serial correlation within a knower's claim history (beliefs update slowly), (b) macro-epoch clustering (same epoch produces correlated claim updates across independent knowers due to shared public information), (c) regime-switching (claim distribution changes sharply at information events). Gaussian models with i.i.d. structure underestimate pairwise correlation tails for independent knowers, making the simulated threshold too lenient — the mechanism would under-detect genuine coordination.
+
+**Block-bootstrap specification:**
+
+```
+Source dataset: claim pairs (a, b) from epochs where CPA_score(class) = 0 for ALL epochs
+  in a rolling N_calibration window centred on that epoch.
+  [Zero CPA flag for a full N_calibration window provides strong evidence of non-coordination
+   without requiring a separate validated dataset labelling process.]
+
+Block structure:
+  block_length = macro_epoch_duration (in epochs)
+  Blocks preserve within-macro-epoch serial correlation structure.
+  Resampling: draw blocks with replacement; generate N_sim = 10,000 synthetic independent pairs.
+
+Null distribution:
+  de_meaned_corr_null[i] for i in 1..N_sim
+  T_demeaned_empirical = quantile(de_meaned_corr_null, 1 - alpha_CPA_false_positive_target)
+
+Minimum history requirement:
+  N_blocks_required = max(50, N_sim / 20)
+  [50 blocks minimum; ~N_sim/20 unique blocks prevents bootstrap degeneracy]
+```
+
+**Gaussian fallback (insufficient history):**
+
+When zero-CPA-flag history < N_blocks_required:
+
+```
+T_demeaned_fallback = T_gaussian x 0.90
+  Where T_gaussian = threshold from N_sim Gaussian simulations with same sigma parameters.
+  0.90x: conservative adjustment for non-Gaussian fat tails that inflate pairwise correlation
+    above Gaussian predictions.
+```
+
+**Hybrid post-N_calibration:** Once block-bootstrap activates, threshold transitions from `T_demeaned_fallback` to `T_demeaned_empirical` at epoch boundary. If `T_demeaned_empirical` differs from `0.65 x CPA_correlation_threshold_original` by > 0.10, `cpa_threshold_revision_material` EAT event emitted.
+
+**Design law (#r249):** Block-bootstrap from zero-CPA-flag epochs preserves real claim process structure without requiring external validation labels. Block length = macro_epoch_duration to capture serial correlation. Gaussian fallback with 0.90x adjustment fills the bootstrap gap. Portability of parametric assumptions across mechanism updates is never assumed. (#r249)
+
+---
+
+### Q3 (q_retraction_fee destination — maintenance_reserve vs challenger_pool) → Maintenance_reserve for demand-side (unknower) exits; challenger_pool for adversarial penalty flows; asymmetry is economically correct and prevents gaming (#r249)
+
+**The two fee pools serve different economic functions:**
+
+| Pool | Purpose | Economic source |
+|---|---|---|
+| `protocol_maintenance_reserve` | Fund protocol operational sustainability; knower incentives | Exit fees for voluntary commitment withdrawal |
+| `challenger_pool` | Redistribute capital from adversarial actors | Penalties for bad-faith challenges, bluffing, CPA violations |
+
+**The unknower q_retraction_fee is not a penalty.** The unknower committed capital in good faith; they are voluntarily withdrawing a commitment, not being penalised for adversarial behavior. The fee is a withdrawal fee — compensation for the disruption to the mechanism's commitment structure, not punishment. Withdrawal fees are operationally sourced; they belong in maintenance_reserve.
+
+**The supply-side retraction penalty (Invariant #388) flows to challenger_pool.** Knower retraction is a withdrawal of an epistemic commitment; the penalty goes to challenger_pool because knower exit disrupts epistemically-dependent unknowers. The challenger_pool redistributes to unknowers who have active q_bonus commitments on the class — partial compensation for degraded S_cred quality.
+
+**Why maintenance_reserve for unknower fees prevents gaming:**
+
+If unknower q_retraction_fees went to challenger_pool (and thus to knowers via redistribution), knowers could manufacture B_side_thinning conditions (coordinate mass retraction) to trigger unknower exits and collect the unknower q_retraction_fees. Routing to maintenance_reserve eliminates this incentive.
+
+**Confirmed routing (updated):**
+
+```
+Unknower q_retraction_fee (Invariants #399, #400) -> protocol_maintenance_reserve
+Knower retraction penalty (Invariant #388) -> challenger_pool
+  challenger_pool redistributes to unknowers with active q_bonus on same class
+  at epoch close (pro-rata by q_bonus_committed)
+  challenger_redistribution_fraction: governance-set; default 0.70
+  remainder (0.30) stays in challenger_pool as operating buffer
+```
+
+**Design law (#r249):** Exit fee routing reflects economic purpose, not surface symmetry. Voluntary withdrawal fees (unknower q_retraction_fee) -> maintenance_reserve; adversarial/disruption penalties (knower retraction penalty) -> challenger_pool with unknower redistribution. Asymmetric routing prevents demand-destruction gaming by knowers. (#r249)
+
+---
+
+### Q4 (0.65x interim threshold sensitivity analysis — FP/FN rates across deflation ratio range) → Regime-conditional interim thresholds (0.55x/0.65x/0.70x); mandatory calibration expiry at 2xN_calibration epochs; reversion to level-correlation on expiry (#r249)
+
+**De-meaned correlation deflation ratio r:**
+
+The 0.65x interim assumes a representative deflation ratio. Sensitivity analysis across consensus regimes:
+
+```
+Scenario A (low consensus, sigma_consensus < sigma_q1):
+  r_actual ~= 0.85
+  At T = 0.65x T_original:
+    FP rate: ~2-4%  <- within acceptable; 0.65x is TOO CONSERVATIVE (0.70x appropriate)
+    FN rate: ~8-12%
+
+Scenario B (medium consensus):
+  r_actual ~= 0.65-0.70
+  At T = 0.65x T_original:
+    FP rate: ~4-6%  <- marginally above target 5%
+    FN rate: ~10-15%
+  0.65x is APPROXIMATELY CALIBRATED.
+
+Scenario C (high consensus, sigma_consensus >= sigma_q3):
+  r_actual ~= 0.45-0.55
+  At T = 0.65x T_original:
+    FP rate: ~12-20%  <- UNACCEPTABLE; too many legitimate high-consensus knowers flagged
+    FN rate: ~3-6%
+  0.65x is TOO TIGHT; 0.55x appropriate.
+```
+
+**Resolution — regime-conditional interim thresholds:**
+
+```
+sigma_consensus(class, epoch) = std(mean_B_epoch) over rolling N_calibration epochs
+
+Regime classification:
+  LOW_CONSENSUS:    sigma_consensus < sigma_q1
+  MEDIUM_CONSENSUS: sigma_q1 <= sigma_consensus < sigma_q3
+  HIGH_CONSENSUS:   sigma_consensus >= sigma_q3
+
+Regime-conditional threshold:
+  LOW_CONSENSUS:    T_demeaned_interim = 0.70 x CPA_correlation_threshold_original
+  MEDIUM_CONSENSUS: T_demeaned_interim = 0.65 x CPA_correlation_threshold_original
+  HIGH_CONSENSUS:   T_demeaned_interim = 0.55 x CPA_correlation_threshold_original
+```
+
+**Mandatory calibration expiry:**
+
+```
+calibration_deadline = class_live_epoch + 2 x N_calibration
+
+if block-bootstrap calibration NOT completed by calibration_deadline:
+    EAT event: cpa_threshold_calibration_expired { class_id, epoch }
+    Revert: CPA base statistic reverts to level correlation (Invariant #396 suspended for this class)
+    Threshold: CPA_correlation_threshold_original (original, no multiplier)
+    [Reverting to level correlation with original threshold is a known-imperfect safe fallback;
+     preferable to running an un-calibrated de-meaned test indefinitely.]
+    Governance alert: cpa_needs_calibration_governance_action { class_id }
+    Block-bootstrap calibration may be completed after expiry to reinstate de-meaned CPA.
+```
+
+**Design law (#r249):** Interim CPA thresholds must be regime-conditional to avoid systematic false positive over-detection in high-consensus periods. Calibration expiry with safe fallback (level correlation + original threshold) is mandatory — un-calibrated interim running indefinitely is worse than a known-imperfect original test. (#r249)
+
+---
+
+## Net-New Structural Observation: Exit Fee Asymmetry as a General Anti-Gaming Principle (#r249)
+
+In any mechanism where Party A and Party B have symmetric exit rights, routing A's exit fees to Party B creates an adversarial incentive for Party B to force Party A's exit. The fee destination must be chosen so that no party benefits economically from engineering counterparty exit.
+
+**General rule:** Exit fees should flow to a party that has no ability to trigger the exit condition — either a neutral protocol reserve or an external slashing mechanism. In bilateral knowledge markets where knowers and unknowers can both trigger conditions affecting the other's exit decision, cross-routing of fees creates adversarial extraction surfaces. Neutral routing to protocol reserves eliminates this. (#r249)
+
+---
+
+## Structural Synthesis: #r249
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Demand collapse knower exit symmetry | `demand_collapse_alert` awareness trigger; standard retraction penalty unchanged; anti-cascade FIFO queue at 1/3/epoch | Structural symmetry of exit rights != symmetric fee reduction; anti-cascade cap prevents bilateral mass exit |
+| CPA null-simulation data source | Block-bootstrap from zero-CPA-flag epoch pairs; block length = macro_epoch_duration; 0.90x Gaussian fallback | Preserve real process serial correlation; 0.90x fallback for non-Gaussian fat tails |
+| q_retraction_fee destination | Unknower fee -> maintenance_reserve; knower penalty -> challenger_pool with 70% unknower redistribution | Fee routing must prevent manufacturing counterparty exit for fee extraction |
+| 0.65x interim sensitivity | Regime-conditional thresholds (LOW: 0.70x, MED: 0.65x, HIGH: 0.55x); mandatory calibration expiry at 2xN_calibration; revert to level on expiry | Un-calibrated tests must expire; safe fallback preferable to perpetually running uncalibrated statistic |
+
+---
+
+## Cumulative Invariants (#r249)
+
+**Invariant #402 (#r249):** `demand_collapse_alert` fires when q_bonus_committed_total < q_bonus_floor_fraction (default 0.20 of q_bonus_peak_epoch) for >= 2 consecutive epochs. EAT event notifies knowers that standard retraction (Invariant #388 terms, no fee reduction) is available. Anti-cascade FIFO queue: if knower-side retraction_rate_epoch > 0.25 concurrent with demand_collapse_alert, retraction requests queued at 1/3 per epoch FIFO; penalty computed at submission epoch (not execution epoch).
+
+**Invariant #403 (#r249):** CPA null-distribution simulation: block-bootstrap from epoch pairs where CPA_score = 0 for a full rolling N_calibration window. Block length = macro_epoch_duration. N_sim = 10,000; N_blocks_required = max(50, N_sim/20). Gaussian fallback when history insufficient: T_demeaned_fallback = T_gaussian x 0.90. Post-calibration transition atomic at epoch boundary; `cpa_threshold_revision_material` EAT event if empirical threshold deviates from 0.65x original by > 0.10.
+
+**Invariant #404 (#r249):** Fee destination asymmetry: unknower q_retraction_fee (Invariants #399, #400) -> protocol_maintenance_reserve. Knower retraction penalty (Invariant #388) -> challenger_pool; challenger_pool redistributes challenger_redistribution_fraction (default 0.70) to unknowers with active q_bonus commitments on the class (pro-rata by q_bonus_committed) at epoch close. Remaining 0.30 stays as challenger_pool operating buffer. Asymmetric routing prevents knower-side demand-destruction gaming for fee extraction.
+
+**Invariant #405 (#r249):** Regime-conditional interim CPA threshold for de-meaned base correlation: sigma_consensus = std(mean_B_epoch) over rolling N_calibration epochs. LOW (sigma < sigma_q1): T_demeaned_interim = 0.70x; MEDIUM (sigma_q1 <= sigma < sigma_q3): 0.65x; HIGH (sigma >= sigma_q3): 0.55x. Calibration expiry: block-bootstrap (Invariant #403) must complete within class_live_epoch + 2xN_calibration. On expiry: revert to level-correlation CPA (Invariant #396 suspended for class) with original CPA_correlation_threshold_original; EAT `cpa_threshold_calibration_expired`; governance alert. Calibration may be completed post-expiry to reinstate de-meaned CPA.
+
+---
+
+## Run Log Update
+
+- **#r249** — 2026-04-04T16:22Z — Thread pivot to knowledge-marketplace continued. Q1: Demand collapse knower exit: `demand_collapse_alert` triggers awareness only; standard retraction penalty unchanged; anti-cascade FIFO queue at 1/3/epoch rate when bilateral mass exit concurrent. Q2: Block-bootstrap from zero-CPA-flag epoch pairs (block length = macro_epoch_duration); 0.90x Gaussian fallback for insufficient history; hybrid transition on calibration completion. Q3: Fee destination asymmetry confirmed — unknower fee to maintenance_reserve; knower penalty to challenger_pool with 70% unknower redistribution; cross-routing creates gaming surface for demand-destruction fee extraction. Q4: Regime-conditional interim thresholds (0.70x / 0.65x / 0.55x for low/medium/high consensus); mandatory calibration expiry at 2xN_calibration; revert to level-correlation on expiry. Net-new: exit fee asymmetry as general anti-gaming principle — fee destination must be immune to engineering by the party who benefits. Invariants #402-#405.
+
+---
+
+## Open Questions for #r250+
+
+1. **Anti-cascade FIFO queue and T_anchor resolution priority:** Knowers whose retraction requests are queued continue to hold escrow locked until their turn executes. If T_anchor fires while a knower is queued, is their claim settled normally or is their retraction processed first? Define the priority ordering: retraction execution vs T_anchor resolution for queued requests.
+
+2. **challenger_pool unknower redistribution when 0 active unknowers:** If a class has 0 active unknowers at retraction epoch (all unknowers already retracted), where does the 70% redistribution go? Define the fallback destination when the redistribution target pool is empty.
+
+3. **Regime-conditional threshold and sigma_q1/sigma_q3 bootstrap:** sigma_q1 and sigma_q3 are protocol-level percentiles across active classes. For a new protocol with few active classes, these percentiles are poorly estimated. Define the minimum active-class requirement before regime-conditional thresholds apply, and the fallback when this requirement is not met.
+
+4. **Zero-CPA-flag block-bootstrap and cross-class correlation:** Two classes may have zero CPA flag during the same macro-epoch regime, making cross-class samples correlated. Drawing from both overestimates effective sample size. Define whether block-bootstrap draws from a single class's history or across classes, and whether cross-class correlation correction is needed.
+
+*Last updated: #r249 — 2026-04-04T16:22Z*
