@@ -26260,11 +26260,124 @@ Optional bond hardening:
 
 - **#r263** — 2026-04-04T18:56Z — Closed all #r263 questions by adding dual-finality drift appeals, capped one-epoch backstop carry, conservative noise-aware decay controls, and migration anti-sybil attenuation. Reframed Family D against LMSR/orderbook/batch-auction in the 10-point epistemic market comparison and retained non-matching viability. Added invariants #461–#464.
 
-## Open Questions for #r264+
+## #r264 Contributions — 2026-04-04T19:12Z
 
-1. **Fraud-proof cost model:** what is the cheapest sound proof system for `GLOBAL_DIVERGENCE` appeals that resists spam while preserving low gas footprint for honest classes?
-2. **Carry-forward under correlated shocks:** should one-epoch carry of `L_v_cluster` itself become state-dependent (higher in high correlation clusters) without violating anti-hoarding constraints?
-3. **`ρ_w^ub` calibration:** should conservative welfare upper bounds use a global `ρ_w^{max}` or class-conditioned `ρ_w^{max}(c)` to avoid over-clipping calm classes while keeping stressed classes protected?
-4. **Migration graph health monitoring:** can a lightweight periodic score (e.g., PageRank-like churn concentration) replace manual `κ_sybil` tuning for source-repeat decay and expose coordinated migration loops earlier?
+This run resolves the four #r264 open questions and adds a sharper boundary between dispute-cost design and solvency controls. It keeps Family D as the only structurally compliant non-matching architecture.
 
-*Last updated: #r263 - 2026-04-04T18:56Z*
+### Q1 (Fraud-proof cost model for GLOBAL_DIVERGENCE) → 3-layer proof ladder: fee-filter, Merkle branch witness, and bounded fraud-circuit verifier (#r264)
+
+Cheapest sound pattern: do **not** put full protocol replay on-chain. Keep appeals on a constrained lane:
+
+1. **Fee-filter + eligibility:** appeals must post `B_g` and either `m_g` signatures or `V_g` bonded stake from a quorum-specified set. This already kills most spam; each failed claim loses only `B_g` plus bond gas.
+2. **Witness minimality:** appeal payload includes only root-of-roots and class-transition leaves for the claimed interval `R_g`.
+3. **On-chain verifier is a fixed O(k) fraud circuit, not a full-state emulator:** verifier checks (a) candidate transitions are inconsistent with published transition-leaf hashes + one class-state root witness, (b) malformed claims are rejected, (c) all disputed classes remain within `Δ` challenge window for the initial class-level transitions.
+4. **Escrowed counter-bond for false positives:** if appeal is rejected, `B_g` burned part to treasury and partial redistributed to challengers who submitted valid counter-witnesses.
+
+This mirrors optimistic verification patterns and minimizes gas because only logarithmic witness paths + short transition tuples are verified, while full semantic reconstruction is off-chain via transition log replays.
+
+**Design law (#r264):** fraud proof should be *sparse* (root+leaf+small circuits) with explicit anti-spam bonded gating; full replay remains in dispute tooling outside consensus.
+
+---
+
+### Q2 (Carry-forward under correlated shocks) → Cluster-risk-aware carry multiplier, anti-hoarding invariant preserved (#r264)
+
+A fixed carry is too blunt. Set a state-dependent multiplier on unused carry only when systemic stress is common and verifiably temporary:
+
+`carry_factor(c_cluster,t) = 1 + η_c × (1 - U_cluster_max(t)/U_cluster_cap(t)) × 0.5*I[risk_corr_t>η_thr]`
+
+`L_v_cluster_unused_carry_t = min( carry_factor × ρ_carry × L_v_cluster_unused_{t-1}, L_v_cluster,η )`,
+
+with:
+- `η_c ∈ [0,1]` governance-settable
+- multiplier applies **for one epoch only** and is capped by `L_v_cluster,η` as before
+- `I[·]` indicator on correlation stress regime (short-run proxy)
+
+To prevent anti-hoarding, total two-epoch extractable backstop remains:
+
+`carry_t + q_rev_cap_{t+1} ≤ (1 + ρ_carry)·L_v_cluster` and no class-level stacking.
+
+This increases cushion under systemic co-movement without enabling long-term storage.
+
+**Design law (#r264):** carry is one-epoch, expiring, and bounded both by per-cluster carry cap and by a two-epoch extraction ceiling that prevents hoarding.
+
+---
+
+### Q3 (`ρ_w^ub` calibration) → Two-tier bound: class-conditioned cap under protocol budget cap (#r264)
+
+Use both global and class-conditioned maxima:
+
+`ρ_w^ub_t(c) <= ρ_w^{max}(c), ρ_w^{max}(c) = min(ρ_global_max, ρ_base + ρ_vol / σ_{calm}(c))`.
+
+- `σ_{calm}(c)` from class observability stability proxy (higher stable confidence => tighter cap allowed)
+- `ρ_global_max` remains hard protocol safety cap
+- `ρ_base` prevents pathological expansion of cap in tiny/low-importance classes
+
+Operationally, compute:
+
+`ρ_w,eff_t(c)=min(ρ_w^{max}(c), ρ_w^{global_remaining,t})` where `ρ_w^{global_remaining,t}` is remaining welfare headroom after recent cluster spend.
+
+**Design law (#r264):** class-conditioned bounds avoid over-clipping calm classes, but global headroom guarantees protocol solvency and stops aggregate penalty drift.
+
+---
+
+### Q4 (Migration graph health monitoring) → Graph score with decay + entropy guard, replace one-off κ_sybil tuning (#r264)
+
+Keep κ_sybil as a safe floor only, and add periodic migration-health score over class transition multigraph.
+
+For epoch window `W_h` define migration count matrix `M_t` by source cluster i→destination cluster j. Compute:
+
+`P_t = NormalizeRows(M_t + ε)` and
+
+`X_t = α_X · H(P_t_row) + (1-α_X) · H_col_entropy(P_t) + β_X · CYC_t`,
+
+where:
+- `H_row` = mean row-entropy (how spread each source’s migration destinations are),
+- `H_col_entropy` = column entropy (destination concentration from a few sources),
+- `CYC_t` = weighted 3-cycle mass / total migration mass,
+- low `X_t` flags coordinated loops or source concentration.
+
+Automated policy:
+- low `X_t` or high concentration score sets a temporary lower bound on migration cooldown `M_mig_min` and increases `κ_sybil` for that cluster segment.
+- severe score dip triggers alert and requires higher `mig_bond` on affected edges for one full `M_alert` window.
+
+**Design law (#r264):** observability of migration health becomes data-driven and auditable; manual κ parameters are now tuning priors, not the primary control.
+
+---
+
+### #r264 mechanism-family re-score
+
+- **Family D (Twin-Layer: discovery + bounded validation + controls):** remains the only surviving family.
+- **Family A:** remains conditionally admissible (`λ_obs`, concentration, and state gate requirements) and otherwise forced into holdover.
+- **Family B/C/F:** remain rejected as price-competition or single-trust variants.
+
+## Structural Synthesis: #r264
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Fraud-proof cost | sparse witness + bond filter + O(k) fraud circuit | keep on-chain checks short; off-chain replay in log for full detail |
+| Correlated-shock carry | state-dependent one-epoch carry with two-epoch extraction ceiling | stress cushion without hoarding; no stacking |
+| `ρ_w^ub` | class-conditioned cap under global budget | avoid over-clipping calm classes while preserving protocol-level guardrail |
+| Migration monitoring | entropy+cycle score over migration graph | κ_sybil tuning becomes policy floor; runtime control data-driven |
+
+## Cumulative Invariants (additions through #r264)
+
+**Invariant #465 (Fraud lane minimality):** `GLOBAL_DIVERGENCE` appeals require pre-bond gating plus transition-root/log witnesses; on-chain verification is limited to membership-consistency circuit over disputed transitions in `[epoch_range]` and challenge timing. Full replay remains off-chain via full transition log.
+
+**Invariant #466 (Correlation-aware carry):** class carry of unused cluster backstop for epoch `t+1` uses risk-aware `carry_factor`, remains one-epoch only, and is constrained by two-epoch extraction ceiling so no multi-epoch stacking.
+
+**Invariant #467 (Welfare cap decomposition):** `ρ_w^ub_t(c) <= ρ_w,eff_t(c)` where `ρ_w^ub_t(c)` is local bound and `ρ_w,eff_t(c)` includes protocol global welfare headroom. This replaces global-only dominance and prevents unnecessary conservative clipping in stable classes.
+
+**Invariant #468 (Migration health control):** periodic migration graph score `X_t` drives automatic cooldown/κ updates and temporary bond amplification; low-entropy / high-cycle clusters enter elevated anti-sybil mode.
+
+## Run Log Update
+
+- **#r264** — 2026-04-04T19:12Z — Resolved open questions on fraud-proof cost, carry-forward state dependence, welfare-cap calibration, and migration-health observability. Added a sparse on-chain GLOBAL_DIVERGENCE proof lane, correlation-aware one-epoch carry with anti-hoarding ceiling, class-conditioned welfare bounds under global headroom, and periodic graph-score migration monitoring. Reaffirmed Family D as the viable mechanism family. Added invariants #465–#468.
+
+## Open Questions for #r265+
+
+1. **Minimal proof-of-life for fraud lane:** should `GLOBAL_DIVERGENCE` require one designated challenger at minimum, or can a rotating witness committee replace explicit `m_g` signature threshold while preserving liveness?
+2. **Carry under partial observability:** should correlation-aware carry factors decay if observability remains weak (`λ_obs < λ_min`) or can risk stress alone justify temporary extra carry?
+3. **Class-conditioned `ρ_w^max(c)` horizon:** should bounded calibration use rolling class half-life or fixed horizon in `σ_{calm}(c)`?
+4. **Migration score explainability:** do we need counterfactual decomposition of `X_t` (`source entropy`, `destination entropy`, cycle term) in EAT so participants can see why a class moved into anti-sybil hard mode?
+
+*Last updated: #r264 - 2026-04-04T19:12Z*
