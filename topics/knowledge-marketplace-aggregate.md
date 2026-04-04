@@ -6442,3 +6442,265 @@ GestAlt v2.1 mechanism specification is **complete** as of #r167.
 ---
 
 *Last updated: #r167 — 2026-04-04T01:32Z*
+
+---
+
+## #r168 Contributions — 2026-04-04T01:42Z
+
+**Phase: v2.2 Module 1 — DISCOVERY_MODE full stack. First-principles design from the bilateral information revelation game framework (Invariant #64 mandate).**
+
+This run opens the DISCOVERY_MODE mechanism design from scratch. It does not apply CLEARING_MODE primitives by analogy — it derives the primitives from the revelation game.
+
+---
+
+### D0 — What Game Are We Actually Playing?
+
+**CLEARING_MODE game (already spec-complete):** Coordination game. Knowers, challengers, and position-holders all benefit from accurate settlement. Information revelation is aligned: a knower who reveals their true posterior maximises expected scoring reward. The mechanism's job is to aggregate credible signals and produce a settlement price that is hard to move without genuine information.
+
+**DISCOVERY_MODE game (this module):** Bilateral information revelation game. The game structure is fundamentally different:
+
+- **Unknower (query buyer):** Has decision-relevant uncertainty about coordinate c. Values accurate state updates. Willing to pay query fees. Wants maximum information extracted per fee.
+- **Knower (information seller):** Has private signal s_a. Can reveal a full posterior, a partial posterior, or a deliberately noisy posterior. Revealing too precisely in epoch t destroys future earning potential (information is consumed by the market once revealed). Wants to maximise multi-epoch fee income, not single-epoch accuracy.
+
+**The core tension absent in CLEARING_MODE:**
+
+In CLEARING_MODE: knower's optimal strategy = honest reporting of posterior. The log-score scoring rule is proper; strategic misreporting reduces expected payoff.
+
+In DISCOVERY_MODE: honesty in epoch t may reduce expected fee income in epochs t+1, t+2, ... because revealed information becomes public knowledge (embedded in S_cred, visible to all unknowers). The knower faces a multi-period tradeoff: reveal now (earn current query fee, exhaust information edge) vs. withhold now (earn smaller current fee, preserve future edge).
+
+Standard proper scoring rules do not resolve this tradeoff. A proper scoring rule induces honest reporting of the *current posterior* — but it does not prevent a knower from strategically maintaining an imprecise current posterior by withholding signal processing. (#r168)
+
+---
+
+### D1 — The Conserved Quantity in DISCOVERY_MODE
+
+In CLEARING_MODE, the conserved quantity is **solvency** (TOWL: capital backing outstanding obligations).
+
+In DISCOVERY_MODE, the conserved quantity is **epistemic value transferred** — the cumulative information moved from high-information zones to the shared state vector.
+
+**Formal definition:**
+
+```
+Let S(t) = S_cred state distribution at epoch t (probability distribution over coordinate c)
+Let π_0 = initial prior (uniform or governance-estimated genesis prior)
+
+Cumulative_IVD(T) = KL(S(T) || π_0)
+    (total information gained from mechanism start through epoch T)
+
+Per-epoch Per-knower Information Value Delivered:
+    IVD_a(t) = KL(S(t) || π_0) − KL(S(t-1) || π_0) × weight_a(t) / Σ_j weight_j(t)
+    (knower a's marginal contribution to total epistemic progress at epoch t)
+```
+
+A healthy DISCOVERY_MODE mechanism shows Cumulative_IVD monotonically increasing toward KL(oracle_truth || π_0). A mechanism where Cumulative_IVD stagnates has failed to deliver genuine information — knowers are collecting fees without moving the state.
+
+**Why KL-divergence from initial prior:** Measures how far the shared state has moved from "knowing nothing." Computable from S(t) and π_0, both committed to EAT. No external oracle required for IVD accounting. (#r168)
+
+---
+
+### D2 — The Revelation Incentive Problem (Formal Statement)
+
+**Knower a's optimization problem (multi-period):**
+
+```
+max_{D_a(1),...,D_a(T)} Σ_t δ^t × E[fee_a(t)]
+
+where δ = time discount factor
+D_a(t) = reported distribution at epoch t
+fee_a(t) = query fee share earned at epoch t
+subject to: D_a(t) derived from private signal history {s_a(1),...,s_a(t)}
+```
+
+Knower a's true posterior at epoch t is P_a(t). Standard proper scoring rules require D_a(t) = P_a(t) for single-epoch optimality. But in a multi-epoch fee stream, the knower may withhold signal processing and report D_a(t) = D_a(t-1) until t = T_anchor − 1 (dump-all strategy).
+
+**Three degenerate equilibria in DISCOVERY_MODE:**
+
+1. **Strategic withholding:** Knowers withhold until late epochs. Unknowers receive uninformative state vectors throughout most of the discovery phase.
+2. **IVD free-riding:** Knower waits for others to reveal, then submits a marginally refined version of the public state, collecting IVD credit at near-zero private cost.
+3. **Noise injection:** Knower submits noisy D_a(t) to earn fees while preserving private edge. Degrades S_cred without triggering accuracy penalty until oracle resolution.
+
+None of these occur in CLEARING_MODE (single-event settlement; no multi-epoch fee stream). (#r168)
+
+---
+
+### D3 — Two Surviving Mechanism Families
+
+Three candidate families generated and evaluated:
+
+**Killed: Auction-for-revelation.** Unknowers bid for information; knowers compete on revelation breadth. Fails: overconfident narrow claims win bids; this is a confidence-display game, not a revelation game. Eliminated.
+
+**Surviving: IVD-weighted query fees.** Fee allocation proportional to per-epoch marginal information value delivered. Directly incentivises what we want. Requires KL-divergence computation per epoch. Implements conserved-quantity accounting directly.
+
+**Surviving: Consistency-penalized multi-epoch revelation contracts.** Knowers commit to sequential distribution updates. Penalised for unjustified large deviations between consecutive reports (Jensen-Shannon divergence gate). Computationally simpler. Does not directly measure IVD but closes the strategic-withholding incentive.
+
+**Why both are needed:**
+
+IVD-weighting rewards genuine epistemic transfer but cannot prevent dump-all (large IVD_weight at t=T−1 may still dominate).
+
+Consistency penalty prevents withholding but cannot distinguish accurate from noisy gradual revelations.
+
+**Combined mechanism:**
+
+```
+discovery_fee_a(t) = query_fee_pool(t) × W_a(t)
+
+W_a(t) = base_share(a,t) × consistency_factor(a,t) × IVD_weight(a,t)
+
+base_share(a,t) = credibility_ratio(a) × stake_a_net / Σ_j (credibility_ratio(j) × stake_j_net)
+
+consistency_factor(a,t):
+  = 1.0    if JS(D_a(t) || D_a(t-1)) ≤ info_arrival_tolerance × Δt
+  ∈ [0.5, 1.0] if within 3× tolerance
+  = 0.0    if JS(D_a(t) || D_a(t-1)) > 3× tolerance (unjustified large jump)
+
+IVD_weight(a,t) = max(0, IVD_a(t)) / Σ_j max(0, IVD_j(t))
+  (zero if knower's contribution decreases state vector quality in epoch t)
+```
+
+**info_arrival_tolerance:** governance-set per coordinate class, reflecting expected rate of new information arrival in the underlying domain. (#r168)
+
+---
+
+### D4 — The Two-Pool Fee Model
+
+Fee structure must incentivise both ongoing information delivery and terminal accuracy simultaneously.
+
+```
+unknower pays: query_fee_total per query submission
+
+Split at submission:
+  fee_streaming_pool:  query_fee_total × query_fee_fraction       (distributed per-epoch via W_a(t))
+  accuracy_bonus_pool: query_fee_total × (1 − query_fee_fraction) (distributed at T_finality)
+
+query_fee_fraction: governance-set per class, bounded [0.2, 0.8], default 0.5
+```
+
+**fee_streaming_pool:** Incentivises genuine ongoing information delivery. Distributed per epoch proportional to W_a(t).
+
+**accuracy_bonus_pool:** Distributed at T_finality proportional to final credibility_ratio(a). Incentivises terminal accuracy. Reuses v2.1 log-score infrastructure — zero new accuracy scoring required.
+
+**Calibration of query_fee_fraction:**
+- Short-horizon (near-expiry) coordinates: lower query_fee_fraction → stronger terminal accuracy discipline.
+- Long-horizon coordinates: higher query_fee_fraction → sustained revelation reward dominates.
+
+Pure streaming → knowers optimise early high-IVD claims that may be wrong at resolution.
+Pure accuracy bonus → dump-all. The split resolves both failure modes simultaneously. (#r168)
+
+---
+
+### D5 — Attack Surface Map (Initial; Full Analysis Deferred to #r169+)
+
+| Attack | Candidate defence | Status |
+|---|---|---|
+| IVD inflation (manufacture IVD via divergent then corrected D_a) | Consistency penalty applied bidirectionally | Partial — gain bounded by info_arrival_tolerance × Δt |
+| IVD sniping (free-ride on others' state advances) | IVD renormalization; early knowers earn multi-epoch cumulative advantage | Partial |
+| Dump-all late revelation | Consistency penalty gates large jumps; accuracy_bonus_pool split bounds profitability | Partial |
+| Noise injection | IVD_weight = 0 if claim decreases state quality | Partial |
+| Query flood (drain streaming pool) | query_fee_total paid by unknower; flooding is self-funded, not an attack | Structural non-issue |
+| Cross-class discovery poisoning | mode_mismatch_discount + attenuated genesis prior (#r154–#r156) | Covered |
+
+Full adversarial analysis deferred to #r169–#r173. (#r168)
+
+---
+
+### D6 — State Model for DISCOVERY_MODE
+
+**S(t) = full probability distribution (not scalar):**
+
+```
+S(t) = Σ_a W_a(t) × D_a(t)   (credibility-weighted mixture of reported distributions)
+```
+
+S(t) carries uncertainty quantification — unknowers receive a distribution, not just a point estimate.
+
+**On-chain representation:**
+- Parametric (default): S(t) = (μ, σ) for Gaussian; or (α, β) for Beta on [0,1] coordinates. O(1) per epoch. Sufficient for most institutional use.
+- Discretized (opt-in): N_buckets = 16 probability bins. O(N_buckets) per epoch. Higher fidelity for tail-sensitive coordinates.
+
+**Update rule per epoch:** Submit D_a(t) → compute IVD_a(t), JS(t), W_a(t), S(t) → distribute fee_streaming_pool → commit S(t) to EAT.
+
+**Why not scalar:** CLEARING_MODE scalar S_cred is sufficient for settlement (just need the best estimate). DISCOVERY_MODE unknowers need the uncertainty envelope to make institutional decisions — e.g., how wide to set collateral margins. (#r168)
+
+---
+
+### D7 — DISCOVERY_MODE vs LMSR / Orderbooks (10-Point Framework Update)
+
+**LMSR:** Prices how capital moves a scalar market probability. Does not distinguish private information from well-capitalised speculation. Does not reward the process of revelation — only terminal accuracy.
+
+**DISCOVERY_MODE advantage:** IVD_weight rewards genuine information flow per epoch. Credibility_ratio stratification means track-record matters, not just capital. S(t) distribution output is richer than LMSR scalar. Consistent incremental revelation is rewarded over strategic dumps.
+
+**DISCOVERY_MODE weakness:** info_arrival_tolerance calibration is a hard governance problem. If miscalibrated, either legitimate knowers are penalised (too tight) or IVD inflation is profitable (too loose). The mechanism's quality is bounded by governance's ability to estimate domain-specific information arrival rates.
+
+**Strongest failure reason:** info_arrival_tolerance is unverifiable at class registration. A governance-estimated tolerance may be systematically wrong for novel coordinate classes, making both withholding and noise injection profitable simultaneously. No fully objective self-calibrating tolerance derivation exists without sufficient historical data — creating a bootstrapping problem for new coordinate types. (#r168)
+
+**Best surviving variant if raw DISCOVERY_MODE fails:** Fall back to accumulating EQ queries as data for future calibration, using a conservative (tight) info_arrival_tolerance as the genesis default, and spending the first N_sigma_window epochs in "calibration mode" where consistency penalties are advisory only. Mechanism degrades gracefully to a data-collection phase rather than failing catastrophically on day 1.
+
+---
+
+### D8 — Simplest Viable DISCOVERY_MODE Mechanism (v2.2 MVP Sketch)
+
+**5 new contracts extending v2.1 base:**
+
+1. **DiscoveryCoordinateRegistry** — adds query_fee_fraction, info_arrival_tolerance, distribution_mode (parametric/discretized)
+2. **DiscoveryClaimEscrow** — adds two-pool accounting: fee_streaming_pool, accuracy_bonus_pool, per-epoch streaming distribution
+3. **DiscoveryCredibilityAggregator** — adds IVD_a(t) computation, JS consistency check, W_a(t) = base × consistency × IVD, S(t) distribution mixture
+4. **DiscoverySettlementEngine** — adds two-pool payout at T_finality; accuracy_bonus_pool distributed by terminal credibility_ratio
+5. **ShadowClearingPairRegistry** — manages shadow↔clearing pair registration, genesis prior snapshot export, two-registration lifecycle
+
+**One-query data flow:**
+```
+unknower submits query(class_id, epoch_t) + query_fee_total
+  → fee_streaming_pool += fee_total × query_fee_fraction
+  → accuracy_bonus_pool += fee_total × (1 − query_fee_fraction)
+  → unknower receives S(t-1) (current EAT-committed state distribution)
+
+Per epoch:
+  knowers submit D_a(t)
+  compute IVD_a(t), JS(t), W_a(t), S(t)
+  distribute fee_streaming_pool proportional to W_a(t)
+  commit S(t) to EAT
+
+At T_finality:
+  oracle resolves V*
+  distribute accuracy_bonus_pool proportional to terminal credibility_ratio(a)
+  shadow-class begins wind-down if linked clearing-class resolved
+```
+
+---
+
+## Structural Synthesis: DISCOVERY_MODE Foundation Established (#r168)
+
+| Primitive | DISCOVERY_MODE | vs CLEARING_MODE |
+|---|---|---|
+| Base primitive | Information transfer (IVD) | Capital warranty |
+| Conserved quantity | Cumulative KL from prior | TOWL solvency |
+| State model | Full distribution S(t) | Scalar credibility-weighted estimate |
+| Update rule | W_a(t) = base × consistency × IVD | credibility_ratio × stake-weighted |
+| Settlement | Two-pool: streaming + accuracy bonus | Single-event at T_finality |
+| Degenerate equilibria | Withholding, IVD sniping, dump-all, noise injection | Sybil, flash-stake, oracle gaming |
+
+---
+
+## Cumulative Invariants (additions through #r168)
+
+**Invariant #65 (#r168):** In DISCOVERY_MODE, the conserved quantity is cumulative epistemic value transferred, measured as KL(S(T) || π_0). A healthy DISCOVERY mechanism shows monotonically increasing Cumulative_IVD toward oracle truth. (#r168)
+
+**Invariant #66 (#r168):** DISCOVERY_MODE fee allocation uses combined weight W_a(t) = base_share × consistency_factor × IVD_weight. All three components are required; any single omission enables a specific degenerate equilibrium. (#r168)
+
+**Invariant #67 (#r168):** DISCOVERY_MODE uses two-pool fee structure: fee_streaming_pool (per-epoch, W_a(t)-proportional) and accuracy_bonus_pool (T_finality, credibility_ratio-proportional). query_fee_fraction ∈ [0.2, 0.8], governance-set per class. (#r168)
+
+**Invariant #68 (#r168):** DISCOVERY_MODE state S(t) is a full probability distribution (parametric default; N_buckets=16 discretized as opt-in). Scalar state vectors are insufficient. (#r168)
+
+---
+
+## Open Questions for #r169+
+
+1. **info_arrival_tolerance calibration:** Most critical DISCOVERY_MODE governance parameter. Derivation candidates: (a) governance-estimated from domain knowledge; (b) derived from historical oracle output variance for analogous coordinate classes; (c) self-calibrating from observed JS divergence distribution over N_sigma_window epochs. Define the derivation procedure.
+
+2. **IVD computation on-chain gas:** KL-divergence requires log operations (no native Solidity log). Does the existing log-score fixed-point arithmetic from v2.1 CredibilityAggregator extend to IVD? What is the maximum acceptable IVD computation error bound?
+
+3. **Dump-all profitability bound (formal):** Formalise: what is the maximum accuracy_bonus_pool fraction at which dump-all at epoch T-1 earns more than consistent multi-epoch strategy? This gives governance the constraint on query_fee_fraction lower bound.
+
+4. **Information re-sale:** Unknowers who receive S(t) can re-sell to third parties without compensating knowers. Is this a protocol-layer problem (needs non-transferability primitive) or a legal/contractual layer problem outside mechanism scope?
+
+*Last updated: #r168 — 2026-04-04T01:42Z*
