@@ -6854,4 +6854,238 @@ Both conditions are met by the D4 two-pool design and D3 consistency factor. The
 
 4. **DISCOVERY_MODE settlement routing into CLEARING_MODE via shadow-class pair:** When the shadow-class achieves a meaningful genesis prior for the linked clearing-class, what is the exact protocol call that exports the DISCOVERY_MODE S(T_anchor) distribution as the clearing-class genesis prior? Define the cross-contract genesis prior export interface.
 
-*Last updated: #r169 — 2026-04-04T01:52Z*
+*Last updated: #r170 — 2026-04-04T02:02Z*
+
+---
+
+## #r170 Contributions — 2026-04-04T02:02Z
+
+**Phase: v2.2 Module 1 — DISCOVERY_MODE. Addresses all four open questions from #r169.**
+
+---
+
+**Q1 (τ_genesis governance quality problem — prevent catastrophic miscalibration) → Bounded-range declaration with mandatory analogy citation; advisory-mode calibration epoch before penalties activate (#r170):**
+
+τ_genesis cannot be derived without oracle history. The failure modes are symmetric:
+- Too tight (τ_genesis → 0): all multi-epoch knower updates are flagged as inconsistent; consistency_factor = 0 for nearly everyone; fee pool starved of legitimate claimants → effective DISCOVERY_MODE shutdown.
+- Too loose (τ_genesis → τ_max): consistency penalty never fires; dump-all strategy is profitable from day 1; IVD_weight is the only deterrent, which is weaker alone.
+
+**Resolution — two-part safeguard:**
+
+**Part 1 — Bounded declaration with analogy citation (governance hard gate):**
+
+```
+class_registration.discovery_params.tau_genesis:
+  required_field: true for DISCOVERY_MODE
+  hard bounds:    [τ_min_protocol, τ_max_protocol] (protocol-level; default [0.02, 0.40] JS divergence)
+  analogy_class_id: required reference to an existing coordinate class with N_sigma_window epochs of data
+  analogy_oracle_velocity: the analogous class's measured oracle_velocity_sigma / oracle_value_range
+  tau_genesis_derivation: governance-declared as:
+    τ_genesis = f_info(analogy_oracle_velocity)  (uses the same self-calibration formula from #r169/Q1)
+```
+
+Governance MUST cite an analogous class. If no analogous class exists (truly novel domain), governance must use the protocol midpoint (τ_genesis = τ_mid = 0.15) and declare `no_analogous_class = true`. The midpoint is conservative — it generates false inconsistency signals for genuinely fast-moving coordinates but never enables dump-all (τ_mid is well below τ_max).
+
+**Part 2 — Advisory-mode calibration epoch (N_calibration macro-epochs):**
+
+During the first N_calibration normal-mode macro-epochs after class genesis:
+```
+advisory_mode = true
+consistency_factor(a, t) = 1.0  (no penalty applied)
+JS(D_a(t) || D_a(t-1)) recorded and committed to EAT
+τ_advisory = governance observes empirical JS distribution and may revise τ_genesis before penalties activate
+```
+
+At the end of N_calibration advisory epochs: governance may submit a one-time `tau_revision` event (updates τ_genesis based on observed JS distribution). Penalty mode activates at N_calibration + 1 regardless of whether τ_revision was submitted.
+
+**Design law (#r170):** Novel coordinate classes require an advisory mode for parameters that lack observable self-calibration anchors. Advisory mode collects data without penalising legitimate participants. The advisory window is bounded (N_calibration epochs); governance must act within the window or accept the genesis default forward. (#r170)
+
+---
+
+**Q2 (N_buckets=16 bucket mapping at oracle resolution) → Outer-fence-proportional bucket boundaries; scalar V* maps to fractional position within its bucket; scoring uses per-bucket probability mass (#r170):**
+
+At T_finality, oracle returns a scalar V*. The 16-bucket representation D_a must be scored against V*. Bucket boundaries must be stable (not epoch-variable) to preserve EAT consistency.
+
+**Bucket boundary specification:**
+
+```
+bucket_boundaries[i] = outer_fence_min + i × (outer_fence_max − outer_fence_min) / N_buckets
+  for i = 0, 1, ..., N_buckets   (17 boundary values; 16 intervals)
+
+bucket_index(V*) = floor((V* − outer_fence_min) / bucket_width)
+  where bucket_width = (outer_fence_max − outer_fence_min) / N_buckets
+
+If V* == outer_fence_max: bucket_index = N_buckets - 1  (last bucket, inclusive right boundary)
+If V* outside outer_fence: oracle_anomaly triggers (Invariant #52); settlement deferred
+```
+
+**Log-score against bucket:**
+
+```
+log_score_a(V*) = log(D_a(t)[bucket_index(V*)])
+
+(standard log-score on the probability mass assigned to the bucket containing V*)
+```
+
+**Precision concern — bucket width vs oracle precision:** At N_buckets=16 over the outer_fence range, each bucket covers 1/16 of the range. If V* typically falls in a narrow region (e.g., a financial rate rarely moves more than ±5% from median), most buckets will have near-zero assigned probability. This is expected and correct — knowers who assign all mass to the probable region earn high log-scores on resolution; knowers who spread mass evenly are penalised.
+
+**Interaction with parametric output:** The parametric (μ, σ) S(t) output to unknowers is the mixture of submitted D_a arrays, re-fit to a Gaussian. Gaussian-fit is off-chain (knower client or governance-operated) and not consensus-critical — unknowers receive a convenience representation of the EAT-committed bucket distribution.
+
+**Design law (#r170):** Bucket boundaries are defined by outer_fence parameters at class registration and are immutable for the class lifecycle. Any change to outer_fence (governance update) triggers a T_transition event in the EAT; historical D_a arrays retain their original bucket interpretation for scoring purposes (EAT immutability). New submissions after T_transition use the new bucket boundaries. (#r170)
+
+---
+
+**Q3 (Information monopoly — minimum independent-knower count for DISCOVERY_MODE epistemic objectives) → Epistemically_live_discovery threshold: ≥2 independent knowers with track record; monopoly mode as formal alternative (#r170):**
+
+The pool-depletion anti-dump mechanism (Invariant from #r169) requires ≥2 independent knowers for the competitive dynamic to function. A single-knower DISCOVERY_MODE coordinate has no pool depletion from competitors — the monopolist faces no multi-epoch revelation pressure.
+
+**Two sub-cases:**
+
+**Sub-case A — Monopoly with honest revelation:** The single knower has genuine private information and wishes to maximise multi-epoch streaming fees. They do NOT have a dump-all incentive if:
+- The consistency penalty still applies (large single-epoch updates are penalised regardless of other knowers)
+- The accuracy_bonus_pool provides terminal incentive
+
+In this case, DISCOVERY_MODE functions correctly under monopoly, with weaker competitive pressure but honest epistemic output. S(t) quality depends entirely on the single knower's calibration.
+
+**Sub-case B — Monopoly with strategic withholding:** The single knower controls timing and can extract maximum accuracy_bonus_pool by waiting. Without a competing knower to deplete the pool, dump-all at epoch T-1 is profitable if accuracy_bonus_pool ≥ (T-1 epochs × expected streaming fee loss).
+
+**Resolution — epistemically_live_discovery threshold and monopoly mode:**
+
+```
+epistemically_live_discovery(class_i) = true iff:
+  unique_active_knowers_with_track_record(class_i) ≥ 2  (at least 2 independent credibility-bearing knowers)
+
+If epistemically_live_discovery = false (monopoly condition):
+  → Switch to MONOPOLY_MODE for this class:
+      accuracy_bonus_pool_fraction increases to 0.70 × query_fee_total (higher terminal incentive)
+      consistency_penalty window is tightened: τ = τ_genesis × 0.70
+      streaming_fee_distribution restricted to IVD_weight only (no base_share; pure information delivery incentive)
+  → Governance alert: monopoly_condition_active
+  → epistemically_live_discovery check per epoch; switches back to normal DISCOVERY on second independent knower
+
+Why not simply prohibit DISCOVERY_MODE with <2 knowers: Some legitimate high-expertise coordinates will naturally attract only one credible knower early in their lifecycle. Blocking the mechanism prevents genuine information revelation from the single expert. MONOPOLY_MODE is a degraded-but-functional alternative.
+```
+
+**Minimum viable threshold reasoning:** Two independent knowers creates a competitive dynamic; one can observe the other's updates (public S(t)) and provide corrective signal. Single-knower is epistemic monopoly; governance alert is appropriate but mechanism is not blocked. (#r170)
+
+---
+
+**Q4 (DISCOVERY_MODE S(T_anchor) genesis prior export interface) → ShadowClearingPairRegistry.exportGenesisPrior; atomic snapshot at epoch boundary; alpha_prior attenuation applied at export (#r170):**
+
+The shadow-class DISCOVERY_MODE produces S(T) — a full distribution (parametric or 16-bucket). The clearing-class needs this as its genesis prior S_clearing_genesis(c). The export must be atomic (single transaction), immutable (EAT-committed), and correctly attenuated (mode_mismatch_discount, alpha_prior_base applied at export time, per #r154/Q1).
+
+**Export interface:**
+
+```
+ShadowClearingPairRegistry.exportGenesisPrior(
+  shadow_class_id,
+  clearing_class_id,
+  epoch_T_anchor   // epoch at which clearing class genesis begins
+):
+  Validates:
+    - shadow_class_id and clearing_class_id are registered as a pair
+    - shadow_class has ≥1 completed normal-mode macro-epoch
+    - clearing_class is in Phase 0 (pre-genesis) or Phase 1 (bootstrap)
+    - msg.sender = governance multisig (only governance can trigger genesis prior export)
+
+  Reads from DiscoveryCredibilityAggregator:
+    S_discovery_snapshot = S(epoch_T_anchor)  // 16-bucket or parametric
+    mode_mismatch_discount_current = current value for the shadow-clearing pair
+    age_at_export = epoch_T_anchor − shadow_class.last_update_epoch
+    alpha_prior_effective = alpha_prior_base
+                            × max(0, 1 − age_at_export / staleness_window_shadow)
+                            × (1 − mode_mismatch_discount_current)
+
+  Computes:
+    S_genesis_prior = alpha_prior_effective × S_discovery_snapshot
+                    + (1 − alpha_prior_effective) × uniform_prior(outer_fence_clearing)
+
+  Writes to CoordinateRegistry_v2.2 (clearing class):
+    genesis_prior_snapshot = S_genesis_prior
+    genesis_prior_source = shadow_class_id
+    genesis_prior_epoch = epoch_T_anchor
+    alpha_prior_effective_at_export = alpha_prior_effective
+
+  Commits EAT events on both chains:
+    shadow-class EAT: genesis_prior_exported { clearing_class_id, epoch_T_anchor, alpha }
+    clearing-class EAT: genesis_prior_received { shadow_class_id, alpha_prior_effective, S_snapshot_hash }
+```
+
+**Atomicity:** The export is a single governance-signed transaction. The shadow-class EAT event and clearing-class EAT event are emitted in the same transaction. No cross-chain race condition — both are on the same EVM deployment (v2.2 contract set, same L2/chain).
+
+**Post-export shadow-class:** The shadow-class does not enter WINDING_DOWN at export. It continues DISCOVERY_MODE normally. Export is a read-only snapshot operation that does not alter the shadow-class state. The clearing-class genesis prior is a snapshot, not a live feed — consistent with Invariant #44 (historical S_cred immutable).
+
+**N_prior_epochs decay in clearing-class:** After export, the clearing class applies N_prior_epochs decay (#r155/Q2): the prior's contribution decays to zero over N_calibration clearing-class macro-epochs. Each clearing epoch, DiscoveryCredibilityAggregator_v2.2 reduces prior weight by (1/N_calibration) additively. (#r170)
+
+---
+
+## Net-New Structural Insight: Advisory Mode as a First-Class Protocol Phase (#r170)
+
+The τ_genesis advisory mode (Q1) introduces a new concept not previously explicit: a **protocol phase that collects data without exercising judgement**. This is distinct from:
+- Normal operation (penalties active)
+- Degraded mode (penalties suspended due to DA/solvency failure)
+- Bootstrap Phase 1 (penalties absent because mechanism infrastructure is immature)
+
+Advisory mode is specifically for **parameter calibration under genuine uncertainty** — the mechanism is operationally functional, the parameter is known to be approximate, and the governance window is bounded.
+
+**First-class advisory mode specification:**
+
+```
+advisory_mode(class_i, parameter_P):
+  active_when: P is beyond its self-calibration bootstrap threshold AND governance has not yet submitted P_revision
+  duration: N_advisory_epochs (default = N_calibration; governance-settable at registration, bounded [2, N_calibration])
+  effect on P: P is active at its genesis value but P-dependent penalties are advisory-only (logged, not applied)
+  P-revision window: governance may submit one P_revision EAT event during advisory_mode
+  advisory_mode exits: at N_advisory_epochs regardless of P_revision status
+```
+
+**Applicable parameters (current list):**
+- τ_genesis (DISCOVERY_MODE info_arrival_tolerance)
+- mode_mismatch_discount_base (shadow-class, before N_align_window epochs)
+- σ_resolve-derived min_q_bonus_ratio (before N_calibration resolved queries)
+- w_override_base × (1-freq) when override_frequency is uninitialised
+
+**Common invariant:** Every governance-estimated parameter has an advisory mode before self-calibration activates, unless the parameter was derived from an analogous existing class (analogy exemption: advisory mode skipped if analogy_class_id is cited and analogy data is valid).
+
+**Design law (#r170):** Advisory mode is a first-class protocol phase for governance-estimated parameters that lack sufficient data for self-calibration. It collects data without penalising legitimate participants, is bounded in duration, and provides a one-shot governance revision window before penalties activate. Analogy citation exempts a class from advisory mode for the cited parameter. (#r170)
+
+---
+
+## Structural Synthesis: DISCOVERY_MODE — Near-Complete (#r170)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| τ_genesis miscalibration | Bounded declaration + analogy citation + N_calibration advisory mode | Advisory mode for governance-estimated params; analogy exemption |
+| Bucket mapping at resolution | outer_fence-proportional; V* → bucket_index; immutable for class lifecycle | Bucket boundaries = outer_fence at registration; change requires T_transition |
+| Information monopoly | Epistemically_live_discovery (≥2 knowers); MONOPOLY_MODE degraded alternative | Monopoly is degraded-but-functional; not blocked |
+| Genesis prior export | ShadowClearingPairRegistry.exportGenesisPrior; atomic, attenuated, EAT-committed | Snapshot at export epoch; not a live feed; clearing class decays prior over N_prior_epochs |
+
+---
+
+## Cumulative Invariants (additions through #r170)
+
+**Invariant #73 (#r170):** Advisory mode is a first-class protocol phase for governance-estimated parameters. Duration = N_advisory_epochs ≤ N_calibration; one-shot P_revision window; penalties advisory-only during advisory_mode; penalties activate at N_advisory_epochs + 1 regardless of whether P_revision was submitted.
+
+**Invariant #74 (#r170):** Bucket boundaries for N_buckets=16 discretization are defined by outer_fence parameters at class registration and are immutable for the class lifecycle. If outer_fence changes mid-lifecycle, a T_transition EAT event is emitted; historical D_a retain original bucket interpretation.
+
+**Invariant #75 (#r170):** epistemically_live_discovery requires ≥2 independent knowers with track records. If this threshold is not met, the class enters MONOPOLY_MODE (degraded-but-functional): tighter consistency penalty, higher accuracy_bonus_pool fraction, IVD-only streaming distribution.
+
+**Invariant #76 (#r170):** ShadowClearingPairRegistry.exportGenesisPrior is governance-only, single-transaction atomic, and produces a snapshot (not a live feed). Shadow-class state is unchanged by export. Clearing class prior decays over N_prior_epochs using the N_calibration decay schedule.
+
+---
+
+## Run Log Update
+
+- **#r170** — 2026-04-04T02:02Z — DISCOVERY_MODE Q1–Q4 (#r169 open questions): τ_genesis advisory mode; bucket mapping; MONOPOLY_MODE for information monopoly; genesis prior export interface. Advisory mode formalised as first-class protocol phase. Four new invariants (#73–#76).
+
+---
+
+## Open Questions for #r171+
+
+1. **Advisory mode and adversarial consistency simulation:** During advisory_mode, JS penalties are logged but not applied. An adversary observing this window can submit extreme D_a distributions to probe the mechanism without penalty, learning τ_genesis calibration information before governance sets the revision. Should advisory-mode submissions be subject to a stake cost (submitted but unrewarded), or are they fully free?
+
+2. **MONOPOLY_MODE → normal DISCOVERY_MODE transition:** When the second independent knower enters, how many epochs must they participate before MONOPOLY_MODE exits? An immediate transition on first second-knower epoch gives a flash-participation attack surface: brief second-knower appearance then withdrawal restores normal DISCOVERY_MODE in one epoch, allowing dump-all again.
+
+3. **ShadowClearingPairRegistry.exportGenesisPrior — prior age staleness:** The export is governance-triggered and may be delayed. If the shadow-class has not updated S(t) for many epochs (e.g., low-activity phase), the exported snapshot may be stale relative to the shadow-class's own staleness_window. Should the export be blocked if age_at_export > staleness_window_shadow?
+
+4. **DISCOVERY_MODE on-chain KL computation — negative IVD handling:** IVD_weight(a,t) = max(0, IVD_a(t)) / Σ max(0, IVD_j(t)). If ALL knowers simultaneously produce negative IVD_a (all updates reduce state quality), the denominator is zero and fee distribution is undefined. What is the fallback distribution when Σ max(0, IVD_j(t)) = 0?
