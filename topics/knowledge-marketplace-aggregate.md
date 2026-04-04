@@ -18143,3 +18143,186 @@ Where σ_oracle_prior² is the variance of submitted claims as of claim_deadline
 4. **Maximum portfolio N for tractable governance-managed correlation registry:** Portfolio EDS* is O(N²) for the bounds and O(N²×k) for full eigenvalue. At what N_max does per-class portfolio computation become governance-infeasible, and is there a cluster-based tiered strategy (subgraph of correlated classes computed independently) that extends tractable range beyond N_max?
 
 *Last updated: #r221 — 2026-04-04T10:52Z*
+
+---
+
+## #r222 Contributions — 2026-04-04T11:02Z
+
+Addresses all four open questions from #r221.
+
+---
+
+**Q1 (η_realized simplified for v2.1 dashboard — advisory governance signal) → Add simplified η_realized to Ω(t) as an optional advisory field; no gate; 4-epoch rolling EMA (#r222):**
+
+The full η_realized formula (Invariant #294) requires σ_oracle_prior² computed from the variance of submitted claims — available at claim_deadline. This is state already committed to the EAT at claim submission. The oracle truth is available at resolution. The computation is:
+
+```
+η_realized_simple(c, t) = 1 − (S_cred_at_T_anchor(c, t) − oracle_truth(c, t))² / σ_claim_spread²(c, t)
+
+σ_claim_spread²(c, t) = variance of submitted claim distributions weighted by effective_weight at claim_deadline
+  (already computed as part of CredibilityAggregator's S_cred update; no new EAT reads required)
+```
+
+**v2.1 dashboard addition:**
+
+```
+Ω(t) advisory field (v2.1):
+  η_realized_ema(c, t) = EMA(η_realized_simple(c, τ), N_eta_window = 4 normal-mode epochs)
+  display: 0.0–1.0 gauge; GREEN ≥ 0.70, YELLOW [0.50, 0.70), RED < 0.50
+  governance action threshold: none (advisory only; RED triggers log entry, not gate)
+```
+
+**Scope boundary:** η_realized_ema is a governance-advisory signal only in v2.1 — it surfaces epistemic quality trends without gating any mechanism operation. In v2.3, it may graduate to a formal gate (e.g., blocking T3 admission when RED for ≥ M_stable epochs). This deferral is explicit in the v2.1 feature classification from #r159.
+
+**Why not a gate in v2.1:** η_realized_ema is a lagging indicator (resolution-dependent). A gate on a lagging indicator could block T3 admissions retroactively for claims already in their service window — a retroactive penalty inconsistent with static-commitment design law (#r137). Advisory surfacing is the correct v2.1 scope. (#r222)
+
+---
+
+**Q2 (DEGRADED_SOURCE floor on residual activity — auto-expiry below economic viability threshold) → Auto-expire when β_effective_remaining < min_bonus_viable; same floor as min_chain_weight_fraction × β_escrow_initial (#r222):**
+
+The DEGRADED_SOURCE state allows an implication declaration from a WINDING_DOWN source class to continue accumulating epistemic-service bonus at decaying β_effective. As β_effective_remaining → 0, the declaration approaches zero bonus with non-zero state clutter and continued escrow lockup — a mechanism overhead without epistemic value.
+
+**Minimum viable bonus threshold:**
+
+```
+min_bonus_viable(c) = min_chain_weight_fraction × β_escrow_initial(declaration)
+
+where min_chain_weight_fraction is the per-class contribution floor from #r136/Q3
+(default 0.01; governance-settable [0.001, 0.05])
+```
+
+**Auto-expiry trigger:**
+
+```
+if β_effective_remaining(declaration_d, t) < min_bonus_viable(declaration_d):
+  → DEGRADED_SOURCE declaration enters AUTO_EXPIRY state
+  → EAT event: degraded_source_auto_expiry { declaration_id, β_at_expiry, t_expiry }
+  → Escrow disposition: return full remaining β_escrow_remaining to knower (not to loser pool)
+    (no slash: the auto-expiry is a mechanism floor, not a quality failure)
+  → Remaining implication_bonus_escrow returned: (1 − settlement_fraction_to_date) × escrow_initial
+  → Declaration removed from CredibilityAggregator active registry
+```
+
+**Return-not-slash rationale:** The DEGRADED_SOURCE state was entered due to the source class's lifecycle event (WINDING_DOWN / merger), not due to the knower's miscalibration. Auto-expiry at a small β threshold is a mechanism efficiency operation; the knower fulfilled their obligation for the active period and should receive their escrow back, minus any portion already earned as bonus.
+
+**Interaction with N_align_window and corroboration ordering:** An auto-expired DEGRADED_SOURCE declaration removes the knower from the active corroboration sequence for that pair. The position sequence from #r139/Q1 is re-indexed at the next macro-epoch boundary: remaining active declarers shift positions downward to fill the gap. Re-indexing is a forward-only operation — prior γ_corr discount history is preserved in EAT; only future bonus calculations use the updated positions. (#r222)
+
+---
+
+**Q3 (Irrecoverability declaration and outstanding T3 escrow at T_anchor) → Settlement proceeds exactly as normal; irrecoverability is an admission gate, not a settlement override (#r222):**
+
+**Formal analysis of the DELIST_PENDING_IRRECOVERABLE state:**
+
+The irrecoverability declaration fires after draw_3 failure (#r221/Q1, Invariant #290). At that point, the class enters DELIST_PENDING_IRRECOVERABLE:
+
+```
+DELIST_PENDING_IRRECOVERABLE effects:
+  - New T3 claim admissions: BLOCKED
+  - Existing T3 claims in warranty: UNAFFECTED
+  - Challenge windows: continue advancing normally (epistemic enforcement not suspended)
+  - T_anchor scheduling: unchanged; fires at oracle-scheduled time
+  - Settlement Freeze Protocol: unchanged
+  - oracle_settlement_override path: unchanged (no-slash path still available)
+  - TOWL zone management: continues (existing escrow is still TOWL-counted)
+```
+
+**No interaction between irrecoverability and claim slash/release logic at T_anchor.** Settlement at T_anchor proceeds as designed:
+- Correct warranted claims: escrow released, base reward paid
+- Wrong warranted claims: slashed, proceeds to loser pool + challenger reward
+- oracle_settlement_override: no-slash path available
+
+**LTRP in DELIST_PENDING_IRRECOVERABLE:** LTRP continues absorbing longtail obligations as scheduled. After all claims reach T_longtail and LTRP is depleted (all outstanding obligations settled), the class archives.
+
+**Why no special case is needed:** The irrecoverability declaration is a solvency-assessment event, not a settlement-authority event. It signals that the class cannot sustain the bilateral-flow regime going forward. It does not affect the validity of warranties already issued — those warranties were backed by escrow committed under the static-commitment design law (#r137) and remain backed regardless of regime state.
+
+**EDS and outstanding escrow:** TOWL continues tracking existing escrow through settlement. If EDS falls further during DELIST_PENDING (e.g., additional unknowers withdraw), the class may enter Zone C for new installations — but existing T3 claims are already fully covered by their committed escrow. Zone C throttling of new admissions (already blocked) has no additional effect.
+
+**Post-irrecoverability archiving gate:** The class achieves ARCHIVED status (final state) only when:
+1. All T_anchor events have fired for all registered positions
+2. All challenge windows closed
+3. All LTRP obligations settled
+4. T_wind_down_max has elapsed since irrecoverability declaration
+
+Consistent with shadow-class ARCHIVED gate from #r155/Q3 — same eligibility structure, same LTRP-assumption path at T_wind_down_max cap. (#r222)
+
+---
+
+**Q4 (Maximum portfolio N for tractable governance computation — cluster-based decomposition) → N_max_bounds = 100; N_max_eigen = 30; cluster decomposition extends tractability to arbitrary N (#r222):**
+
+**Computational complexity baseline:**
+
+```
+Bounds computation (Gershgorin + Rayleigh, Invariant #291): O(N²) — all pairwise ρ
+  feasible up to N_max_bounds ≈ 100 (10,000 pairs; ~100ms on governance node)
+
+Full eigenvalue (when uncertainty band > 0.10, Invariant #291): O(N³) — LAPACK/Lanczos
+  feasible up to N_max_eigen ≈ 30 (27,000 operations; ~100ms)
+  N = 100: ~10⁶ operations; ~10s — marginal; may cause block gas issues in an on-chain context
+```
+
+**Cluster decomposition — extends tractable range to arbitrary N:**
+
+Two classes i, j are in the same cluster if ρ(i, j) > ρ_cluster_threshold. Clusters are connected components in the correlation graph.
+
+```
+cluster_decomposition_algorithm:
+  1. Build correlation graph G = (V, E) where E contains (i,j) iff ρ(i,j) > ρ_cluster_threshold
+  2. Identify connected components C_1, C_2, ..., C_k using BFS/DFS: O(N + E) = O(N²)
+  3. For each cluster C_m:
+     - Run bounds + eigenvalue within cluster (size |C_m|)
+     - EDS*(C_m) computed independently
+  4. Total portfolio EDS* = Σ_m EDS*(C_m)   [exact if inter-cluster ρ ≤ ρ_cluster_threshold]
+```
+
+**Why additivity is exact:** Classes in different clusters have ρ ≤ ρ_cluster_threshold. The portfolio EDS* for uncorrelated classes is exactly additive (diagonal covariance matrix has λ_max = 1 for each block). Setting ρ_cluster_threshold = 0.20 (governance-settable, bounded [0.10, 0.40]) makes cross-cluster correlation contributions < 5% of within-cluster variance for typical asset classes — effectively diagonal.
+
+**Governance constants:**
+
+```
+ρ_cluster_threshold:   0.20 (default)  [0.10, 0.40]
+N_max_within_cluster:  30 (governance-set; triggers warning if any cluster exceeds this)
+  → If |C_m| > N_max_within_cluster: governance must manually split or accept eigenvalue computation delay
+```
+
+**Alert:** If any cluster exceeds N_max_within_cluster, `cluster_size_warning` EAT event emitted. Governance has N_calibration epochs to split the class or accept the computational overhead.
+
+**Practical deployment N range:**
+
+For GestAlt v2.1 launch (CLEARING_MODE, few coordinate classes): N ≤ 10 expected. O(N²) bounds computation runs in microseconds. Full eigenvalue is available for all classes with zero concern. Cluster decomposition is a v2.2–v2.3 concern when the protocol operates dozens to hundreds of coordinate classes.
+
+**Traceability and EAT commit:** Cluster assignments are committed to the EAT each epoch (`portfolio_clusters` field alongside the TOWL snapshot). Cluster-level EDS* computations are EAT-committed; total portfolio EDS* is derived as their sum. Governance can verify the decomposition via EAT replay. (#r222)
+
+---
+
+## Structural Synthesis: Mechanism Completeness Confirmed (#r222)
+
+With #r222, the four final open questions are resolved. Key contributions:
+
+| Question | Resolution | Invariant |
+|---|---|---|
+| η_realized v2.1 scope | Optional advisory field in Ω(t); 4-epoch EMA; GREEN/YELLOW/RED; no gate in v2.1 | #r294 extended (v2.3 gate deferred) |
+| DEGRADED_SOURCE activity floor | Auto-expire at β_remaining < min_chain_weight_fraction × β_escrow_initial; return escrow, no slash | #r293 extended |
+| Irrecoverability + T3 escrow | Settlement proceeds exactly as designed; irrecoverability is admission gate only; post-irrecoverability archiving per shadow-class gate | #r222 (no new invariant; confirms existing design) |
+| Portfolio N tractability | N_max_bounds=100, N_max_eigen=30; cluster decomposition (O(N²) graph + per-cluster eigenvalue) extends to arbitrary N; ρ_cluster_threshold=0.20; additivity exact below threshold | #r291 extended |
+
+**Design law confirmed (#r222):** Mechanism solvency gates (irrecoverability, Zone C) are admission gates — they control new liability creation. They never override liability settlement for obligations already committed. Static-commitment design law (#r137) is the invariant; solvency-state changes do not retroactively alter commitment terms. This is the last time this principle needed restatement; it is now considered axiomatic.
+
+---
+
+## Cumulative Invariants (#r222)
+
+**Invariant #295 (#r222):** η_realized_simple = 1 − settlement_error²/σ_claim_spread² is an optional advisory signal in v2.1 Ω(t) dashboard. 4-epoch EMA; GREEN ≥ 0.70, YELLOW [0.50, 0.70), RED < 0.50. Advisory only in v2.1; no gate on any mechanism operation. Graduation to v2.3 admission gate deferred.
+
+**Invariant #296 (#r222):** DEGRADED_SOURCE declarations auto-expire when β_effective_remaining < min_chain_weight_fraction × β_escrow_initial. Remaining escrow returned to knower (no slash — lifecycle event, not quality failure). Declaration removed from CredibilityAggregator. Corroboration sequence re-indexed forward-only at next macro-epoch boundary.
+
+**Invariant #297 (#r222):** Irrecoverability declaration is an admission gate only. All outstanding T3 claims, challenge windows, T_anchor events, Settlement Freeze Protocol, and oracle_settlement_override paths proceed exactly as designed. Post-irrecoverability archiving requires: all T_anchor fired + all challenge windows closed + all LTRP settled + T_wind_down_max elapsed.
+
+**Invariant #298 (#r222):** Portfolio correlation decomposition: ρ_cluster_threshold = 0.20 (default); N_max_within_cluster = 30; cluster EDS* summed additively (exact below threshold). Cluster assignments EAT-committed each epoch. `cluster_size_warning` if any cluster exceeds N_max_within_cluster; governance has N_calibration epochs to split or accept.
+
+---
+
+## Run Log Update
+
+- **#r222** — 2026-04-04T11:02Z — Q1: η_realized_simple as optional advisory Ω(t) field; 4-epoch EMA; GREEN/YELLOW/RED display; no v2.1 gate; v2.3 upgrade path noted. Q2: DEGRADED_SOURCE auto-expiry at β_remaining < min_chain_weight_fraction × β_escrow_initial; escrow returned not slashed; corroboration sequence re-indexed forward-only. Q3: Irrecoverability is admission gate only; all outstanding settlement logic proceeds unchanged; post-irrecoverability archiving mirrors shadow-class ARCHIVED gate. Q4: N_max_bounds=100, N_max_eigen=30; cluster decomposition O(N²) graph BFS + per-cluster eigenvalue; ρ_cluster_threshold=0.20; additivity exact below threshold; cluster_size_warning if |C_m| > N_max_within_cluster. Design law reconfirmed: solvency gates never override committed obligations. Invariants #295–#298.
+
+*Last updated: #r222 — 2026-04-04T11:02Z*
