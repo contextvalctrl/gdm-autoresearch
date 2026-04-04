@@ -20757,3 +20757,205 @@ Adapters registered as optional slots in v2.3 registry. Backward compatibility i
 4. **⌈k/2⌉ rule retraction: contingency preservation for relaxed commit-reveal?** Commit-reveal is mandatory for COMMITTEE oracle votes (Invariant #303). If commit-reveal is ever relaxed (e.g., in a governance-declared emergency where vote latency is critical), the ⌈k/2⌉ anti-coordination concern re-emerges. Should the retracted rule be preserved as a dormant contingency parameter that activates if `committee_vote_protocol != COMMIT_REVEAL`, or is it fully eliminated from the mechanism spec?
 
 *Last updated: #r234 — 2026-04-04T13:32Z*
+
+---
+
+## #r235 Contributions — 2026-04-04T13:42Z
+
+Addresses all four open questions from #r234. Net-new angle: the **carry-oracle claim resolution problem** reveals a deeper structural question — should warranty obligations be computed against the oracle that was *live at installation* or the oracle that *fires at T_anchor*? This dissolves on examination but the path is instructive.
+
+---
+
+### Q1 (carry_throttle_factor and claim resolution under carry oracle — does the carry value become the warranty baseline?) → No special exemption; claims resolve against oracle_declared at T_anchor regardless of whether T_anchor is a carry epoch; the carry_throttle_factor already limits new obligations during uncertainty (#r235)
+
+**The concern:** T3 claims installed during a carry epoch are warranted against a specific coordinate range. If the carry value is materially wrong and the eventual fresh oracle_declared is far from the carry, those newly-installed claims resolve as wrong — they were warranted against an epistemic state that was stale by construction.
+
+**Why no exemption is correct:**
+
+The warranty on a T3 claim is: "S_cred at T_anchor will be within q_quality_threshold of oracle_declared." oracle_declared is always the exogenous oracle value at T_anchor — not the S_cred, not the carry value, not the installation-time S_cred. This invariant is from Invariant #27 and has never been qualified.
+
+If T_anchor happens during a carry epoch (oracle_declared = carry), claims resolve against the carry value. If T_anchor fires after the carry ends (fresh oracle resumes), claims resolve against the fresh oracle_declared. The claim makes no promise about what the oracle will be — only about how well S_cred will track it.
+
+**The carry_throttle_factor already handles the risk correctly:**
+
+The carry soft-throttle (Invariant #347, default 0.5×) limits new T3 installations precisely because new claims during carry are entering a class with reduced oracle integrity. Knowers who install during carry accept carry-epoch uncertainty and voluntarily forgo the fresh-oracle baseline. This is a self-selection mechanism: informed knowers can choose not to install during carry epochs; less-informed knowers who install accept the risk at standard warranty terms.
+
+**One refinement — EQ metadata must disclose oracle freshness to unknowers at query time:**
+
+Unknowers querying S_cred during carry epochs receive the `oracle_freshness = "carry"` EQ metadata field (Invariant #347). This is the correct information asymmetry corrector. The knower's warranty terms are unchanged; the unknower has the information needed to discount the warranty value.
+
+**Retroactive carry detection:** If T_anchor fires unexpectedly during a carry epoch (carry epoch longer than anticipated), no retroactive adjustment is made. Positions settle at the carry oracle_declared. This is consistent with static-commitment design law (#r137): settlement terms are fixed at installation; oracle behaviour after installation does not alter terms.
+
+**Design law (#r235):** No carry-epoch claim exemption. Warranty resolves against oracle_declared at T_anchor, always. carry_throttle_factor is the mechanism's risk-limiting tool for the installation window. EQ metadata is the information-symmetry tool for unknowers. Static-commitment design law governs retroactive-adjustment prohibition. (#r235)
+
+---
+
+### Q2 (Compatibility adapter registration latency — pre-finalize vs post-finalize optional-slot update) → Adapters registered pre-finalize as part of deploy sequence; post-finalize optional-slot updates prohibited on immutable registry; secondary mutable AdapterRegistry for runtime updates (#r235)
+
+**The tension:** Invariant #349 states registry.finalize() makes all slots immutable. But compatibility adapters may need to be added after v2.3 deployment as v2.2 classes complete migration in waves. "Register adapters before finalize()" requires knowing which adapters are needed at deploy time — impossible if v2.2 classes migrate incrementally over months.
+
+**Resolution — two-tier registry design:**
+
+```
+ProtocolAddressRegistry (immutable post-finalize):
+  Purpose: core protocol contract addresses only (stable, known at deploy time)
+  CommitteeStateEngine_v2_3, CredibilityAggregator_v2_3, etc.
+  Compatibility adapter slots: NOT registered here
+
+AdapterRegistry (mutable; governance-gated writes):
+  Purpose: compatibility adapters, protocol plugins, and runtime-added optional features
+  governance_multisig write access only
+  Emits EAT event on each write: adapter_registered { slot, address, epoch }
+  Read interface: isAdapterAvailable(slot) + getAdapter(slot)
+  NOT finalized — remains mutable to support wave migration
+```
+
+**Updated caller pattern for cross-version reads:**
+
+```solidity
+// Check AdapterRegistry (mutable), not ProtocolAddressRegistry (immutable)
+if (adapterRegistry.isAdapterAvailable(V2_2_COMPAT_SLOT)) {
+    address adapter = adapterRegistry.getAdapter(V2_2_COMPAT_SLOT);
+    return IV2_2_To_V2_3_Adapter(adapter).getClass(classId);
+}
+```
+
+**AdapterRegistry address in ProtocolAddressRegistry:** One required slot in the immutable registry points to the mutable AdapterRegistry. This is the single stable anchor. All adapter lookups use: `immutable_registry.get(ADAPTER_REGISTRY_SLOT) → adapterRegistry.getAdapter(slot)`. The chain is: immutable → mutable → adapter. No immutable registry post-finalize writes needed.
+
+**Wave migration lifecycle:** As v2.2 classes complete migration to v2.3, the V2_2_COMPAT adapter slot in AdapterRegistry is deprecated (governance vote). After all v2.2 classes are migrated, the adapter is deregistered (emits `adapter_deregistered` EAT event). Legacy wind-down lifecycle completes.
+
+**Design law (#r235):** ProtocolAddressRegistry is permanently immutable post-finalize; no post-finalize optional-slot update mechanism. Runtime-mutable adapters live in a separate mutable AdapterRegistry, anchored by one stable slot in the immutable registry. This two-tier pattern preserves core contract address stability while enabling wave migration flexibility. (#r235)
+
+---
+
+### Q3 (τ_commit_bonus pool sizing at full-k Phase-1 participation — per-epoch budget ceiling) → Per-epoch τ_commit_bonus_budget_max = τ_budget_fraction × protocol_maintenance_reserve_epoch_draw; slot_base_reward derived backwards from budget and expected k (#r235)
+
+**Full-k payout scenario:** All k committee members commit Phase-1 and are eligible. Total payout = k × τ_bonus_rate × slot_base_reward. For k=5 and τ_bonus_rate=0.10 (illustrative), payout = 0.5 × slot_base_reward × protocol_maintenance_reserve_epoch. This cannot exceed the per-epoch reserve draw without reserve depletion.
+
+**Resolution — backwards derivation of slot_base_reward from budget ceiling:**
+
+```
+τ_commit_bonus_budget_max_epoch =
+    τ_budget_fraction × protocol_maintenance_reserve_epoch_draw
+    τ_budget_fraction: governance-set ∈ [0.05, 0.30]; default 0.15
+
+slot_base_reward_max = τ_commit_bonus_budget_max_epoch / (k_required × τ_bonus_rate)
+
+Per-epoch payout:
+  actual_payout = min(
+      n_phase1_committers × τ_bonus_rate × slot_base_reward,
+      τ_commit_bonus_budget_max_epoch
+  )
+```
+
+If all k members commit Phase-1 and slot_base_reward is set at slot_base_reward_max, the budget ceiling is exactly met. Governance must not set slot_base_reward > slot_base_reward_max or the budget can overflow. Contract enforcement: `require(slot_base_reward ≤ slot_base_reward_max, "SLOT_BASE_REWARD_EXCEEDS_BUDGET")` at governance parameter-set time.
+
+**Dynamic slot_base_reward on k changes:** If k_required is changed by governance (adding or removing committee members), slot_base_reward_max is recalculated. Existing members' accrued bonus expectations are locked at the prior slot_base_reward for current-epoch resolutions; new slot_base_reward applies from next epoch.
+
+**Sourcing:** τ_commit_bonus is sourced from protocol_maintenance_reserve (same pool as Phase-2 maintenance bonus). τ_budget_fraction governs what share of the reserve's epoch draw is earmarked for commit bonuses vs Phase-2 maintenance bonuses. Residual after τ_commit_bonus_budget pays Phase-2 maintenance.
+
+**Why 15% default:** τ_commit_bonus is a secondary incentive (Phase-1 speed acceleration). Phase-2 maintenance (the primary HYBRID_EXTERNAL knower retention mechanism) should dominate the reserve draw. 15% for τ_commit_bonus preserves 85% for Phase-2 maintenance at full participation.
+
+**Design law (#r235):** slot_base_reward is governance-set but contract-enforced to not exceed τ_commit_bonus_budget_max_epoch / (k_required × τ_bonus_rate). Budget ceiling = τ_budget_fraction × maintenance_reserve_epoch_draw (default 0.15). Dynamic recalculation on k_required changes applies from next epoch. (#r235)
+
+---
+
+### Q4 (⌈k/2⌉ rule retraction — contingency preservation for relaxed commit-reveal?) → Fully eliminated from spec; relaxed commit-reveal is prohibited by Invariant #303; contingency parameter for a prohibited scenario is structural debt (#r235)
+
+**The question:** Should we preserve the retracted ⌈k/2⌉ anti-coordination threshold as a dormant parameter that activates if `committee_vote_protocol != COMMIT_REVEAL`?
+
+**Resolution — full elimination; no dormant parameter:**
+
+**First-principles argument:** Invariant #303 establishes commit-reveal as a hard requirement for COMMITTEE oracle votes, not a governance-settable parameter. The justification is epistemic, not operational: without commit-reveal, committee endogeneity (Invariant #301) cannot be cryptographically guaranteed, and the mechanism's oracle-independence property fails. Relaxing commit-reveal is not a valid emergency mode — it would convert COMMITTEE mode into an endogenous oracle, violating the mode's founding invariant.
+
+**Consequence for the retracted rule:** The ⌈k/2⌉ rule was designed for a scenario (non-commit-reveal committee voting) that the mechanism structurally prohibits. Preserving a dormant parameter for a prohibited scenario is structural debt — it creates a configuration path that should not exist and signals to future engineers that the prohibited scenario is a valid state.
+
+**The correct emergency response if commit-reveal is operationally infeasible:** oracle_carry_epoch (Invariant #341) is the designed emergency mode — not a relaxed-commit-reveal fallback. If committee members cannot meet the commit deadline (latency emergency), the epoch becomes a carry epoch. DELIST_PENDING_IRRECOVERABLE is the terminus for classes that cannot sustain committee operations.
+
+**Hard prohibition in code:** `committee_vote_protocol` is not a governance parameter — it is a constant in CommitteeStateEngine_v2:
+
+```solidity
+enum CommitteeVoteProtocol { COMMIT_REVEAL }  // sole valid value; extensibility prohibited
+
+function setVoteProtocol(CommitteeVoteProtocol protocol) external {
+    revert("CommitteeVoteProtocol is immutable: COMMIT_REVEAL required");
+}
+```
+
+This revert is the code-level guarantee that Invariant #303 cannot be relaxed by governance or emergency.
+
+**Design law (#r235):** Dormant contingency parameters for mechanistically prohibited scenarios are structural debt and should not exist. The ⌈k/2⌉ rule is fully eliminated. The correct emergency path for committee operational failure is oracle_carry_epoch, not protocol relaxation. Commit-reveal is a hard constant in CommitteeStateEngine_v2, not a governance parameter. (#r235)
+
+---
+
+## Net-New Structural Observation: The Warranty-Oracle Coupling Invariant (#r235)
+
+The carry oracle analysis (Q1) surfaces a deeper structural invariant that has not been explicitly stated across 234 runs, though it is implicit in multiple invariants:
+
+**The warranty-oracle coupling invariant (formal statement):**
+
+The warranty on any T3 claim is fully determined by two exogenous inputs at installation time:
+1. q_quality_threshold (the accuracy promise; set at installation)
+2. oracle_declared at T_anchor (the truth reference; exogenous; unknowable at installation)
+
+The mechanism does not and cannot promise what oracle_declared will be. It only promises that **S_cred will be within q_quality_threshold of whatever oracle_declared turns out to be**. This holds regardless of:
+- Whether oracle_declared comes from a carry epoch or fresh committee vote
+- Whether the oracle source is AUTOMATED, COMMITTEE, or HYBRID_EXTERNAL
+- Whether S_cred at installation was high or low
+- Whether TOWL zone is A, B, or C
+
+**Why this is the deepest structural invariant of the mechanism:**
+
+It defines the conserved relationship between capital commitment and epistemic value. Capital (escrow) is committed at installation; truth (oracle) is revealed at T_anchor. The mechanism is epistemically honest only because it cannot retroactively redefine what truth is. If oracle_declared were endogenous — if the mechanism could affect what oracle_declared becomes — the warranty would be circular (guaranteeing accuracy relative to a truth the mechanism itself shaped). Exogenous oracle is not a design choice; it is a logical necessity for the warranty to have meaning.
+
+**Formal expression:**
+
+```
+Warranty(claim_a) = Pr[|S_cred(c, T_anchor) − oracle_declared(c, T_anchor)| ≤ q_quality_threshold_a]
+
+All components except oracle_declared are endogenous or governance-set.
+oracle_declared is the only exogenous variable.
+Mechanism integrity ⟺ oracle_declared is exogenous.
+```
+
+This is Invariant #337 generalised to its logical foundation. (#r235)
+
+---
+
+## Structural Synthesis: #r235
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Carry oracle claim resolution | No exemption; oracle_declared at T_anchor governs always; carry_throttle_factor handles installation-window risk; EQ metadata handles unknower information asymmetry | Static-commitment + exogenous oracle are jointly sufficient; no carry exemption |
+| Adapter registration latency | Two-tier: immutable ProtocolAddressRegistry + mutable AdapterRegistry (anchored by one required slot); adapters live in AdapterRegistry; wave migration via governance-gated writes | Immutability preserved for core addresses; mutability preserved for adapters via tier separation |
+| τ_commit_bonus pool ceiling | slot_base_reward ≤ budget_max/(k × τ_rate); budget_max = τ_budget_fraction × maintenance_reserve_draw (default 0.15); dynamic on k change | Budget-ceiling backwards derivation; contract-enforced at parameter-set time |
+| ⌈k/2⌉ contingency preservation | Fully eliminated; dormant params for prohibited scenarios = structural debt; commit-reveal is a hard constant; carry epoch is the valid emergency path | Prohibited scenarios have no contingency parameters; structural prohibitions are code constants |
+| Warranty-oracle coupling | oracle_declared exogeneity is a logical necessity, not a design choice; mechanism integrity ⟺ oracle independence | Warranty meaning requires exogenous truth; endogenous oracle makes warranty circular |
+
+---
+
+## Cumulative Invariants (#r235)
+
+**Invariant #350 (#r235):** No carry-epoch claim exemption. All T3 claims resolve against oracle_declared at T_anchor, always. carry_throttle_factor limits new installations during oracle uncertainty (Invariant #347). EQ metadata `oracle_freshness = "carry"` informs unknowers. Retroactive warranty term adjustment for carry-epoch installations is prohibited (static-commitment design law, #r137).
+
+**Invariant #351 (#r235):** Two-tier registry architecture: (1) immutable ProtocolAddressRegistry for core protocol contracts (finalized post-deploy; one required slot = ADAPTER_REGISTRY_SLOT pointing to the mutable tier); (2) mutable AdapterRegistry for compatibility adapters and runtime plugins (governance-gated writes; EAT-committed; not finalized). Post-finalize optional-slot updates to ProtocolAddressRegistry are prohibited. Cross-version compatibility adapters are registered in AdapterRegistry, not ProtocolAddressRegistry.
+
+**Invariant #352 (#r235):** τ_commit_bonus slot_base_reward is contract-enforced: slot_base_reward ≤ τ_commit_bonus_budget_max_epoch / (k_required × τ_bonus_rate). τ_commit_bonus_budget_max_epoch = τ_budget_fraction × protocol_maintenance_reserve_epoch_draw; τ_budget_fraction default 0.15 (governance [0.05, 0.30]). Recalculated on k_required changes; applies from next epoch. Sourced from protocol_maintenance_reserve.
+
+**Invariant #353 (#r235):** The ⌈k/2⌉ anti-coordination threshold is fully eliminated from the mechanism spec (retraction initiated in Invariant #348). committee_vote_protocol = COMMIT_REVEAL is a hard constant in CommitteeStateEngine_v2 (not a governance parameter); the setVoteProtocol() function reverts unconditionally. Dormant contingency parameters for mechanistically prohibited scenarios are structural debt and are not created.
+
+**Invariant #354 (#r235):** Warranty-oracle coupling: Warranty(claim_a) = Pr[|S_cred(c, T_anchor) − oracle_declared(c, T_anchor)| ≤ q_quality_threshold_a]. oracle_declared is the sole exogenous variable. Mechanism integrity is equivalent to oracle_declared being exogenous. Endogenous oracle renders warranty circular; this is why all three class_oracle_mode values (AUTOMATED, COMMITTEE, HYBRID_EXTERNAL) require external oracle independence. This is the logical foundation of Invariant #337.
+
+---
+
+## Open Questions for #r236+
+
+1. **AdapterRegistry write authorization and multi-sig requirements:** The mutable AdapterRegistry is governance-multisig gated. Define the minimum multisig threshold for adapter writes (e.g., 3-of-5 vs 2-of-3) and whether adapter writes require a time-lock (e.g., 48-hour time-lock to enable community inspection before an adapter goes live).
+
+2. **τ_commit_bonus and protocol_maintenance_reserve epoch draw computation:** The epoch draw from protocol_maintenance_reserve is shared between Phase-2 maintenance bonus and τ_commit_bonus. Is the total epoch draw fixed (governance-set reserve draw rate × reserve balance) or uncapped (total payout = sum of all eligible bonuses)? If uncapped, reserve depletion is unbounded in high-participation epochs.
+
+3. **Two-tier registry and AdapterRegistry upgrade:** If AdapterRegistry itself needs an upgrade (bug fix; new write-authorization model), it must be replaced while all adapters remain accessible. Define the AdapterRegistry upgrade path: new AdapterRegistry address replaces the ADAPTER_REGISTRY_SLOT in ProtocolAddressRegistry — but ProtocolAddressRegistry is immutable post-finalize. How is ADAPTER_REGISTRY_SLOT changed without breaking the immutability guarantee?
+
+4. **Warranty-oracle coupling and partial-truth resolution:** Invariant #354 addresses full oracle resolution. Under partial-truth resolution (oracle fires but only partially covers the coordinate space — e.g., range instead of point value), is the warranty evaluated at the partial resolution midpoint? At the interval boundary closest to S_cred? Or does partial-truth resolution defer warranty evaluation to next full-resolution event?
+
+*Last updated: #r235 — 2026-04-04T13:42Z*
