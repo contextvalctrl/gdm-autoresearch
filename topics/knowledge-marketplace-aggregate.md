@@ -10955,3 +10955,171 @@ All four outputs from this run follow the same self-calibrating pattern establis
 ## Run Log Update
 
 - **#r188** — 2026-04-04T05:02Z — Q1: CorrelationBonus_v1 seed = ψ_corr × WED_clearing_ref × N_demo; per-epoch cap at 2% of WED; WED-anchored genesis seeding law. Q2: oracle_divergence_monitor Δ_alert_threshold self-calibrating at 2-sigma above historical mean; genesis default 0.5; dual-condition transition at N_calibration resolved epochs. Q3: three-family taxonomy is internal-only; external messaging uses customer-value propositions against Polymarket/Kalshi/Betfair. Q4: Θ_collective = max(3.0, 0.75 × Σ active w_a) + fraction_consensus > 0.75; absolute floor 3.0; DISCOVERY_MODE v2.2 only. Invariants #140–#143.
+
+
+---
+
+## #r189 Contributions — 2026-04-04T05:12Z
+
+**Phase: v2.1/v2.2 edge cases — Q1–Q4 from #r188 (co-firing risk, thin-pool override, SEE interaction, migration path).**
+
+---
+
+### Q1 (CorrelationBonus + oracle_divergence_monitor co-firing in same epoch) → Bonus payout suspension when oracle stress and seed stress coincide; governance alert with dual-flag event (#r189)
+
+**The adversarial scenario:**
+
+Knowers anticipate oracle unreliability (e.g., a contested event). They mass-register correlated declarations (X, Y) betting on a disputed resolution. Oracle fires with a divergent value, triggering both:
+- `Δ_smooth > Δ_alert_threshold` (oracle_divergence_monitor alert)
+- `seed_status == YELLOW` (bonus demand drains seed pool simultaneously)
+
+This is liability concentration: the mechanism is under oracle stress precisely when knowers are drawing on the bonus reserve. The two signals are correlated by construction.
+
+**Resolution — dual-flag suspension:**
+
+```
+If in the same epoch:
+  oracle_divergence_monitor_alert(class_i) == true
+  AND seed_status(class_i) in {YELLOW, EMPTY}
+
+Then:
+  CorrelationBonus_v1 payouts for class_i suspended for that epoch
+  (existing declarations not cancelled; payouts deferred to next epoch if conditions clear)
+  Emit: correlation_bonus_suspension_alert {
+    class_id, reason: "dual_oracle_stress_seed_stress", epoch, Δ_smooth, seed_status
+  }
+  Governance_alert: "CorrelationBonus suspended — review oracle and seed status"
+```
+
+**On condition clearing:** If Δ_smooth drops below threshold AND seed_status returns to GREEN, deferred payouts release at end of next qualifying epoch. If seed_status == EMPTY persists: deferred payouts permanently forfeited (seed exhausted; no additional knower slash).
+
+**Why deferral not cancellation:** A correlated declaration reflects genuine epistemic conviction. Cancellation punishes knowers for oracle stress that is not their fault. Deferral preserves the incentive structure while protecting the reserve.
+
+**Design law (#r189):** CorrelationBonus payouts are suspended (not cancelled, not slashed) when oracle_divergence_monitor and seed_status alerts co-fire in the same epoch. Deferred payouts release when both conditions clear, bounded by seed availability. Dual-flag suspension is the canonical response to liability concentration risk. (#r189)
+
+**v2.1 contract addition:** CorrelationBonusManager (new minimal contract or ClaimEscrow extension): dual-flag check at epoch boundary; deferred_payout ledger per declaration; governance alert event.
+
+---
+
+### Q2 (Thin-pool collective override — N_C < N_unanimous_floor requires unanimous consensus) → N_unanimous_floor = 5; below that, fraction_consensus requirement = 1.0 (#r189)
+
+**The problem formalised:**
+
+For N_C = 3 (exactly at epistemically_live floor), 75% fraction_consensus requires `ceil(0.75 × 3) = 3/3 = unanimous` in practice. This is implicit in the formula but should be explicit.
+
+For N_C = 4: `ceil(0.75 × 4) = 3/4` — genuine supermajority. For N_C = 5: `ceil(0.75 × 5) = 4/5`. The 75% threshold first behaves as a true non-unanimous supermajority at N_C ≥ 5.
+
+**Resolution — explicit N_unanimous_floor:**
+
+```
+effective_consensus_fraction(class_i, t) =
+  if active_knower_count(class_i, t) < N_unanimous_floor:
+    1.0   (unanimous required)
+  else:
+    0.75  (supermajority required)
+
+N_unanimous_floor = 5  (governance-settable, bounded [3, 8])
+```
+
+**Justification for 5:** At N_C = 3 or 4, a single knower dissent blocks override. Requiring unanimous agreement at these pool sizes is correct — three or four agents cannot constitute a credible epistemic supermajority against a silent oracle. N_C = 5 is the threshold where 75% majority means 4/5 agents — one permissible dissent, a genuinely meaningful (not trivially unanimous) consensus.
+
+**Design law (#r189):** Qualified collective override requires unanimous consensus when `active_knower_count < N_unanimous_floor = 5`. For N_C ≥ 5, the 75% fraction_consensus supermajority applies. This eliminates arithmetic ambiguity and correctly tightens the override bar for thin epistemic pools. (#r189)
+
+---
+
+### Q3 (CorrelationBonus_v1 SEE interaction — both/one/neither markets SEE-tagged) → Full SEE inherits full protection (no bonus); single-leg SEE gets 50% forfeiture; no-SEE unaffected (#r189)
+
+**Three cases:**
+
+**Case 1 — Both markets SEE-tagged:** Both oracle confirmations disrupted. Correlated declaration inherits SEE protection on both legs. No bonus earned; no additional slash; seed pool NOT depleted. Declaration persists to next non-SEE epoch.
+```
+Both SEE → full SEE inheritance; no bonus; no slash; declaration persists.
+```
+
+**Case 2 — Only market X is SEE-tagged; market Y resolves normally:** Market X SEE-protected (no slash on X leg). Declaration suspended for this epoch (deferred to next epoch where X also resolves or exits SEE). If X never resolves (SEE persists beyond T_longtail): declaration closes without bonus; X-leg escrow returned per SEE protection; Y-leg bonus forfeited (50% of maximum possible bonus — the Y-correct leg contribution).
+```
+Single-leg SEE → declaration suspended; if X non-resolving: 50% bonus forfeiture.
+```
+
+**Case 3 — Neither market SEE-tagged:** Standard CorrelationBonus_v1 resolution. Unaffected.
+
+**Why 50% in Case 2:** The declarant correctly predicted Y's direction but loses the synergistic bonus because X's resolution is unavailable — not because they were wrong. 50% represents approximate symmetric per-leg contribution. More complex decomposition would require per-leg stake weighting at v2.1 — not worth the complexity.
+
+**Design law (#r189):** CorrelationBonus_v1 SEE inheritance: (a) both-SEE → full protection, no bonus, declaration persists; (b) single-leg-SEE → declaration suspended; 50% bonus forfeiture if non-resolving leg persists beyond T_longtail; (c) no-SEE → normal resolution. Per-leg SEE evaluation; conservative outcome always applies. (#r189)
+
+---
+
+### Q4 (CorrelationBonus_v1 → v2.2 implication chain migration) → No migration path; independent coexistence; seed-pool natural sunset (#r189)
+
+**Assessment:**
+
+CorrelationBonus_v1: "I believe X and Y are correlated ±1." Payout: flat 0.15× bonus if both correct. No causal structure, no α_cap, no IMPL_PENDING.
+
+v2.2 implication chain: "I believe A occurring implies B." Payout: α_cap × depth-discounted bonus. Full IMPL_PENDING lifecycle.
+
+These are epistemically distinct claims. Grandfathering conflates statistical correlation with causal structure — incorrect.
+
+**Coexistence model:**
+
+| Feature | Activation | Escrow type | Settlement |
+|---------|-----------|-------------|------------|
+| CorrelationBonus_v1 | `declare_correlated(X, Y, dir_X, dir_Y)` | Governance seed pool | Pro-rata; epoch boundary |
+| Implication chain v2.2 | `declare_implication(A, B, depth)` | implication_bonus_escrow | IMPL_PENDING lazy cascade |
+
+**Economic incentive to upgrade:** CorrelationBonus_v1 pays 0.15× from a depleting seed pool. Implication chain pays α_cap × stake (potentially larger) from self-funded escrow. For knowers with genuine causal conviction, implication chain is economically superior. CorrelationBonus_v1 is priced as a lower-conviction, lower-commitment feature — appropriate.
+
+**Self-retiring mechanism:** When seed pool empties and governance does not refill it, CorrelationBonus_v1 naturally sunsets without active deprecation. New declarations stop; existing declarations complete their oracle lifecycles. Clean separation from v2.2 implication chains — no migration path needed or defined.
+
+**Design law (#r189):** CorrelationBonus_v1 and v2.2 implication chains are independent coexisting features with different escrow types, settlement paths, and epistemic semantics. No migration path exists or is needed. CorrelationBonus_v1 sunsets via seed pool depletion. Statistical correlation and causal structure are distinct claims; conflation is prohibited. (#r189)
+
+---
+
+## Structural Synthesis: Edge Case Closure (#r189)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| CorrelationBonus + oracle divergence co-firing | Dual-flag suspension (not cancellation); deferred payout; governance alert | Liability concentration → deferral, not forfeiture |
+| Thin-pool (N_C < 5) collective override | Unanimous consent required; N_unanimous_floor = 5 | Thin epistemic pool cannot produce non-unanimous supermajority |
+| CorrelationBonus SEE interaction | Both-SEE: full protection; single-leg-SEE: 50% forfeiture on non-resolving leg; no-SEE: normal | Per-leg SEE evaluation; conservative outcome always applies |
+| v2.1 → v2.2 migration | No migration; independent coexistence; seed-pool natural sunset | Statistical correlation and causal structure are distinct claims |
+
+---
+
+## v2.1/v2.2 Contract Spec Additions from #r189
+
+| Contract | Addition |
+|---|---|
+| **CorrelationBonusManager** (new minimal v2.1 contract) | Dual-flag suspension logic; deferred_payout ledger; governance alert event; per-declaration SEE-status check; suspension; 50% forfeiture rule; SEE interaction event |
+| **DiscoveryCoordinateRegistry** (v2.2) | N_unanimous_floor parameter; effective_consensus_fraction selector at collective override check |
+
+---
+
+## Cumulative Invariants (additions through #r189)
+
+**Invariant #144 (#r189):** CorrelationBonus_v1 payouts are suspended (not cancelled, not slashed) when oracle_divergence_monitor and seed_status alerts co-fire in the same epoch. Deferred payouts release when both conditions clear; forfeited only if seed pool is empty at deferred epoch.
+
+**Invariant #145 (#r189):** Qualified collective override requires unanimous consensus when `active_knower_count < N_unanimous_floor = 5`. For N_C ≥ 5, the 75% fraction_consensus supermajority applies.
+
+**Invariant #146 (#r189):** CorrelationBonus_v1 SEE interaction: both-SEE → full SEE protection, no bonus, declaration persists; single-leg-SEE → declaration suspended; 50% bonus forfeiture if non-resolving leg persists beyond T_longtail; no-SEE → normal resolution.
+
+**Invariant #147 (#r189):** CorrelationBonus_v1 and v2.2 implication chains coexist independently. No migration path exists or is needed. CorrelationBonus_v1 sunsets via seed pool depletion. Statistical correlation and causal structure are distinct epistemic claims; conflation is prohibited.
+
+---
+
+## Run Log Update
+
+- **#r189** — 2026-04-04T05:12Z — Edge case closure: dual-flag suspension (CorrelationBonus + oracle divergence co-firing); N_unanimous_floor=5 for thin-pool collective override; CorrelationBonus SEE interaction (both/one/none); no-migration v2.1→v2.2 coexistence with natural seed-pool sunset. One new contract (CorrelationBonusManager). Invariants #144–#147.
+
+---
+
+## Open Questions for #r190+
+
+1. **CorrelationBonusManager attack surface:** Top-3 adversarial vectors: (a) seed pool exhaustion griefing (spam correlated declarations to drain seed without oracle resolution), (b) SEE manipulation to force 50% forfeiture on competitor declarations, (c) dual-flag co-firing exploitation (trigger oracle divergence alert to suppress competitor bonuses).
+
+2. **Knowledge marketplace v2.2 roadmap priority:** Highest-leverage unaddressed v2.2 question: (a) multi-oracle quorum design for qualified collective override, (b) calibration_warmup_oracle genesis implementation, (c) DISCOVERY_MODE → CLEARING_MODE migration path for established shadow-classes.
+
+3. **Demo Day materials production:** Minimal materials set for YC X26 Demo Day (2026-06-16) derived from this research thread.
+
+4. **Thread status:** After 189 runs covering mechanism design, engineering spec, adversarial audit, and handoff — should this thread close and split into (a) implementation audit, (b) Demo Day materials, (c) v2.2 design threads? Or continue in this aggregate document?
+
+*Last updated: #r189 — 2026-04-04T05:12Z*
