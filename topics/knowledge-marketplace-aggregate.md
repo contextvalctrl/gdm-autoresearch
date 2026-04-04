@@ -12762,3 +12762,198 @@ CLEARING_MODE is a **warranted-attestation pool** producing a public-good cleari
 4. **DISCOVERY_MODE bilateral flow pressure test (v2.2 thread #r2):** Does EQ escrow-conditioned query actually produce bilateral flow, or does the warranted-attestation-pool failure mode recur in DISCOVERY_MODE? First pressure test for knowledge-marketplace-v22.md #r2.
 
 *Last updated: #r196 — 2026-04-04T06:22Z*
+
+---
+
+## #r197 Contributions — 2026-04-04T06:32Z
+
+Addresses all four open questions from #r196.
+
+---
+
+**Q1 (Zellic brief final version — incorporate ZA-5 refined + ZA-6) → Final 1-page Zellic audit brief spec; all six ZA items integrated (#r197):**
+
+The deliverable is a scoped audit brief, not the audit itself. ZA items are design-level findings the audit must verify.
+
+**Final Zellic Brief Specification (v2.1):**
+
+```
+GESTALT v2.1 — SECURITY AUDIT BRIEF
+Scope: CredibilityAggregator, ClaimEscrow, SettlementEngine (primary); CoordinateRegistry, EATManager (secondary)
+
+ZA-1 (credibility_ratio log-score edge cases):
+  Verify log-score computation safe for: zero-probability claim buckets, extreme stake bounds,
+  arithmetic precision (overflow/underflow) in credibility-weighted aggregation.
+  Correct behavior: zero-probability claim → proportional slash; large stake → W_max cap before
+  S_cred weighting.
+
+ZA-2 (W_max single-agent dominance cap):
+  Verify W_max enforced at aggregation time (not submission time).
+  Attack vector: same-block top-up pushes effective weight above W_max within one epoch boundary.
+  Correct behavior: W_max applied at effective_weight computation; excess silently capped.
+
+ZA-3 (T_anchor race condition — StateFreeze atomicity):
+  Verify CoordinateRegistry.freezeForSettlement is a single atomic EVM transaction.
+  Attack vector: attacker submits high-stake claim in same block as StateFreeze;
+  S_cred update interleaves before snapshot is taken.
+  Correct behavior: StateFreeze reads epoch-open S_cred snapshot; intra-epoch claims
+  do not affect settlement_frozen candidate_price.
+
+ZA-4 (Zone C deferral bypass in SettlementEngine):
+  Verify settlement_finality challenge windows cannot advance while class_zone == ZONE_C.
+  Confirm only settlement_finality type is deferred; epistemic challenges advance normally.
+  Attack vector: non-challenge-type governance call indirectly advances settlement window counter.
+
+ZA-5 (EATManager freeze-aware logging):
+  Verify getLiveS_epistemic() post-T_anchor emits POST_FREEZE_LIVE_NOT_FOR_SETTLEMENT tag
+  and is inaccessible to SettlementEngine.candidate_price storage.
+  Attack vector: caller spoofs SettlementEngine role to inject live post-freeze S_cred into settlement.
+  Correct behavior: SettlementEngine reads exclusively from its own candidate_price storage slot
+  written once at T_anchor; no post-freeze cross-contract CredibilityAggregator read for settlement.
+
+ZA-6 (Immutable cross-contract addresses):
+  Verify all v2.1 cross-contract addresses: set in constructor only; declared immutable.
+  Attack vector: governance takeover calls a post-constructor address setter to redirect
+  CredibilityAggregator reads to a malicious contract.
+  Correct behavior: address updates require full contract redeployment + governance adapter migration.
+  No in-place setter on live v2.1 contracts.
+```
+
+Deliverable file: `/home/ubuntu/dev/contextvalctrl/gdm-autoresearch/topics/zellic-brief-v2.1.md`
+Target: committed before 2026-04-07. (#r197)
+
+---
+
+**Q2 (Demo Day narrative revision — "track record determines weight") → Three revised canonical sentences replacing "capital proves conviction" (#r197):**
+
+**Deprecated framing (as of #r196):** "Money on the table is proof-of-conviction." / "Capital improves epistemics because forfeiture risk filters noise."
+
+**Revised canonical sentences:**
+
+1. *Base mechanism:*
+   > "In GestAlt, settlement prices are weighted by track record: participants who have been right before — verifiably, on-chain, with capital at risk — carry more weight than first-timers regardless of how much capital a first-timer posts."
+
+2. *Why capital matters (corrected):*
+   > "Capital is the anti-Sybil gate: you must post escrow to participate, filtering trivial noise. But capital alone does not determine influence on the clearing price — your history of accurate resolutions does."
+
+3. *Competitor contrast (replaces manipulation-resistance line from #r160/Q3):*
+   > "On Polymarket, a large enough wallet can move implied probability. On GestAlt, moving the clearing price requires a wallet AND a verifiable track record of accurate claims on related coordinates — making manipulation two orders of magnitude more expensive."
+
+The phrase "skin-in-the-game" is retained (accurate: capital is at risk) with the clarification that it enables track record accumulation, not that it IS the epistemic signal.
+
+**Revision scope:** These three sentences replace any "proof-of-conviction" or "capital improves epistemics" instance in Demo Day deck, Zellic brief background, and investor one-pager. (#r197)
+
+---
+
+**Q3 (CLEARING_MODE fee sustainability — minimum viable fee_fraction × WED_clearing) → Closed-form sustainability threshold; WED_clearing_min_viable gate at class registration (#r197):**
+
+**Revenue model (v2.1 CLEARING_MODE — confirmed #r196):** Fee revenue from `fee_fraction` on warranted claim escrow flows only. No unknower payment. Two revenue events: claim submission escrow routing + slash proceeds fraction.
+
+**Revenue per epoch per class:**
+```
+R_epoch = fee_fraction × N_claims × k_avg × (1 + ε)
+  N_claims = average active T3 claims/epoch
+  k_avg    = average stake per claim
+  ε        = expected error rate (fraction slashed)
+```
+
+**Sustainability condition (covers per-class protocol costs):**
+```
+R_epoch ≥ C_seed + L_seed + D_cost + G_reserve
+  C_seed   = challenger pool seed replenishment/epoch
+  L_seed   = LTRP seed replenishment/epoch
+  D_cost   = Celestia DA cost/epoch
+  G_reserve = governance reserve/epoch
+
+fee_fraction_min = (C_seed + L_seed + D_cost + G_reserve) / (N_claims × k_avg × (1 + ε))
+```
+
+**Illustrative benchmark** (governance fills in actuals at registration):
+N_claims=50, k_avg=10k USDC, ε=0.10, cost_floor=800 USDC/epoch:
+```
+fee_fraction_min = 800 / (50 × 10,000 × 1.10) = 0.0015  (0.15%)
+```
+
+A 0.15% fee on warranted claim escrow flows sustains the class without governance seed subsidies at this market depth.
+
+**Minimum viable WED_clearing (inverted):**
+```
+WED_clearing_min_viable = (C_seed + L_seed + D_cost + G_reserve) / (fee_fraction × (1 + ε))
+```
+
+**Design law (#r197):** At class registration, governance must verify `WED_clearing_projected ≥ WED_clearing_min_viable(fee_fraction_class)`. Classes below threshold require a declared governance sustainability subsidy as a registration pre-condition — not discovered post-hoc. (#r197)
+
+---
+
+**Q4 (DISCOVERY_MODE bilateral flow pressure test — does EQ produce genuine bilateral flow?) → Genuine under Type D2 unknowers; degenerate under D1; adversarial under D3; Type D3 = new v2.2 attack surface (#r197):**
+
+**Three unknower types in DISCOVERY_MODE:**
+
+| Type | Behaviour | Bilateral flow? |
+|------|-----------|-----------------|
+| D1: quality-indifferent | q_bonus=0; pays only for access | NO — access-payment only; no D(c) revelation; WED routing blind |
+| D2: quality-sensitive, genuinely uncertain | Non-trivial q_bonus conditional on oracle accuracy | YES — genuine bilateral: capital flows from information-poor to information-rich zone conditional on accuracy |
+| D3: strategic (already informed) | Has private information; uses EQ to inflate D(c) signal on a coordinate where they hold a correlated position | ADVERSARIAL — mechanism still produces accurate S_cred (D3 overpays), but D(c) routing is distorted |
+
+**Bilateral flow holds in DISCOVERY_MODE when:**
+1. q_bonus > 0 (not pure access-payment)
+2. unknower faces genuine resolution uncertainty (not D3)
+3. q_bonus / q_fee ≥ min_q_bonus_ratio (#r150/Q1)
+
+The warranted-attestation-pool failure mode (#r196) does NOT recur under these conditions. It recurs only under Type D1 dominance.
+
+**Type D3 adversarial unknower — new v2.2 design requirement:**
+
+D3 unknowers inflate q_bonus on coordinates where they hold large correlated positions, distorting WED routing toward their positions. Defence: EQ conflict-of-interest disclosure.
+
+```
+effective_q_bonus(unknower_a) = q_bonus_a × (1 - min(1, position_fraction_a / conflict_threshold))
+conflict_threshold = 0.05  (5% of WED_clearing; governance-settable)
+```
+
+Large-position unknowers' q_bonus is discounted from WED routing. They can still buy S_cred; they simply cannot game coordinate priority via inflated demand signals. This is a mandatory v2.2 EQ submission field. (#r197)
+
+**Note on Type D3 side-effect:** D3 unknowers who inflate q_bonus still produce accurate S_cred as a side effect (knowers attracted by q_bonus resolve the coordinate correctly). The mechanism still works; it just over-allocates epistemic effort to coordinates with strategic demand. The conflict discount corrects the misallocation without blocking the query.
+
+---
+
+## Structural Synthesis: External Materials + Fee Sustainability + DISCOVERY_MODE Flow (#r197)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Zellic brief | ZA-1 through ZA-6 fully specified; deliverable by 2026-04-07 | Atomic-interaction contracts audited as unit |
+| Demo Day framing | "Track record determines weight"; three revised canonical sentences | Capital = spam filter; no "conviction" language |
+| CLEARING_MODE sustainability | fee_fraction_min = cost_floor / WED_clearing proxy; WED_clearing_min_viable gate at registration | Thin classes require declared subsidy at registration |
+| DISCOVERY_MODE bilateral flow | D2 unknowers produce genuine flow; D3 = new attack; EQ conflict discount for v2.2 | Bilateral flow achievable; adversarial D3 requires position-conflict disclosure |
+
+---
+
+## Cumulative Invariants (additions through #r197)
+
+**Invariant #176 (#r197):** Zellic audit brief includes ZA-1 through ZA-6. Any future CredibilityAggregator change must be validated against all six ZA items before deployment.
+
+**Invariant #177 (#r197):** "Capital proves conviction" language is deprecated. Canonical framing: capital is the anti-Sybil participation gate; track record is the epistemic signal. All external materials use the revised framing.
+
+**Invariant #178 (#r197):** At CLEARING_MODE class registration, governance must verify `WED_clearing_projected ≥ WED_clearing_min_viable(fee_fraction_class)`. Classes below threshold require a declared governance sustainability subsidy as a registration pre-condition.
+
+**Invariant #179 (#r197):** In DISCOVERY_MODE (v2.2), EQ unknowers with active positions ≥ conflict_threshold fraction of WED_clearing receive a conflict discount on effective_q_bonus in WED routing. Position-conflict disclosure is a mandatory EQ submission field. Default conflict_threshold = 0.05.
+
+---
+
+## Run Log Update
+
+- **#r197** — 2026-04-04T06:32Z — Q1: Zellic brief ZA-1 through ZA-6 final spec; deliverable by 2026-04-07. Q2: "track record determines weight" canonical framing; three revised external sentences retiring "proof-of-conviction." Q3: closed-form CLEARING_MODE fee sustainability; fee_fraction_min = cost_floor / (N_claims × k_avg × (1+ε)); WED_clearing_min_viable as registration gate. Q4: DISCOVERY_MODE bilateral flow pressure test — D1 degenerate, D2 genuine, D3 adversarial; EQ conflict-of-interest discount as new v2.2 design requirement. Invariants #176–#179.
+
+---
+
+## Open Questions for #r198+
+
+1. **Zellic brief document creation:** Materialize the brief at `/home/ubuntu/dev/contextvalctrl/gdm-autoresearch/topics/zellic-brief-v2.1.md` using the ZA-1 through ZA-6 spec from #r197/Q1. Confirm file exists and committed before 2026-04-07.
+
+2. **fee_fraction per-class vs protocol-global:** Should fee_fraction be settable per coordinate class (allows high-stakes clearing classes to charge higher fees) or protocol-global? Per-class allows thin classes to charge more; global is simpler. Derive the governance trade-offs.
+
+3. **EQ conflict-of-interest disclosure — scope of "position":** On-chain positions in the same protocol are trustlessly verifiable. Off-chain or cross-chain positions are not. Define the disclosure scope: same-protocol on-chain positions only, or broader? If broader, what is the enforcement model?
+
+4. **Type D3 side-effect — is distorted WED routing actually a failure?** D3 unknowers who inflate q_bonus still produce accurate S_cred as a side effect. The only failure is misallocated knower effort (toward D3 coordinates vs genuinely high-D(c) coordinates). Is this a mechanism failure requiring defence, or an acceptable inefficiency? If the conflict discount is too aggressive, it may deter Type D2 unknowers with legitimate large positions on the same coordinate.
+
+*Last updated: #r197 — 2026-04-04T06:32Z*
