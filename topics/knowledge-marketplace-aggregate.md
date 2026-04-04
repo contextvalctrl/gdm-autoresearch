@@ -9670,3 +9670,288 @@ This stub unblocks all other v2.1 delta work in parallel. The four scaffold cont
 4. **Cross-contract integration test plan:** With five contracts now gap-assessed, the integration test suite should cover: (a) Zone C gate blocks new T3 during solvency stress, (b) oracle_settlement_override does not slash knower escrow, (c) epistemically_live gate prevents market activation below threshold, (d) StateFreeze is atomic (no S_cred update after T_anchor). Define the test case structure before implementation begins.
 
 *Last updated: #r182 — 2026-04-04T04:02Z*
+
+
+---
+
+## #r183 Contributions — 2026-04-04T04:12Z
+
+**Phase: v2.1 engineering handoff — CredibilityAggregator_v1 full interface spec; silo-to-tier tier-weight governance; SCHRODINGER duration; cross-contract integration test plan.**
+
+---
+
+### Q1 (CredibilityAggregator_v1 full interface spec — storage layout, W_max, epoch buffer, credibility_ratio decay, view functions) (#r183)
+
+CredibilityAggregator_v1 is the root dependency for five v2.1 contracts and all launch-gate invariants (#r182). Full interface spec follows.
+
+**State variables:**
+
+```solidity
+struct KnowerRecord {
+    uint256 credibilityRatioBps;       // 0–10000 bps; starts at 5000 (neutral)
+    uint256 cumulativeLogScore;        // fixed-point 18 decimals; monotonically updated
+    uint256 resolvedClaimCount;        // for track record prerequisite checks
+    uint256 lastUpdateEpoch;           // last epoch this record was written
+    bool    active;                    // registered and in standing
+}
+
+struct S_credSnapshot {
+    uint256 candidatePrice;            // credibility-weighted cleared value
+    bytes32 blockHash;                 // block.hash at snapshot time (EAT anchor)
+    uint256 epoch;                     // epoch number at snapshot
+    bool    frozen;                    // true after freezeForSettlement()
+}
+
+mapping(uint256 => mapping(address => KnowerRecord)) public knowerRecords;
+mapping(uint256 => S_credSnapshot)                   public s_credSnapshots;
+mapping(uint256 => uint256)                          public activeChallengerCount;
+mapping(uint256 => uint256)                          public epochBuffer;
+mapping(uint256 => bool)                             public epistemicallyLive;
+
+uint256 public W_MAX_BPS = 2500;           // 25% per-agent S_cred weight cap
+uint256 public DECAY_PER_EPOCH_BPS = 50;  // 0.5% credibility_ratio decay per inactive epoch
+uint256 public EPOCH_BUFFER_BLOCKS;        // one-epoch delay window
+```
+
+**External functions:**
+
+```solidity
+// Initialise knower record at claim registration
+function registerKnower(uint256 marketId, address knower)
+    external onlyRole(CLAIM_ESCROW_ROLE);
+
+// Commit epoch buffer to live S_cred at epoch boundary; apply W_MAX cap
+function commitEpochBuffer(uint256 marketId)
+    external onlyRole(SETTLEMENT_ENGINE_ROLE);
+
+// Update log-score delta and credibility_ratio at oracle resolution
+function updateCredibilityRatio(
+    uint256 marketId,
+    address knower,
+    int256  logScoreDelta,
+    uint256 epochWeight
+) external onlyRole(ORACLE_MANAGER_ROLE);
+
+// Soft recalibration on oracle_settlement_override (no slash)
+function applyOverrideRecalibration(uint256 marketId)
+    external onlyRole(ORACLE_MANAGER_ROLE);
+
+// Atomic StateFreeze at T_anchor (SCHRODINGER entry)
+function freezeForSettlement(uint256 marketId)
+    external onlyRole(SETTLEMENT_ENGINE_ROLE)
+    returns (S_credSnapshot memory snapshot);
+// Reverts if already frozen; emits SettlementFrozen event
+
+// Record successful challenge commit; update epistemically_live
+function recordChallengeSuccess(uint256 marketId, address challenger)
+    external onlyRole(CLAIM_ESCROW_ROLE);
+
+// View functions
+function getS_credSnapshot(uint256 marketId) external view
+    returns (uint256 candidatePrice, bytes32 blockHash, bool frozen);
+
+function towlContribution(uint256 marketId, address knower) external view
+    returns (uint256 tierWeightedObligation);
+
+function epistemicallyLiveStatus(uint256 marketId) external view
+    returns (bool live, uint256 challengerCount, uint256 minRequired);
+```
+
+**Credibility_ratio update rule:**
+
+```
+credibility_ratio_new = credibility_ratio_old × (1 - decay_per_epoch × epochs_inactive)
+                      + alpha_lr × (log_score_a / log_score_prior_best)
+Clamped to [bps_min=1000, 10000]; alpha_lr = 500 bps (governance-settable)
+Decay floor: credibility_ratio cannot drop below 1000 bps from decay alone
+```
+
+**W_MAX cap at commitEpochBuffer:**
+
+```
+w_raw_a = base_share(a) × consistency_factor(a) × ivd_weight(a)
+w_effective_a = min(w_raw_a, W_MAX_BPS/10000 × Σw_raw)
+w_final_a = w_effective_a / Σw_effective_j
+S_cred_new = Σ w_final_a × claim_a
+```
+
+**Epoch buffer one-epoch delay:** Claims in epoch E held in epochBuffer until commitEpochBuffer at E+1. freezeForSettlement reads only the committed s_credSnapshots — not epochBuffer. No post-freeze commitEpochBuffer is permitted (reverts if frozen).
+
+**Design law (#r183):** CredibilityAggregator_v1 owns all epistemic state. Other contracts receive role-gated write entrypoints or read-only snapshots. No contract reads live epochBuffer directly. Epoch buffer delay is enforced by the commitEpochBuffer/freezeForSettlement separation. (#r183)
+
+---
+
+### Q2 (GestAltVault silo-to-tier tier-weight — governance-adjustable vs immutable) → Governance-adjustable with time lock; retroactivity protection via position.tier_weight_at_registration (#r183)
+
+**Resolution — governance-adjustable with time lock:**
+
+```solidity
+// In GovernanceParams:
+mapping(uint8 => uint16) public tierWeightBps;
+uint16 public constant TIER_WEIGHT_FLOOR_BPS    = 0;
+uint16 public constant TIER_WEIGHT_CEILING_BPS  = 10000;
+uint256 public N_tier_weight_delay = 8;  // epochs; min 4; changes time-locked
+
+// Genesis defaults:
+// tierWeightBps[1] = 0      (T1: non-warranted)
+// tierWeightBps[2] = 2500   (T2: partial warranty, 25%)
+// tierWeightBps[3] = 10000  (T3: full warranty, 100%)
+```
+
+**Retroactivity protection:** ClaimEscrow commits `tier_weight_at_registration` per position at claim submission. GestAltVault.towlUtilization() uses the committed value for existing positions and the current GovernanceParams value for new registrations. This prevents a tier weight increase from retroactively reclassifying existing positions as more capital-intensive.
+
+**v2.2 extension:** When DISCOVERY_MODE T3-equivalent positions are added, governance calls `setTierWeightBps(4, value)` — no GestAltVault code changes required.
+
+**Design law (#r183):** Tier weights are governance-adjustable with N_tier_weight_delay time lock (default 8 epochs, minimum 4). Existing positions retain tier_weight_at_registration committed to ClaimEscrow. Time lock prevents retroactive solvency reclassification. (#r183)
+
+---
+
+### Q3 (BatchAuction SCHRODINGER duration — per-class governance-set with Zone C tolling) → 24-hour launch default; 1-hour is protocol floor; Zone C tolls effective elapsed time (#r183)
+
+**Per-class challenge period in CoordinateRegistry_v1:**
+
+```solidity
+struct MarketClass {
+    // ...existing fields...
+    uint256 settlementChallengePeriod;  // seconds; per-class governance-set
+}
+
+uint256 public constant MIN_SETTLEMENT_CHALLENGE_PERIOD = 3600;   // 1 hour
+uint256 public constant MAX_SETTLEMENT_CHALLENGE_PERIOD = 604800; // 7 days
+```
+
+**SCHRODINGER enforcement in BatchAuction:**
+
+```solidity
+// At freezeForSettlement(): record frozenAt = block.timestamp
+// At advanceState() (SCHRODINGER → FINALIZED):
+uint256 challengePeriod = CoordinateRegistry.getSettlementChallengePeriod(marketId);
+uint256 elapsed = block.timestamp - frozenAt - tolledSeconds[marketId];
+require(elapsed >= challengePeriod || sfpChallengeResolved[marketId],
+    "BatchAuction: challenge period not elapsed");
+```
+
+**Zone C tolling:** `tolledSeconds[marketId]` accumulates seconds during which `towlZone() == C`. Effective elapsed = gross elapsed − tolledSeconds.
+
+**SFP early exit:** If settlement-finality challenge resolves before challenge period ends, `sfpChallengeResolved[marketId] = true` permits early FINALIZED transition.
+
+**v2.1 launch default:** `settlementChallengePeriod = 86400` (24 hours) for first deployment. Institutional participants need 24 hours to inspect candidate price across time zones. The 1-hour OracleManager constant is a protocol floor, not a production default.
+
+**Design law (#r183):** Settlement challenge period is per-class governance-set, bounded [1 hour, 7 days]. Zone C tolls effective elapsed time. v2.1 launch default is 24 hours. (#r183)
+
+---
+
+### Q4 (Cross-contract integration test plan — four critical invariants as test cases) (#r183)
+
+**IT-1: Zone C gate blocks new T3 during solvency stress**
+
+```
+Setup: GestAltVault + CoordinateRegistry + CredibilityAggregator stub
+  8 × T3 knowers, 10 ETH escrow each; vault.balance = 90 ETH
+  towlUtilization = 80/90 = 89% (Zone B)
+Action: 9th T3 knower registers with 10 ETH → projected utilization = 90/100 = 90% (Zone C threshold)
+Expected: registerClaim() reverts "zone C, T3 blocked"
+Failure mode: without Zone C gate, 9th registration succeeds; vault over-committed
+```
+
+**IT-2: oracle_settlement_override does not slash knower escrow**
+
+```
+Setup: All 5 contracts; market M2; knower A: 5 ETH escrow, T3 claim at price 100
+  T_anchor fires: candidatePrice = 100; settlement_finality challenge filed by B
+Action: OracleManager.confirmResolution() with oraclePrice = 95 (ResolutionType.SETTLEMENT_OVERRIDE)
+Expected: knower A escrow NOT slashed; challenger B fee RETURNED; final_price = 95
+  CredibilityAggregator.applyOverrideRecalibration(M2) fires (soft only)
+Failure mode: without ResolutionType routing, OracleManager slashes A's 5 ETH erroneously
+```
+
+**IT-3: epistemically_live gate prevents market activation below threshold**
+
+```
+Setup: CoordinateRegistry + CredibilityAggregator stub; market M3
+  activeChallengerCount[M3] = 2 (below min 3); epistemicallyLive[M3] = false
+Action: governance calls activateMarket(M3)
+Expected: reverts "not epistemically live"
+Recovery: third challenger files commit → recordChallengeSuccess → count = 3 → live = true
+  activateMarket(M3) now succeeds
+Failure mode: without on-chain gate, M3 activates with 2 challengers; no enforcement
+```
+
+**IT-4: StateFreeze is atomic — no S_cred update after T_anchor**
+
+```
+Setup: All 5 contracts; market M4; S_cred = 100 (committed epoch E)
+  freezeForSettlement(M4) called: candidatePrice = 100; frozen = true
+Action (attack): knower B calls commitEpochBuffer(M4) after freeze
+Expected: commitEpochBuffer reverts "market is frozen"
+  s_credSnapshots[M4].candidatePrice = 100 unchanged throughout SCHRODINGER → FINALIZED
+Failure mode: without frozen check, B injects new S_cred during challenge window
+```
+
+**Execution priority:**
+
+| Priority | Test | Stub-sufficient? | Blocker |
+|---|---|---|---|
+| 1 | IT-3 | Yes — CredibilityAggregator stub only | First CI green test |
+| 2 | IT-4 | Requires commitEpochBuffer + freeze | StateFreeze atomicity |
+| 3 | IT-1 | Requires TOWL tier weights + utilization | Solvency zone model |
+| 4 | IT-2 | Full 5-contract integration | Last; broadest scope |
+
+IT-3 is the first test that should be green in v2.1 CI — it validates the on-chain epistemically_live gate with minimum implementation. IT-4 is second because post-freeze S_cred mutation is the highest-solvency-risk gap.
+
+**Design law (#r183):** Integration test priority = launch-gate invariant risk × implementation dependency. The simplest stub-sufficient test (IT-3) runs first; the broadest integration test (IT-2) runs last. Tests are ordered so earlier failures expose the root cause before downstream complexity obscures it. (#r183)
+
+---
+
+## Structural Synthesis: v2.1 Engineering Handoff — Specification Phase Complete (#r183)
+
+| Deliverable | Status |
+|---|---|
+| CredibilityAggregator_v1 interface spec | Complete — Document 4 of engineering handoff |
+| Tier weight governance model | Complete — time lock + retroactivity protection |
+| SCHRODINGER challenge period | Complete — per-class, 24h launch default, Zone C tolling |
+| Integration test plan IT-1–IT-4 | Complete — execution priority defined |
+
+**Engineering handoff document status:**
+
+| Document | Status |
+|---|---|
+| Doc 1: Architecture overview | Producible in 1 formatting run |
+| Doc 2: Interface specs (5 contracts) | CredibilityAggregator_v1 spec complete this run |
+| Doc 3: Security briefing | From #r182 adversarial simulation |
+| Doc 4: Governance params reference | Complete (#r180/Q3 + tier weights this run) |
+| Doc 5: Launch readiness checklist | Complete (#r180/Q3 + integration tests this run) |
+
+All five engineering handoff documents are specification-complete. Content formatting run is the remaining step (estimated 1–2 runs).
+
+---
+
+## Cumulative Invariants (additions through #r183)
+
+**Invariant #128 (#r183):** CredibilityAggregator_v1 owns all epistemic state. All other contracts receive role-gated write entrypoints or read-only snapshots. No contract reads live epochBuffer directly. Epoch buffer delay enforced by commitEpochBuffer/freezeForSettlement separation.
+
+**Invariant #129 (#r183):** Tier weights are governance-adjustable with N_tier_weight_delay time lock (default 8 epochs, minimum 4). Existing positions retain tier_weight_at_registration committed to ClaimEscrow. Time lock prevents retroactive solvency reclassification.
+
+**Invariant #130 (#r183):** Settlement challenge period is per-class governance-set, bounded [3600s, 604800s]. Zone C tolls effective elapsed time. v2.1 launch default is 86400s (24 hours). The 1-hour OracleManager scaffold constant is the protocol floor, not the deployment default.
+
+**Invariant #131 (#r183):** Integration test IT-3 (epistemically_live gate) must be green before any other v2.1 contract work proceeds. IT-4 (StateFreeze atomicity) is second. IT-1 (Zone C) and IT-2 (oracle_settlement_override) require fuller integration and run last.
+
+---
+
+## Run Log Update
+
+- **#r183** — 2026-04-04T04:12Z — CredibilityAggregator_v1 full interface spec (storage, external functions, credibility_ratio update rule, W_MAX cap, epoch buffer, freeze entrypoint); tier weight governance model (time lock, retroactivity protection); SCHRODINGER challenge period per-class with 24h default and Zone C tolling; four integration test cases IT-1 through IT-4 with execution priority. Four new invariants (#128–#131). Engineering handoff specification phase declared complete.
+
+---
+
+## Open Questions for #r184+
+
+1. **CredibilityAggregator log-score computation on-chain — gas budget:** log(P_a(V*)) requires fixed-point natural log on-chain. What is the acceptable per-resolution gas spend? The epoch-buffer model batches most computation; log-score at oracle resolution is the hot path.
+
+2. **GovernanceParams contract interface:** Referenced throughout but never formally spec'd. It holds tier_weight_bps, N_tier_weight_delay, alpha_lr, DECAY_PER_EPOCH_BPS, W_MAX_BPS, and all class-level parameters. Standalone upgradeable proxy (recommended) or storage module within CoordinateRegistry?
+
+3. **Document 1 formatting run:** Produce engineering handoff Document 1 (architecture overview) in prose from this aggregate doc as source.
+
+4. **Next research priority (P2): thin challenger microstructure.** With adversarial simulation and engineering handoff spec complete, the next mechanism-design question is S_cred quality and clearing price accuracy when challenger populations are at the epistemically_live minimum. Parametric analysis of W_a(t) under adversarial concentration.
+
+*Last updated: #r183 — 2026-04-04T04:12Z*
