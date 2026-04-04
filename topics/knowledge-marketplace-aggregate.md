@@ -8172,3 +8172,240 @@ The entry subsidy is available to any new knower who submits a valid claim withi
 4. **Module 3 entry: implication chain settlement routing in CLEARING_MODE.** With Module 2 adversarial pass complete, the next major v2.2 surface is the settlement routing for A→B implication declarations under the bifurcated bonus (#r141). Key question: in CLEARING_MODE, how does partial-resolution settlement of the implication bonus escrow interact with the Settlement Freeze Protocol at T_anchor? Specifically: if A's T_anchor fires but B's oracle has not yet resolved, does the implication_bonus_escrow enter a partial settlement-frozen state at T_anchor, or is it fully deferred to B's T_anchor?
 
 *Last updated: #r175 — 2026-04-04T02:52Z*
+
+---
+
+## #r176 Contributions — 2026-04-04T03:02Z
+
+**Phase: v2.2 Module 2 closure (Q1–Q3 from #r175) + Module 3 entry (Q4 from #r175 — implication chain settlement routing).**
+
+---
+
+### Q1 (Entry subsidy gaming — coordinated rotation through second-knower status) → Anti-cycling gate: N_cycling_lock + one-subsidy-per-address-per-class + credibility floor (#r176)
+
+**Attack model:**
+
+```
+Epoch T:   Coordinator A holds MONOPOLY_MODE on class C
+           MONOPOLY_MODE persists >= N_calibration → entry_subsidy fires
+Epoch T+1: Coordinated address B claims entry_subsidy; enters as second knower
+Epoch T+2: B withdraws (stake expires via T_longtail); MONOPOLY_MODE resumes
+           N_monopoly_alert resets...
+Epoch T+N_calibration: entry_subsidy fires again → repeat
+```
+
+Cost per cycle: T_longtail-minimum escrow × interest + claim_submission_fee. Profitable at thin k_min.
+
+**Resolution — two-part anti-cycling gate:**
+
+**Part 1 — N_cycling_lock minimum active duration:**
+
+```
+entry_subsidy_pool refills only when:
+  resolved_claims(entry_subsidy_claimed_by) >= 1   (at least one oracle resolution)
+  AND epoch_elapsed since entry_timestamp >= N_cycling_lock = N_calibration
+
+If either condition unmet when N_monopoly_alert fires again:
+  entry_subsidy_pool does NOT refill
+  governance_alert: subsidy_cycling_suspected { class_id, last_claimant, elapsed_epochs }
+```
+
+**Part 2 — One subsidy per address per class + credibility floor:**
+
+```
+entry_subsidy_eligible(a) = true iff:
+  a has NOT previously claimed entry_subsidy on class_i
+  AND (a is new address with no prior claims OR credibility_ratio(a) >= 0.10)
+```
+
+A coordinated attack requires a fresh address with partial credibility history for each cycle, making each rotation progressively more expensive.
+
+**Design law (#r176):** Entry subsidies are anti-cycling gated: last claimant must achieve >= 1 resolution before pool refills; N_cycling_lock epochs must elapse; each address is ineligible for repeated subsidies on the same class. Cycling attack cost grows with resolution-cycle latency × min_escrow. (#r176)
+
+**v2.2 contract addition:** DiscoveryCredibilityAggregator: entry_subsidy_claimed_by tracking; N_cycling_lock gate on refill; one-subsidy-per-address-per-class check.
+
+---
+
+### Q2 (SSC accuracy_bonus_pool solvency on indefinite oracle delay) → T_wind_down_max mandatory at SSC registration; one governance extension; LTRP routing on expiry (#r176)
+
+**The problem:** Governance-terminated SSCs accumulate accuracy_bonus in escrow indefinitely if governance never acts.
+
+**Resolution — mandatory T_wind_down_max:**
+
+```
+SSC registration: T_wind_down_max REQUIRED
+  T_wind_down_max_max = governance-settable global cap (default: 1000 macro-epochs)
+  T_wind_down_max_min = 2 × N_calibration
+
+accuracy_bonus_expiry = T_wind_down_max + N_accuracy_grace (default 4 macro-epochs)
+
+If oracle has not resolved by accuracy_bonus_expiry:
+  accuracy_bonus_pool → LTRP routing
+  Each unknower's pre-paid bonus refunded pro-rata
+  EAT event: ssc_accuracy_bonus_expired
+  governance_alert: ssc_oracle_failure
+```
+
+**One-time extension:** Governance may call ssc_wind_down_max_extension (k-of-n multisig; max 1× extension doubling original value; second extension not permitted).
+
+**Design law (#r176):** All DISCOVERY_MODE classes with non-oracle termination must declare T_wind_down_max at registration. Accuracy_bonus escrow is bounded by T_wind_down_max + N_accuracy_grace. Governance may extend once; LTRP routing fires on expiry. (#r176)
+
+**v2.2 contract addition:** DiscoveryClaimEscrow: T_wind_down_max enforcement; accuracy_bonus_expiry; one-time extension EAT event; LTRP routing on expiry. CoordinateRegistry_v2: T_wind_down_max required for SSC registration.
+
+---
+
+### Q3 (WINDING_DOWN S evolution and re-export consistency) → One initial export + one re-export per (shadow, clearing) pair; CLOSED state returns cached snapshot (#r176)
+
+**The question:** Multiple clearing-classes linked to one shadow-class may request re-exports at different times during WINDING_DOWN; each snapshot differs due to staleness decay. Is this a problem?
+
+**Analysis:** Different genesis timestamps for different linked clearing-classes should produce different genesis priors — staleness decay between T1 and T2 is real information about prior age. No consistency attack: the two-epoch terminal averaging (Invariant #96) already bounds manipulation magnitude to 50% of single-epoch change.
+
+**Resolution — per-pair export state machine:**
+
+```
+ShadowClearingPairRegistry.export_state(shadow_id, clearing_id):
+  NEVER_EXPORTED → INITIAL_EXPORTED (first exportGenesisPrior call)
+  INITIAL_EXPORTED → RE_EXPORTED   (genesis_prior_re_export_request at clearing genesis)
+  RE_EXPORTED → CLOSED             (no further re-export; returns cached RE_EXPORTED snapshot)
+```
+
+Each (shadow_id, clearing_id) pair has an independent state machine. Multiple linked clearing-classes each get their own INITIAL + RE_EXPORT independently computed at their genesis timestamps.
+
+**Design law (#r176):** Each (shadow-class, clearing-class) pair permits at most one initial export and one re-export. CLOSED state returns cached RE_EXPORTED snapshot without recomputation. Multiple linked clearing-classes are independent pairs, each with their own state machine. (#r176)
+
+**v2.2 contract addition:** ShadowClearingPairRegistry: export_state per pair; CLOSED gate after RE_EXPORTED; cached snapshot storage.
+
+---
+
+### Q4 — Module 3 Entry: Implication Chain Settlement Routing in CLEARING_MODE
+
+**The core question:** At A's T_anchor (A-correct, B-unresolved), does implication_bonus_escrow enter partial settlement, full deferral, or a new intermediate state?
+
+**Route analysis:**
+
+- **Route 2 — Full deferral:** Rejected. Declarant submitted accurate A-prediction and deserves implication_bonus_direct immediately. Withholding until B resolves punishes A-accuracy. (#r176)
+
+- **Route 3 — IMPL_PENDING_B (adopted):**
+
+```
+At T_anchor_A (A-correct, B-unresolved):
+  1. Release: implication_bonus_direct → declarant (immediate)
+  2. IMPL_PENDING_B: implication_bonus_residual held pending B oracle
+     T_impl_pending_max = governance-set (see Q4 below)
+  3. At T_anchor_B:
+     if B-correct: release implication_bonus_residual → declarant
+     if B-wrong:   slash implication_bonus_residual → challenger_pool
+  4. If T_impl_pending_max reached without B resolving:
+     LTRP routing of implication_bonus_residual
+```
+
+**SFP interaction:** A's Settlement Freeze Protocol runs normally on settlement_price_A. If A's SFP challenge succeeds (A-correct overturned), IMPL_PENDING_B closes and clawback fires:
+
+```
+Clawback precedence:
+  1. Debit from declarant's claim_stake_A (if still locked in ClaimEscrow)
+  2. If claim_stake_A released: debit from declarant_bond
+  3. If declarant_bond insufficient: governance bond call
+```
+
+**IMPLPendingB struct:**
+
+```
+IMPLPendingB {
+  declaration_id,
+  declaring_address,
+  linking_class_B_id,
+  implication_bonus_residual,
+  T_anchor_A_epoch,
+  T_impl_pending_max,
+  sfp_challenge_active: bool
+}
+```
+
+**Design law (#r176):** Implication chain settlement uses IMPL_PENDING_B. At T_anchor_A (A-correct, B-unresolved): implication_bonus_direct releases immediately; residual enters IMPL_PENDING_B pending B oracle or T_impl_pending_max expiry (LTRP). Full deferral is rejected. SFP challenge success on A triggers clawback in precedence order: claim_stake → declarant_bond → governance_bond. (#r176)
+
+**v2.2 contract addition:** SettlementEngine: IMPLPendingB struct; IMPL_PENDING_B state machine; immediate implication_bonus_direct release; T_impl_pending_max with LTRP routing; SFP clawback precedence. ClaimEscrow: clawback call interface.
+
+---
+
+## Net-New Structural Insight: The Conditional Escrow Primitive (#r176)
+
+IMPL_PENDING_B introduces a general mechanism pattern: **conditionally-held escrow with a secondary time-bounded resolution trigger**. This structure recurs:
+
+- Standard claim escrow: locked until one event (oracle resolution).
+- IMPL_PENDING_B: locked until B oracle fires OR T_impl_pending_max expires.
+- SSC accuracy_bonus: locked until oracle fires OR T_wind_down_max + N_accuracy_grace expires.
+- LTRP escrow: locked until T_longtail expires.
+
+**Generalised pattern:**
+
+```
+IMPLPending {
+  escrow_amount,
+  primary_trigger:    event_type × event_identifier,
+  expiry_trigger:     timestamp (T_impl_pending_max),
+  primary_resolution: (correct → release | wrong → slash),
+  expiry_resolution:  LTRP_routing | refund | governance_alert,
+  clawback_order:     [claim_stake, declarant_bond, governance_bond]
+}
+```
+
+**Design law (#r176):** Conditionally-held escrow with a secondary time-bounded trigger is a first-class mechanism primitive: IMPLPending(escrow, primary_trigger, expiry_trigger, primary_resolution, expiry_resolution, clawback_order). All multi-trigger escrow objects should be modelled in this form for audit clarity. (#r176)
+
+---
+
+## Structural Synthesis: Module 2 Closure + Module 3 Entry (#r176)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Entry subsidy cycling | N_cycling_lock; one-subsidy-per-address; credibility floor | Cycling cost grows with resolution-cycle latency |
+| SSC accuracy_bonus escrow on oracle delay | T_wind_down_max mandatory; one governance extension; LTRP on expiry | Non-oracle termination always time-bounded |
+| WINDING_DOWN re-export multiplicity | Per-pair state machine; INITIAL + RE_EXPORT max; CLOSED returns cache | At most two exports per (shadow, clearing) pair |
+| Implication chain settlement routing | IMPL_PENDING_B: direct release immediate + residual deferred; SFP clawback | Full deferral rejected; conditional escrow primitive formalised |
+
+---
+
+## v2.2 Contract Spec Additions from #r176
+
+| Contract | Addition |
+|---|---|
+| **DiscoveryCredibilityAggregator** | entry_subsidy_claimed_by tracking; N_cycling_lock gate; one-subsidy-per-address per class |
+| **DiscoveryClaimEscrow** | T_wind_down_max enforcement; accuracy_bonus_expiry; one-time extension; LTRP routing on expiry |
+| **CoordinateRegistry_v2** | T_wind_down_max required field for SSC registration |
+| **ShadowClearingPairRegistry** | export_state machine per pair; CLOSED gate after RE_EXPORTED; cached snapshot |
+| **SettlementEngine** | IMPLPendingB struct + state machine; implication_bonus_direct immediate release; T_impl_pending_max LTRP; SFP clawback precedence |
+| **ClaimEscrow** | clawback call interface for SettlementEngine |
+
+---
+
+## Cumulative Invariants (additions through #r176)
+
+**Invariant #100 (#r176):** Entry subsidies are anti-cycling gated: last claimant must achieve >= 1 oracle resolution before pool refills; N_cycling_lock = N_calibration epochs must elapse; each address is ineligible for repeated subsidies on the same class.
+
+**Invariant #101 (#r176):** All DISCOVERY_MODE classes with non-oracle termination must declare T_wind_down_max at registration. Accuracy_bonus escrow releases to LTRP at T_wind_down_max + N_accuracy_grace. Governance may extend T_wind_down_max once (max doubling); second extension prohibited.
+
+**Invariant #102 (#r176):** Each (shadow-class, clearing-class) pair has an independent export state machine: at most INITIAL_EXPORTED + RE_EXPORTED. In CLOSED state, further requests return the cached RE_EXPORTED snapshot without recomputation.
+
+**Invariant #103 (#r176):** Implication chain settlement uses IMPL_PENDING_B. At T_anchor_A (A-correct, B-unresolved): implication_bonus_direct releases immediately; residual enters IMPL_PENDING_B pending B oracle or T_impl_pending_max expiry (LTRP). SFP challenge success on A triggers clawback: claim_stake_A → declarant_bond → governance_bond.
+
+**Invariant #104 (#r176):** Conditionally-held escrow with a secondary time-bounded trigger is a first-class mechanism primitive: IMPLPending(escrow, primary_trigger, expiry_trigger, primary_resolution, expiry_resolution, clawback_order). All multi-trigger escrow objects must be modelled in this form.
+
+---
+
+## Run Log Update
+
+- **#r176** — 2026-04-04T03:02Z — Module 2 closure (Q1–Q3: subsidy cycling gate, SSC T_wind_down_max, re-export state machine); Module 3 entry (Q4: IMPL_PENDING_B routing, SFP clawback precedence, conditional escrow primitive formalised). Five new invariants (#100–#104). Six v2.2 contract additions catalogued.
+
+---
+
+## Open Questions for #r177+ (v2.2 Module 3: Implication Chains continued)
+
+1. **Parallel chain resolution (A→B→C): settlement order dependencies.** If A implies B implies C, A's T_anchor fires, two IMPL_PENDING objects are created. When B resolves, A-pending-B closes and may cascade into A-B-pending-C. Define settlement ordering and composability of chained IMPL_PENDING objects.
+
+2. **Circular implication detection.** Can A→B and B→A be registered simultaneously? If so, both enter IMPL_PENDING_B and wait indefinitely for each other. Define registration-time cycle detection gate.
+
+3. **IMPL_PENDING_B and TOWL zone interaction.** How does TOWL capacity account for IMPLPendingB holdings? Zone A (backing identified contingent obligation), Zone B (uncertain), or excluded (separately tracked)?
+
+4. **T_impl_pending_max governance interface.** Who sets T_impl_pending_max and when? Options: (a) declarant at declaration time; (b) governance at class registration; (c) derived from T_longtail of class B. Tradeoffs between flexibility and manipulation resistance.
+
+*Last updated: #r176 — 2026-04-04T03:02Z*
