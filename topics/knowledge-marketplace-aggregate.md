@@ -23989,3 +23989,251 @@ In any mechanism where Party A and Party B have symmetric exit rights, routing A
 4. **Zero-CPA-flag block-bootstrap and cross-class correlation:** Two classes may have zero CPA flag during the same macro-epoch regime, making cross-class samples correlated. Drawing from both overestimates effective sample size. Define whether block-bootstrap draws from a single class's history or across classes, and whether cross-class correlation correction is needed.
 
 *Last updated: #r249 — 2026-04-04T16:22Z*
+
+---
+
+## #r250 Contributions — 2026-04-04T16:32Z
+
+Addresses all four open questions from #r249. Net-new structural observation: **single-class block-bootstrap is the correct scope — cross-class bootstrap introduces regime correlation that inflates effective sample size; the minimum active-class requirement is a protocol-level property, not a per-class one.**
+
+---
+
+### Q1 (Anti-cascade FIFO queue and T_anchor resolution priority) → T_anchor resolution takes unconditional priority over queued retraction; queued retraction is cancelled on T_anchor fire; escrow settled at oracle outcome, not retracted (#r250)
+
+**First-principles conflict:**
+
+A queued retraction is the knower's stated preference to exit before oracle resolution. T_anchor is the mechanism's external truth event — the moment at which the epistemological claim is tested. These two cannot simultaneously apply to the same escrow: settlement and retraction are mutually exclusive dispositions of committed capital.
+
+**Which takes priority — and why T_anchor wins:**
+
+The retraction mechanism exists to free committed capital when the knower's belief has changed before oracle resolution. Once T_anchor fires, the oracle has resolved; there is nothing left to retract from. The claim has either been validated or falsified. Allowing retraction to supersede T_anchor would:
+1. Permit a knower to see T_anchor's resolution direction and retroactively exit — a form of oracle front-running on settlement
+2. Destroy the mechanism's calibration record by removing resolved claims from the track record
+
+The retraction is an escape before the epistemic test. The epistemic test cannot be retroactively escaped.
+
+**Protocol rule — T_anchor priority:**
+
+```
+At T_anchor firing for class_B:
+  For all knowers with active retraction requests in FIFO queue:
+    retraction_request_status -> CANCELLED_BY_ORACLE_RESOLUTION
+    escrow disposition -> standard oracle settlement (Invariant #384, T_anchor cascade logic)
+    credibility_ratio update applied normally
+    EAT event: retraction_cancelled_by_t_anchor { knower_id, class_id, epoch }
+
+  FIFO queue cleared at T_anchor epoch close.
+  Penalty is NOT applied (retraction did not execute; it was superseded by oracle resolution).
+```
+
+**Edge case — simultaneous T_anchor trigger and new retraction request in same epoch:**
+
+Same-epoch ordering: T_anchor fire is processed first (block-validated atomic event); retraction requests submitted in the same epoch that T_anchor fires are rejected at submission with `retraction_rejected_t_anchor_pending`.
+
+**Why penalty is not applied on FIFO cancellation:** The knower submitted a retraction in good faith and was queued; T_anchor fired before their turn executed. They bear the escrow settlement consequence (could be a slash if wrong), not a double penalty from the retraction mechanism. Applying retraction penalty on top of oracle-settlement slash would over-punish correct mechanical behavior.
+
+**Design law (#r250):** Oracle resolution (T_anchor) unconditionally supersedes queued retraction requests. Retraction is an escape from epistemic testing; oracle resolution is the test — the test cannot be escaped retroactively. FIFO queue clears at T_anchor epoch; no retraction penalty applied to cancelled requests. (#r250)
+
+---
+
+### Q2 (challenger_pool unknower redistribution when 0 active unknowers) → Fallback to protocol_maintenance_reserve with deferred priority claim for future unknowers registering within N_calibration epochs; perpetual fallback thereafter (#r250)
+
+**The empty-redistribution case:**
+
+When all unknowers have exited (q_bonus_active_count = 0 at retraction epoch), the challenger_pool 70% redistribution has no recipient. This occurs naturally when: (a) a demand_collapse_alert preceded the knower retraction, causing mass unknower exit, and (b) no new unknowers have entered since.
+
+**Three candidate destinations for the orphaned redistribution:**
+
+- Option A: protocol_maintenance_reserve — clean; operationally simple; no gaming surface.
+- Option B: challenger_pool operating buffer (absorb the 70% into the 30%) — reduces the segregation between redistribution and buffer; confuses pool accounting.
+- Option C: Deferred redistribution — escrow funds held for future unknowers who register on the class within a window, as a subsidy for re-entry demand.
+
+**Resolution — deferred priority claim with maintenance_reserve fallback:**
+
+```
+deferred_redistribution_pool(class_B):
+  Created when challenger_pool redistribution target is empty.
+  Holds: redistribution_amount = challenger_redistribution_fraction x knower_penalty_total
+  Duration: N_calibration epochs from creation epoch.
+
+  Within deferred window:
+    Any unknower registering q_bonus commitment on class_B receives pro-rata share from
+    deferred_redistribution_pool on their first q_bonus registration (one claim per unknower).
+    [Subsidy for re-entry; reduces cost of reactivating demand on a class with epistemically
+     committed remaining knowers.]
+    Remaining pool balance distributed proportionally if multiple unknowers enter within window.
+
+  After N_calibration epochs with no unknower re-entry:
+    deferred_redistribution_pool -> protocol_maintenance_reserve.
+    EAT: deferred_redistribution_expired { class_id, epoch, amount_forfeited_to_reserve }
+
+  If class reaches DELIST_PENDING before deferred window expires:
+    Pool immediately -> protocol_maintenance_reserve.
+```
+
+**Why deferred redistribution is preferable to immediate maintenance_reserve:**
+
+The challenger_pool redistribution's purpose is to partially compensate unknowers for degraded epistemic service. If unknowers mass-exited due to supply collapse, new unknowers who take the risk of re-entering a thinned class should receive some of that compensation — they are taking on the class's epistemic quality risk. The deferred subsidy converts a potential write-off into a re-entry incentive, which may revive otherwise abandoned classes with remaining honest knowers.
+
+**Gaming check:** Can knowers engineer an empty-redistribution state to avoid sharing their penalty with unknowers? Knowers have no control over unknower exit timing. The demand_collapse_alert precondition requires sustained (2+ epoch) low demand — engineering this requires suppressing unknower entry for 2+ epochs, which is not achievable by knowers alone. The deferred window closes after N_calibration epochs — any gaming delay is bounded.
+
+**Design law (#r250):** Empty challenger_pool redistribution creates a deferred_redistribution_pool with priority claim for re-entering unknowers within N_calibration epochs. After expiry: maintenance_reserve. Deferred subsidy converts supply-collapse write-offs into re-entry incentives, preserving class viability when some honest knowers remain. (#r250)
+
+---
+
+### Q3 (Regime-conditional threshold and sigma_q1/sigma_q3 bootstrap — minimum active-class requirement) → Protocol-level percentile bootstrap requires N_classes_active_min = 10; below: MEDIUM_CONSENSUS single-regime fallback; per-class percentile from own history supplementary for borderline cases (#r250)
+
+**The statistical problem:**
+
+sigma_q1 and sigma_q3 are computed from the distribution of sigma_consensus values across all active classes. With < 10 active classes, the empirical percentile distribution is poorly estimated — sigma_q1 and sigma_q3 could easily fall within noise of each other, making regime classification meaningless.
+
+**Resolution — two-tier fallback:**
+
+```
+Protocol-level regime classification (regime-conditional threshold applies):
+  Requires: N_classes_active >= N_classes_active_min (default 10; bounded [5, 20])
+  sigma_q1, sigma_q3: empirical 25th/75th percentile of {sigma_consensus(class_j)} across
+    all active classes at epoch t.
+
+Fallback A (N_classes_active < N_classes_active_min):
+  Regime classification suspended for all classes.
+  All classes use MEDIUM_CONSENSUS interim threshold (0.65x T_original).
+  EAT: regime_classification_suspended { epoch, n_active_classes, threshold_fallback }
+  Lifts immediately when N_classes_active >= N_classes_active_min.
+
+Fallback B (N_classes_active >= N_classes_active_min but class_j has < N_calibration resolved epochs):
+  Per-class sigma_consensus(j) computed from available history (even if < N_calibration epochs).
+  Included in protocol-level sigma distribution without per-class minimum history requirement.
+  (The percentile estimation benefits from more classes, not from longer per-class history.)
+
+Per-class individual-regime detection (supplementary only):
+  After class_j has N_calibration resolved epochs:
+    sigma_consensus_self(j, t) = std(mean_B_epoch_j) over own N_calibration history.
+    Used ONLY to break ties when j's sigma_consensus falls within 5% of sigma_q1 or sigma_q3
+      boundaries (borderline classification only).
+```
+
+**Why 10 is the right minimum:**
+
+With 10 active classes, the 25th and 75th percentile are computed from 10 values (2.5th and 7.5th order statistics). Quantile estimation error at N=10 is roughly ±0.15 of the sigma range — sufficient to produce meaningfully different LOW/MEDIUM/HIGH classifications for the tails. Below 10 the three-bin regime classification produces near-identical L/M/H boundaries with no classification power.
+
+**Protocol-level sigma_q1/sigma_q3 update cadence:**
+
+Updated at each epoch boundary (not smoothed — regime percentiles should be responsive to the current class population, not lagged). Sudden large changes: `regime_percentile_shift_alert` when |sigma_qi(t) - sigma_qi(t-1)| > 0.20 x sigma_qi(t-1).
+
+**Design law (#r250):** Protocol-level regime classification requires N_classes_active >= 10 for meaningful sigma_q1/sigma_q3 estimation. Below: MEDIUM_CONSENSUS flat fallback. Percentile computation is per-epoch (not smoothed); shift alerts fire on >20% movement. Per-class sigma history is supplementary for borderline classification, not a substitute for protocol-level percentiles. (#r250)
+
+---
+
+### Q4 (Zero-CPA-flag block-bootstrap and cross-class correlation — single-class vs cross-class scope) → Single-class history only; cross-class bootstrap overestimates effective sample size by the regime correlation factor; minimum N_blocks_required computed per-class; short-history classes use Gaussian fallback independently (#r250)
+
+**The cross-class correlation problem:**
+
+Two classes in the same market regime during the same macro-epochs will have correlated claim processes, even when both are CPA-flag-free. The common regime driver (market information state, oracle state) induces cross-class pairwise correlation in claim values. If the block-bootstrap draws from both classes in the same macro-epoch, both samples are drawn from the same underlying regime state — the bootstrap treats them as independent draws but they are not.
+
+**Effective sample size inflation:**
+
+```
+True effective sample size (N_eff) when drawing n blocks across k classes
+  with pairwise class-level correlation rho_cross:
+    N_eff = n_blocks x block_length / (1 + (k-1) x rho_cross)
+
+For k = 5 classes, rho_cross = 0.30 (mild regime correlation):
+  N_eff = 5 x N_blocks / (1 + 4 x 0.30) = 5 x N_blocks / 2.2 = 2.27 x N_blocks
+  [vs naive assumption of 5 x N_blocks: 2.2x overstatement of sample size]
+
+For k = 10 classes, rho_cross = 0.50 (moderate regime correlation):
+  N_eff = 10 x N_blocks / (1 + 9 x 0.50) = 10 x N_blocks / 5.5 = 1.82 x N_blocks
+  [vs naive 10x N_blocks: 5.5x overstatement — grows with k]
+```
+
+At high protocol-level class count (k > 20) and moderate rho_cross, the overestimation compounds non-linearly with k, making the null distribution threshold progressively too lenient as the protocol scales.
+
+**Resolution — single-class bootstrap only:**
+
+```
+Block-bootstrap for class_j's CPA null distribution:
+  Source: class_j's own claim history restricted to zero-CPA-flag rolling windows.
+  Cross-class draws: NOT PERMITTED.
+  N_blocks_required(j) = max(50, N_sim / 20)
+    Evaluated against class_j's own history exclusively.
+
+If class_j's own history < N_blocks_required(j):
+  Use Gaussian fallback (Invariant #403): T_demeaned_fallback = T_gaussian x 0.90
+  with regime-conditional multiplier (Invariant #405).
+  No cross-class pooling as a substitute.
+```
+
+**Design intent:** Each class has its own null distribution calibrated to its own claim dynamics. A class with fat-tailed claim distributions (high-volatility oracle events) will have a higher null-distribution threshold than a stable low-volatility class. Cross-class pooling averages these away, mis-calibrating both tails.
+
+**Long-history benefit:** New classes start with Gaussian fallback and graduate to empirical null distribution only after accumulating N_blocks_required of their own zero-CPA-flag history. Early-class CPA detection uses a conservative fallback while the class establishes its own null distribution fingerprint.
+
+**Cross-class null distribution reference (non-binding):**
+
+The protocol maintains a cross-class aggregate null distribution as a diagnostic — useful for governance to compare a class's empirical threshold against the protocol-wide typical. This aggregate is never used as the binding CPA threshold for any individual class.
+
+**rho_cross_protocol estimation for governance diagnostics:**
+
+```
+rho_cross_protocol(t) = median pairwise corr(mean_B_epoch_j, mean_B_epoch_k)
+  across all active class pairs (j, k) at epoch t.
+  EAT: cross_class_regime_correlation { epoch, rho_cross_protocol }
+  Alert: cross_class_correlation_elevated when rho_cross_protocol > 0.50 for >= N_calibration epochs.
+    [High cross-class correlation signals dominant regime affecting all classes;
+     governance may consider protocol-wide CPA threshold adjustment.]
+```
+
+**Design law (#r250):** Block-bootstrap is single-class scoped. Cross-class draws overestimate effective sample size by the regime correlation factor (1 + (k-1) x rho_cross), which grows non-linearly with k. Each class calibrates its own null distribution; fat-tailed claim classes get appropriately higher thresholds. Cross-class aggregate maintained as diagnostic only. (#r250)
+
+---
+
+## Net-New Structural Observation: Cross-Class Regime Correlation as Epistemic Concentration Risk (#r250)
+
+The single-class bootstrap scope resolves a scalability problem that would have worsened as the protocol added more classes: cross-class pooling's sample size overestimation grows with class count, making the null distribution threshold progressively too lenient at scale.
+
+**General principle:** In mechanisms where multiple parallel markets share common regime drivers (macro-economic conditions, correlated oracle types, common knower populations), null distribution calibration for any individual market must use only that market's own history. Cross-market pooling introduces regime correlation that inflates effective sample size non-linearly with market count.
+
+**Implication for GestAlt scaling:** As the class registry grows, rho_cross_protocol should be monitored as a protocol-level systemic risk metric. High rho_cross (> 0.50) signals that many classes are effectively the same epistemic bet — a form of epistemic concentration risk analogous to oracle-type TOWL concentration risk (Invariant #372). This creates a second systemic risk dimension beyond oracle concentration: correlation of knower belief updates across classes. (#r250)
+
+---
+
+## Structural Synthesis: #r250
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| FIFO queue vs T_anchor priority | T_anchor unconditionally supersedes queued retraction; FIFO queue clears; no penalty applied to cancelled requests | Oracle test cannot be retroactively escaped; retraction is pre-test exit only |
+| Empty challenger_pool redistribution | Deferred redistribution pool (N_calibration window) as re-entry subsidy; maintenance_reserve fallback after expiry | Deferred subsidy converts write-offs to re-entry incentives; preserves viable classes |
+| sigma_q1/sigma_q3 with few active classes | N_classes_active_min = 10; below: MEDIUM_CONSENSUS flat fallback; per-class history supplementary for borderline cases | Regime percentile classification requires >= 10 classes for meaningful quantile estimation |
+| Cross-class block-bootstrap correlation | Single-class scope only; cross-class draws overestimate N_eff by (1 + (k-1)xrho_cross); Gaussian fallback for short-history classes | Each class calibrates its own null distribution; regime correlation grows with class count |
+
+---
+
+## Cumulative Invariants (#r250)
+
+**Invariant #406 (#r250):** FIFO retraction queue resolution priority: T_anchor firing unconditionally supersedes all queued retraction requests for that class. Queued retractions with status PENDING at T_anchor epoch are set to CANCELLED_BY_ORACLE_RESOLUTION; escrow settles by oracle outcome (calibration update applied normally); no retraction penalty applied. Same-epoch retraction submissions rejected at intake when T_anchor is pending (`retraction_rejected_t_anchor_pending`). FIFO queue clears at T_anchor epoch close.
+
+**Invariant #407 (#r250):** Challenger_pool unknower redistribution fallback when q_bonus_active_count = 0: create deferred_redistribution_pool(class_B) holding challenger_redistribution_fraction x knower_penalty_total. Within N_calibration epochs: any new unknower registering q_bonus on class_B receives pro-rata share on first registration (one claim per unknower; remaining pool distributed proportionally across all re-entrants). After N_calibration epochs with no re-entry, or on DELIST_PENDING: pool to protocol_maintenance_reserve. EAT: `deferred_redistribution_pool_created` and `deferred_redistribution_expired`.
+
+**Invariant #408 (#r250):** Regime-conditional CPA threshold applies only when N_classes_active >= N_classes_active_min (default 10; bounded [5, 20]). Below: all classes use MEDIUM_CONSENSUS interim threshold (0.65x T_original); EAT `regime_classification_suspended`. sigma_q1/sigma_q3 computed at each epoch boundary as 25th/75th percentile of sigma_consensus across all active classes; `regime_percentile_shift_alert` emitted when |sigma_qi(t) - sigma_qi(t-1)| > 0.20 x sigma_qi(t-1). Per-class sigma history is supplementary for borderline classification only (within 5% of sigma_q1 or sigma_q3 boundary).
+
+**Invariant #409 (#r250):** Block-bootstrap for CPA null distribution is single-class scoped. Cross-class draws are prohibited; they overestimate effective sample size as N_eff = n_blocks x block_length / (1 + (k-1) x rho_cross), inflating non-linearly with class count k. Each class's N_blocks_required evaluated against its own zero-CPA-flag history exclusively. Short-history classes (< N_blocks_required own history) use Gaussian fallback independently (Invariant #403). Cross-class aggregate null distribution maintained as governance diagnostic only (non-binding). rho_cross_protocol = median pairwise corr(mean_B_epoch_j, mean_B_epoch_k) recorded each epoch; `cross_class_correlation_elevated` alert at rho_cross_protocol > 0.50 for >= N_calibration epochs.
+
+---
+
+## Run Log Update
+
+- **#r250** — 2026-04-04T16:32Z — Q1: T_anchor unconditionally supersedes FIFO retraction queue; FIFO cleared at T_anchor epoch; no penalty on cancelled requests; same-epoch retraction submissions rejected on T_anchor pending. Q2: Empty challenger_pool redistribution: deferred_redistribution_pool (N_calibration window) as re-entry subsidy for new unknowers; maintenance_reserve fallback on expiry or DELIST_PENDING. Q3: sigma_q1/sigma_q3 requires N_classes_active >= 10; below: MEDIUM_CONSENSUS flat fallback; epoch-boundary percentile update with 20% shift alert; per-class history supplementary for borderline-only. Q4: Block-bootstrap single-class scope only; cross-class draws inflate N_eff by regime correlation factor (grows non-linearly with k); Gaussian fallback for short-history classes independently; rho_cross_protocol monitored as diagnostic; elevated alert at rho_cross > 0.50. Net-new: cross-class regime correlation as epistemic concentration risk — rho_cross_protocol is a protocol-level systemic risk metric analogous to oracle-type TOWL concentration (Invariant #372). Invariants #406-#409.
+
+---
+
+## Open Questions for #r251+
+
+1. **deferred_redistribution_pool and partially-filled window:** If 3 unknowers enter during the N_calibration deferred window but the pool was sized for a larger redistribution, do the entrants receive the full pool split among them, or only their pro-rata share of the original intended split (leaving residual until expiry -> maintenance_reserve)?
+
+2. **rho_cross_protocol elevated alert and CPA threshold protocol-wide adjustment:** When rho_cross_protocol > 0.50 for >= N_calibration epochs, the alert is currently governance-only. Should there be an automatic CPA threshold protocol-wide tightening (all classes reduce T_demeaned_interim by an additional factor) to compensate for elevated common regime signal inflating even de-meaned correlations? Or does de-meaning already remove the common regime signal sufficiently?
+
+3. **N_classes_active_min = 10 and calibration deadline interaction:** At protocol genesis, N_classes_active = 0 and MEDIUM_CONSENSUS fallback is active. Does the calibration deadline clock (class_live_epoch + 2xN_calibration from Invariant #405) pause when MEDIUM_CONSENSUS fallback is active (because empirical regime classification is not yet determinable), or does it run regardless of fallback state?
+
+4. **Invariant #406 T_anchor "pending" definition:** The resolution states same-epoch retraction requests are rejected when T_anchor is "pending." Define "pending" precisely: is T_anchor pending from the first oracle event in the epoch triggering the resolution chain, or only after the oracle committee has submitted all votes (for COMMITTEE mode) and the credibility-weighted median is computable?
+
+*Last updated: #r250 — 2026-04-04T16:32Z*
