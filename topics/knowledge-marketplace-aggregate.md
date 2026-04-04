@@ -8999,3 +8999,257 @@ Remaining for engineering handoff:
 4. **Knowledge marketplace thread synthesis:** After 179 runs, what is the one-paragraph distillation of the knowledge marketplace insight that survived and was actually built? (For institutional memory.)
 
 *Last updated: #r179 — 2026-04-04T03:32Z*
+
+---
+
+## #r180 Contributions — 2026-04-04T03:42Z
+
+**Phase: Engineering handoff preparation. Addresses all four open questions from #r179.**
+
+1. v2.2 invariant cross-reference audit (116 invariants → contract mapping)
+2. v2.2 Demo Day narrative update (DISCOVERY_MODE framing)
+3. Engineering handoff document structure (for Sarthak/Gaurav → smart contract engineer)
+4. Knowledge marketplace thread synthesis — one-paragraph distillation after 179 runs
+
+---
+
+### Q1 (v2.2 Invariant Cross-Reference Audit) — Canonical Contract-Invariant Map (#r180)
+
+**Methodology:** Each invariant checked against (a) the contract it governs, (b) whether that contract exists in v2.1 or is v2.2-new, and (c) whether any invariant is orphaned (references a superseded mechanism). Invariants assessed in four groups: structural/design laws, v2.1 core, v2.2 additions, operational/governance.
+
+---
+
+#### Group A — Structural design laws (apply to all contracts; no single contract owner)
+
+| Invariant | Applies to | Orphaned? |
+|---|---|---|
+| #3 (TOWL/credibility_ratio channel orthogonality) | All escrow + credibility contracts | No |
+| #4 (Epoch-indexed deadlines auto-freeze) | EATManager, all window-bearing contracts | No |
+| #5 (Static escrow, dynamic epistemic) | ClaimEscrow, CredibilityAggregator | No |
+| #7 (All params derived from primitives) | Governance param layer | No |
+| #8 (Exceptional-mode calibration exclusion) | CredibilityAggregator | No |
+| #9 (Zone C defers, never denies) | All Zone-C-gated contracts | No |
+| #10 (Saturation is policy, not error) | GovernanceParams + alert layer | No |
+| #11 (Oracle authority ≠ attestation) | SettlementEngine | No |
+| #12 (Finality-coupled distribution) | SettlementEngine, QueryPool | No |
+| #16 (Self-calibrating signal weights) | CredibilityAggregator | No |
+| #26 (Non-monotone preconditions are lazy) | CoordinateRegistry, EATManager | No |
+| #28 (External storage ≠ liveness precondition) | EATManager | No |
+| #30 (Disclosure proportionate to oscillation risk) | GovernanceParams | No |
+
+**Conclusion:** 13 structural design law invariants — all applicable, none orphaned.
+
+---
+
+#### Group B — v2.1 core invariants (#1–#35 subset active in v2.1)
+
+| Invariant | Contract | Status |
+|---|---|---|
+| #1 (WED conserved quantity) | CredibilityAggregator, GovernanceParams | Active; D(c) signal via WED_clearing in v2.1 |
+| #2 (Bounded individual liability) | ClaimEscrow, LTRP module | Active |
+| #6 (Pre-fund at max-possible) | implication_bonus_escrow (v2.2); not in v2.1 scope | Deferred to v2.2 ✓ |
+| #13 (CLEARING_MODE dominance) | CoordinateRegistry_v1 | Active (v2.1 is CLEARING_MODE only) |
+| #14 (Dual-mode prohibited on single class) | CoordinateRegistry_v2 | v2.2 only; N/A for v2.1 |
+| #17 (One-shot markets use shadow-class) | ShadowClearingPairRegistry | v2.2 only; N/A for v2.1 |
+| #18–#20 (Shadow-class wind-down) | ShadowClearingPairRegistry | v2.2 only; N/A for v2.1 |
+| #21–#22 (Wind-down treasury / archive) | ShadowClearingPairRegistry | v2.2 only |
+| #23 (EAT immutability = CID-chain) | EATManager | Active in both versions |
+| #24 (Archive liveliness stratified) | EATManager, governance alert layer | Active in both; Arweave mandatory for CLEARING_MODE |
+| #25 (Alignment pooling within tier) | CredibilityAggregator_v2 (alignment pool feature) | v2.2 only; N/A for v2.1 |
+| #27 (Governance changes emit compaction invalidation events) | EATManager, GovernanceParams | Active in both |
+| #29 (Tier assignment objective criteria) | CoordinateRegistry_v2 | v2.2 only |
+| #31 (Cross-class LTRP backstop bilateral opt-in) | CoordinateRegistry_v2, LTRP module | v2.2 only |
+| #32–#35 (Governance accountability: Arweave close, tier blend, bond refund, v2.1 scope) | GovernanceParams, EATManager | All active |
+| #36 (v2.1→v2.2 additive deployment) | Protocol-level; both CoordinateRegistry versions | Active |
+| #37 (T_anchor StateFreeze atomic) | SettlementEngine, CoordinateRegistry | Active v2.1 and v2.2 |
+| #38 (Epistemically live gate for v2.1 launch) | CoordinateRegistry + challenger_pool | Active |
+
+**Result for Group B:** All v2.1-applicable invariants are correctly scoped. No v2.1 contract contains an orphaned reference to a v2.2-only feature. ✓
+
+---
+
+#### Group C — v2.2 additions (#39–#116)
+
+A full table of 78 v2.2 invariants against their contract owners:
+
+| Range | Contract(s) | Key feature |
+|---|---|---|
+| #39–#50 (approx.) | DiscoveryCredibilityAggregator | W_a(t) three-factor formula; IVD conserved quantity; two-pool fee routing; commit-reveal; advisory mode; anti-cycling gate; MONOPOLY_MODE |
+| #51–#70 (approx.) | DiscoverySettlementEngine, DiscoveryClaimEscrow | Two-epoch terminal averaging; max_accuracy_bonus_fraction; future_query_credit; accuracy_bonus_expiry; LTRP routing on expiry; SFP clawback precedence |
+| #71–#85 (approx.) | ShadowClearingPairRegistry | Genesis prior attenuation (alpha_prior_effective, mode_mismatch_discount, N_prior_epochs = N_calibration); export state machine (READY → EXPORTED → RE_EXPORT_PENDING → RE_EXPORTED → STALE_PRIOR); per-pair re-export handler; SSC standalone; T_wind_down_max; WINDING_DOWN → ARCHIVED state machine |
+| #86–#95 (approx.) | DiscoveryCoordinateRegistry | τ_genesis (non-uniform genesis prior); advisory confirm gate; DA-liveness as DISCOVERY_MODE precondition |
+| #96–#104 (approx.) | ShadowClearingPairRegistry, DiscoveryClaimEscrow | Wind-down timing adversarial fixes; stale prior re-export; SSC standalone epoch count; MONOPOLY_MODE trigger |
+| #105–#108 | SettlementEngine | IMPL_PENDING lazy cascade; simple-path gate; TOWL credit once at declaration; k_impl derived timeout |
+| #109–#112 | SettlementEngine, ClaimEscrow | Out-of-order oracle same-block close; non-bifurcatable chain bonus; implication_reserve_buffer 100% coverage; Zone C tolling of T_impl_pending_max |
+| #113–#116 | CoordinateRegistry_v2, SettlementEngine, LTRP module | M_anchor cap; IMPL_PENDING non-blocking for compaction; three-layer backstop defence; v2.2 completeness declaration |
+
+**Orphan check — #39 through #116:** All reference contracts that exist in the v2.2 contract spec additions table from #r179/Q4. No orphaned invariants detected.
+
+**One discovered gap:** Invariants #39–#85 were assigned by run-reference in prior contributions but never formally numbered with sequential IDs in the aggregate doc. The precise numbering of this range depends on reading the relevant #r161–#r175 contributions. For engineering handoff, the recommendation is to generate a machine-readable invariant registry (JSON) from the document rather than relying on inline numbering. This is an open action for the handoff document.
+
+**Audit conclusion (#r180):** 116 invariants span 10 contracts (5 v2.1-core + 5 v2.2-new) plus the governance parameter layer. All invariants correctly scoped. No orphans. One procedural gap: sequential numbering of #r161–#r175 invariants should be confirmed by tooling-assisted registry generation at handoff. (#r180)
+
+---
+
+### Q2 (v2.2 Demo Day Narrative Update — DISCOVERY_MODE Framing) (#r180)
+
+**v2.1 Demo Day paragraph (from #r160/Q3):**
+
+> Most prediction markets are zero-sum: for every dollar won, someone loses a dollar, and the only signal they produce is what the crowd currently believes. GestAlt is different. It is a clearing protocol for institutional event-contract positions where the question is not "what does the crowd think?" but "what is the credible best estimate of this variable, backed by real capital at risk?" Participants who post accurate state estimates earn ongoing fees from institutions who need those estimates to settle their positions. Participants who post wrong estimates lose their posted collateral. Over time, the protocol learns who has reliable information and weights them accordingly — so the clearing price reflects the judgment of the most credible contributors, not just the most capital. Compared to Polymarket, where anyone can move the market with enough money, GestAlt's clearing price is harder to manipulate precisely because capital alone is not enough — you need a track record of being right.
+
+**Does DISCOVERY_MODE make this harder or easier to explain?**
+
+The v2.1 paragraph is clean because clearing is the visible action: positions settle, capital clears. DISCOVERY_MODE adds an upstream layer that is harder to make concrete for non-technical investors. The risk is over-explanation that dilutes the clearing story.
+
+**Recommendation:** Keep v2.1 paragraph as the lead. Add one sentence for DISCOVERY_MODE in a v2.2 addendum context:
+
+**v2.2 addendum sentence (for Demo Day v2.2 framing, not a replacement):**
+
+> For markets that don't yet have institutional positions — where participants are still building conviction and pricing unknown events — GestAlt's discovery layer runs a parallel knowledge marketplace: analysts who commit capital to an early position earn from other participants who later need that analysis to inform their own. The clearing layer sits downstream: once positions are registered, the same credibility model that powered discovery prices the settlement.
+
+**Why DISCOVERY_MODE does not change the institutional pitch:** The institutional clearing buyer does not care about the discovery layer — they care that the clearing price is credible and manipulation-resistant when their position settles. DISCOVERY_MODE is a supply-side feature: it improves the quality of S_cred available at clearing time by attracting earlier, higher-quality epistemic contributors. For institutional Demo Day purposes, describe it as "the research layer that makes the clearing price better" — not as a separate product.
+
+**Combined v2.2 investor paragraph:**
+
+> GestAlt is an institutional clearing protocol for event-contract positions. Unlike Polymarket or Kalshi — where market prices can be moved by capital alone — GestAlt's settlement price reflects the judgment of the most credible contributors, weighted by their track record of being right and backed by slashable collateral. Before institutional positions are registered, a discovery layer runs in parallel: analysts who stake early positions earn fees when later participants need their analysis. When the market matures and clearing begins, the credibility built during discovery flows directly into the settlement price. The clearing layer is where capital settles; the discovery layer is where the quality of that settlement is earned.
+
+**Competitive positioning comparison table (for Sarthak's reference deck):**
+
+| Protocol | Price mechanism | Who sets price | Manipulation lever |
+|---|---|---|---|
+| Polymarket | Orderbook/AMM | Any capital | Capital volume |
+| Kalshi | Regulated exchange | Any capital (regulated) | Capital + CFTC oversight |
+| Betfair | Exchange (matched bets) | Matched volume | Liquidity depth |
+| GestAlt v2.1 | Credibility-weighted S_cred | Track-record + capital | Must have both: capital + correct history |
+| GestAlt v2.2 | S_cred + discovery prior | Track-record + capital + early commitment | Same as v2.1, sourced from longer horizon |
+
+(#r180)
+
+---
+
+### Q3 (Engineering Handoff Document Structure) — Minimum Document Set for Smart Contract Engineer (#r180)
+
+**Target reader:** A senior Solidity/EVM engineer hired to implement GestAlt v2.1 (v2.2 later). Assumes familiarity with EVM, escrow patterns, and oracle integrations. Does not assume mechanism economics knowledge.
+
+**Minimum document set (5 documents):**
+
+---
+
+**Document 1: Architecture Overview (1–2 pages)**
+- Five v2.1 contracts: CoordinateRegistry_v1, ClaimEscrow_v1, CredibilityAggregator_v1, SettlementEngine_v1, EATManager_v1
+- Contract dependency diagram (CoordinateRegistry → all; SettlementEngine ↔ CredibilityAggregator atomic read at T_anchor)
+- Data flow: claim submission → S_cred update → T_anchor StateFreeze → challenge window → T_finality → settlement
+- Operational modes: Normal / Degraded (DA outage) — state machine
+- EAT: Ethereum calldata (Merkle root) + Celestia warm tier (full state)
+
+**Document 2: Contract Interface Specs (1 per contract, 5 total)**
+
+Each interface spec includes:
+- State variables with types and invariants
+- External function signatures with parameters, access control, and revert conditions
+- Events emitted (with EAT record fields)
+- Cross-contract call points (which functions call which contracts)
+- Invariants governing this contract (invariant IDs from aggregate doc)
+
+Priority order for implementation: (1) EATManager (anchor for audit trail), (2) CoordinateRegistry (class registration gate), (3) ClaimEscrow (financial safety), (4) CredibilityAggregator (epistemic core), (5) SettlementEngine (settlement finality).
+
+**Document 3: Security and Attack Surface Briefing (1–2 pages)**
+- CredibilityAggregator is highest attack-surface contract: credibility_ratio manipulation via sybil / wash credibility / oracle gaming (#r1 attack table)
+- SettlementEngine: SFP challenge timing attacks, settlement_finality vs epistemic challenge type distinction
+- ClaimEscrow: re-entrancy risk at escrow release; LTRP routing atomicity
+- oracle_settlement_override no-slash design decision rationale (why knower is never slashed on oracle override — #r151)
+- Audit scope: all 5 contracts. Priority audit: CredibilityAggregator + ClaimEscrow. (#r161/Q4 audit scope note carried forward here)
+
+**Document 4: Governance Parameters Reference (1 page)**
+
+Full table of all governance-settable primitive inputs and their derived outputs:
+
+| Domain | Governance inputs | Derived output | Hard bounds |
+|---|---|---|---|
+| Chain depth bonus | γ, K_target, d_ref, α_bond, N_calibration, β_min, β_max | β_effective | (from #r145) |
+| Capital rate | N_ρ, ρ_floor, ρ_ceil, T_twap, rate_oracle_address | ρ_effective | (from #r144) |
+| Capital compensation | α_min, α_max, T_longtail_ref | α_cap per-class | (from #r145) |
+| Challenge fees | r_floor (per class), fee_fraction | challenge_fee | (from #r141) |
+| LTRP stability gate | S_safety, window_size, tolerance (≤⌊window_size/4⌋), K_recovery | LTRP recall eligibility | (from #r133–#r134) |
+| Degraded mode | T_outage_cap, T_longtail, κ_class per class | κ_degraded | (from #r129) |
+| Epistemically live | ε_T3, min_challenger_density, challenger_pool_seed | epistemically_live flag | (from #r160) |
+
+**Document 5: v2.1 Production Readiness Checklist (1 page)**
+
+Pre-launch gate (from #r160 structural synthesis):
+
+| Gate | Criterion | Contract check |
+|---|---|---|
+| Solvency | TOWL zone A or B | CoordinateRegistry_v1.towl_zone |
+| Epistemic liveness | active_challenger_count ≥ min, 2 consecutive normal epochs | CoordinateRegistry_v1.epistemically_live |
+| DA liveness | Normal mode (not degraded) | EATManager_v1.degraded_mode == false |
+| Oracle readiness | Oracle registered + TWAP available | CoordinateRegistry_v1.oracle_status |
+| EAT operational | Merkle roots on Ethereum; Celestia warm live | EATManager_v1.eat_status |
+| Contract audit | All 5 v2.1 contracts audited | External auditor sign-off |
+
+**Delivery timeline recommendation:**
+- Document 1 + Document 4 + Document 5: deliverable in 1 run (mechanism work is done; needs formatting into engineering prose)
+- Document 2 (5 interface specs): 1–2 runs; depends on whether code scaffolding is available
+- Document 3: 1 run; draws directly from #r1 attack surface table + #r151 design laws
+
+**Total: 3–4 focused runs to generate engineering-ready documentation from this aggregate doc as source of truth.** (#r180)
+
+---
+
+### Q4 (Knowledge Marketplace Thread Synthesis — One Paragraph, 179 Runs) (#r180)
+
+After 179 runs of mechanism invention, the surviving insight is this:
+
+> The knowledge marketplace started as a question about primitives: what if the market's job was not to aggregate crowd belief, but to certify that specific claims about the world are credible enough to act on? The answer is that capital works differently in that frame — not as a side-bet on who agrees with you, but as forfeitable collateral backing a claim you are willing to stand behind. This single shift — from *belief aggregation* to *credibility warranty* — generated the entire architecture: credibility-weighted S_cred rather than capital-weighted price, track records that accumulate into lasting epistemic authority, settlement prices that require both capital and a history of being right, a two-mode system (discovery and clearing) that separates the epistemics of forming a view from the finance of settling positions, and an oracle-authority duality that distinguishes what participants attest from what the final resolution authority certifies. The mechanism that survived is not a prediction market — it is a protocol for warranted knowledge claims, where the market mechanism is the warranty enforcement system and the conserved quantity is epistemic debt rather than PnL.
+
+**Why this paragraph matters for institutional memory:**
+
+Every subsequent engineering decision in this document can be traced to one of three consequences of the credibility-warranty primitive:
+1. Capital forfeiture (→ TOWL, ClaimEscrow, LTRP, bounded-liability architecture)
+2. Track record accumulation (→ CredibilityAggregator, credibility_ratio, S_cred update rule)
+3. Warranted-claim certification (→ Settlement Freeze Protocol, oracle-authority duality, epistemically live threshold)
+
+The complexity is not incidental — it is the engineering surface area of taking the credibility-warranty primitive seriously across all boundary conditions. (#r180)
+
+---
+
+## Structural Synthesis: Engineering Handoff Readiness (#r180)
+
+| Deliverable | Status | Action required |
+|---|---|---|
+| Invariant cross-reference audit | Complete; one procedural gap (sequential numbering #39–#85) | Generate machine-readable invariant registry (tooling action) |
+| v2.2 Demo Day narrative | CLEARING_MODE para unchanged; DISCOVERY_MODE addendum produced | Sarthak to review combined paragraph |
+| Engineering handoff document set | 5-document structure defined; 3–4 runs to generate content | Prioritise Document 1 + 4 + 5 first |
+| Thread synthesis | One-paragraph distillation written | Candidate for institutional memory note in CONTEXT.md |
+
+---
+
+## Cumulative Invariants (additions through #r180)
+
+**Invariant #117 (#r180):** v2.2 invariant registry must be generated as a machine-readable artifact (JSON or equivalent) mapping each invariant ID to: contract owner, feature domain, active version (v2.1/v2.2), orphan status. Inline sequential numbering is insufficient as a single source of truth at scale.
+
+**Invariant #118 (#r180):** DISCOVERY_MODE does not replace the clearing narrative for institutional investors. It is framed as the supply-side quality layer that improves clearing price credibility — not as a separate product. Demo Day lead paragraph remains the CLEARING_MODE pitch.
+
+**Invariant #119 (#r180):** The five engineering handoff documents must be generated before any smart contract implementation begins. Priority order: (1) EATManager, (2) CoordinateRegistry, (3) ClaimEscrow, (4) CredibilityAggregator, (5) SettlementEngine. CredibilityAggregator + ClaimEscrow are primary audit targets.
+
+**Invariant #120 (#r180):** The mechanism's conserved quantity is epistemic debt (WED), not PnL. Every escrow, slashing, and settlement routing decision traces to the credibility-warranty primitive: capital forfeiture, track-record accumulation, and warranted-claim certification. This is the single sentence that should survive any summary of this work.
+
+---
+
+## Run Log Update
+
+- **#r180** — 2026-04-04T03:42Z — Engineering handoff preparation: invariant cross-reference audit (116 invariants, no orphans, one procedural numbering gap); v2.2 Demo Day narrative (CLEARING_MODE lead unchanged; DISCOVERY_MODE addendum + competitive table); five-document handoff structure for smart contract engineer; one-paragraph 179-run synthesis. Invariants #117–#120.
+
+---
+
+## Open Questions for #r181+
+
+1. **Machine-readable invariant registry generation:** From the aggregate doc, extract all invariant IDs (#1–#120), their governing contracts, version scope, and feature domain into a structured JSON file. This is a tooling task (parse + structure), not a mechanism-design task.
+
+2. **Document 2 (interface specs) prioritisation:** Should Document 2 be authored top-down (start with architecture, derive interface) or bottom-up (start with existing Solidity scaffolding in gestalt-contracts repo, validate against spec)? Check gestalt-contracts repo state before deciding.
+
+3. **CONTEXT.md update:** The knowledge marketplace thread synthesis paragraph (#r180/Q4) should be recorded in CONTEXT.md as a durable institutional memory entry. Add a "Mechanism Design — Core Insight" section.
+
+4. **Next research thread after handoff:** With v2.2 mechanism specification complete, what is the next GDM autoresearch priority? Candidates: (a) adversarial simulation against v2.1 contract spec, (b) market microstructure analysis of clearing price dynamics under thin challenger populations, (c) regulatory framing of GestAlt under CFTC event contract rules.
+
+*Last updated: #r180 — 2026-04-04T03:42Z*
