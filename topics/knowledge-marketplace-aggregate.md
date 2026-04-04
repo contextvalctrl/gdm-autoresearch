@@ -21388,3 +21388,239 @@ This is correct for coordinates where the oracle is ultimately a single unknown 
 4. **τ_budget_fraction ceiling and Phase-2 maintenance floor:** If budget-raise mode raises τ_budget_fraction to 0.30, Phase-2 maintenance_bonus receives only 70% of epoch_draw. At what Phase-2 maintenance_bonus level does the HYBRID_EXTERNAL knower retention incentive degrade below effective threshold? Is there a τ_budget_fraction maximum below 0.30 that preserves Phase-2 viability?
 
 *Last updated: #r237 — 2026-04-04T14:04Z*
+
+---
+
+## #r238 Contributions — 2026-04-04T14:14Z
+
+Addresses all four open questions from #r237. Net-new structural insight: the **dual-floor committee sizing constraint** reveals that committee size in HYBRID_EXTERNAL classes has a structural ceiling determined by reserve size and incentive floor parameters — not governance preference alone.
+
+---
+
+### Q1 (HDI attestation challenge and arbitration path) → Two-tier: on-chain plausibility gate + off-chain governance arbitration; 72-hour window; δ_HDI ≤ 2σ tolerance; re-settlement on confirmed manipulation (#r238)
+
+**The challenge surface:** Oracle reporter commits [L_α, R_α] to EAT at T_anchor. On-chain distribution verification is infeasible. Two failure modes: (a) adversarial manipulation (artificially wide/narrow HDI); (b) honest computational error. Both require challenge; penalty and evidence standard differ.
+
+**Tier 1 — On-chain plausibility gate (fires immediately at T_anchor):**
+
+```
+Gate 1: R_alpha - L_alpha >= 1 × σ_claim_spread          [width lower bound: not trivially narrow]
+Gate 2: R_alpha - L_alpha <= 6 × σ_claim_spread          [width upper bound: not trivially wide]
+Gate 3: S_cred_last ∈ [L_alpha − 2σ, R_alpha + 2σ]       [prior consistency]
+```
+
+Heuristic, not exact. Catches gross manipulation. HDI passing the plausibility gate proceeds to settlement.
+
+**Tier 2 — Off-chain governance arbitration (72-hour challenge window):**
+
+```
+Challenger files HDI_challenge_evidence:
+  (1) Distribution source data (IPFS hash, off-chain reference)
+  (2) Recomputed HDI at same α level
+  (3) δ_HDI = |challenger_L − reporter_L| + |challenger_R − reporter_R|
+
+Resolution:
+  δ_HDI ≤ 2 × σ_claim_spread → challenge rejected (methodology variance); challenger escrow slashed
+  δ_HDI > 2 × σ_claim_spread AND evidence accepted by 3-of-5 governance multisig (5-epoch review):
+    Outcome A (reporter correct): challenger slashed
+    Outcome B (challenger correct): reporter bond slashed; HDI corrected in EAT; re-settlement applies
+```
+
+**Why 72-hour window:** 3× normal challenge window; gathering distribution source data and computing rebuttal HDI requires more preparation than a standard oracle dispute.
+
+**Design law (#r238):** HDI challenges use two-tier: plausibility gate (on-chain, immediate) + governance arbitration (evidence-based, 72h, δ_HDI tolerance = 2σ). Confirmed manipulation triggers HDI correction in EAT and re-settlement. (#r238)
+
+---
+
+### Q2 (Dimension-weighted escrow normalisation at registration) → Normalise at escrow-split time; zero-weight prohibited; non-unit-sum warns, does not revert; last-dimension residual for dust (#r238)
+
+**Two approaches:** (a) enforce Σwᵢ = 1.0 at registration — brittle due to floating-point encoding; (b) normalise at split time — permissive at registration, correct at execution.
+
+**Resolution — option (b) with warning gate:**
+
+```solidity
+function registerCoordinateDimensions(
+    bytes32 classId, bytes32[] calldata dimIds, uint256[] calldata weights
+) external onlyGovernance {
+    uint256 weightSum = 0;
+    for (uint i = 0; i < weights.length; i++) {
+        require(weights[i] > 0, "ZERO_WEIGHT_DIMENSION_PROHIBITED");
+        weightSum += weights[i];
+    }
+    if (weightSum != WEIGHT_PRECISION) {  // WEIGHT_PRECISION = 1e18
+        emit DimensionWeightSumNonUnit(classId, weightSum);
+    }
+    _dimensionWeights[classId] = weights;
+    _dimensionWeightSum[classId] = weightSum;
+}
+
+// At escrow-split time:
+escrowShare_i = (weight_i × totalEscrow) / weightSum;
+// Last dimension receives residual to prevent dust:
+escrowShare_lastDim = totalEscrow - Σ(escrowShare for dims 0..N-2);
+```
+
+**Why zero-weight is prohibited:** A zero-weight dimension has no escrow stake — a knower warrants it with zero capital at risk. This breaks the skin-in-the-game invariant. Zero-weight is structural prohibition, not a normalisation edge case.
+
+**Design law (#r238):** Dimension weights normalised at split time. Zero-weight prohibited (no warranty without capital). Non-unit-sum warns, does not revert. Last-dimension residual handles rounding dust. (#r238)
+
+---
+
+### Q3 (Diamond storage naming convention across v2.x contracts) → Canonical schema "GestAlt.<ContractFamily>.<version>.<name>.storage"; STORAGE_NAMESPACE_REGISTRY yaml in repo; CI collision check at deployment (#r238)
+
+**The risk:** Human naming errors can produce identical strings across contracts → same hash → storage corruption across delegatecall boundaries.
+
+**Canonical schema:**
+
+```
+STORAGE_SLOT = keccak256("GestAlt.<ContractFamily>.<MajorVersion>.<StorageName>.storage")
+
+ContractFamily: CoordinateRegistry | ClaimEscrow | CredibilityAggregator |
+                SettlementEngine | EATManager | CommitteeStateEngine |
+                AdapterRegistry | ProtocolAddressRegistry
+MajorVersion:   v2 | v3 | ... (increments only on incompatible layout changes)
+StorageName:    Main | Governance | Historical | Credibility | ...
+
+Examples:
+  "GestAlt.AdapterRegistry.v1.Main.storage"
+  "GestAlt.CredibilityAggregator.v2.Main.storage"
+  "GestAlt.CommitteeStateEngine.v2.Credibility.storage"
+```
+
+**STORAGE_NAMESPACE_REGISTRY (YAML, repo-committed):**
+
+```yaml
+namespaces:
+  - slot: "GestAlt.AdapterRegistry.v1.Main.storage"
+    contract: AdapterRegistryForwardingProxy
+    hash: "0x<keccak256>"
+    introduced: v2.2
+```
+
+**CI collision checks:**
+1. All `STORAGE_SLOT` constants in codebase appear in registry YAML.
+2. No duplicate strings.
+3. Computed hash matches stored hash.
+
+New diamond storage slot requires registry addition in same PR — enforced by CI.
+
+**MajorVersion increment policy:** Only on incompatible changes (field removal, reorder, type change). Appended fields → same version, same slot.
+
+**Design law (#r238):** Canonical naming schema + STORAGE_NAMESPACE_REGISTRY + CI collision check = intentional, auditable, collision-detected-pre-deployment diamond storage. (#r238)
+
+---
+
+### Q4 (τ_budget_fraction ceiling and Phase-2 maintenance floor) → maintenance_floor_fraction = 0.60; τ_budget_fraction_max = 0.40 (hard) / 0.30 (soft); size-gate preferred; k_max_joint derived from joint feasibility (#r238)
+
+**Phase-2 incentive viability condition:**
+
+```
+Phase2_share_epoch = (1 − τ_budget_fraction) × epoch_draw ≥ maintenance_floor_fraction × epoch_draw
+→ τ_budget_fraction ≤ 1 − maintenance_floor_fraction
+```
+
+**Resolution:**
+
+```
+maintenance_floor_fraction = 0.60 (default; governance [0.40, 0.80])
+  Rationale: Phase-2 maintenance is the primary knower retention mechanism;
+  majority of reserve must serve it at all times.
+
+τ_budget_fraction_max (hard) = 1 − maintenance_floor_fraction = 0.40
+τ_budget_fraction_max (soft, default) = 0.30  [extra buffer above viability floor]
+```
+
+Contract enforcement:
+
+```solidity
+function setτBudgetFraction(uint256 newFraction) external onlyGovernance {
+    require(newFraction <= 1e18 - maintenanceFloorFraction, "EXCEEDS_MAINTENANCE_FLOOR");
+    τBudgetFraction = newFraction;
+}
+```
+
+**Size-gate preferred over budget-raise:** Budget-raise cannibalises Phase-2; size-gate preserves both floors by limiting committee size.
+
+**Joint feasibility — k_max_joint:**
+
+```
+Commit bonus floor:   τ_budget_fraction × epoch_draw / k ≥ τ_bonus_floor_per_member
+Phase-2 floor:        τ_budget_fraction ≤ 1 − maintenance_floor_fraction
+
+Jointly feasible iff:
+  k ≤ epoch_draw × (1 − maintenance_floor_fraction) / τ_bonus_floor_per_member
+
+k_max_joint = ⌊ epoch_draw × (1 − maintenance_floor_fraction) / τ_bonus_floor_per_member ⌋
+```
+
+k_max_joint is the structural committee size ceiling. Governance sets k ≤ k_max_joint at registration. Contract enforces at member-addition time.
+
+**Three governance levers for larger committees:**
+1. Larger protocol_maintenance_reserve seed (increases epoch_draw)
+2. Lower τ_bonus_floor_fraction (reduces τ_bonus_floor_per_member)
+3. Lower maintenance_floor_fraction (increases the share available for τ_commit_bonus)
+
+All three reduce one floor to expand the other — explicit governance trade-off.
+
+**Design law (#r238):** Dual-floor constraint → structural k ceiling. k_max_joint = ⌊epoch_draw × (1 − maintenance_floor_fraction) / τ_bonus_floor_per_member⌋. Governance has three levers; each trades one floor against the other. Size-gate preferred to preserve Phase-2 viability. (#r238)
+
+---
+
+## Net-New Structural Observation: Dual-Floor Committee Sizing as a General Resource-Allocation Primitive (#r238)
+
+The joint feasibility constraint generalises beyond GestAlt:
+
+**Any mechanism with two competing incentive programs sharing a reserve pool has a combined-capacity ceiling:**
+
+```
+capacity_max = reserve_epoch_draw × (share_available_for_program_A) / floor_per_unit_program_A
+```
+
+Where `share_available_for_program_A = 1 − minimum_share_for_program_B`.
+
+This is a resource-allocation primitive. Governance wanting to increase capacity must either grow the pool or accept a weaker floor on one program. The mechanism cannot simultaneously increase capacity, hold both floors, and not grow the pool. This triad constraint is deterministic and follows from the definitions — not a design choice.
+
+GestAlt surfaces this as k_max_joint. Any incentive architecture with competing programs will encounter an analogous ceiling. Identifying it explicitly at design time prevents the failure mode of governance incrementally raising both floors and committee size until the reserve depletes unexpectedly. (#r238)
+
+---
+
+## Structural Synthesis: #r238
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| HDI attestation challenge | Two-tier: plausibility gate + governance arbitration (72h); δ_HDI ≤ 2σ tolerance; re-settlement on confirmed manipulation | Evidence-based adjudication; on-chain gate catches gross manipulation only |
+| Dimension weight normalisation | Normalise at split time; zero-weight prohibited; non-unit-sum warns; last-dim residual | Proportional weights canonical; zero stake = no warranty |
+| Diamond storage naming | "GestAlt.<Family>.<version>.<name>.storage"; STORAGE_NAMESPACE_REGISTRY yaml; CI collision check | Intentional naming + registry = auditable, pre-deployment collision detection |
+| τ_budget_fraction ceiling | maintenance_floor_fraction = 0.60; τ_budget_fraction_max = 0.40 hard / 0.30 soft; size-gate preferred; k_max_joint structural ceiling | Dual-floor constraint; three governance levers; capacity ceiling is deterministic |
+
+---
+
+## Cumulative Invariants (#r238)
+
+**Invariant #364 (#r238):** HDI attestation challenges: Tier 1 on-chain plausibility gate (width ∈ [1σ_claim_spread, 6σ_claim_spread]; S_cred prior consistency [L_α − 2σ, R_α + 2σ]). Tier 2: 72-hour governance arbitration; IPFS-linked evidence; δ_HDI tolerance = 2 × σ_claim_spread. δ_HDI > tolerance + evidence accepted → HDI corrected in EAT + re-settlement; reporter bond slashed. δ_HDI ≤ tolerance → challenge rejected; challenger escrow slashed (anti-grief).
+
+**Invariant #365 (#r238):** Dimension weights normalised at escrow-split time (divide by Σwᵢ). Zero-weight dimensions prohibited (no capital at risk = no warranty on that dimension). Non-unit-sum at registration emits `DimensionWeightSumNonUnit` warning; does not revert. Last-dimension receives residual to prevent rounding dust accumulation.
+
+**Invariant #366 (#r238):** Diamond storage slot naming schema: "GestAlt.<ContractFamily>.<MajorVersion>.<StorageName>.storage". All slots declared in `storage-namespace-registry.yaml` (repo-committed). CI pre-deployment verifies: all STORAGE_SLOT constants in registry; no duplicate strings; computed hashes match stored hashes. MajorVersion increments only on incompatible layout changes (field removal, reorder, type change). Appended fields → same version.
+
+**Invariant #367 (#r238):** Phase-2 maintenance floor: maintenance_floor_fraction (default 0.60; governance [0.40, 0.80]). τ_budget_fraction hard max = 1 − maintenance_floor_fraction (contract-enforced). Soft ceiling = 0.30. k_max_joint = ⌊epoch_draw × (1 − maintenance_floor_fraction) / τ_bonus_floor_per_member⌋ is the structural maximum committee size. Contract enforces k ≤ k_max_joint at member-addition time. Size-gate mode preferred over budget-raise. Three governance levers to increase k_max_joint: (1) larger reserve seed, (2) lower τ_bonus_floor_fraction, (3) lower maintenance_floor_fraction — each trades one floor against the other explicitly.
+
+---
+
+## Run Log Update
+
+- **#r238** — 2026-04-04T14:14Z — Q1: HDI two-tier challenge: plausibility gate (width ∈ [1σ, 6σ], prior consistency) + governance arbitration (72h, δ_HDI ≤ 2σ tolerance); re-settlement on confirmed manipulation. Q2: Dimension weights normalised at split-time; zero-weight prohibited; non-unit-sum warns; last-dimension dust residual. Q3: Diamond storage naming schema "GestAlt.<Family>.<version>.<name>.storage"; STORAGE_NAMESPACE_REGISTRY yaml; CI collision check; MajorVersion increment policy. Q4: maintenance_floor_fraction = 0.60; τ_budget_fraction hard max = 0.40; soft ceiling 0.30; size-gate preferred; k_max_joint = floor(epoch_draw × (1 − floor_fraction) / τ_bonus_floor_per_member). Net-new: dual-floor committee sizing = general resource-allocation primitive; triad constraint (capacity, floors, reserve) is deterministic. Invariants #364–#367.
+
+---
+
+## Open Questions for #r239+
+
+1. **HDI re-settlement scope:** When governance corrects HDI and re-settlement applies, how far back does it reach? Claims that resolved before the challenge window opened used the incorrect HDI. Should re-settlement be bounded to claims that resolved after T_anchor (prospective only) or also retroactive to pre-challenge-window resolutions?
+
+2. **k_max_joint and dynamic reserve balance:** k_max_joint depends on epoch_draw = α_draw × reserve_balance. As reserve depletes, k_max_joint decreases. Does the contract enforce k reduction dynamically (forcing member removal when balance drops), or is k_max_joint fixed at registration and reserve depletion handled by exhausting bonuses without k enforcement?
+
+3. **STORAGE_NAMESPACE_REGISTRY tooling:** Should the CI collision check be a Hardhat/Foundry plugin, a standalone lint script, or a Solidity `forge test` that reads the YAML and verifies on-chain constants against computed hashes?
+
+4. **Dimension weight update after class goes live:** Can governance update dimension weights after epistemically_live = true? If yes, existing claims were installed under prior weights — define the boundary between old-weight and new-weight claim resolution.
+
+*Last updated: #r238 — 2026-04-04T14:14Z*
