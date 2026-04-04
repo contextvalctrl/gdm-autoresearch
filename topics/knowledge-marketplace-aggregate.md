@@ -14877,4 +14877,235 @@ t=5: Oracle resolves; children correct
 
 4. **live_with_direct_stake and echo resolution interaction:** Case D4 echo resolution uses last-pre-LTRP epoch. If that epoch had direct knowers but current epoch does not (LTRP expiry cleared the pool), live_with_direct_stake fails on current epoch check. Explicit precedence rule: echo resolution uses epoch-at-time check, not current-epoch check.
 
-*Last updated: #r206 — 2026-04-04T08:07Z*
+*Last updated: #r207 — 2026-04-04T08:17Z*
+
+---
+
+## #r207 Contributions — 2026-04-04T08:17Z
+
+Addresses all four open questions from #r206. Adds one net-new structural insight: the activation-floor reflexivity trap.
+
+---
+
+**Q1 (PENDING_ACTIVATION + DELIST_PENDING interaction) → Class DELIST_PENDING supersedes edge PENDING_ACTIVATION; auto-reject with validity_stake return (#r207):**
+
+When a coordinate class enters DELIST_PENDING, it signals the imminent termination of normal class operations. No new claims are accepted during DELIST_PENDING; no activation floor can be reached by new staking activity because new claims are blocked.
+
+**Resolution:** Class DELIST_PENDING is a superseding lifecycle event for all edges in PENDING_ACTIVATION on that class.
+
+```
+On class_status → DELIST_PENDING:
+  For each edge_e in { edges with parent_class_id = class_id, status = PENDING_ACTIVATION }:
+    edge_e.status → REJECTED_DELIST
+    emit edge_rejection_event: { edge_id, reason: "parent_class_delist", epoch }
+    validity_stake → returned minus governance_review_fee  (same disposition as T_veto_max_abs auto-rejection, #r218)
+    declarant may not re-submit: class is being delisted
+```
+
+**Rationale:** Keeping edges in PENDING_ACTIVATION while the parent class is being delisted creates a ghost-state — the activation floor can never be met legitimately, and the edge can never contribute to S_epistemic propagation. There is no semantic value in preserving these edges; auto-rejection is the clean, deterministic outcome.
+
+**Inheritance vs supersession:** DELIST_PENDING does not suspend the T_veto_window countdown for already-PENDING edges — it supersedes them entirely with an immediate rejection event. This avoids a race between T_veto_max_abs expiry and DELIST_PENDING governance window.
+
+**DELIST_PENDING governance window and edge creation:** New edge declarations are not accepted once a class enters DELIST_PENDING. Any edge declaration submitted in the same block as the DELIST_PENDING event follows the same atomic EAT ordering rule established for T_anchor — if the DELIST_PENDING event precedes the edge declaration in the EAT timestamp, the declaration is rejected at submission. (#r207)
+
+---
+
+**Q2 (σ_oracle_scalar upper bound — knower liquidity-preference derivation) → Bound is registration-anchored, not parameter-intuition; σ_oracle_scalar_max = min(3.0, T_longtail_max_abs/T_longtail_base − 1) (#r207):**
+
+**Derivation from liquidity-preference:**
+
+A rational knower with per-epoch discount rate ρ_effective stakes k if:
+```
+expected_reward(k) ≥ k × ρ_effective × T_longtail_effective
+```
+
+The bonus_capital_comp (#r141) covers the incremental capital opportunity cost:
+```
+bonus_capital_comp = α_cap × β_effective × k × min(1, T_longtail_effective / T_longtail_ref)
+```
+
+At σ_oracle = 1 (maximum oracle uncertainty), for the knower to remain willing to stake under the worst-case extended lockup:
+```
+α_cap × β_effective ≥ ρ_effective × T_longtail_effective(σ_oracle=1)
+                     = ρ_effective × T_longtail_base × (1 + σ_oracle_scalar_max)
+⟹ σ_oracle_scalar_max ≤ (α_cap × β_effective) / (ρ_effective × T_longtail_base) − 1
+```
+
+**Plugging in the governance-defined extremes:** α_max = 0.5, β_max = 2.5, ρ_floor = 0.002/epoch, T_longtail_base:
+
+```
+σ_oracle_scalar_max_liquidity = (0.5 × 2.5) / (0.002 × T_longtail_base) − 1
+```
+
+For T_longtail_base = 4 epochs: σ_oracle_scalar_max_liquidity ≈ 155 — far above 3.0.
+
+**Conclusion:** The 3.0 bound from #r206 is not binding from a liquidity-preference perspective. The actually binding constraint is T_longtail_max_abs (the hard ceiling immutably set at class registration). The principled bound is:
+
+```
+σ_oracle_scalar_max_binding = min(3.0, T_longtail_max_abs / T_longtail_base − 1)
+```
+
+If T_longtail_max_abs = 5 × T_longtail_base, σ_oracle_scalar_max_binding = 4.0 (3.0 is the tighter bound).
+If T_longtail_max_abs = 3 × T_longtail_base, σ_oracle_scalar_max_binding = 2.0 (registration ceiling is tighter).
+
+**Updated governance interface:** The governance parameter `σ_oracle_scalar` has a hard contract upper bound = min(3.0, T_longtail_max_abs / T_longtail_base − 1), evaluated at class registration and enforced at parameter-update time. Classes where T_longtail_max_abs is very close to T_longtail_base (conservative ceiling) automatically get a lower σ_oracle_scalar ceiling — consistent with the class designer's stated intent.
+
+**Design law (#r207):** Hard bounds on extension scalars must be anchored to the registration-immutable ceiling (T_longtail_max_abs), not set independently. This ensures parameter bounds are coherent with the class's declared maximum obligation horizon. (#r207)
+
+---
+
+**Q3 (Commit-reveal gas economics for DAG declarations — batch pattern) → O(1) transactions per parent; single batch hash covers all child edges; partial reveal invalid (#r207):**
+
+Individual commit-reveal doubles declaration costs (2 transactions per edge). For a parent coordinate with k child coordinates, individual commit-reveal costs O(k) transactions. Batch commit-reveal collapses this to O(1) transactions regardless of k.
+
+**Batch commit-reveal protocol:**
+
+**Phase 1 (commit):**
+```
+commit_hash = H(edge_data_1 || edge_data_2 || ... || edge_data_k || nonce)
+  where edge_data_i = (parent_coord, child_coord_i, propagation_fn_i, validity_stake_fraction_i)
+
+submit: batch_commit_tx = { parent_class_id, commit_hash, total_validity_stake }
+EAT event: { type: dag_batch_commit, parent, commit_hash, epoch_committed }
+```
+
+**Phase 2 (reveal):**
+```
+submit: batch_reveal_tx = {
+  parent_class_id,
+  commit_hash_ref,         (references Phase 1 EAT event)
+  edge_data: [edge_data_1, ..., edge_data_k],
+  nonce
+}
+Contract verifies: H(edge_data_1 || ... || edge_data_k || nonce) == commit_hash_ref
+```
+
+**Atomicity constraint — partial reveal is invalid:**
+
+The batch reveal must include all k edges committed in Phase 1. If any edge is omitted, the reveal is rejected. This is required for the front-run protection property: if partial reveal were valid, a declarant could front-run on their own declaration by:
+1. Committing edges for parent → [child1, child2, child3]
+2. Revealing only child1 first (observing market reaction)
+3. Revealing child2, child3 if child1 moved in desired direction
+
+Atomicity prevents this selective reveal strategy.
+
+**T_reveal_window:** Phase 2 must be submitted within T_reveal_window = N_calibration macro-epochs of Phase 1. Beyond this, the commit hash expires; validity_stake is returned to declarant.
+
+**Gas cost analysis:** Phase 1 = ~21,000 + calldata (32 bytes for hash + small metadata) ≈ flat. Phase 2 = ~21,000 + calldata (k × ~150 bytes per edge). Total = 2 flat transactions + O(k) calldata. For a parent with 10 children: ~2 transactions vs ~20 without batch pattern.
+
+**Non-batch fallback:** For single-child declarations, batch and individual commit-reveal are equivalent. Batch is the canonical protocol; individual commit-reveal is a degenerate case of batch with k=1.
+
+**Design law (#r207):** Commit-reveal for structural declarations must be batched per parent. Partial reveals are categorically invalid. T_reveal_window bounds the commitment to prevent orphaned commits. (#r207)
+
+---
+
+**Q4 (live_with_direct_stake + echo resolution — epoch-at-time check) → live_with_direct_stake evaluated at T_echo, not current epoch (#r207):**
+
+Echo resolution uses the S_epistemic snapshot from T_echo = last-pre-LTRP epoch. The settlement is evaluated against the epistemically warranted state at the time the LTRP pool absorbed the longtail obligations. The current epoch may have no direct knowers (LTRP expiry cleared the pool) even though T_echo had active direct knowers.
+
+**Resolution — epoch-at-time check for echo resolution:**
+
+```
+For echo_resolution on coordinate c:
+  T_echo = last_epoch_before_LTRP_expiry(c)
+  settlement_eligible = live_with_direct_stake(c, T_echo)
+    where:
+      live_with_direct_stake(c, T_echo) =
+        epistemically_live(c, T_echo)               [challenger count at T_echo]
+        AND direct_knower_count(c, T_echo) ≥ 1      [at least 1 knower was active at T_echo]
+        AND direct_challenger_count(c, T_echo) ≥ 1  [at least 1 challenger was active at T_echo]
+```
+
+**Why current epoch check is wrong for echo resolution:** Echo resolution is a fallback precisely for coordinates where the oracle is delayed or absent. The settlement legitimacy question is: "Was this state epistemically warranted at the time we locked it as the best available estimate?" The answer depends on T_echo's epistemic state, not the current epoch's.
+
+**Normal (non-echo) resolution:** live_with_direct_stake is evaluated at the oracle resolution epoch (current epoch). This is unchanged.
+
+**EAT record for echo resolution:** The settlement EAT event records `settlement_basis: echo_resolution`, `T_echo`, and `live_with_direct_stake_epoch: T_echo`. Auditors can verify the eligibility check against the EAT history at T_echo, not the current state.
+
+**Edge case — T_echo itself was during degraded mode:** If T_echo was in a degraded-mode epoch, direct_knower_count at T_echo uses the degraded-mode provisional snapshot (marked as `degraded_mode_provisional`). Settlement proceeds but with the `degraded_mode_settlement` audit tag. Consistent with degraded mode's principle: mechanism continues under stale-but-committed state. (#r207)
+
+---
+
+### Net-New Structural Insight: The Activation-Floor Reflexivity Trap (#r207)
+
+**The problem:** The Tier 2 DAG edge activation floor is set at 50% of child stake at declaration time (#r215). But the act of declaring an edge is itself a public signal that the declarant believes a structural relationship exists — likely with private information backing it. This signal can cause child stake to increase reflexively between declaration and activation floor measurement.
+
+**Formal attack scenario:**
+```
+T=0:      Pre-declaration: child_coord_1 has stake S_0
+T=1:      Knower K commits batch edge declaration for parent→child_coord_1
+          (commit-reveal Phase 1: only hash visible)
+T_reveal: Knower K reveals edge. Observers see structural claim. Information signal leaks.
+T=2:      Observers stake on child_coord_1, seeing K's structural belief
+          child_coord_1 stake rises from S_0 to S_1 > S_0
+T_veto:   Activation floor measured = 50% × S_1 (declaration-time = reveal time)
+          Floor met because S_1 > S_0, even though market was indifferent at T=0
+```
+
+The reflexivity: K's declaration → market reacts → activation floor is easier to meet. An adversary could amplify this: (1) K declares a weak structural edge; (2) adversary front-runs on child stake; (3) floor is met; (4) adversary's child stake earns credibility from the now-active structural propagation even though the edge is dubious.
+
+**Why commit-reveal partially addresses this but doesn't fully close it:** Commit-reveal (Phase 1 in Q3) hides the edge content until reveal. But at reveal time, the hash is committed to EAT and becomes public. The activation floor should be measured against child stake at a pre-declaration reference point to prevent reflexivity from inflate the floor.
+
+**Resolution — pre-declaration frozen denominator:**
+
+```
+activation_floor_reference_stake(child_coord_j) =
+    median_stake(child_coord_j, epochs [T_declaration − N_ref, T_declaration − 1])
+    where T_declaration = epoch of Phase 1 commit
+    N_ref = N_calibration (rolling median over pre-declaration window)
+```
+
+The activation floor is 50% × pre-declaration median stake, not 50% × declaration-time stake. This denominator is frozen at Phase 1 commit and stored in the EAT commit record.
+
+**Properties:**
+1. Declaration-induced stake increases do not move the activation floor — the denominator is already locked.
+2. Genuine market growth between declaration and T_veto does count toward the numerator (total stake at T_veto) — floor is met sooner if the child coordinate genuinely attracts new participation.
+3. Adversarial front-running drives up numerator stake on the child coordinate but not the denominator — the floor test is harder to game.
+
+**Interaction with static validity_stake (#r215):** validity_stake is also frozen at declaration. Combined, the Tier 2 edge's financial commitment at declaration is fully pre-declared — neither the validity_stake nor the activation floor denominator changes after Phase 1 commit. This is consistent with the static-commitment design law (#r137).
+
+**Design law (#r207):** Activation floors that are functions of market state must use pre-declaration frozen denominators, not declaration-time or post-declaration denominators. Any threshold sensitive to reflexive market responses to the declaration itself must be anchored to the pre-announcement state. (#r207)
+
+---
+
+## Structural Synthesis: #r207
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| DELIST_PENDING supersedes PENDING_ACTIVATION | Auto-reject + validity_stake return; no ghost states | Class lifecycle events dominate edge lifecycle events |
+| σ_oracle_scalar bound is registration-anchored | σ_oracle_scalar_max = min(3.0, T_longtail_max_abs / T_longtail_base − 1) | Bound derives from declared maximum obligation horizon, not intuition |
+| Batch commit-reveal; partial reveal invalid | O(1) transactions per parent; atomicity prevents selective reveal front-run | Batch is canonical; k=1 is degenerate case |
+| Echo resolution: epoch-at-time check | live_with_direct_stake evaluated at T_echo, not current epoch | Settlement legitimacy assessed against the state that was warranted when locked |
+| Activation-floor reflexivity trap | Pre-declaration frozen denominator; median over N_calibration pre-declaration epochs | Reflexive front-running cannot inflate activation floor |
+
+---
+
+## Cumulative Invariants (#r207)
+
+**Invariant #220 (#r207):** Class DELIST_PENDING is a superseding lifecycle event for all PENDING_ACTIVATION edges on that class. Affected edges are auto-rejected with validity_stake returned minus governance_review_fee. No new edge declarations are accepted during DELIST_PENDING.
+
+**Invariant #221 (#r207):** σ_oracle_scalar hard upper bound = min(3.0, T_longtail_max_abs / T_longtail_base − 1), enforced at parameter-update time. Hard bounds on extension scalars are anchored to the class's immutable registration ceiling.
+
+**Invariant #222 (#r207):** DAG edge commit-reveal is batched per parent. Phase 2 must include all edges committed in Phase 1; partial reveal is categorically invalid. T_reveal_window = N_calibration macro-epochs. Single-child declarations are a degenerate case of batch.
+
+**Invariant #223 (#r207):** For echo resolution, live_with_direct_stake is evaluated at T_echo (last-pre-LTRP epoch), not the current oracle-resolution epoch. Settlement EAT record includes `live_with_direct_stake_epoch: T_echo`.
+
+**Invariant #224 (#r207):** DAG edge activation floor denominator is the pre-declaration frozen median child stake over [T_declaration − N_calibration, T_declaration − 1], committed to EAT at Phase 1 commit. Post-declaration market movements affect only the numerator (stakes at T_veto). Reflexive floor inflation through declaration signalling is structurally prevented.
+
+---
+
+## Run Log Update
+
+- **#r207** — 2026-04-04T08:17Z — Q1: DELIST_PENDING supersedes PENDING_ACTIVATION; auto-reject with stake return. Q2: σ_oracle_scalar bound registration-anchored (T_longtail_max_abs / T_longtail_base − 1); liquidity-preference derivation shows 3.0 is conservative. Q3: batch commit-reveal; O(1) transactions; partial reveal invalid; T_reveal_window. Q4: echo resolution live_with_direct_stake at T_echo not current epoch. Net-new: activation-floor reflexivity trap — pre-declaration frozen denominator. Invariants #220–#224.
+
+---
+
+## Open Questions for #r208+
+
+1. **Frozen denominator edge case — pre-declaration period has zero stake:** If child_coord_j is newly registered and has zero pre-declaration stake, the median over N_calibration epochs is zero. Any non-zero stake at T_veto satisfies 50% × 0 = 0. Should zero-denominator cases require a minimum absolute stake floor instead, analogous to the challenger_pool minimum count floor (#r160/Q4)?
+
+2. **T_reveal_window interaction with DA degraded mode:** Phase 1 commit is epoch-indexed. If DA outage begins after Phase 1 but before T_reveal_window expires, the reveal window should toll (consistent with all epoch-indexed deadlines, #r137/Q3 design law). Verify no new rule is needed.
+
+3. **Batch reveal atomicity and gas limits:** For very large parent declarations (k >> 10 children), Phase 2 calldata may approach block gas limits. Should there be a maximum k per batch declaration, or a chunked reveal protocol that preserves partial-reveal security while handling large batches?
+
+4. **σ_oracle_scalar_max governance recalibration when T_longtail_max_abs is changed:** T_longtail_max_abs is immutable at registration (#r216). But governance could set a stricter T_longtail_max_abs at v2.2 upgrade for new classes. If an existing class has σ_oracle_scalar near T_longtail_max_abs / T_longtail_base − 1 and a sibling class is registered with a tighter ceiling, is there any cross-class consistency requirement?
