@@ -14517,3 +14517,174 @@ Portability rule (new):
 4. **Relative-truth resolution credibility_ratio portability** — confirmed isolated by class ID (Invariant #163). But: what if the reference coordinate itself is also a ratio-resolved class? Transitive reference chains require a bounded resolution depth to prevent infinite regress.
 
 *Last updated: #r204 — 2026-04-04T07:42Z*
+
+---
+
+## #r205 Contributions — 2026-04-04T07:52Z
+
+Addresses all four open questions from #r204. Adds one net-new structural insight: bounded relation depth as a first-class mechanism invariant.
+
+---
+
+**Q1 (DAG relation governance — governance-only vs. knower-submitted validity_stake) → Tiered open submission with validity_stake; governance retains veto; no strict governance-only bottleneck (#r205):**
+
+Governance-only declaration is robust but becomes a bottleneck at scale. Knower-submitted relations with validity_stake (from T1a DECLARE_RELATION, #r204) are decentralized but open to adversarial DAG inflation.
+
+**Resolution — tiered submission model:**
+
+```
+Tier 1 (governance-declared): DAG edges for settlement-critical parent coordinates
+  e.g., "USD_rate ∋ [SOFR, EFFR, OIS]" for clearing-class CLEARING_MODE
+  No validity_stake required; governance bears declaratory responsibility.
+
+Tier 2 (knower-submitted, validity_stake required): DAG edges for informational parents
+  Any participant may declare edge(parent, children[], identity_fn) by posting validity_stake
+  validity_stake = max(k_min_parent, ε_independence × Σ child stakes at time of declaration)
+  Edge enters PENDING state; governance has T_veto_window = 4 macro-epochs to veto
+  If not vetoed: edge activates; validity_stake locked until parent resolves
+  If vetoed: edge rejected; validity_stake returned minus governance_review_fee
+```
+
+**Veto mechanics:** Governance may veto for: provably wrong identity_fn, circular edge (creates cycle), or CLEARING_MODE parent without sufficient knower pool. Veto requires explicit on-chain rationale. A vetoed knower may appeal in 1 macro-epoch; if appeal succeeds, edge activates with 0.5× validity_stake returned.
+
+**Design law (#r205):** DAG relation governance is tiered by the parent's mode and settlement-criticality. CLEARING_MODE settlement-critical parents require governance-declared edges. DISCOVERY_MODE and informational parents allow knower-submitted edges with validity_stake and governance veto. (#r205)
+
+---
+
+**Q2 (γ_oracle_absent calibration — cold-start estimation from analogous class priors) → Hierarchical empirical Bayes: calibrate from resolved class accuracy distributions in the same market-structure tier (#r205):**
+
+At registration, a new class has no resolved history. γ_oracle_absent must be estimated from analogous class data.
+
+**Resolution — tier-matched empirical Bayes prior:**
+
+```
+γ_oracle_absent_prior(class_new) =
+  weighted_average(γ_oracle_absent_empirical(class_j))
+  for class_j in same market_structure_tier AND same oracle_type
+  weighted by: 1 / (age_of_class_j + 1) × n_resolved_claims_j
+
+γ_oracle_absent_empirical(class_j) =
+  fraction_of_oracle_absent_claims_that_survived_challenge / total_claims_submitted_in_oracle_absent_epochs
+```
+
+A claim "survived challenge" = no successful challenger during the full WINDING_DOWN period — used as a proxy for correctness when oracle never arrives (conservative). Governance may adjust by survival_to_correct_ratio ∈ [0.7, 1.3].
+
+**Cold-start fallback:** γ_oracle_absent_fallback = 0.3. Self-calibrates to class-specific estimate after N_calibration resolved-equivalent epochs.
+
+**Design law (#r205):** Cold-start parameter estimation uses tier-matched analogous class data as empirical Bayes priors. No parameter defaults to a fixed constant without a defined derivation path once tier data is available. (#r205)
+
+---
+
+**Q3 (σ_oracle_premium staleness — update mechanism resistant to after-the-fact manipulation) → Monotone ratchet: σ_oracle can only increase; decreases require oracle confirmation event; no governance-only override (#r205):**
+
+**Resolution — monotone ratchet with oracle-anchored decrease:**
+
+```
+σ_oracle(class_i, t) is monotone non-decreasing:
+
+  Auto-increase (no governance required):
+    At each macro-epoch boundary without oracle arrival past expected arrival epoch:
+    σ_oracle(t) = min(1.0, σ_oracle(t-1) + ratchet_fraction × (1 - σ_oracle(t-1)))
+    ratchet_fraction = 0.10 (governance-settable, bounded [0.05, 0.20])
+    — geometric convergence toward 1.0; each epoch adds 10% of remaining gap
+
+  Auto-decrease: PROHIBITED
+  Decrease: only on oracle_confirmed_event (T_resolve)
+    σ_oracle reset to 0.0 at T_resolve
+
+  Governance: may set σ_oracle_floor_increase = true to accelerate ratchet;
+              cannot lower σ_oracle below current value without oracle event
+```
+
+**Attack surface:** (1) Inflate σ_oracle at declaration → governance veto window at registration handles this. (2) False oracle event to trigger reset → same oracle_confirmed_event as T_resolve; counterfeit oracle events defended at oracle layer. (3) No-update on delay → ratchet is automatic; no governance action required.
+
+**Design law (#r205):** Uncertainty parameters measuring external event arrival ratchet monotonically toward maximum uncertainty as time passes without resolution. Decreases are anchored to the resolution event itself. Governance can accelerate; cannot reverse without oracle evidence. (#r205)
+
+---
+
+**Q4 (Relative-truth resolution — transitive reference chains and bounded depth) → D_max_ref = 2 hard contract bound; deeper chains prohibited (#r205):**
+
+**Why depth > 2 fails:**
+
+1. σ_oracle compounds multiplicatively: `σ_oracle(depth_k) ≈ 1 - Π(1 - σ_oracle_i)`. At depth 3, σ_oracle_chain ≈ 0.66 — more likely than not to require oracle-absent settlement.
+2. T_longtail compounds with each depth level.
+3. Attack surface: adversary constructs deep chains to delay resolution while earning EQ fees.
+
+**Resolution — hard contract limit D_max_ref = 2:**
+
+```
+STAKE_RELATIVE(coord_new, coord_ref, ratio_claim, stake):
+  CONTRACT GATE: reference_depth(coord_ref) ≤ 1
+  (coord_ref must be depth-0 or depth-1; depth-2 claims cannot be used as references)
+
+reference_depth(coord):
+  = 0 if absolute (not STAKE_RELATIVE)
+  = 1 + reference_depth(coord.reference) otherwise
+```
+
+EAT at declaration: `reference_chain: [coord_ref, coord_ref.reference (if depth≥1)]`. Credibility_ratio isolation per Invariant #163: each depth level is a separate class ID; no transitive laundering.
+
+**Design law (#r205):** Resolution dependency chains are bounded at D_max_ref = 2. Any mechanism feature introducing transitive oracle dependencies must specify a hard bounded depth at feature design time. Unbounded transitive dependencies are prohibited. (#r205)
+
+---
+
+## Net-New Structural Insight: Bounded Relation Depth as a First-Class Mechanism Invariant (#r205)
+
+Both Q1 (DAG governance) and Q4 (reference chain depth) converge on the same structural principle: **the mechanism must bound the depth of any transitive dependency, whether epistemic (DAG propagation) or resolution (reference chains).**
+
+**Unified bounded-depth table:**
+
+| Dependency type | Bounded by | Enforcement |
+|---|---|---|
+| DAG coordinate relation (epistemic propagation) | Bonus disabled at implication depth ≥ 5 (#r73, #r75) | Bonus formula; γ^(depth-1) discount |
+| Relative-truth resolution chain | D_max_ref = 2 (#r205) | Contract gate |
+| Credibility carry-over | N_anchor = 20 saturates; negative propagates (#r71) | Attenuated formula |
+| Escrow obligation | max(T_longtail_A, T_longtail_B); 2× doubling cap (#r135) | Escrow ceiling |
+
+**General law (#r205):** Every transitive dependency in the mechanism has a hard contractual depth bound. Unbounded transitive dependencies are a first-class mechanism failure mode.
+
+---
+
+## Structural Synthesis: #r205
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| Tiered DAG relation governance | Tier 1 governance-declared; Tier 2 validity_stake + 4-epoch veto | Decentralised DAG construction with governance quality gate |
+| γ_oracle_absent empirical Bayes | Tier-matched analogous class data as prior; self-calibrates | No cold-start constant — all defaults have a derivation path |
+| σ_oracle monotone ratchet | Auto-increases without oracle; decreases only on oracle_confirmed | Manipulation-resistant uncertainty tracking |
+| D_max_ref = 2 hard contract bound | Depth >2 chains prohibited; σ_oracle compounds to near-1 at depth>2 | Contract gate is correct safety measure |
+| Bounded dependency principle | All transitive dependencies have hard contractual depth bounds | First-class mechanism invariant |
+
+---
+
+## Cumulative Invariants (#r205)
+
+**Invariant #210 (#r205):** DAG relation governance is tiered. CLEARING_MODE settlement-critical parent edges: governance-declared. DISCOVERY_MODE and informational edges: knower-submitted with validity_stake, T_veto_window = 4 macro-epochs, governance veto with rationale obligation.
+
+**Invariant #211 (#r205):** γ_oracle_absent is calibrated from tier-matched analogous class empirical data via hierarchical empirical Bayes. Fallback = 0.3. Transitions to class-specific estimate after N_calibration resolved-equivalent epochs.
+
+**Invariant #212 (#r205):** σ_oracle is a monotone non-decreasing parameter. Auto-increases by ratchet_fraction × (1 - σ_oracle) per epoch without oracle arrival. Resets to 0 on oracle_confirmed_event only. Governance cannot decrease σ_oracle without oracle evidence.
+
+**Invariant #213 (#r205):** Relative-truth resolution chain depth is bounded at D_max_ref = 2. Any STAKE_RELATIVE declaration with coord_ref.reference_depth ≥ 2 is rejected by contract. EAT commits full reference chain at declaration.
+
+**Invariant #214 (#r205):** All forms of transitive dependency (epistemic propagation, oracle resolution chains, credibility carry-over, escrow obligation) have hard contractual depth bounds. Unbounded transitive dependencies are a first-class mechanism failure mode.
+
+---
+
+## Run Log Update
+
+- **#r205** — 2026-04-04T07:52Z — Net-new: tiered DAG relation governance (Tier 1 governance, Tier 2 validity_stake + veto); γ_oracle_absent empirical Bayes from tier-matched analogous classes; σ_oracle monotone ratchet (auto-increase; oracle-anchored decrease only); D_max_ref = 2 hard contract bound for relative-truth resolution chains; bounded dependency principle as first-class invariant. Invariants #210–#214.
+
+---
+
+## Open Questions for #r206+
+
+1. **Tier 2 DAG edge validity_stake sizing:** The formula `max(k_min_parent, ε_independence × Σ child stakes)` ties stake to child-stake state at declaration time. If children acquire much larger stakes post-declaration, the validity_stake is under-sized. Should validity_stake auto-ratchet with child stake growth, or is declaration-time sizing correct (static commitment)?
+
+2. **Monotone σ_oracle ratchet and T_longtail capacity:** As σ_oracle increases, T_longtail should also increase. Should T_longtail be programmatically linked to σ_oracle (e.g., T_longtail = T_longtail_base × (1 + σ_oracle)), or must governance manually update it?
+
+3. **DAG propagation and epistemically_live threshold:** If a parent coordinate's S_epistemic is derived purely from child propagation (no direct knowers), does it qualify as `epistemically_live`? It has no independent challenger population and no direct credibility_ratio backing. Should propagated-only S_epistemic be excluded from settlement_price eligibility?
+
+4. **Governance veto window T_veto_window interaction with degraded mode:** If a Tier 2 DAG edge enters PENDING during a DA outage, T_veto_window epoch count pauses (epoch-indexed, implicit freeze per Invariant #137). Should the PENDING period during degraded mode be bounded analogously to T_wind_down_max?
+
+*Last updated: #r205 — 2026-04-04T07:52Z*
