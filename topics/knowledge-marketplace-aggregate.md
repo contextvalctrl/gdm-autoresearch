@@ -9955,3 +9955,315 @@ All five engineering handoff documents are specification-complete. Content forma
 4. **Next research priority (P2): thin challenger microstructure.** With adversarial simulation and engineering handoff spec complete, the next mechanism-design question is S_cred quality and clearing price accuracy when challenger populations are at the epistemically_live minimum. Parametric analysis of W_a(t) under adversarial concentration.
 
 *Last updated: #r183 — 2026-04-04T04:12Z*
+
+---
+
+## #r184 Contributions — 2026-04-04T04:22Z
+
+**Phase: v2.1 engineering handoff — on-chain log-score gas budget; GovernanceParams interface spec; Document 1 architecture overview; P2 thin-challenger microstructure analysis.**
+
+---
+
+### Q1 (CredibilityAggregator log-score on-chain — gas budget and library recommendation) → PRBMath SD59x18 ln(); <50,000 gas per knower per resolution; batch with single OPERATOR_ROLE call; no budget concern at current knower scale (#r184)
+
+**Two computation moments:**
+
+1. **Per-epoch hot path (commitEpochBuffer):** W_a(t) computation — batched by OPERATOR_ROLE at epoch boundary. Iterates all knowers in one transaction. This dominates gas in normal operation but is amortized across all knowers per epoch.
+
+2. **Per-resolution path (oracle fires → updateCredibilityRatio):** log-score update. This is the billing question. Each knower's `credibility_ratio` is updated once per oracle resolution per class lifetime.
+
+**Fixed-point ln() cost:**
+
+PRBMath SD59x18 `ln()` (already in gestalt-contracts dependency chain via OpenZeppelin ecosystem): approximately 350–600 gas per call depending on operand magnitude. One `ln(P_a)` call per knower per resolution.
+
+**Per-knower resolution cost breakdown:**
+
+| Operation | Gas estimate |
+|---|---|
+| `ln(P_a)` (PRBMath) | ~500 |
+| `credibilityRatioBps` SSTORE (warm slot) | ~5,000 |
+| `cumulativeLogScore` SSTORE | ~5,000 |
+| `resolvedClaimCount` SSTORE | ~5,000 |
+| `lastUpdateEpoch` SSTORE | ~5,000 |
+| EAT event emit | ~3,000 |
+| Total per knower | **~23,500 gas** |
+
+**At expected v2.1 scale:**
+
+| Knowers per class | Resolution gas | At 30 gwei, $2K ETH |
+|---|---|---|
+| 10 | ~235,000 | ~$14 |
+| 50 | ~1,175,000 | ~$71 |
+| 100 | ~2,350,000 | ~$141 |
+
+All well within the 30M gas block limit. Resolution is a once-per-lifetime event per class (not per-epoch). No gas budget concern at current knower scale.
+
+**DISCOVERY_MODE epoch-level log-score (N_buckets=16):** Use approximate JS divergence (piecewise linear or table lookup for bucket-level log-scores) rather than exact ln() per bucket. Reduces to 1–2 ln() calls per epoch per knower.
+
+**Batching recommendation:**
+
+```solidity
+// Single OPERATOR_ROLE call at oracle resolution:
+function batchUpdateCredibilityRatio(
+    uint256 marketId,
+    address[] calldata knowers,
+    int256[] calldata logScoreDeltas,
+    uint256[] calldata epochWeights
+) external onlyRole(ORACLE_MANAGER_ROLE);
+```
+
+**Design law (#r184):** PRBMath SD59x18 `ln()` is the canonical log-score primitive. Gas cost is dominated by SSTORE writes (~20k/knower), not by ln() (~500/knower). Batch all knower updates in a single `batchUpdateCredibilityRatio` call at oracle resolution. DISCOVERY_MODE epoch-level computation uses JS divergence approximation, not per-bucket ln(). (#r184)
+
+---
+
+### Q2 (GovernanceParams contract interface — standalone upgradeable proxy vs storage module) → Standalone upgradeable proxy with TimelockController; all 5 v2.1 contracts read from IGovernanceParams interface (#r184)
+
+**Decision: Standalone upgradeable proxy (OpenZeppelin TransparentUpgradeableProxy + TimelockController).**
+
+Arguments: All 5 contracts read governance parameters. Parameter changes require time-lock per Invariant #129. Upgradeability independent of CoordinateRegistry is required.
+
+**Core IGovernanceParams interface:**
+
+```solidity
+interface IGovernanceParams {
+    struct PendingChange {
+        uint256 newValue;
+        uint256 effectiveEpoch;
+        bool    active;
+    }
+    struct ClassParams {
+        uint256 settlementChallengePeriod;
+        uint16  wMaxBps;
+        uint16  minChallengerCount;
+        bool    overrideActive;
+    }
+
+    function tierWeightBps(uint8 tier) external view returns (uint16);
+    function tierWeightAtEpoch(uint8 tier, uint256 epoch) external view returns (uint16);
+    function alphaLrBps() external view returns (uint16);
+    function decayPerEpochBps() external view returns (uint16);
+    function wMaxBps() external view returns (uint16);
+    function credibilityRatioFloorBps() external view returns (uint16);
+    function zoneAThresholdBps() external view returns (uint16);
+    function zoneBThresholdBps() external view returns (uint16);
+    function defaultSettlementChallengePeriod() external view returns (uint256);
+    function minChallengerCount() external view returns (uint256);
+    function classParams(uint256 classId) external view returns (ClassParams memory);
+    function wMaxBpsForClass(uint256 classId) external view returns (uint16);
+    function setClassParams(uint256 classId, ClassParams calldata params) external;
+    function queueGlobalParamChange(bytes32 paramId, uint256 newValue) external;
+    function executeGlobalParamChange(bytes32 paramId) external;
+    function cancelQueuedChange(bytes32 paramId) external;
+
+    event ParamChangeQueued(bytes32 indexed paramId, uint256 newValue, uint256 effectiveEpoch);
+    event ParamChangeExecuted(bytes32 indexed paramId, uint256 newValue, uint256 previousValue);
+    event ClassParamsSet(uint256 indexed classId, ClassParams params);
+}
+```
+
+**Per-class param resolution:**
+
+```solidity
+function wMaxBpsForClass(uint256 classId) external view returns (uint16) {
+    ClassParams memory cp = _classParams[classId];
+    return (cp.overrideActive && cp.wMaxBps > 0) ? cp.wMaxBps : _wMaxBps;
+}
+```
+
+**Retroactivity protection for tier weights:** ClaimEscrow commits `tier_weight_at_registration = IGovernanceParams.tierWeightAtEpoch(tier, currentEpoch)` at claim submission. This value is immutable for that position's lifecycle.
+
+**v2.1 deployment order:**
+1. GovernanceParams (root anchor)
+2. EATManager
+3. CredibilityAggregator_v1
+4. CoordinateRegistry_v1 + GestAltVault
+5. OracleManager
+6. BatchAuction / SettlementEngine
+
+**Design law (#r184):** GovernanceParams is a standalone upgradeable proxy deployed before all other contracts. Global parameter changes are time-locked (N_tier_weight_delay); per-class overrides are immediate. (#r184)
+
+---
+
+### Q3 (Document 1 — Engineering Handoff Architecture Overview) (#r184)
+
+**GestAlt v2.1 — Engineering Architecture Overview**
+
+*Intended reader: senior EVM smart contract engineer.*
+
+**What GestAlt Does**
+
+GestAlt is a clearing protocol for institutional event-contract positions. Participants post forfeitable collateral backing their price estimates for a market coordinate (an observable real-world event with a verifiable terminal value). At resolution, accurate participants earn rewards; inaccurate participants lose posted collateral. A credibility score accumulates over resolution history and determines weight in the protocol's consensus price, S_cred.
+
+**System Context**
+
+```
+Participants (Knowers / Challengers)
+        │
+        ▼
+CoordinateRegistry_v1  ←──(reads params)──  GovernanceParams
+        │
+        ├──► GestAltVault_v1        (collateral escrow, TOWL solvency)
+        ├──► CredibilityAggregator_v1  (S_cred, credibility_ratio, epoch buffer)
+        ├──► OracleManager_v1       (oracle authority, settlement override, challenge routing)
+        ├──► BatchAuction_v1        (epoch lifecycle, StateFreeze, SCHRODINGER, settlement)
+        └──► EATManager_v1          (Ethereum + Celestia audit trail, CID chain)
+```
+
+All five core contracts write to EATManager. All five read from GovernanceParams.
+
+**Contract Roles**
+
+| Contract | Primary responsibility |
+|---|---|
+| GovernanceParams | All configurable parameters with time-lock enforcement |
+| CoordinateRegistry_v1 | Market lifecycle; epistemically_live gate; TOWL zone gate on T3 registration |
+| GestAltVault_v1 | Three-silo collateral escrow; tier-weighted TOWL; Zone A/B/C solvency |
+| CredibilityAggregator_v1 | S_cred computation; credibility_ratio; epoch buffer; StateFreeze |
+| OracleManager_v1 | Two-layer oracle (WHEN/WHAT); oracle_settlement_override; challenge routing |
+| BatchAuction_v1 | 8-phase epoch lifecycle; SCHRODINGER challenge window; settlement finality |
+| EATManager_v1 | Ethereum Merkle root + Celestia warm tier; CID chain; compaction |
+
+**Operational Modes**
+
+- **Normal mode:** Full epistemic protocol active; full settlement path.
+- **Degraded mode** (DA outage): T3 installs suspended; deadlines auto-freeze; S_cred frozen.
+
+**Core Data Flow: Claim Lifecycle**
+
+```
+1. registerClaim(knower, marketId, price, escrow):
+   ├── CoordinateRegistry: epistemically_live gate; TOWL Zone < C gate
+   ├── GestAltVault: recordObligation(silo, tier_weight × escrow)
+   ├── CredibilityAggregator: registerKnower(marketId, knower)
+   └── EATManager: emit(ClaimRegistered)
+
+2. Per-epoch boundary: CredibilityAggregator.commitEpochBuffer(marketId)
+   └── S_cred updated from epoch buffer; W_MAX cap enforced
+
+3. T_anchor (OracleManager.confirmEvent()):
+   ├── BatchAuction.freezeForSettlement(marketId):
+   │   ├── CredibilityAggregator.freezeForSettlement(marketId) [atomic snapshot]
+   │   └── BatchAuction enters SCHRODINGER state
+   └── EATManager: emit(SettlementFrozen)
+
+4. SCHRODINGER window (challenge_period, Zone C tolling, SFP early exit)
+
+5. T_finality (SCHRODINGER → FINALIZED):
+   ├── CredibilityAggregator.batchUpdateCredibilityRatio() [log-scores applied]
+   ├── GestAltVault: releaseObligations() [correct] + slashEscrow() [wrong]
+   └── EATManager: emit(MarketFinalized)
+```
+
+**TOWL Solvency Model**
+
+Utilization = Σ (tierWeight[silo_i] × siloObligations[i]) / totalCollateralValue
+
+- Zone A (< 70%): full operation
+- Zone B (70–90%): governance alert
+- Zone C (≥ 90%): T3 suspended; SCHRODINGER clock tolled
+
+**What Is Net-New vs Scaffold**
+
+| Component | Scaffold state | Delta needed |
+|---|---|---|
+| GestAltVault (3-silo) | Correct skeleton, binary solvency only | Zone A/B/C tier-weighted TOWL |
+| OracleManager | Correct skeleton | ResolutionType routing; OracleManager↔BatchAuction wiring |
+| MarketFactory → CoordinateRegistry | Role-gated creation only | epistemically_live on-chain gate |
+| BatchAuction (SCHRODINGER) | Correct skeleton, S_cred = TODO | StateFreeze atomicity; clearing price; challenge period enforcement |
+| CredibilityAggregator | **Absent** | Entire contract — net-new; highest priority |
+| GovernanceParams | **Absent** | Entire contract — deploy first |
+| EATManager | **Absent** | Ethereum Merkle root + Celestia integration |
+
+**Four Critical Integration Points (must be tested before audit):**
+1. OracleManager → BatchAuction: `confirmResolution()` must call `freezeForSettlement()`. Currently disconnected.
+2. BatchAuction → CredibilityAggregator: `freezeForSettlement()` must be atomic. Currently missing.
+3. OracleManager → CredibilityAggregator: SETTLEMENT_OVERRIDE must call `applyOverrideRecalibration()`. Currently missing.
+4. GestAltVault → CredibilityAggregator: TOWL tier-weighted utilization requires knower credibility data. Currently no dependency.
+
+*(Document 1 v2.1. Source: knowledge-marketplace-aggregate.md #r184.)*
+
+---
+
+### Q4 (P2: Thin challenger microstructure — S_cred error bound at epistemically_live minimum) (#r184)
+
+**S_cred adversarial error model:**
+
+```
+ΔS_cred = α_a × δ × (1 − challenger_interception_rate)
+
+Where:
+  α_a ≤ W_MAX = 0.25  (per-agent weight cap)
+  δ = |adversary_claimed_price − truth|
+  challenger_interception_rate at N_C = 3 (minimum): ~0.30
+```
+
+At epistemically_live minimum (N_C = 3):
+
+```
+ΔS_cred_max ≈ 0.25 × δ × 0.70 = 0.175 × δ  (17.5% of adversary deviation)
+```
+
+Compared to epistemically_dead (N_C = 0):
+
+```
+ΔS_cred_max ≈ 0.25 × δ × 0.95 = 0.2375 × δ  (23.75%)
+```
+
+The live-vs-dead gap is ~6.25 percentage points. W_MAX is the dominant protection regardless of challenger count.
+
+**The key insight:** At thin challenger populations, the mechanism's epistemic guarantee shifts from *ex-ante* wrong-installation detection (challengers actively disputing) to *ex-post* credibility_ratio penalization (wrong knowers lose capital at oracle resolution). Both enforce the warranty; only the timing of enforcement differs.
+
+**Scaling:**
+
+| N_C | challenger_interception_rate (estimate) | ΔS_cred_max / δ |
+|---|---|---|
+| 0 (dead) | ~5% | 23.75% |
+| 3 (minimum) | ~30% | 17.5% |
+| 10 | ~55% | 11.25% |
+| 20 | ~70% | 7.5% |
+
+**Governance implication:** For binary-outcome classes (δ ≤ 1), W_MAX alone bounds S_cred error to ≤ 0.25 regardless of N_C. For high-stakes continuous-outcome classes (large δ), override minChallengerCount via GovernanceParams.setClassParams(classId, {minChallengerCount: 10}).
+
+**Design law (#r184):** S_cred adversarial error bound = W_MAX × (1 − challenger_interception_rate) × |adversary_deviation_from_truth|. At epistemically_live minimum, bound ≈ 17.5% of adversary deviation. Binary-outcome classes are adequately protected by W_MAX alone. High-stakes continuous-outcome classes require per-class minChallengerCount override above 3. (#r184)
+
+---
+
+## Structural Synthesis: Engineering Handoff — All Five Documents Specification-Complete (#r184)
+
+| Document | Status |
+|---|---|
+| Doc 1: Architecture overview | ✅ Produced this run |
+| Doc 2: Interface specs | ✅ CredibilityAggregator (#r183) + GovernanceParams (#r184) |
+| Doc 3: Security briefing | ✅ From #r182 adversarial simulation |
+| Doc 4: Governance params reference | ✅ #r180 + #r183 + GovernanceParams interface (#r184) |
+| Doc 5: Launch readiness checklist | ✅ #r180 + integration tests (#r183) + challenger density guidance (#r184) |
+
+---
+
+## Cumulative Invariants (additions through #r184)
+
+**Invariant #132 (#r184):** Log-score computation uses PRBMath SD59x18 `ln()` (~500 gas). All knower credibility_ratio updates at oracle resolution are batched in a single `batchUpdateCredibilityRatio` call. Per-knower resolution cost target: <50,000 gas. DISCOVERY_MODE epoch computation uses JS divergence approximation (1–2 ln() calls per knower per epoch, not 16).
+
+**Invariant #133 (#r184):** GovernanceParams is a standalone upgradeable proxy deployed before all other contracts. Global parameter changes are time-locked (N_tier_weight_delay); per-class overrides are immediate. Deployment order: GovernanceParams → EATManager → CredibilityAggregator → CoordinateRegistry + GestAltVault → OracleManager → BatchAuction.
+
+**Invariant #134 (#r184):** S_cred adversarial error bound = W_MAX × (1 − challenger_interception_rate) × |adversary_deviation|. At epistemically_live minimum (N_C = 3): bound ≈ 17.5% of adversary deviation. Binary-outcome classes protected by W_MAX alone. High-stakes continuous-outcome classes should override minChallengerCount via GovernanceParams.setClassParams().
+
+---
+
+## Run Log Update
+
+- **#r184** — 2026-04-04T04:22Z — On-chain log-score gas budget (PRBMath, <50k gas/knower, batch call); GovernanceParams full interface spec (standalone proxy, IGovernanceParams, per-class override, deployment order); Document 1 architecture overview (full engineering prose for smart contract engineer); P2 thin-challenger microstructure (17.5% S_cred bound at minimum; binary vs continuous distinction). Three new invariants (#132–#134). All five handoff documents specification-complete.
+
+---
+
+## Open Questions for #r185+
+
+1. **EATManager_v1 interface spec:** State variables, `commitEpochRecord()`, `verifyRecord()`, Celestia write batching, CID chain, degraded-mode flag, Arweave mirror trigger.
+
+2. **BatchAuction clearing price computation:** `candidatePrice` = credibility-weighted average. Should this use the final committed epoch's S_cred snapshot or a TWAP across the N_calibration epochs preceding T_anchor?
+
+3. **PositionToken.sol role in v2.1:** Is this WED/position accounting, or a legacy artifact? Does v2.1 require tradeable ERC-20 positions or non-transferable registry records?
+
+4. **Engineering handoff delivery format:** markdown in gestalt-contracts/docs/, separate spec repo, or KBase? Recommendation and execution path for the formatting run.
+
+*Last updated: #r184 — 2026-04-04T04:22Z*
