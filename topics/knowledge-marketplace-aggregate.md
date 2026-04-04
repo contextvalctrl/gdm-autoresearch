@@ -16118,3 +16118,218 @@ Per-class calibration within a type allows adjustment for coordinate volatility 
 3. **τ_bonus_shadow portability inflation ceiling — does it require explicit bounding beyond count-based carry-over?** The count-based carry-over cap (Invariant #20) limits magnitude by n_resolutions / N_anchor. If a shadow class has a very high τ_bonus (t_submit close to T_anchor_shadow, short window), credibility_ratio_shadow could be large. Carry-over is then credibility_ratio_shadow × carry_over_fraction — which could still be large even at 25% of an inflated credibility_ratio_shadow. Is an absolute magnitude cap on credibility_ratio_shadow warranted?
 
 4. **Zone_C impact on τ_bonus timing incentive:** τ_bonus rewards early submission relative to T_anchor_locked (the T_anchor known at submission). In Zone_C episodes, T_anchor_max may approach sooner than T_anchor_optimal (endogenous); knowers who submitted early expecting T_anchor_optimal to fire now have effectively lower τ_bonus (T_anchor_locked = T_anchor_max is farther from their submission time than T_anchor_optimal would have been). Is there a τ_bonus correction for Zone_C-forced T_anchor_max firing, or does τ_bonus accept this asymmetry as inherent governance cost?
+
+---
+
+## #r213 Contributions — 2026-04-04T09:22Z
+
+Addresses all four open questions from #r212. Net-new first-principles angle: the unknower bid as an epistemic demand signal and two-sided information extraction.
+
+---
+
+### Q1 (θ_convergence_floor and QUIESCENT_WINDOW interaction) → N_quiescent_max is the QUIESCENT_WINDOW analog of θ_convergence_floor; BINARY_ANCHOR fallback if announcement never detected (#r213)
+
+θ_convergence_floor in SMOOTH_DELTA mode sets a minimum Δ below which the mechanism treats S_cred as converged regardless of residual noise. Its purpose: prevent adversarial sustained disruption from holding Δ above θ_convergence indefinitely. The structural analog in QUIESCENT_WINDOW is a maximum wait epoch after which T_anchor fires unconditionally.
+
+**Resolution — N_quiescent_max as the QUIESCENT_WINDOW governance floor:**
+
+```
+QUIESCENT_WINDOW forced-T_anchor rule:
+  If t ≥ T_anchor_max:
+    T_anchor fires unconditionally (existing; all profiles share T_anchor_max)
+
+  If announcement epoch t* was detected AND t - t* ≥ N_quiescent_max AND quiescence criteria not met:
+    T_anchor fires at T_anchor_min_post_announcement = t* + N_quiescent_max
+    (governance-set; default = N_calibration; bounded [N_calibration/2, 2×N_calibration])
+
+  If announcement epoch t* never detected AND t ≥ T_anchor_max:
+    BINARY_ANCHOR fallback: T_anchor fires at T_anchor_max
+    EAT: { type: t_anchor, profile: QUIESCENT_WINDOW, announcement_detected: false,
+           fallback: BINARY_ANCHOR_MAX }
+```
+
+**Three-case forced-T_anchor taxonomy for QUIESCENT_WINDOW:**
+
+| Case | Trigger | Outcome |
+|---|---|---|
+| Normal | Post-announcement quiescence confirmed | T_anchor fires at quiescence threshold |
+| Quiescence delayed | t* detected but post-quiescence window exceeded N_quiescent_max | T_anchor fires at t* + N_quiescent_max |
+| No announcement | t* never detected before T_anchor_max | BINARY_ANCHOR fallback at T_anchor_max |
+
+**Design law (#r213):** Every convergence profile has a governance-calibrated hard fallback that forces T_anchor at a bounded worst-case epoch. SMOOTH_DELTA's fallback is θ_convergence_floor; QUIESCENT_WINDOW's fallback is N_quiescent_max post-announcement and BINARY_ANCHOR at T_anchor_max if no announcement detected. The fallback prevents both adversarial delay and governance-indeterminate waiting. (#r213)
+
+---
+
+### Q2 (BINARY_ANCHOR and early on-chain event — T_anchor_min as hard floor) → T_anchor fires at max(T_oracle_available_onset, T_anchor_min); T_anchor_min is a hard participation floor, not advisory (#r213)
+
+**Why T_anchor_min must be a hard floor:**
+
+T_anchor_min represents the minimum knower participation window. If an on-chain event fires before T_anchor_min, knowers who planned submissions around T_anchor_min have not yet had a full opportunity to refine estimates or challenge early claims. Settlement triggered at T_oracle_available < T_anchor_min would settle on a thin S_cred that systematically underweights late-arriving but potentially more accurate knower input.
+
+**Resolution — T_anchor_fires = max(T_oracle_available_onset, T_anchor_min):**
+
+```
+On BINARY_ANCHOR class, oracle availability detection:
+  CoordinateRegistry.notifyOracleAvailable(classId, epoch_available):
+    stores oracle_available_epoch = epoch_available
+    emits EAT: oracle_availability_onset { class_id, epoch_available }
+
+T_anchor trigger (BINARY_ANCHOR profile):
+  T_anchor_fires = max(oracle_available_epoch, T_anchor_min)
+  If oracle_available_epoch < T_anchor_min:
+    EAT: { type: t_anchor_deferred, reason: "T_anchor_min_floor",
+           oracle_available_epoch, T_anchor_min, T_anchor_effective: T_anchor_min }
+    — knowers are notified oracle is available; they can refine estimates until T_anchor_min
+  If oracle_available_epoch >= T_anchor_min:
+    T_anchor fires immediately at oracle_available_epoch
+```
+
+**Epistemic benefit of early oracle notification before T_anchor fires:** When notifyOracleAvailable fires before T_anchor_min, knowers learn the oracle value is determined. Rational knowers update remaining claims toward the known outcome — S_cred converges rapidly during [oracle_available_epoch, T_anchor_min]. Settlement price at T_anchor_min is more accurate than if oracle availability were hidden, without compromising the participation floor.
+
+**Design law (#r213):** T_anchor_min is a hard participation-floor guarantee, not an advisory. For BINARY_ANCHOR classes: T_anchor fires at max(oracle_available_onset, T_anchor_min). Early oracle notification is published immediately; knowers use the remaining window to refine. (#r213)
+
+---
+
+### Q3 (τ_bonus_shadow portability inflation ceiling — absolute magnitude cap warranted) → credibility_ratio_shadow_max = N_calibration × log_score_unit_max; cap enforced per knower per class (#r213)
+
+**The inflation path:** Short T_anchor_shadow window → τ_bonus near (1 + τ_scale_max) ≈ 1.33. credibility_ratio_shadow can accumulate large values per epoch if the class has a compressed scheduling window. Portability carry-over = credibility_ratio_shadow × (n_shadow_resolutions / N_anchor). At n = N_anchor/4 and credibility_ratio_shadow = 4× normal (τ_bonus-inflated), carry-over = 1.0× normal — the count-based cap does not contain magnitude-inflation from τ_bonus.
+
+**Resolution:**
+
+```
+credibility_ratio_shadow_max(class_i, knower_a) =
+    N_calibration × log_score_unit_max   [hard cap; governance-set range [0.5×, 1.5×] of formula]
+
+Enforcement in CredibilityAggregator.updateShadowCredibility:
+    credibility_ratio_shadow[a][class_i] =
+        min(credibility_ratio_shadow_max, credibility_ratio_shadow[a][class_i] + τ_bonus × log_score_delta)
+```
+
+**Properties:**
+1. Shadow credibility cannot exceed "N_calibration perfect live epochs" regardless of τ_bonus or window compression.
+2. Portability carry-over is bounded at ≤ carry_over_fraction × N_calibration × log_score_unit_max — same as N_calibration live epochs at full carry-over.
+3. τ_bonus still applies per epoch (incentive intact); ceiling prevents compounding across many compressed epochs.
+
+**Design law (#r213):** credibility_ratio_shadow is capped at N_calibration × log_score_unit_max per knower per class. Shadow portability does not exceed the equivalent of N_calibration perfect live epochs regardless of τ_scale or shadow window design. (#r213)
+
+---
+
+### Q4 (τ_bonus correction for Zone_C-forced T_anchor_max) → No correction; T_anchor_locked = T_anchor_max is the contract; Zone_C is expectation risk accepted at submission (#r213)
+
+**Formal argument:**
+
+Knower submitted at t_submit. T_anchor_locked = T_anchor_max (Invariant #240). Zone_C forces T_anchor_max to fire instead of T_anchor_optimal. The τ_bonus is:
+```
+τ_bonus = 1 + τ_scale × (1 − t_submit / T_anchor_max)
+```
+
+This is exactly the contract. Zone_C does not change T_anchor_max (Invariant #248). T_anchor fires at T_anchor_max. The calculation is correct; no asymmetry exists at the contract level.
+
+**Where the perceived asymmetry arises:** Knowers who expected endogenous T_anchor_optimal (faster) would have expected a higher τ_bonus. Zone_C preventing this is pure expectation risk — identical to a COMMITTEE oracle that announces later than expected. This is a known submission-time risk.
+
+**Design law (#r213):** τ_bonus uses T_anchor_locked = T_anchor_max at submission. Zone_C cannot change T_anchor_max. Zone_C τ_bonus impact is expectation risk accepted at submission time. No correction mechanism is warranted or correct. (#r213)
+
+---
+
+### Net-New First-Principles Pass: The Unknower Bid as an Epistemic Demand Signal (#r213)
+
+**The structural asymmetry:** In 212 runs, the unknower has been treated primarily as a fee-payer. But the magnitude and timing of unknower EQ bids is itself an information signal about coordinate epistemic value — and the mechanism has not extracted this signal.
+
+**What a high q_bonus EQ bid reveals:**
+1. **High private value for S_cred accuracy:** The unknower has an asymmetric payoff depending heavily on coordinate accuracy — signals strategic institutional importance.
+2. **High urgency:** The unknower needs S_cred now — signals an imminent decision window and possibly that something relevant to coordinate c is about to happen.
+
+**Bilateral flow gap:** The three conditions for bilateral flow (#r204/§4) had a gap: the mechanism does not use EQ bid density as a feedback signal to knowers about where to direct epistemic effort. Information flows from knowers to unknowers, but demand information does not flow back. This breaks the bilateral circuit.
+
+**Formal: Epistemic Demand Signal (EDS) mechanism (#r213):**
+
+```
+EDS(c, t) = rolling_median_q_bonus(c, [t - N_eds_window, t]) / q_fee_base(c)
+  N_eds_window = N_calibration / 2
+
+EDS(c, t) > EDS_threshold_high:
+  → EAT event: epistemic_demand_signal { class_id, EDS_value, epoch }
+  → visible to all registered knowers for class c
+  → governance advisory: prioritise class c in bootstrap/resource allocation
+
+EDS(c, t) < EDS_threshold_low:
+  → demand thinning signal; governance advisory to review potential DELIST_PENDING trigger
+```
+
+**EDS does NOT modify S_cred weighting, credibility_ratio updates, or τ_bonus directly.** It is an informational layer only.
+
+**Attack resistance:** An adversary inflating q_bonus to generate a false EDS pays (q_bonus > q_fee_base) per query — a direct cost distributed to knowers. There is no direct payoff from a false EDS signal unless the adversary profits from attracting specific knowers — which requires actually improving S_cred in the desired direction. The adversary can only profit if the false demand signal generates real information supply they can then exploit, which is self-defeating.
+
+**EDS-weighted welfare (#r209/Q4 + #r234 extension):**
+
+```
+coverage_weighted(t) = Σ_c EDS(c,t) × is_epistemically_live(c,t) / Σ_c EDS(c,t)
+W_demand_adjusted(t) = coverage_weighted(t) × accuracy(t) - transaction_cost(t)
+```
+
+coverage_weighted reweights class coverage by actual unknower demand. A live class with zero demand contributes little to welfare; a high-EDS class contributes proportionally more.
+
+**The bilateral circuit, completed:**
+> - Knowers (high-information) → S_cred → Unknowers (low-information): credibility transfer.
+> - Unknowers (high-valuation signals) → EDS → Knowers (epistemic resource allocation): demand transfer.
+
+Prior runs modelled only the forward direction. EDS adds the feedback direction. Both are necessary for a true knowledge marketplace.
+
+**Minimal mechanism extension (T5 QUERY update):**
+
+```
+T5 QUERY(u, coord, q_bonus):
+  require fee_paid = q_fee_base(coord) + q_bonus
+  distribute fee to knowers proportional to credibility_ratio
+  update EDS(coord, current_epoch) with q_bonus magnitude
+  if EDS crosses EDS_threshold_high: emit epistemic_demand_signal event
+  return S_cred_history[latest_committed_epoch]
+```
+
+One additional operation to T5. No new contracts. EDS requires one new storage variable per class per epoch (rolling median accumulator). (#r213)
+
+---
+
+## Structural Synthesis: #r213
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| QUIESCENT_WINDOW N_quiescent_max + BINARY_ANCHOR fallback | Every convergence profile has a hard fallback | Prevents COMMITTEE non-announcement from blocking settlement indefinitely |
+| BINARY_ANCHOR T_anchor_min hard floor | T_anchor fires at max(oracle_available_onset, T_anchor_min) | Participation floor protected; early notification accelerates knower convergence |
+| credibility_ratio_shadow_max cap | N_calibration × log_score_unit_max; prevents τ_bonus shadow inflation | Shadow portability does not exceed equivalent perfect live credential |
+| τ_bonus under Zone_C T_anchor_max | No correction; T_anchor_locked = T_anchor_max is the contract | Zone_C impact is known expectation risk; mechanism correct as designed |
+| EDS (Epistemic Demand Signal) | Unknower q_bonus density closes the bilateral information circuit | EDS completes knower↔unknower feedback loop; EDS-weighted coverage refines W(t) |
+
+---
+
+## Cumulative Invariants (#r213)
+
+**Invariant #251 (#r213):** QUIESCENT_WINDOW convergence profile has a forced-T_anchor fallback: N_quiescent_max epochs post-announcement (default N_calibration). If announcement never detected before T_anchor_max, BINARY_ANCHOR fallback fires at T_anchor_max. All three convergence profiles share T_anchor_max as the unconditional hard ceiling.
+
+**Invariant #252 (#r213):** For BINARY_ANCHOR classes, T_anchor fires at max(oracle_available_onset, T_anchor_min). T_anchor_min is a hard participation floor. Early oracle availability is published immediately via notifyOracleAvailable; knowers refine estimates in the remaining window. Early notification does not compromise the participation floor.
+
+**Invariant #253 (#r213):** credibility_ratio_shadow is capped at N_calibration × log_score_unit_max per knower per class. This bounds τ_bonus-induced shadow inflation. Shadow portability carry-over cannot exceed the equivalent of N_calibration perfect live epochs regardless of τ_scale or T_anchor_shadow window compression.
+
+**Invariant #254 (#r213):** τ_bonus uses T_anchor_locked = T_anchor_max at submission (Invariant #240). Zone_C cannot change T_anchor_max (Invariant #248). Zone_C impact on realized τ_bonus is expectation risk accepted at submission time. No correction mechanism is warranted or correct.
+
+**Invariant #255 (#r213):** Epistemic Demand Signal (EDS): rolling median q_bonus over N_calibration/2 epochs, normalised by q_fee_base. EDS events emitted at governance-set thresholds. EDS is informational only — does not modify S_cred, credibility_ratio, or τ_bonus. EDS completes the bilateral information circuit: knowers→unknowers (S_cred) and unknowers→knowers (demand signal). W_demand_adjusted(t) = coverage_weighted(t) × accuracy(t) − transaction_cost(t), where coverage_weighted reweights by EDS.
+
+---
+
+## Run Log Update
+
+- **#r213** — 2026-04-04T09:22Z — Q1: QUIESCENT_WINDOW N_quiescent_max fallback; BINARY_ANCHOR fallback when announcement never detected; all profiles share T_anchor_max hard ceiling. Q2: BINARY_ANCHOR T_anchor_min hard floor; T_anchor fires at max(oracle_available_onset, T_anchor_min); early oracle notification accelerates knower convergence in remaining window. Q3: credibility_ratio_shadow_max = N_calibration × log_score_unit_max; absolute cap prevents τ_bonus shadow inflation; cap enforced in CredibilityAggregator. Q4: No τ_bonus correction for Zone_C-forced T_anchor_max; Zone_C impact is known expectation risk; mechanism correct as designed. Net-new: EDS (Epistemic Demand Signal) — unknower q_bonus density as epistemic demand feedback; bilateral information circuit closed; T5 QUERY extended with EDS accumulation; W_demand_adjusted(t) with EDS-weighted coverage. Invariants #251–#255.
+
+---
+
+## Open Questions for #r214+
+
+1. **EDS adversarial cost precision:** q_bonus paid by adversary is distributed to knowers — not burned. Is the adversarial cost truly a deterrent (transfer to knowers) vs. a potential payoff from redirecting knower attention to a class where the adversary has an informational edge?
+
+2. **EDS threshold calibration derivation:** EDS_threshold_high and EDS_threshold_low are governance-set. From what reference distribution should they be derived? Candidate: rolling 90th/10th percentile of cross-class EDS at class registration.
+
+3. **Multi-shadow-class portability chaining:** A knower participates in 3 shadow classes all targeting the same clearing class, each reaching credibility_ratio_shadow_max. Portability carry-over is applied 3×. Does the receiving clearing class need a total cross-source carry-over cap?
+
+4. **BINARY_ANCHOR early oracle notification and S_cred manipulation window:** Once notifyOracleAvailable fires, anyone who reads the oracle value first can submit claims aligned with it before full propagation. Does BINARY_ANCHOR require a simultaneous notification mechanism or propagation delay, or is τ_bonus already sufficient (early correct claims were submitted before notification; late-aligned claims earn lower τ_bonus)?
+
+*Last updated: #r213 — 2026-04-04T09:22Z*
