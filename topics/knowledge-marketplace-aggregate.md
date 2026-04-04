@@ -18326,3 +18326,230 @@ With #r222, the four final open questions are resolved. Key contributions:
 - **#r222** — 2026-04-04T11:02Z — Q1: η_realized_simple as optional advisory Ω(t) field; 4-epoch EMA; GREEN/YELLOW/RED display; no v2.1 gate; v2.3 upgrade path noted. Q2: DEGRADED_SOURCE auto-expiry at β_remaining < min_chain_weight_fraction × β_escrow_initial; escrow returned not slashed; corroboration sequence re-indexed forward-only. Q3: Irrecoverability is admission gate only; all outstanding settlement logic proceeds unchanged; post-irrecoverability archiving mirrors shadow-class ARCHIVED gate. Q4: N_max_bounds=100, N_max_eigen=30; cluster decomposition O(N²) graph BFS + per-cluster eigenvalue; ρ_cluster_threshold=0.20; additivity exact below threshold; cluster_size_warning if |C_m| > N_max_within_cluster. Design law reconfirmed: solvency gates never override committed obligations. Invariants #295–#298.
 
 *Last updated: #r222 — 2026-04-04T11:02Z*
+
+---
+
+## #r223 Contributions — 2026-04-04T11:12Z
+
+No open questions carried forward from #r222 (all four resolved). This run opens three new first-principles threads identified as structural gaps in the mechanism's current design.
+
+---
+
+### Thread 1: Coordinated Prior Alignment — The Epistemic Bubble Attack (#r223)
+
+**Gap in §6 attack surface:** The attack surface covers individual manipulation, bluffing, sybil, wash credibility, collusion, cheap talk, and oracle gaming. It does not separately address *coordinated prior alignment (CPA)* — where multiple epistemically sincere knowers share a common wrong prior through correlated information sources rather than coordinated deception.
+
+**The formal distinction:**
+- **Collusion:** agents conspire to misrepresent their private signals. Detectable as coordinated signal deviation from oracle truth.
+- **CPA:** agents have correctly-derived-from-their-sources private signals, all pulled from the same biased upstream source. Each agent is honest; the information pool is systematically correlated.
+
+CPA is harder to defend against because it generates no honesty violation — the mechanism's log-score and credibility_ratio tracking cannot flag it until oracle resolution, by which time unknowers have paid for the biased S_cred.
+
+**Epistemic bubble condition:**
+
+```
+Let ρ_prior = average pairwise correlation between knower private signals
+
+S_cred_variance_effective ≈ σ_claim² × [(1 − ρ_prior)/N_knowers + ρ_prior]
+
+Epistemic bubble: ρ_prior → 1
+  → S_cred_variance_effective → σ_claim²  (single-agent effective; more knowers add no value)
+  → S_cred appears highly converged (low Δ_epoch_S_cred) but is only as accurate as one signal
+
+Efficient aggregation: ρ_prior → 0
+  → S_cred_variance_effective → σ_claim²/N_knowers  (standard averaging reduction)
+```
+
+The W_max per-agent cap (Invariant #71) addresses single-agent influence concentration; it does not address correlated-agent clusters. A CPA attack with N_attack agents at W_max each, all correlated at ρ_prior ≈ 1, collectively achieves influence = N_attack × W_max — far above W_max — because the correlation is not visible to the weighting mechanism.
+
+**Proposed defence — information lineage tracking (#r223):**
+
+At T3 claim submission, knower optionally declares a lineage hash:
+```
+claim.lineage_declaration = {
+    primary_source_hash:  keccak256(source_identifier)   [opaque; self-declared]
+    lineage_cluster_id:   governance-registered enum      [e.g., "macro_consensus", "proprietary_model"]
+}
+```
+
+Credibility weighting adjustment:
+```
+effective_weight(a, c, t) = w_a × (1 − CPA_penalty(a, c, t))
+
+diversity_factor(c, t) = N_distinct_lineage_clusters_represented / N_knowers_active
+CPA_penalty(a, c, t)   = max(0, (1 − diversity_factor) × ρ_cluster_weight_fraction)
+```
+
+When diversity_factor is low (all knowers from one source cluster), S_cred confidence is self-deflated — correctly widening the effective S_cred variance signal for unknowers querying via EQ.
+
+**Post-hoc CPA detection:**
+
+Lineage declarations are voluntary. False declarations are detectable post-oracle: if N claims from the *same declared cluster* converge on a wrong outcome, the protocol infers ρ_prior_cluster ≈ 1 and applies a retroactive `credibility_ratio_cluster_penalty` to all cluster members. Detection uses:
+```
+CPA_trigger(c, epoch_t):
+  oracle_resolved(c, t) = s_oracle
+  same_cluster_wrong_fraction = |{a : lineage_a = cluster_k AND d_a ≠ s_oracle}|
+                               / |{a : lineage_a = cluster_k}|
+  CPA_triggered iff same_cluster_wrong_fraction > CPA_detection_threshold (default 0.70)
+```
+
+**In DISCOVERY_MODE:** Unknowers querying via EQ receive diversity_factor as S_cred metadata — they can request "how diverse are the information sources backing this S_cred?" before paying q_bonus. Low diversity_factor is a credibility discount signal available to informed unknowers.
+
+**Invariant property:** CPA_penalty reduces knower rewards when the pool is homogeneous — it is a calibration mechanism, not a punishment. Penalty is proportional to homogeneity, not to wrongness. This preserves incentive compatibility: honest knowers with diverse sources are unaffected. (#r223)
+
+---
+
+### Thread 2: Epoch Microstructure — Formal MEV and Timing Comparison (#r223)
+
+The cron's original scope explicitly included comparison against LMSR, standard orderbooks, and batch auctions. Prior runs handled this conceptually; this is the final formal microstructure statement.
+
+**Taxonomy:**
+
+| Mechanism | Revelation timing | State update | Front-running | MEV surface |
+|---|---|---|---|---|
+| LMSR | Continuous | Cost fn instantaneous | None — first mover extracts full price impact | Trade ordering MEV; AMM sandwich attacks |
+| LOB (Limit Order Book) | Continuous, ordered | Fill at matching price | Cancel-insert; queue priority | Full MEV: sandwich, front-run, back-run, spoofing |
+| Batch auction (standard) | Discrete epochs; blind within epoch | Uniform clearing price at close | Strong within epoch | MEV at epoch boundary only; last-look submission timing |
+| GestAlt S_cred epoch | Discrete epochs; claims committed within epoch | Credibility-weighted state update at epoch boundary | Intra-epoch: no ordering effect on S_cred | MEV surface enumerated below |
+
+**GestAlt five MEV surfaces — formal analysis:**
+
+```
+MEV_1: Intra-epoch claim ordering
+  Possible? No. CredibilityAggregator applies all epoch claims at boundary via batch integration.
+  Block-level ordering within an epoch has zero effect on S_cred weight.
+
+MEV_2: τ_bonus epoch timing advantage
+  Possible? Yes — but by protocol design. τ_bonus rewards claims submitted in earlier epochs.
+  Extractable by external miner/sequencer? No — the knower must submit in the epoch; the miner
+  cannot submit a claim on the knower's behalf and claim τ_bonus. Incentive is earned, not extracted.
+
+MEV_3: Oracle front-running (Window B)
+  Partially closed by oracle read-lock (#r214/Invariant #260).
+  Residual: off-chain observation of oracle before notifyOracleAvailable; no claim credit extractable.
+
+MEV_4: Challenge window sandwich
+  Possible? No. Challenge window does not create a price impact that can be sandwiched.
+  Challenger earns slash proceeds if correct; no continuous price discovery at challenge time.
+
+MEV_5: EQ query race
+  Possible? Trivially observable — first query extracts S_cred. But S_cred is public state; EQ
+  queries are non-exclusive. Multiple EQ queries in the same epoch all succeed at same S_cred.
+  No structural MEV advantage to speed.
+```
+
+**Comparative conclusion:**
+
+LMSR and LOB both expose continuous trade-ordering MEV. Standard batch auctions eliminate intra-epoch ordering MEV but are blind instruments (no credibility weighting; no Phase 2 maintenance). GestAlt's epoch structure largely eliminates on-chain MEV on the epistemic state — the τ_bonus epoch timing advantage is a designed knower incentive, not a sequencer-extractable surplus.
+
+**GestAlt vs standard batch auction (the closest structural sibling):**
+
+Standard batch auctions produce a clearing price per epoch. GestAlt produces a credibility-weighted epistemic state update. Standard batch auctions have no mechanism for credibility calibration (every "bid" is equally weighted); GestAlt's weighting is the core distinction. The batch timing structure is similar; the epistemic quality guarantee is uniquely GestAlt's. (#r223)
+
+---
+
+### Thread 3: Committee Oracle Endogeneity — The S_cred Feedback Loop (#r223)
+
+**Structural gap:** §6 attack surface covers external oracle manipulation. It does not cover the case where the oracle mechanism itself is epistemically polluted by observing the signal it adjudicates — committee oracle endogeneity.
+
+**Formal model:**
+
+Let s_true = ground truth; S_cred_t = mechanism estimate at committee vote time; s_committee = committee vote.
+
+If committee members observe S_cred_t before voting:
+```
+s_committee = (1 − α_ind) × s_true + α_ind × S_cred_t
+
+α_ind ∈ [0, 1]: committee anchoring susceptibility (unobservable; varies by committee member)
+```
+
+When α_ind > 0, oracle_declared ≠ s_true. The mechanism rewards knowers who were right about s_committee (the contaminated oracle) not s_true (ground truth). credibility_ratio calibration tracks oracle_declared, not s_true — the calibration signal itself is polluted.
+
+**CPA + committee endogeneity compounding attack:**
+
+```
+Step 1: CPA knowers drive S_cred_t toward s_wrong.
+Step 2: Committee observes S_cred_t = s_wrong; anchors (α_ind > 0).
+Step 3: oracle_declared = s_wrong.
+Step 4: Protocol rewards wrong-prior knowers; slashes correct-prior knowers.
+Step 5: Correct-prior knowers exit; diversity_factor collapses; CPA attack self-perpetuates.
+Step 6: Class enters permanent epistemic failure while all consistency metrics appear healthy.
+```
+
+This is the only identified compounding attack in the mechanism's design. Thread 1 (CPA) and Thread 3 (committee endogeneity) individually are recoverable via credibility_ratio tracking after enough resolutions. Together, they compound into a self-reinforcing failure that the current mechanism cannot detect before it is complete.
+
+**Three defences:**
+
+**Defence A — S_cred blinding for COMMITTEE classes:**
+Require committee votes to be submitted before S_cred epoch publication for the resolution epoch. Enforced by:
+```
+class registration parameter: T_committee_vote_deadline < T_epoch_S_cred_publication
+
+Verification: committee vote EAT timestamp < S_cred epoch-publication EAT timestamp
+  → committee cannot have read S_cred_t before voting
+  → α_ind = 0 by enforcement (not by trust)
+```
+Implementation: S_cred is epoch-published at epoch boundary; committee vote is collected during the epoch before boundary. The committee votes on the coordinate value as-of the prior epoch's S_cred (N−1 epoch lag). A one-epoch lag is acceptable — the committee's independent signal should not depend on the concurrent S_cred.
+
+**Defence B — Multi-committee diversification for high-risk classes:**
+For COMMITTEE classes with low diversity_factor history or high ρ_prior risk:
+```
+k_committees_required = governance-set [2, 5]; default 3 for high-EDS/high-WED classes
+oracle_declared = median(committee_votes_k)
+  weighted by inter-committee agreement rate (committees that consistently agree with final oracle get higher weight)
+```
+
+**Defence C — Long-term anchoring bias detection:**
+The credibility_ratio tracking can be applied to committee members themselves. Over N_calibration resolutions, a committee member with high α_ind will show: votes consistently closer to S_cred_prior than to final ground-truth (when ground-truth can be verified independently). This is detectable as a systematic anchoring coefficient. Committee members with anchoring bias are flagged; governance can weight their votes down.
+
+**Governance implementation — `committee_s_cred_blind_attestation` parameter (#r223):**
+
+```
+class_registration for COMMITTEE oracle_type:
+  committee_s_cred_blind: true/false
+    true:  T_committee_vote_deadline < T_epoch_S_cred_publication enforced on-chain
+    false: class flagged as endogeneity_risk; EAT field: endogeneity_risk_flag = true
+
+High-value COMMITTEE classes (WED > WED_institutional_threshold): committee_s_cred_blind = true required
+  Governance enforcement: class blocked from epistemically_live = true if false and WED > threshold
+```
+
+---
+
+## Structural Synthesis: #r223
+
+| Thread | New structural insight | Mechanism implication |
+|---|---|---|
+| CPA (epistemic bubble attack) | ρ_prior signal correlation is distinct from and invisible to existing collusion detection; CPA + endogeneity compounds | Lineage declaration + diversity_factor weighting + post-hoc cluster penalty; DISCOVERY_MODE EQ metadata |
+| Epoch microstructure MEV analysis | GestAlt largely eliminates epistemic-state MEV; τ_bonus is designed incentive not extractable surplus; batch structure is best-in-class vs LMSR and LOB | Formal closure of batch-auction comparison from cron's original scope |
+| Committee oracle endogeneity | COMMITTEE oracle feedback loop + CPA is only identified compounding failure mode; invisible to consistency metrics | S_cred blinding (T_committee_vote_deadline enforcement); multi-committee; anchoring bias detection; committee_s_cred_blind_attestation parameter |
+
+---
+
+## Cumulative Invariants (#r223)
+
+**Invariant #299 (#r223):** Coordinated Prior Alignment (CPA) is distinct from collusion: agents are epistemically sincere but share correlated information sources. S_cred_variance_effective ≈ σ²[(1−ρ_prior)/N + ρ_prior]; W_max cap does not bound CPA. Defence: lineage_declaration (voluntary; optional at T3 submission), diversity_factor = N_distinct_lineage_clusters / N_active, CPA_penalty = (1−diversity_factor) × ρ_cluster_weight_fraction reduces effective_weight of homogeneous pools. Post-hoc CPA detection: same_cluster_wrong_fraction > 0.70 at oracle resolution triggers retroactive credibility_ratio_cluster_penalty. EQ metadata includes diversity_factor for DISCOVERY_MODE unknowers.
+
+**Invariant #300 (#r223):** GestAlt epoch microstructure eliminates five candidate MEV surfaces: (1) intra-epoch ordering — zero effect on batch S_cred integration; (2) τ_bonus timing — designed incentive, not sequencer-extractable; (3) oracle front-running — closed by oracle read-lock (Invariant #260); (4) challenge window sandwich — no price impact at challenge submission; (5) EQ query race — S_cred is public; queries are non-exclusive. GestAlt is MEV-minimal on epistemic state. Comparison: LMSR and LOB both expose trade-ordering MEV; standard batch auctions share epoch structure but lack credibility weighting.
+
+**Invariant #301 (#r223):** COMMITTEE oracle endogeneity: committee members observing S_cred before voting creates epistemic feedback (s_committee = (1−α_ind)×s_true + α_ind×S_cred_t). CPA + committee endogeneity is the only identified compounding failure mode — self-reinforcing and invisible to consistency metrics. Three defences: (A) S_cred blinding by enforcing T_committee_vote_deadline < T_epoch_S_cred_publication on-chain; (B) multi-committee median (k_committees_required = 3 for high-value classes); (C) long-term committee anchoring-bias detection via calibration tracking. `committee_s_cred_blind_attestation` registration parameter required for high-WED COMMITTEE classes; epistemically_live gate blocked if false above WED_institutional_threshold.
+
+---
+
+## Run Log Update
+
+- **#r223** — 2026-04-04T11:12Z — Thread 1: CPA (epistemic bubble attack); ρ_prior signal correlation distinct from collusion; S_cred_variance_effective collapses at ρ_prior→1 despite large N; lineage_declaration + diversity_factor + CPA_penalty + post-hoc cluster penalty; EQ metadata in DISCOVERY_MODE. Thread 2: Formal MEV surface analysis (5 surfaces); GestAlt epoch structure eliminates all five; τ_bonus = designed incentive not extractable MEV; formal closure of cron's batch-auction comparison scope. Thread 3: COMMITTEE oracle endogeneity formalised; CPA + endogeneity = only identified compounding failure; S_cred blinding (T_committee_vote_deadline enforcement), multi-committee, anchoring-bias detection; committee_s_cred_blind_attestation required for high-WED classes; epistemically_live gate blocked if absent. Invariants #299–#301.
+
+---
+
+## Open Questions for #r224+
+
+1. **CPA detection threshold calibration:** same_cluster_wrong_fraction > 0.70 triggers CPA. How is 0.70 derived? At what cluster size N_cluster and wrong fraction f does the false-positive rate (innocent homogeneous knowers who happen to be wrong) become indistinguishable from genuine CPA?
+
+2. **S_cred blinding enforcement on public blockchains:** S_cred is public state on-chain. Enforcing T_committee_vote_deadline before S_cred epoch publication is verifiable by timestamp. But committee members can read prior-epoch S_cred and use it as a proxy for current-epoch prediction. Is a one-epoch lag sufficient blinding, or must the protocol use a cryptographic commit-reveal scheme for S_cred publication?
+
+3. **GestAlt's "bid-ask spread" equivalent:** For completeness of the LOB comparison, what is the cost an unknower pays for EQ access to S_cred vs the cost to self-compute S_cred from public EAT records? The spread = q_fee_base + q_bonus − self_computation_cost. If self_computation_cost → 0 (public state), does the EQ market collapse except for trust/speed premia?
+
+4. **Multi-committee oracle and credibility_ratio model:** If k_independent_committees vote and their votes are medianised, should each committee (as a unit) have its own credibility_ratio tracked? Or is the committee tracked as an oracle source (with credibility at the oracle-type level, not the committee level)?
+
+*Last updated: #r223 — 2026-04-04T11:12Z*
