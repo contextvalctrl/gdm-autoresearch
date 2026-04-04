@@ -10462,4 +10462,91 @@ For multi-collateral support (v2.1 question #r186/Q4): if GestAltVault supports 
 
 4. **PositionToken multi-collateral WED_clearing:** If GestAltVault supports multiple collateral assets, collateralPerToken is not a single constant. Restrict v2.1 to single-collateral, or aggregate in USD terms via an oracle?
 
-*Last updated: #r185 — 2026-04-04T04:32Z*
+*Last updated: #r186 — 2026-04-04T04:42Z*
+
+---
+
+## #r186 Contributions — 2026-04-04T04:42Z
+
+**Phase: Engineering handoff delivery. All five v2.1 handoff documents written to `gestalt-contracts/docs/`. Addresses open Q1–Q4 from #r185.**
+
+---
+
+### Q1 (EATManager keeper architecture — keeper failure vs degraded mode) → Keeper failure is off-chain alerting only; EATManager enters degraded mode only on explicit DA_LIVENESS_ORACLE_ROLE call; celestiaTxHash=0x0 retry path (#r186)
+
+**Resolution:**
+
+`commitEpochRecord(epoch, root, celestiaTxHash)` is called by the keeper after Celestia blob write. If the keeper misses the window:
+- Epoch record is committed with `celestiaTxHash = 0x0`.
+- A second `commitEpochRecord` with a non-zero TX hash overwrites the zero-hash commit for the same epoch.
+- EATManager does **not** automatically enter degraded mode on keeper failure.
+
+Keeper failure tracking is off-chain: the governance alert system monitors for epochs with `celestiaTxHash == 0x0` persisting beyond a keeper SLA (e.g., 15 minutes) and pages the operator. `enterDegradedMode()` requires a deliberate call from `DA_LIVENESS_ORACLE_ROLE` — a governance-registered liveness probe oracle that confirms Celestia is actually unavailable.
+
+**Why separate keeper-failure from DA outage:** A keeper crash is an operational incident; a DA outage is a systemic protocol event with different consequences (T3 suspension, epoch freeze). Conflating them would cause false degraded-mode entries from routine keeper downtime.
+
+**Design law (#r186):** EATManager degraded mode is triggered exclusively by the DA liveness oracle, not by keeper absence. Keeper failure produces a `celestiaTxHash = 0x0` epoch record that is overwriteable on keeper recovery. Off-chain monitoring is responsible for keeper SLA enforcement. (#r186)
+
+---
+
+### Q2 (BatchAuction clearing price — confirmed single committed epoch S_cred snapshot) → Canonical formula: `getCommittedSCred(marketId, epochAtAnchor - 1)` (#r186)
+
+Confirmed per #r185/Q2 analysis. `candidatePrice = CredibilityAggregator.getCommittedSCred(marketId, epochAtAnchor - 1)`. This is the single Merkle-committed value from the immediately preceding epoch boundary. No TWAP. Atomic in `freezeForSettlement`.
+
+The `clearingPrice` field in `BatchAuction.Batch` (currently `// TODO`) should be populated from this value in `freezeForSettlement` or the `SCHRODINGER → FINALIZED` transition. Recommendation: set at `freezeForSettlement` so the audit trail captures candidatePrice at the StateFreeze epoch, not at FINALIZED.
+
+---
+
+### Q3 (PositionToken.sol role — confirmed core v2.1 ERC-1155 primitive) → WED_clearing view added to CoordinateRegistry_v1 spec (#r186)
+
+Confirmed per #r185/Q3. PositionToken is core (not legacy). WED_clearing view:
+
+```solidity
+// In CoordinateRegistry_v1:
+function computeWEDClearing(uint256 marketId) external view returns (uint256) {
+    uint256 yesId = marketId * 2;
+    return IPositionToken(positionToken).totalSupply(yesId) * collateralPerToken;
+}
+```
+
+v2.1 restriction: single collateral asset; `collateralPerToken` is a constant. Multi-collateral deferred.
+
+---
+
+### Q4 (Engineering handoff delivery) → All five documents written to gestalt-contracts/docs/ (#r186)
+
+Documents produced this run:
+
+| File | Content |
+|---|---|
+| `v2.1-architecture.md` | System context, contract roles, data flow, TOWL model, S_cred, WED_clearing, scaffold delta, deployment order |
+| `v2.1-interfaces.md` | Full interface specs: GovernanceParams, CredibilityAggregator_v1, EATManager_v1 |
+| `v2.1-security-briefing.md` | A1–A16 attack surface; priority audit targets; design decisions for auditors |
+| `v2.1-governance-params.md` | All parameters, defaults, hard bounds, time-lock rules, derived values, per-class overrides |
+| `v2.1-launch-checklist.md` | D1–D7 deployment gates, M1–M6 per-class activation gates, IT-1–IT-4 integration tests, thin-challenger guidance |
+
+---
+
+## Structural Synthesis: Engineering Handoff — Complete (#r186)
+
+All five handoff documents are specification-complete and committed to `gestalt-contracts/docs/`. The research thread has produced:
+
+- 186 runs of mechanism design from first principles
+- 136 cumulative invariants spanning v2.1 and v2.2
+- 5 net-new v2.2 contracts + additions to 8 existing contracts
+- Complete engineering handoff for v2.1 (5 production docs)
+- One-paragraph mechanism synthesis (Invariant #120) as institutional memory
+
+**Mechanism design phase: closed.** Engineering implementation phase begins.
+
+---
+
+## Cumulative Invariants (additions through #r186)
+
+**Invariant #136 (#r186):** EATManager degraded mode is triggered exclusively by `DA_LIVENESS_ORACLE_ROLE`, not by keeper absence. Keeper failure produces an overwriteable `celestiaTxHash = 0x0` epoch record. Off-chain monitoring is responsible for keeper SLA enforcement.
+
+---
+
+## Run Log Update
+
+- **#r186** — 2026-04-04T04:42Z — Engineering handoff delivery: all five v2.1 docs written to gestalt-contracts/docs/; EATManager keeper architecture (keeper-failure vs DA outage distinction); candidatePrice canonical formula confirmed; PositionToken WED_clearing view added to CoordinateRegistry spec; documents committed and pushed. Invariant #136. Mechanism design phase closed.
