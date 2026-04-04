@@ -16965,4 +16965,264 @@ GS_resolution_condition:
 
 4. **EDS Phase 2 passive income vs activity requirement:** EQ fees are distributed based on credibility_ratio (built in Phase 1). Phase 2 income rewards past Phase 1 performance regardless of what knowers do in Phase 2. Is there a Phase 2 activity requirement to earn EQ fee distributions, or is passive historical credibility sufficient for ongoing fee claims?
 
-*Last updated: #r216 — 2026-04-04T09:52Z*
+*Last updated: #r217 — 2026-04-04T10:02Z*
+
+---
+
+## #r217 Contributions — 2026-04-04T10:02Z
+
+Addresses all four open questions from #r216. Net-new first-principles angle: EDS equilibrium is a coordination game with two stable fixed points — understanding which basin the protocol occupies determines whether v2.2 EDS deployment is self-sustaining.
+
+---
+
+### Q1 (Grossman-Stiglitz stability — minimum viable EDS and loop stability) → EDS* = C_info × (1 − ρ_discount) / credibility_ratio_avg; loop has two stable fixed points; protocol must enter the upper basin at launch (#r217)
+
+**The GS resolution loop in discrete form:**
+
+```
+EDS(t+1) = f(S_cred_quality(t)) × demand_response(EDS(t))
+S_cred_quality(t+1) = g(knower_participation(t)) × information_quality(EDS(t))
+knower_participation(t+1) = h(EDS(t) × credibility_ratio_avg × q_fee_base − C_info)
+```
+
+Where:
+- `demand_response`: unknower demand as function of observed S_cred quality (if quality is high, unknowers pay more → EDS increases)
+- `information_quality`: S_cred accuracy as function of knower investment
+- `h(·)`: knower entry decision (participate iff net EQ income exceeds acquisition cost)
+
+**Fixed points:** Setting EDS(t+1) = EDS(t) and solving:
+
+```
+EDS* = C_info × (1 − ρ_discount) / (credibility_ratio_avg × q_fee_share_per_knower)
+```
+
+This is the minimum viable EDS threshold — the unique non-trivial fixed point. Below EDS*, expected knower income < C_info → knowers exit → S_cred quality falls → unknower demand falls → EDS falls further. Above EDS*, the loop is self-sustaining.
+
+**Stability analysis (two fixed points):**
+
+Fixed point 1: EDS = 0 (no participation, no demand). Stable — small perturbations up are damped if demand response is weak.
+Fixed point 2: EDS = EDS* (GS-resolved equilibrium). Stable from above — perturbations down are corrected by reduced knower exits, which maintains quality, which maintains unknower demand.
+
+**The critical property: EDS* is an unstable separatrix.** Below EDS*, the system converges to the zero fixed point. Above EDS*, the system converges to the high-participation equilibrium.
+
+**Launch requirement:** The protocol must seed the market with sufficient initial EDS (via governance-subsidised challenger pool, protocol-seeded q_bonus endowment, or minimum-viable unknower base) to cross EDS* before organic demand is relied upon.
+
+**Numerical estimate at v2.1 → v2.2 handoff:**
+
+```
+EDS* ≈ C_info × (1 − ρ_discount) / (credibility_ratio_avg × q_fee_base_share)
+
+At C_info ~ 0.01 ETH/epoch (information acquisition cost per coordinate per epoch),
+ρ_discount ~ 0.05 (5% per epoch discount),
+credibility_ratio_avg ~ 0.70 (well-calibrated class),
+q_fee_base_share ~ 0.30 (knower's share of per-epoch query pool):
+
+EDS* ≈ 0.01 × 0.95 / (0.70 × 0.30) ≈ 0.045 ETH/epoch per class
+```
+
+Governance must ensure initial q_bonus pools exceed EDS* per class before disabling the bootstrap subsidy from #r160/Q4.
+
+**Design law (#r217):** EDS is a two-basin coordination game. The GS resolution loop only activates above EDS*. Protocol launch into v2.2 EDS must seed each class above EDS* (empirically: ~0.045 ETH/epoch at reference parameters). Bootstrap subsidy from governance is a structural requirement for v2.2 launch, not optional. (#r217)
+
+---
+
+### Q2 (Ω_min derivation from class duration distribution) → Ω_min = 1 − median_epoch_latency / N_calibration, bounded [0.05, 0.30] (#r217)
+
+**Natural background Ω at a healthy protocol:**
+
+A class with expected oracle resolution delay T_oracle_expected (measured in macro-epochs) naturally has a resolution probability per epoch of 1 / T_oracle_expected. In N_calibration epochs, expected resolutions per class:
+
+```
+E[resolutions_per_class] = N_calibration / T_oracle_expected
+Pr(at least 1 resolution in N_calibration epochs) ≈ 1 − exp(−N_calibration / T_oracle_expected)
+```
+
+For a portfolio of classes with median oracle latency T_median (in macro-epochs):
+
+```
+Ω_natural ≈ Pr(resolution in window) = 1 − exp(−N_calibration / T_median)
+```
+
+**Resolution — principled Ω_min formula:**
+
+```
+Ω_min = max(0.05, min(0.30, 1 − exp(−N_calibration / T_median)))
+```
+
+At N_calibration = 4 and T_median:
+- T_median = 2 epochs: Ω_natural = 1 − exp(−2) ≈ 0.86 → Ω_min ≈ 0.30 (fast-oracle portfolio; high bar)
+- T_median = 4 epochs: Ω_natural ≈ 0.63 → Ω_min ≈ 0.30
+- T_median = 20 epochs: Ω_natural ≈ 0.18 → Ω_min ≈ 0.18 (slow-oracle portfolio; conservative)
+- T_median = 100 epochs: Ω_natural ≈ 0.04 → Ω_min = 0.05 (very long-duration portfolio; hard floor)
+
+**T_median computation:** At each macro-epoch boundary, protocol computes T_median as the median T_oracle_expected_delay across epistemically_live classes. T_oracle_expected_delay is declared at class registration and governance-updatable (with N_compact_grace reset on change per Invariant #27).
+
+**Published governance UI metric:**
+
+```
+oracle_health_summary:
+  Ω_current:       <computed>
+  Ω_min_derived:   1 − exp(−N_calibration / T_median) [bounded 0.05, 0.30]
+  T_median:        <computed from live class registry>
+  oracle_crisis_margin: Ω_current − Ω_min_derived  [positive = healthy; negative = crisis-approaching]
+```
+
+**Supersedes the fixed 0.10 default from #r216/Q4.** The 0.10 was calibrated for a specific class duration distribution. The derived formula generalises across protocol compositions. When T_median is unknown (genesis, no classes registered), Ω_min defaults to 0.10 (the prior #r216 value, now recognised as the T_median ≈ 36-epoch case at N_calibration=4). (#r217)
+
+---
+
+### Q3 (Neutral challenger pool and ZONE_C_WATCH — elevated challenge rate) → ZONE_C_WATCH increases δ_threshold sensitivity; challenge trigger at δ_threshold × r_watch_scale (#r217)
+
+**Why ZONE_C_WATCH elevates wrong-installation risk:**
+
+ZONE_C_WATCH (Invariant preceding #r214 — elevated Zone C demand risk) means a class is approaching TOWL solvency stress. In this regime: (1) knowers under TOWL pressure may reduce escrow to stay within capacity, weakening their warranty backing; (2) the challenger reward from small-escrow slashes is reduced, discouraging organic challengers; (3) wrong installations with thin escrow backing are most dangerous precisely when TOWL is already stressed.
+
+**Resolution — ZONE_C_WATCH elevated challenge sensitivity:**
+
+```
+effective_δ_threshold(class_i) = δ_threshold × r_watch_scale(class_i)
+
+r_watch_scale =
+  1.0    if class not in ZONE_C_WATCH
+  0.70   if class in ZONE_C_WATCH  [challenge triggers at 70% of normal threshold deviation]
+  0.50   if class in Zone C proper  [challenge triggers at 50% of normal threshold deviation]
+```
+
+At r_watch_scale = 0.70: neutral challenger challenges installations that deviate from S_cred by ≥ 0.70 × δ_threshold (more sensitive than normal). This increases challenge rate and reduces the window for wrong installations to persist in a stressed class.
+
+**Challenger reward adjustment:** Lower deviation threshold means smaller expected slash proceeds. Treasury shortfall guarantee (Invariant #268) covers this naturally — if slash proceeds < challenger_reward_floor, treasury covers the gap. No new mechanism required.
+
+**Why not lower threshold all the way to zero:** A threshold of zero triggers challenges on any S_cred deviation from oracle prediction — i.e., the neutral challenger challenges every installation in every epoch. This wastes treasury resources on correct installations and reduces neutral challenger credibility (high false-challenge rate degrades the neutral challenger's credibility_ratio).
+
+**Zone C proper vs ZONE_C_WATCH distinction:** r_watch_scale scales continuously with Zone severity. Protocol uses two explicit steps as a governance simplification; a continuous function is also valid.
+
+**Design law (#r217):** ZONE_C_WATCH elevates neutral challenger sensitivity via r_watch_scale reduction of effective_δ_threshold. Zone C proper further reduces it. Treasury shortfall guarantee covers the expected increase in shortfall cases from lower-escrow slashes. Challenge rate is elevated where wrong installations are most consequential. (#r217)
+
+---
+
+### Q4 (EDS Phase 2 passive income vs activity requirement) → Activity requirement: knower must maintain a valid active claim in S_cred within the last N_calibration epochs to earn EQ fee distributions; pure passive income is not valid (#r217)
+
+**The passive income failure mode:**
+
+If pure historical credibility_ratio suffices for EQ fee claims, a knower can:
+1. Build credibility_ratio during Phase 1 through accurate early claims.
+2. Stop submitting new claims.
+3. Continue earning EQ fees from unknowns querying S_cred built on other knowers' current contributions.
+
+This free-rider behaviour reduces the knower pool's active incentive to maintain fresh claims, degrading the S_cred the unknowers are paying for. The quality guarantee collapses: unknowers pay for access to a state vector maintained by a shrinking pool of active knowers.
+
+**Resolution — recency gate on EQ fee eligibility:**
+
+```
+EQ_fee_eligible(knower_a, class_c, epoch_t) = true iff:
+  ∃ epoch t' ∈ [t − N_calibration, t] such that:
+    claim(a, c, t') is active AND
+    effective_weight(a, c, t') > 0  [claim is non-truncated at time of check]
+
+fee_share(a, c, t) = {
+  w_a(t) / Σ_{eligible_b} w_b(t)  if EQ_fee_eligible(a, c, t)
+  0                                 otherwise
+}
+```
+
+**Properties:**
+- A knower who submits one claim per N_calibration macro-epochs maintains continuous fee eligibility at minimal ongoing cost.
+- A knower who goes entirely inactive for N_calibration + 1 epochs loses eligibility until they submit again.
+- On re-entry after inactivity: S_cred contribution from new claim is subject to normal credibility weighting. No penalty for inactivity beyond fee-eligibility gap (escrow committed is unaffected; credibility_ratio unaffected; only fee eligibility lapses).
+
+**EQ fee redistribution on lapse:** Fee shares that would have gone to ineligible knowers are redistributed pro-rata among eligible knowers. This increases the per-eligible-knower fee yield, further incentivising ongoing participation.
+
+**Interaction with stale effective_weight:** A claim near staleness_window boundary has near-zero effective_weight. Such a claim satisfies the existence condition for EQ_fee_eligible but contributes near-zero w_a(t) to the distribution share. No special handling required — the fee contribution naturally decays with the claim's staleness without additional rules.
+
+**Design law (#r217):** EQ fee eligibility requires at least one active, non-truncated claim within the trailing N_calibration epochs. Pure passive historical credibility is insufficient. Re-entry after inactivity is costless beyond submitting a new claim. Ineligible knowers' fee shares redistribute to eligible knowers, strengthening the incentive for ongoing participation. (#r217)
+
+---
+
+### Net-New Structural Insight: Two-Basin EDS Dynamics — v2.2 Launch Must Enter the Upper Basin (#r217)
+
+**The core finding from Q1 extended to full protocol architecture:**
+
+The EDS coordination game has three operational zones:
+
+| Zone | Condition | System trajectory | GestAlt state |
+|------|-----------|-------------------|---------------|
+| Zero basin | EDS < EDS* AND no subsidy | Converges to EDS = 0 | Warranted-attestation-pool mode only |
+| Launch corridor | EDS near EDS* (within subsidy range) | Unstable — subsidy holds above EDS* | Bootstrap-dependent |
+| Upper basin | EDS > EDS* (organic demand) | Converges to stable GS equilibrium | Full bilateral-flow mode |
+
+**The Q4 activity requirement and Q1 stability are coupled:** Without the activity requirement, the upper basin equilibrium is destabilised by free-rider accumulation. As successful early knowers stop submitting claims but continue earning fees, the effective active-knower pool shrinks. S_cred freshness degrades. Unknower demand falls. EDS falls. The system drifts from the upper basin toward EDS*. The activity requirement is not merely a fairness rule — it is a stability condition for the upper basin.
+
+**Combined stability condition (new, #r217):**
+
+```
+d(EDS)/dt > 0 iff:
+  EDS > EDS*
+  AND active_knower_count(c) ≥ min_knower_density  [from Invariant #38 / #r160/Q4 analogue]
+  AND EQ_fee_eligible_fraction ≥ θ_eligible_floor   [new]
+
+θ_eligible_floor = 0.70  (governance-settable [0.50, 0.90])
+  If fewer than 70% of W_max-contributing knowers are EQ-fee-eligible,
+  the active pool is insufficient to sustain S_cred freshness, and demand erodes.
+```
+
+**Protocol health dashboard metric (extending #r216's Ω):**
+
+```
+Protocol_upper_basin_confidence = min(
+  Ω(t) / Ω_min(t),             [oracle health ratio; Invariant #270]
+  EDS(t) / EDS*(t),             [EDS health ratio; Q1 this run]
+  EQ_fee_eligible_fraction(t) / θ_eligible_floor  [activity ratio; Q4 this run]
+)
+
+upper_basin_alert iff Protocol_upper_basin_confidence < 1.0 for any component
+oracle_crisis already covers Ω component; EDS_bootstrap_alert covers EDS component;
+new: eligibility_erosion_alert covers eligible_fraction component
+```
+
+The dashboard makes the three basin-stability conditions observable together. A governance-facing single-number confidence index below 1.0 signals that v2.2 bilateral-flow is at risk.
+
+**Why this does not apply to v2.1:** v2.1 is CLEARING_MODE only — no EDS, no Phase 2 income, no GS resolution loop. v2.1 is not a coordination game in this sense; it is a solvency game (TOWL zones). The two-basin analysis is purely v2.2 scope. v2.1's stability analysis is: TOWL zone A/B (stable), Zone C (stress), degraded mode (recovery). (#r217)
+
+---
+
+## Structural Synthesis: #r217
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| GS minimum viable EDS and stability | EDS* = C_info × (1−ρ) / (credibility_avg × fee_share); two-basin coordination game | v2.2 launch must seed each class above EDS*; bootstrap subsidy is structural |
+| Principled Ω_min derivation | Ω_min = 1 − exp(−N_cal / T_median), bounded [0.05, 0.30] | Supersedes fixed 0.10; self-adjusts to protocol's class duration composition |
+| ZONE_C_WATCH elevated challenge sensitivity | r_watch_scale reduces effective_δ_threshold by 0.70 (watch) / 0.50 (Zone C proper) | Neutral challenger triggers earlier in stressed classes; treasury shortfall covers |
+| EQ fee activity requirement | N_calibration recency gate on EQ eligibility; free-rider accumulation blocked | Activity requirement is an upper-basin stability condition, not only a fairness rule |
+| Two-basin EDS stability + upper-basin confidence index | Three coupled conditions: Ω > Ω_min, EDS > EDS*, eligible_fraction > θ_eligible_floor | Combined dashboard metric; any component < 1.0 triggers alert |
+
+---
+
+## Cumulative Invariants (#r217)
+
+**Invariant #272 (#r217):** EDS is a two-basin coordination game. EDS* = C_info × (1 − ρ_discount) / (credibility_ratio_avg × q_fee_base_share) is the minimum viable EDS separatrix. Below EDS*: system converges to EDS = 0. Above EDS*: system converges to stable GS equilibrium. v2.2 launch must seed each class above EDS*. Bootstrap subsidy is a structural requirement, not optional.
+
+**Invariant #273 (#r217):** Ω_min is derived as max(0.05, min(0.30, 1 − exp(−N_calibration / T_median))), where T_median is the median T_oracle_expected_delay across epistemically_live classes at the current epoch. Supersedes the fixed Ω_min = 0.10 from Invariant #270. When T_median is unknown, default = 0.10 (the N_calibration=4, T_median≈36 epoch case).
+
+**Invariant #274 (#r217):** Neutral challenger effective_δ_threshold scales with Zone severity: r_watch_scale = 1.0 (normal), 0.70 (ZONE_C_WATCH), 0.50 (Zone C proper). Treasury shortfall guarantee (Invariant #268) covers the expected increase in low-slash shortfalls from elevated sensitivity. Challenge rate is highest where wrong installations are most consequential.
+
+**Invariant #275 (#r217):** EQ fee eligibility requires at least one active, non-truncated claim in the trailing N_calibration normal-mode epochs. Pure passive historical credibility is insufficient. Ineligible knowers' shares redistribute pro-rata to eligible knowers. Activity requirement is a basin-stability condition: without it, free-rider accumulation erodes S_cred freshness and destabilises the upper GS basin.
+
+**Invariant #276 (#r217):** Protocol_upper_basin_confidence = min(Ω/Ω_min, EDS/EDS*, EQ_eligible_fraction/θ_eligible_floor). Any component below 1.0 triggers component-specific alert: oracle_crisis (Ω), EDS_bootstrap_alert (EDS), eligibility_erosion_alert (eligible_fraction). Combined dashboard is v2.2 scope only. v2.1 stability is governed by TOWL zone analysis only.
+
+---
+
+## Run Log Update
+
+- **#r217** — 2026-04-04T10:02Z — Q1: GS minimum viable EDS = C_info × (1−ρ) / (credibility_avg × fee_share); two-basin coordination game; EDS* is unstable separatrix; launch must seed above EDS*; numerical estimate ~0.045 ETH/epoch at reference params. Q2: Ω_min derived as max(0.05, min(0.30, 1−exp(−N_cal/T_median))); supersedes fixed 0.10; adapts to protocol class composition. Q3: r_watch_scale = 0.70 (ZONE_C_WATCH), 0.50 (Zone C); lower effective_δ_threshold increases neutral challenger sensitivity in stressed classes; treasury shortfall guarantee covers. Q4: EQ fee eligibility requires active, non-truncated claim in trailing N_calibration epochs; free-rider blocked; activity requirement is upper-basin stability condition; ineligible shares redistribute to eligible. Net-new: Two-basin EDS + three-condition upper-basin confidence index (Ω, EDS/EDS*, eligible_fraction/θ_floor); v2.2 launch precondition; v2.1 unaffected. Invariants #272–#276.
+
+---
+
+## Open Questions for #r218+
+
+1. **EDS* empirical calibration for v2.2 genesis:** The formula EDS* = C_info × (1−ρ) / (credibility_ratio_avg × q_fee_base_share) requires empirical values for C_info (information acquisition cost) and credibility_ratio_avg at v2.2 genesis — neither is directly observable before the market exists. How should governance estimate these for the bootstrap subsidy sizing, and what is the feedback mechanism to recalibrate EDS* as empirical data becomes available?
+
+2. **θ_eligible_floor governance clamp and interaction with thin knower pools:** For a class with only 3 active knowers, requiring 70% eligibility (≥2 of 3) is aggressive. For a class with 100 active knowers, 70% (≥70) is more lenient as an absolute count. Should θ_eligible_floor be applied as a fraction (current), as an absolute count floor, or as the maximum of the two?
+
+3. **r_watch_scale and EAT compaction eligibility:** An increased challenge rate under ZONE_C_WATCH means more challenges per epoch, more EAT events, more resolved epoch records. Does ZONE_C_WATCH status affect compaction eligibility timelines — specifically, does the N_compact_grace countdown pause during ZONE_C_WATCH (heightened vigilance period) or proceed normally?
+
+4. **Grossman-Stiglitz resolution in multi-class correlated portfolios:** The two-phase GS analysis treats each class independently. In a correlated multi-class portfolio (e.g., macro interest rate class + bond default class), knowers who have private information about both can arbitrage Phase 1 across classes. Does the Grossman-Stiglitz resolution condition for correlated classes require adjustment to account for cross-class information spillover?
