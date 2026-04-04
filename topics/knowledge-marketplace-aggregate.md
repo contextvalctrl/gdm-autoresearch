@@ -5392,3 +5392,203 @@ The knowledge-marketplace mechanism is **specification-complete** for GestAlt v2
 - Specific mechanism gaps surfaced by the engineering team during spec translation
 
 *Last updated: #r162 — 2026-04-04T00:42Z*
+
+---
+
+## #r163 Contributions — 2026-04-04T00:52Z
+
+**Phase: Adversarial stress-testing of v2.1 minimal scope. (#r162 declared mechanism spec complete; this run opens systematic novel-attack analysis.)**
+
+Focus: enumerate and evaluate attack vectors that are NOT already covered by the existing attack surface table (#r6, expanded through #r152). v2.1 scope is: CoordinateRegistry, ClaimEscrow, CredibilityAggregator, SettlementEngine, EATManager — CLEARING_MODE only, no implication chains.
+
+---
+
+### Attack Taxonomy: Five Novel Families for v2.1
+
+---
+
+#### A1 — Credibility Laundering via Coordinated Correct Claims
+
+**Attack:** An adversary controls multiple Sybil accounts. Before the target settlement epoch, they stake modest amounts across many coordinate classes with pre-known outcomes (low-uncertainty events). All accounts accumulate high credibility_ratio at low cost. At the target settlement epoch, all accounts stake heavily, driving S_cred toward the adversary's desired settlement price. Settlement financial gain exceeds total credibility-building cost.
+
+**Why not covered by existing Sybil defence:** The γ_corr defence (#r6) was designed around simultaneous multi-account credibility concentration, not sequential credibility laundering across low-cost preliminary events.
+
+**Formal attack model:**
+
+```
+N accounts each build credibility_ratio ≈ C_target over K pre-target epochs
+  staking S_small per epoch on N_easy_classes with σ_resolve ≈ 0.95
+
+Cost per account ≈ K × S_small × 0.05  (5% expected loss on easy classes)
+
+At target epoch: each account stakes S_large on target coordinate c
+  Combined weight w_adversary = Σ_a (C_target × log(1 + S_large))
+
+Attack profitable if: settlement_gain(w_adversary) > K × N × S_small × 0.05 + N × S_large × P(wrong)
+```
+
+**W_max partial defence:** W_max limits per-address contribution, but N addresses each at W_max contribute N × W_max combined — far exceeding the per-entity cap.
+
+**Defence — γ_corr as on-chain mapping in CredibilityAggregator:**
+
+```
+S_cred_contribution(a) = C_a × log(1 + k_a_net) × γ_corr(a)
+
+γ_corr(a) = 1.0 if no cluster detected
+γ_corr(a) ∈ [0.3, 0.9] if cluster detected (governance-committed)
+```
+
+γ_corr was mentioned in #r6 but never formally specified for on-chain v2.1 S_cred aggregation. This is a specification gap. Cluster detection may be off-chain (gas cost); γ_corr application must be contract-enforced.
+
+**Secondary signal:** `S_cred_concentration_index = max_contributor_fraction / (1/N_active_contributors)`. High concentration → governance alert → γ_corr review trigger. Committed to EAT per epoch.
+
+**New v2.1 spec addition:** γ_corr on-chain mapping in CredibilityAggregator, governance-updateable. S_cred_concentration_index in EAT. (#r163)
+
+---
+
+#### A2 — Settlement-Epoch Timing Attack via Zone C Trigger
+
+**Attack:** An adversary with a position favouring a particular settlement price files a large spurious challenge on a high-escrow coordinate in the epoch before T_anchor, stressing TOWL capacity. If TOWL transitions to Zone C, settlement-finality challenge windows defer (#r151/Q1). The adversary's desired price is installed without SFP challenge risk during the Zone C window.
+
+**Why novel:** Zone C deferral of SFP challenges was designed as solvency protection. It becomes an attack surface when Zone C can be deliberately triggered on a separate coordinate.
+
+**Defence — SFP deferral immunity when zone_at_T_anchor ∈ {A, B}:**
+
+```
+zone_at_T_anchor = TOWL_zone(class_id, T_anchor_epoch)
+
+settlement_finality_challenge_zone_c_deferral:
+  IF zone_at_T_anchor ∈ {ZONE_A, ZONE_B}: challenge window NOT deferred
+  IF zone_at_T_anchor == ZONE_C: standard deferral applies
+```
+
+If the class was solvent when the oracle fired, post-anchor Zone C transitions (triggered externally) do not affect SFP windows for this class. Deferral protects only already-stressed classes.
+
+**EAT record addition:** zone_at_T_anchor field in T_anchor event. SettlementEngine reads this field for deferral determination. (#r163)
+
+---
+
+#### A3 — Pre-Resolution Withdrawal: Asymmetric Credibility Capture
+
+**Attack:** If the mechanism permits voluntary claim withdrawal before oracle resolution, a knower can stake high on confident claims (earning credibility_ratio on correct resolution) and withdraw before resolution on uncertain claims (avoiding penalty). This asymmetrically builds credibility_ratio while evading the skin-in-the-game requirement.
+
+**Check against existing spec:** ClaimEscrow specifies release paths but does not explicitly enumerate voluntary withdrawal as prohibited. This is a spec gap.
+
+**Resolution — withdrawal explicitly prohibited; escape paths closed:**
+
+```
+ClaimEscrow escape paths (exhaustive, #r163):
+  oracle_resolved_correct → release escrow
+  oracle_resolved_wrong   → slash
+  T_longtail_expiry       → LTRP routing
+  challenge_success_slash → slash
+
+Voluntary knower withdrawal: NOT A VALID OPERATION.
+```
+
+**Implication for S_cred:** A withdrawn claim that had contributed to S_cred would pollute the state vector with a contribution whose calibration signal is selectively filtered. Prohibition is required for both financial integrity (ClaimEscrow) and epistemic integrity (CredibilityAggregator).
+
+**Design law (#r163):** Claim escrow is non-withdrawable post-submission. The staking event and resolution event are protocol-coupled. "Money on the table is proof-of-conviction" requires the table to be non-retractable. (#r163)
+
+---
+
+#### A4 — Oracle Timing Arbitrage: Position Front-Running S_cred Convergence
+
+**Attack:** S_cred for a high-certainty coordinate converges to near-final value before T_anchor fires. An on-chain observer identifies the converged value and registers a position exploiting the known settlement price — not because they have genuine economic exposure, but because they saw S_cred converge. Position registration is still open because T_anchor has not fired.
+
+**Mechanism impact:** WED_clearing is supposed to reflect genuine decision-relevant economic exposure. Speculative positions registered after S_cred convergence corrupt the WED_clearing signal — they reflect oracle-arbitrage, not real exposure.
+
+**Defence — T_anchor_lock window:**
+
+```
+T_anchor_lock = T_anchor − N_lock_epochs  (default N_lock_epochs = 1 macro-epoch)
+
+Position registration open:  T_class_genesis → T_anchor_lock
+Position registration closed: T_anchor_lock → T_anchor (S_cred convergence window)
+
+WED_clearing computed from position registry snapshot at T_anchor_lock.
+```
+
+The lock window (1 macro-epoch) gives S_cred one epoch to converge without position-registration gaming. Genuine position holders registered before T_anchor_lock are unaffected.
+
+**New CoordinateRegistry field:** T_anchor_lock (derived from T_anchor − N_lock_epochs). Position registration gated by this timestamp. SettlementEngine reads WED_clearing from the T_anchor_lock snapshot. (#r163)
+
+---
+
+#### A5 — Epistemic Liveness Suppression via Flood-Challenge
+
+**Attack:** An adversary creates wrong claims on easy-outcome coordinates (from controlled accounts), then challenges them from other accounts, earning challenger rewards while draining challenger_pool. With challenger_pool depleted, epistemically_live status for hard coordinates weakens, and the adversary installs wrong warranted claims on hard coordinates without effective challenge.
+
+**Cost model:**
+
+```
+Net cost per wash cycle = slash × (1 − γ_challenger)
+  at γ_challenger = 0.30: cost = slash × 0.70
+
+Cost to drain challenger_pool by Δ = Δ / γ_challenger × (1 − γ_challenger) ≈ 2.33 × Δ
+```
+
+Attack costs ~2.33× what it drains. Feasible for thin challenger_pools on new classes.
+
+**Defence — rate limit + γ_corr on challenger rewards + auto-refill:**
+
+```
+per_class_challenge_rate_limit = R_max (default: 5 challenges per address per macro-epoch)
+
+γ_corr_challenger(a) applied to challenger rewards:
+  challenger_reward(a) = base_reward × γ_corr_challenger(a)
+  γ_corr_floor_challenger = 0.5  (preserve incentive while limiting wash profitability)
+
+challenger_pool auto-refill already specified (#r160/Q4)
+```
+
+Floor = 0.5 (not lower): eliminating challenger incentive entirely would break epistemically_live. The floor preserves enforcement incentive while limiting wash-challenge income.
+
+**New CredibilityAggregator additions:** R_max per-address challenge rate limit; γ_corr_challenger mapping; floor enforcement at 0.5. (#r163)
+
+---
+
+### Summary: Five Novel Attack Families and v2.1 Spec Additions
+
+| Attack | Class | Defence | v2.1 spec addition? |
+|--------|-------|---------|---------------------|
+| A1 — Credibility laundering | Sybil + track record gaming | γ_corr on-chain mapping; S_cred_concentration_index | **YES** — CredibilityAggregator |
+| A2 — Zone C timing exploit | TOWL manipulation → SFP deferral | SFP immunity if zone_at_T_anchor ∈ {A,B} | **YES** — SettlementEngine + EAT |
+| A3 — Pre-resolution withdrawal | Claim exit before oracle | Withdrawal prohibited; escape paths closed | **YES** — ClaimEscrow invariant |
+| A4 — Oracle timing arbitrage | Position front-running S_cred | T_anchor_lock; WED_clearing snapshot at lock | **YES** — CoordinateRegistry |
+| A5 — Flood-challenge pool drain | Wash-challenge liveness suppression | Rate limit + γ_corr on challenger rewards + auto-refill | **YES** — CredibilityAggregator |
+
+All five are v2.1-relevant. Four require additions to the v2.1 engineering spec not yet present. The adversarial stress-test phase is productive — the mechanism spec was logically complete but underdetermined on several implementation constraints.
+
+**v2.1 contract spec additions from #r163 (by contract):**
+
+1. **CredibilityAggregator:** γ_corr on-chain mapping (governance-updateable); S_cred_concentration_index per epoch; γ_corr_challenger mapping at floor 0.5; R_max per-address challenge rate limit.
+2. **SettlementEngine:** zone_at_T_anchor field in T_anchor EAT event; SFP Zone C deferral conditional on zone_at_T_anchor.
+3. **ClaimEscrow:** Explicit prohibition on voluntary pre-resolution withdrawal; escape path enum exhaustively closed.
+4. **CoordinateRegistry:** T_anchor_lock field; position registration window closes at T_anchor_lock; WED_clearing computed from T_anchor_lock snapshot.
+
+---
+
+**Invariant additions (#r163):**
+
+**Invariant #47:** Claim escrow is non-withdrawable post-submission. Voluntary knower withdrawal is not a ClaimEscrow operation. Escape paths: oracle_resolved, T_longtail_expiry, challenge_slash only. (#r163)
+
+**Invariant #48:** SFP Zone C deferral applies only when zone_at_T_anchor == ZONE_C. If the class was in Zone A or B at T_anchor, settlement-finality challenge windows advance regardless of subsequent Zone C transitions. (#r163)
+
+**Invariant #49:** Position registration closes at T_anchor_lock = T_anchor minus N_lock_epochs. WED_clearing is computed from the snapshot at T_anchor_lock, not at T_anchor. (#r163)
+
+**Invariant #50:** γ_corr is applied in CredibilityAggregator both to S_cred contributions and to challenger rewards. Challenger γ_corr floor = 0.5 to preserve enforcement incentive. (#r163)
+
+---
+
+## Open Questions for #r164+
+
+1. **γ_corr cluster detection — governance commit latency:** Cluster detection is off-chain; governance commits γ_corr updates as on-chain transactions. What is the maximum allowable governance response SLA? Define an interim fallback (e.g., provisional γ_corr floor on new addresses with no resolution history) to cover the window between cluster formation and governance γ_corr update.
+
+2. **T_anchor_lock eliminates the T_grace window need:** The pre-T_anchor position requirement for SFP challenge eligibility (#r151/Q3) now resolves to "registered before T_anchor_lock." Does T_anchor_lock render the T_grace window unnecessary, or does a residual case still exist (e.g., T_anchor_lock fires unexpectedly early)?
+
+3. **S_cred commit-reveal to prevent A4 convergence gaming:** A4 is partially addressed by T_anchor_lock. But if S_cred is publicly observable on-chain throughout, any participant can watch convergence before T_anchor_lock too. Does v2.1 need a commit-reveal scheme for S_cred updates (knowers commit a hash, reveal at epoch close) to prevent convergence-watching gaming of position registration?
+
+4. **Remaining adversarial surface for #r164:** Four attack families not yet evaluated: (a) oracle registration attacks (governance approves a malicious oracle address); (b) EAT Merkle root manipulation; (c) credibility_ratio integer precision attacks (log-score rounding exploitation); (d) TOWL capacity inflation via phantom escrow registration. Recommend #r164 addresses these four.
+
+*Last updated: #r163 — 2026-04-04T00:52Z*
