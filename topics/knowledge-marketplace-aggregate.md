@@ -20579,3 +20579,181 @@ Including chain_id in salt: registry addresses differ by chain (no address colli
 4. **CREATE2 registry and contract upgrade (v2.2→v2.3):** CREATE2 with deterministic salt means the v2.2 registry address is taken permanently on each chain. A v2.3 registry would need a different salt or a different deployer. Define the registry upgrade path: new salt (different address) vs proxy pattern over the same CREATE2 address.
 
 *Last updated: #r233 — 2026-04-04T13:22Z*
+
+---
+
+## #r234 Contributions — 2026-04-04T13:32Z
+
+Addresses all four open questions from #r233.
+
+---
+
+### Q1 (Optional slot address(0) caller handling — canonical interface) → `registry.isAvailable(slot)` is the canonical capability-check; raw `registry.get()` is for required slots only; caller degrades gracefully on false (#r234)
+
+**The problem with raw `registry.get()` + address(0) caller check:** Every caller that accesses an optional slot must independently implement an address(0) guard. This is error-prone — a single missed guard in a hot path silently routes calls to address(0). The pattern duplicates safety logic across the codebase with no enforcement.
+
+**Resolution — two-tier access API on ProtocolAddressRegistry:**
+
+```solidity
+function isAvailable(bytes32 slot) external view returns (bool) {
+    return _finalized && _slots[slot] != address(0);
+}
+
+function get(bytes32 slot) external view returns (address) {
+    require(_finalized, "REGISTRY: not finalized");
+    address a = _slots[slot];
+    require(a != address(0), "REGISTRY: slot not set");
+    return a;
+}
+
+function getOptional(bytes32 slot) external view returns (address) {
+    require(_finalized, "REGISTRY: not finalized");
+    return _slots[slot];
+}
+```
+
+**Canonical call pattern for optional feature routing:**
+
+```solidity
+if (class_oracle_mode[classId] == COMMITTEE) {
+    require(registry.isAvailable(COMMITTEE_ENGINE_SLOT), "CommitteeStateEngine not deployed");
+    address cse = registry.getOptional(COMMITTEE_ENGINE_SLOT);
+    return ICommitteeStateEngine(cse).getS_credAtAnchor(classId, anchorEpoch);
+}
+```
+
+**Policy:** `get()` for required slots (reverts on address(0)); `getOptional()` for optional slots (returns address(0) without revert); `isAvailable()` for capability-check before optional-slot paths. `isAvailable()` also checks `_finalized` — callers checking only the returned address(0) would miss the pre-finalization safety gate.
+
+**CI enforcement:** Any call to `getOptional()` without a prior `isAvailable()` check is a linting violation (Slither or custom lint rule). Enforced at code review; not enforced by the contract itself.
+
+**Design law (#r234):** Optional slots use `isAvailable()` + `getOptional()`. Required slots use `get()`. Three-function API eliminates address(0) ambiguity and enforces capability-check discipline across the codebase. (#r234)
+
+---
+
+### Q2 (oracle_carry_epoch and Zone C / TOWL interaction) → Zone C thresholds unchanged; carry epoch imposes independent soft T3 installation throttle; `stale_oracle_warning` EAT event; EQ metadata disclosure (#r234)
+
+**Zone C is solvency-gated; carry epoch is oracle-quality-gated. These are orthogonal.** TOWL tracks outstanding warranted epistemic obligations (escrow + expected bonus). Zone C fires when TOWL/EDS* exceeds threshold. Oracle freshness does not affect TOWL accounting. Tightening Zone C thresholds during carry would conflate solvency risk with oracle quality risk — a category error.
+
+**Resolution — independent carry-epoch T3 installation soft-throttle:**
+
+```
+During oracle_carry_epoch(class_i, t):
+  (1) Zone C computation: unchanged — TOWL/EDS* thresholds unmodified
+  (2) New T3 installation soft-throttle:
+      max_new_T3_per_carry_epoch = T3_install_cap_base × carry_throttle_factor
+      carry_throttle_factor: default 0.5 (governance-settable [0.0, 1.0])
+  (3) EAT event each carry epoch:
+      { type: "stale_oracle_warning", class_id, carry_epoch, carried_value, carry_duration: n }
+  (4) EQ metadata field: oracle_freshness = "carry" (with epoch count and last fresh value)
+      — informed unknowers can discount S_cred accuracy accordingly
+```
+
+**Rationale for soft-throttle (not hard block):** A hard block compounds the density gap problem — the class already has a committee density problem; blocking T3 also limits the knower pool available to recover EDS*. The soft-throttle reduces new warranty obligations during elevated uncertainty without eliminating recovery paths. `carry_throttle_factor = 0.0` is a governance option for classes where stale oracle is unacceptable.
+
+**TOWL impact:** Soft-throttle reduces new TOWL additions during carry epochs, slightly improving TOWL/EDS* ratio — a natural solvency benefit, not a Zone C adjustment.
+
+**Design law (#r234):** Zone C thresholds are solvency-invariant; oracle freshness does not modulate them. Carry-epoch oracle quality risk is handled via independent carry-throttle and EQ metadata disclosure. (#r234)
+
+---
+
+### Q3 (τ_commit_bonus and CONSENSUS_LOCK — uniform early conviction) → All Phase-1 committers eligible regardless of k; ⌈k/2⌉ rule from #r233 retracted; CONSENSUS_LOCK does not modulate τ_commit_bonus (#r234)
+
+**The ⌈k/2⌉ anti-coordination threshold from #r233** was designed to prevent a scenario where committee members observe early commits and rush to also commit before the window closes to share the bonus. This attack requires observing that peers have committed (i.e., that their hashes are public). In a commit-reveal scheme, the hash reveals nothing about vote value or conviction — late members cannot infer whether to follow. Therefore: **all Phase-1 commits are independent by construction** in a commit-reveal scheme. The ⌈k/2⌉ rule is structurally inapplicable and is retracted.
+
+**Resolution — Phase-1 commitment is the sole criterion:**
+
+```
+τ_commit_bonus eligibility (supersedes #r233 Invariant #344 partially):
+  (1) Member committed in Phase 1 (first 1/3 of epoch vote window): YES
+  (2) Reveal is valid: YES
+  → τ_commit_bonus awarded to ALL Phase-1 committers, regardless of total k
+  
+  ⌈k/2⌉ anti-coordination threshold: RETRACTED for commit-reveal protocol
+  CONSENSUS_LOCK at reveal: does NOT suppress or modulate τ_commit_bonus
+```
+
+**Epistemic rationale:** Uniform early conviction (all members commit Phase-1, all votes identical) is the highest-value epistemic event in COMMITTEE mode — independent agents converging on the same signal before observing each other. Taxing this with a threshold cap would penalise exactly the scenario that validates the committee model. Full bonus pool distribution for uniform early conviction is correct.
+
+**Bonus pool sizing note:** When all k members commit Phase-1, pool = k × τ_bonus_rate × slot_base_reward. Governance must calibrate slot_base_reward with full-k payout in mind. This is addressed as an open question for #r235.
+
+**Design law (#r234):** In commit-reveal τ_commit_bonus, Phase-1 commitment is the sole criterion. ⌈k/2⌉ anti-coordination rule is retracted — it was designed for a non-commit-reveal scheme and is structurally inapplicable. CONSENSUS_LOCK does not modulate τ_commit_bonus. Uniform early conviction → full bonus pool distributes to all Phase-1 committers. (#r234)
+
+---
+
+### Q4 (CREATE2 registry upgrade path v2.2→v2.3 — new salt vs proxy pattern) → New version-specific salt (new address per version); proxy pattern prohibited; compatibility adapters for cross-version reads (#r234)
+
+**The proxy pattern problem:** A proxy at the v2.2 CREATE2 address with an upgradeable implementation pointer allows v2.3 logic behind the same address. But contracts compiled against v2.2 ABI now call v2.3 ABI without redeployment. If v2.3 changes the interface (new slot types, method signatures), the stable address becomes a trap — ABI changes are undetectable at compile time by v2.2 callers.
+
+The deterministic address value proposition is "derive the address from public parameters at compile time." A mutable proxy behind a deterministic address offers stability without interface commitment — which is not a useful guarantee.
+
+**Resolution — new version-specific CREATE2 salt:**
+
+```
+v2.2 salt: keccak256(abi.encodePacked("GestAlt_PAR_v2.2", chain_id))
+v2.3 salt: keccak256(abi.encodePacked("GestAlt_PAR_v2.3", chain_id))
+```
+
+Different addresses per version. Each pre-computable from public parameters. v2.2 contracts call v2.2 address; v2.3 contracts call v2.3 address. Coexistence during migration is designed in.
+
+**Cross-version reads — compatibility adapter:**
+
+```solidity
+contract V2_2_To_V2_3_RegistryAdapter is IRegistryAdapter {
+    IProtocolAddressRegistry v22Registry;
+    IProtocolAddressRegistry v23Registry;
+
+    function getClass(bytes32 classId) external view returns (ClassMetadata memory) {
+        try v23Registry.get(classId) returns (address meta) { ... }
+        catch { return v22Registry.get(classId); }
+    }
+}
+```
+
+Adapters registered as optional slots in v2.3 registry. Backward compatibility is a capability, not a requirement for all deployments.
+
+**Migration lifecycle:** Both registries coexist during v2.2→v2.3 additive deployment. Classes migrate voluntarily. v2.2 registry becomes wind-down-eligible when governance declares migration threshold reached — analogous to shadow-class WINDING_DOWN lifecycle (#r155). Proxy patterns prohibited in protocol deployment policy; documented in AGENTS.md-equivalent per-repo doc.
+
+**Design law (#r234):** Registry upgrades use new version-specific CREATE2 salts (new address per version). Proxy patterns prohibited — they sacrifice interface commitment. Cross-version dependencies use compatibility adapters (optional slots). Legacy registry follows shadow-class wind-down lifecycle after governance-declared migration threshold. (#r234)
+
+---
+
+## Structural Synthesis: #r234
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Optional slot interface | `isAvailable()` + `getOptional()` for optional; `get()` for required; CI lint enforcement | Three-function API; capability-check discipline enforced |
+| Carry epoch + Zone C | Zone C unchanged; carry_throttle_factor soft T3 throttle (default 0.5); stale_oracle_warning EAT + EQ metadata | Solvency and oracle freshness are orthogonal — independent throttles |
+| τ_commit_bonus + CONSENSUS_LOCK | ⌈k/2⌉ rule retracted; all Phase-1 committers eligible; CONSENSUS_LOCK does not modulate bonus | Commit-reveal independence supersedes anti-coordination rule; uniform conviction → full bonus |
+| CREATE2 registry upgrade | New salt per version; proxy prohibited; compatibility adapters; legacy wind-down lifecycle | Interface commitment requires new address per version |
+
+---
+
+## Cumulative Invariants (#r234)
+
+**Invariant #346 (#r234):** ProtocolAddressRegistry canonical access API: `get(slot)` for required slots (reverts on address(0)); `getOptional(slot)` for optional slots (returns address(0) without revert); `isAvailable(slot)` for capability-check (returns finalized && non-zero). CI lint rule: `getOptional()` without prior `isAvailable()` check is a violation.
+
+**Invariant #347 (#r234):** oracle_carry_epoch does not modulate Zone C thresholds. Carry epochs impose an independent T3 installation soft-throttle: max_new_T3_install = T3_install_cap_base × carry_throttle_factor (default 0.5; governance-settable [0.0, 1.0]). `stale_oracle_warning` EAT event emitted each carry epoch. EQ metadata field `oracle_freshness = "carry"` disclosed to unknowers.
+
+**Invariant #348 (#r234):** τ_commit_bonus for COMMITTEE mode (supersedes Invariant #344 partially): all Phase-1 committers are eligible regardless of total k committers. The ⌈k/2⌉ anti-coordination threshold from Invariant #344 is retracted — structurally inapplicable in a commit-reveal scheme where all Phase-1 commits are independent by construction. CONSENSUS_LOCK does not modulate τ_commit_bonus. Uniform early conviction → full bonus pool distributes to all Phase-1 committers.
+
+**Invariant #349 (#r234):** ProtocolAddressRegistry upgrades use version-specific CREATE2 salts (format: `keccak256(abi.encodePacked("GestAlt_PAR_v<N>", chain_id))`). Proxy patterns prohibited — they sacrifice interface commitment. Cross-version reads use compatibility adapters registered as optional slots in the new registry. Legacy registries follow shadow-class wind-down lifecycle after governance-declared migration threshold.
+
+---
+
+## Run Log Update
+
+- **#r234** — 2026-04-04T13:32Z — Q1: Three-function registry API (get/getOptional/isAvailable); required vs optional enforcement; CI lint rule. Q2: carry_throttle_factor soft T3 throttle (default 0.5) during carry epoch; Zone C unchanged; stale_oracle_warning EAT + EQ metadata. Q3: ⌈k/2⌉ rule retracted — commit-reveal independence makes all Phase-1 commiters eligible; CONSENSUS_LOCK does not modulate τ_commit_bonus; uniform conviction → full bonus pool. Q4: New salt per version for registry upgrade; proxy prohibited; compatibility adapter; legacy registry wind-down. Invariants #346–#349.
+
+---
+
+## Open Questions for #r235+
+
+1. **carry_throttle_factor and claim resolution under carry oracle:** T3 claims installed during carry epochs have their warranty evaluated against oracle_declared = carry value at T_anchor. If the eventual fresh oracle_declared differs significantly from the carry value, do those claims resolve as wrong via normal slash logic, or is there a carry-epoch claim exemption that adjusts the warranty evaluation baseline?
+
+2. **Compatibility adapter registration latency and v2.3 finalize() ordering:** The compatibility adapter must be registered as an optional slot in v2.3 before v2.3 queries route to v2.2 legacy classes. Must adapters be registered before `finalize()` (i.e., as part of the deploy sequence) or can they be registered post-finalize via a governance-gated optional-slot update mechanism?
+
+3. **τ_commit_bonus pool sizing at full-k Phase-1 participation:** If all k=5 committee members commit Phase-1 and all earn τ_commit_bonus, the pool = k × τ_bonus_rate × slot_base_reward. Define the per-epoch bonus budget ceiling and how `slot_base_reward` is calibrated to accommodate full-k payouts without exceeding the protocol_maintenance_reserve budget.
+
+4. **⌈k/2⌉ rule retraction: contingency preservation for relaxed commit-reveal?** Commit-reveal is mandatory for COMMITTEE oracle votes (Invariant #303). If commit-reveal is ever relaxed (e.g., in a governance-declared emergency where vote latency is critical), the ⌈k/2⌉ anti-coordination concern re-emerges. Should the retracted rule be preserved as a dormant contingency parameter that activates if `committee_vote_protocol != COMMIT_REVEAL`, or is it fully eliminated from the mechanism spec?
+
+*Last updated: #r234 — 2026-04-04T13:32Z*
