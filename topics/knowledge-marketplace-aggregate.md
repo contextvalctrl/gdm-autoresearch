@@ -8784,3 +8784,218 @@ EAT event: impl_pending_zone_c_toll_applied { impl_id, tolled_epochs, new_expiry
 4. **v2.2 cumulative contract additions summary:** Canonical list of new v2.2 contracts and additions, structured analogously to the v2.1 summary table at #r166, for engineering handoff.
 
 *Last updated: #r178 — 2026-04-04T03:22Z*
+
+---
+
+## #r179 Contributions — 2026-04-04T03:32Z
+
+**Phase: v2.2 Module 3 closure (adversarial candidates + completeness gate) + Module 4 (lazy compaction eligibility) + Module 5 (cross-class LTRP backstop adversarial) + v2.2 cumulative contract additions summary.**
+
+---
+
+### DA(M3)-1 — Declaration Front-Running via Mempool Observation
+
+**Attack model:** Adversary observes a valid A→B→C implication chain declaration in the public mempool and submits an identical chain with higher gas priority, becoming the first declarant and claiming the first-declarer bonus. The original epistemic contributor receives the second-declarer gamma_corr discount.
+
+**Economic analysis:**
+
+Front-running requires the adversary to: post identical escrow (β_escrow + γ_escrow) — same stake as legitimate declarant; carry the same slash risk at A's, B's, and C's oracle resolution; have no information advantage on accuracy — the adversary copied the chain structure, not the underlying private signal.
+
+The asymmetry: if the legitimate declarant had a private signal, the front-runner is a noise trader staking on a prediction they did not generate. At oracle resolution, the original declarant earns higher expected log-score from genuine private information; the front-runner's accuracy depends on the prediction being correct, which they accepted blindly.
+
+**Resolution:** Front-running is tolerated at mechanism level; it is a layer-1 transaction-ordering problem outside mechanism scope. The gamma_corr discount already bounds the differential between first- and second-declarer bonuses. Declarants who are legitimately informationally advantaged earn superior accuracy rewards that dominate the priority-ordering differential over the lifecycle. No mechanism addition required. Add to audit scope: confirm gamma_corr discount cap prevents first-declarer-to-second-declarer value transfer from dominating expected declaration payoff. (#r179)
+
+---
+
+### DA(M3)-2 — Flash-Loan Attack at IMPL_PENDING_BC Closure
+
+**Attack model:** Adversary borrows large capital via flash loan to inflate stake_a_net on C-class in the epoch of IMPL_PENDING_BC resolution, capturing disproportionate accuracy_bonus_pool and streaming fee.
+
+**Why this fails structurally:** W_a(t) = base_share × consistency_factor × IVD_weight. Flash loans return capital within one transaction (single block). stake_a_net in DISCOVERY_MODE is ClaimEscrow-locked — the escrow lockup spans at least one macro-epoch, not one block. A flash loan cannot enter and exit ClaimEscrow within one transaction while satisfying Invariant #47. Even if an adversary pre-staged large escrow, credibility_ratio is historical (multi-epoch log-score) and cannot be flash-bought. W_a(t) is dominated by credibility_ratio for established knowers; a single-epoch stake spike from a low-credibility address earns minimal W_a.
+
+**Resolution:** Flash-loan attacks on IMPL_PENDING_BC closure are structurally non-viable. Add to audit scope: verify DiscoveryClaimEscrow escrow_lock cannot be entered and exited within a single transaction. (#r179)
+
+---
+
+### DA(M3)-3 — Multi-Chain Entanglement: N IMPL_PENDING Objects from One Anchor Oracle Event
+
+**Attack model:** Adversary registers N independent chain declarations (A→B_1), (A→B_2), ..., (A→B_N) against one anchor coordinate A. At A's T_anchor (A-correct): N IMPL_PENDING objects created simultaneously; N × implication_bonus_direct_A earned. Protocol reserve holds N × residual_AB_i.
+
+**Assessment:** This is risk diversification, not an exploit. Each declaration requires its own β_escrow + γ_escrow. If A resolves wrong: all N declarations slashed. The adversary takes N× risk to earn N× direct bonus. The residual concern is concentration stress on implication_reserve_buffer.
+
+**Defence — max_impl_pending_per_anchor_class cap:**
+
+```
+max_impl_pending_per_anchor_class(class_A) = M_anchor
+  M_anchor = governance-settable at class_A registration; default 10; bounded [3, 50]
+
+Registration gate: chain declaration from class_A rejected if:
+  outstanding_impl_pending_from_A >= M_anchor AND T_anchor_A has not yet fired
+```
+
+M_anchor = 10 allows meaningful parallel chain hypothesis testing while preventing unbounded implication_reserve_buffer stress.
+
+**Design law (#r179):** max_impl_pending_per_anchor_class bounds simultaneous IMPL_PENDING objects from one anchor coordinate. This is a concentration governance parameter, not a solvency cap — each declaration is fully pre-funded. (#r179)
+
+**v2.2 contract addition:** CoordinateRegistry_v2: max_impl_pending_per_anchor_class field; outstanding_impl_pending_from_A counter check at chain declaration registration gate.
+
+---
+
+### Module 3 Completeness Declaration
+
+Three adversarial candidates evaluated and resolved:
+
+| Attack | Status | Mechanism addition |
+|---|---|---|
+| DA(M3)-1: Declaration front-running | Tolerated; fairness-only, no solvency risk; audit scope only | None |
+| DA(M3)-2: Flash-loan at IMPL_PENDING closure | Non-viable; escrow lockup blocks same-block capital exit | Audit scope: confirming invariant |
+| DA(M3)-3: Multi-chain entanglement | Bounded by max_impl_pending_per_anchor_class cap | CoordinateRegistry_v2: M_anchor cap |
+
+**Module 3 — Implication chain settlement — is specification-complete.** (#r179)
+
+---
+
+### Q2 — Module 4 Entry: Lazy Compaction Eligibility with Outstanding IMPL_PENDING
+
+**Core question:** Can epoch E containing IMPL_PENDING_AB creation be lazy-compacted while IMPL_PENDING_AB is still outstanding?
+
+**Resolution — IMPL_PENDING is non-blocking for lazy compaction:**
+
+All fields in IMPLPendingB required for resolution are self-contained in SettlementEngine contract storage. Resolution (B oracle fires or T_impl_pending_max expires) requires the EAT record of B's oracle resolution — a different epoch's EAT, not epoch E. Compaction of epoch E does not destroy any data needed for IMPL_PENDING_AB closure.
+
+**Updated compaction eligibility criterion:**
+
+```
+epoch_E_compaction_eligible = true iff:
+  all_claims_in_E_resolved
+  AND no_outstanding_sfp_challenges_referencing_E
+  // IMPL_PENDING existence in epoch E is NOT a blocker
+```
+
+**Audit trail after compaction:** At IMPL_PENDING_AB closure, SettlementEngine emits epoch_declaration_cid (Arweave CID of compacted epoch-E blob) in the settlement event — providing auditable provenance without hot EAT access. Compaction of epoch E triggers a batch impl_pending_epoch_cid_updated EAT event updating all outstanding IMPL_PENDING objects referencing E.
+
+**Design law (#r179):** Conditionally-held escrow objects (IMPL_PENDING family) must be self-contained: their resolution must not require hot EAT access to their creation epoch. Self-containment enables lazy compaction without IMPL_PENDING lifecycle dependencies. epoch_declaration_cid is populated at compaction time for audit trail. (#r179)
+
+**v2.2 spec additions:** SettlementEngine: epoch_declaration_cid field in IMPLPendingB struct; batch impl_pending_epoch_cid_updated EAT event on compaction. Module 4 (three-tier archive integration) is now specification-complete for the implication chain interface.
+
+---
+
+### Q3 — Module 5: Cross-Class LTRP Backstop Adversarial — Opportunistic Zone C Opt-In
+
+**Attack model:** Adversary operates class X with inflated TOWL obligations. Obtains bilateral opt-in X↔Y via governance. X enters Zone C; draws from Y's reserve, impairing Y's Zone A headroom.
+
+**Three-layer defence:**
+
+**Layer 1 — Bilateral governance approval gate (primary):** Y's governance must independently register the link. Adversarial X cannot compel Y's independent governance.
+
+**Layer 2 — Per-epoch draw cap (secondary):**
+
+```
+zone_c_backstop_draw_per_epoch(X, Y) = min(
+  X_towl_deficit,
+  backstop_draw_cap_fraction × Y_zone_A_surplus
+)
+backstop_draw_cap_fraction = 0.20  (governance-settable, bounded [0.05, 0.40])
+```
+
+Single Zone C event on X cannot drain Y below Zone B.
+
+**Layer 3 — Backstop opt-in seasoning window (tertiary):**
+
+```
+backstop_opt_in_seasoning_window: N_seasons macro-epochs (default 4)
+  Backstop draw unavailable until N_seasons epochs after opt-in registration
+  Y governance can observe X's TOWL trajectory and revoke opt-in during seasoning
+```
+
+**Opt-in revocation:** Y's governance may unilaterally revoke X→Y backstop access with N_revoke_notice epochs' notice (default 2 epochs). If X enters Zone C within the notice window, the draw proceeds (earned protection period); after the notice period, backstop draw is blocked.
+
+**Design law (#r179):** Cross-class backstop draw defended by three layers: bilateral governance approval gate, per-epoch draw cap (20% of Y Zone A surplus), and backstop_opt_in_seasoning_window (N_seasons epochs). Y may unilaterally revoke with N_revoke_notice. Collusion between X and Y governance is a systemic governance capture problem outside mechanism scope. (#r179)
+
+**v2.2 contract additions (Module 5):** CoordinateRegistry_v2: backstop_opt_in_seasoning_window, opt-in timestamp, backstop_available_from = T_opt_in + N_seasons, Y-governance revocation call, N_revoke_notice enforcement. ClaimEscrow/LTRP module: zone_c_backstop_draw_per_epoch cap; multi-epoch draw accumulator.
+
+---
+
+### Q4 — v2.2 Cumulative Contract Additions Summary
+
+**Five new contracts:**
+
+| Contract | Purpose | Key source |
+|---|---|---|
+| **DiscoveryCoordinateRegistry** | DISCOVERY_MODE class registration; τ_genesis; advisory mode; T_wind_down_max for SSC | #r168–#r170 |
+| **DiscoveryClaimEscrow** | Two-pool accounting; accuracy_bonus_expiry; LTRP routing on expiry; future_query_credit | #r168, #r172, #r176 |
+| **DiscoveryCredibilityAggregator** | W_a(t) = base × consistency × IVD; momentum discount; commit-reveal; MONOPOLY_MODE; advisory calibration; anti-cycling gate | #r168–#r176 |
+| **DiscoverySettlementEngine** | Two-pool payout; max_accuracy_bonus_fraction cap; two-epoch terminal_credibility_ratio average | #r168, #r174 |
+| **ShadowClearingPairRegistry** | exportGenesisPrior: alpha_prior_effective, SELF_CALIBRATED gate, advisory-confirm gate at alpha ≤ 0.10, two-epoch terminal averaging; per-pair export_state machine; re-export handler | #r170, #r174–#r175 |
+
+**Key additions to existing contracts:**
+
+| Contract | Additions | Source |
+|---|---|---|
+| **CoordinateRegistry_v2** | clearing_class_id = null for SSC; T_wind_down_max required for SSC; simple_path chain gate; k_impl [0.5, 2.0]; M_anchor cap + counter; backstop_opt_in_seasoning_window; opt-in revocation + N_revoke_notice | #r173, #r177, #r179 |
+| **SettlementEngine** | IMPL_PENDING_AB struct + lazy cascade; implication_bonus_direct immediate release; T_impl_pending_max = k_impl × T_longtail(B); Zone C + SFP tolling; same-block IMPL_PENDING close (out-of-order); implication_reserve_buffer 100% coverage floor; epoch_declaration_cid; batch CID update EAT event; SFP clawback precedence | #r176–#r179 |
+| **ClaimEscrow** | Clawback call interface; chain_declaration_id reference-only | #r176, #r178 |
+| **LTRP module / ClaimEscrow** | zone_c_backstop_draw_per_epoch cap; multi-epoch draw accumulator | #r179 |
+
+---
+
+### v2.2 Module Completion Status
+
+| Module | Scope | Status |
+|---|---|---|
+| M1 — DISCOVERY_MODE full stack | IVD primitive, two-pool fees, W_a(t), all degenerate equilibria + adversarial pass (DA1–DA4) | **Complete** |
+| M2 — Shadow-class lifecycle adversarial | Wind-down timing, stale prior, SSC standalone, MONOPOLY_MODE, anti-cycling, T_wind_down_max, export state machine | **Complete** |
+| M3 — Implication chains settlement routing | IMPL_PENDING_AB; lazy cascade; Zone C tolling; adversarial DA(M3)-1/2/3 | **Complete** |
+| M4 — Three-tier archive integration | IMPL_PENDING non-blocking for compaction; epoch_declaration_cid; batch CID update event | **Complete** |
+| M5 — Cross-class LTRP backstop adversarial | Three-layer defence; seasoning window; opt-in revocation | **Complete** |
+
+**v2.2 mechanism specification is substantively complete as of #r179.**
+
+Remaining for engineering handoff:
+1. v2.2 invariant cross-reference audit (confirm all contract additions reference the right invariant; confirm no orphans) — 1 run
+2. v2.2 Demo Day narrative update (how DISCOVERY_MODE changes the institutional pitch) — 1 run
+3. Engineering handoff document structure (targeting Sarthak/Gaurav as readers) — 1–2 runs
+
+---
+
+## Structural Synthesis: v2.2 Near-Final (#r179)
+
+| Module | Core invariant | Net addition |
+|---|---|---|
+| DISCOVERY_MODE | IVD as conserved quantity; two-pool fees; W_a(t) three-factor; advisory mode | 5 new contracts + 20+ additions |
+| Shadow lifecycle | Genesis prior two-epoch terminal averaging; per-pair export state machine; SSC standalone | Additions to ShadowClearingPairRegistry, DiscoveryClaimEscrow |
+| Implication chains | Lazy cascade; non-bifurcatable bonus; conditional escrow primitive; Zone C tolling | Additions to SettlementEngine, ClaimEscrow |
+| Archive integration | IMPL_PENDING non-blocking; epoch_declaration_cid audit trail | Additions to SettlementEngine |
+| LTRP backstop | Three-layer defence; seasoning; unilateral revocation | Additions to CoordinateRegistry_v2, LTRP module |
+
+---
+
+## Cumulative Invariants (additions through #r179)
+
+**Invariant #113 (#r179):** max_impl_pending_per_anchor_class (M_anchor, default 10) caps outstanding chain declarations per anchor coordinate before its oracle fires. Prevents unbounded implication_reserve_buffer concentration.
+
+**Invariant #114 (#r179):** IMPL_PENDING objects do not block lazy compaction of their creation epoch. All resolution-required data is self-contained in SettlementEngine storage. epoch_declaration_cid is populated at compaction time; all outstanding IMPL_PENDING objects referencing the compacted epoch receive a batch CID update via EAT event.
+
+**Invariant #115 (#r179):** Cross-class LTRP backstop draw is defended by three layers: bilateral governance approval (primary), per-epoch draw cap = backstop_draw_cap_fraction (default 0.20) × Y_Zone_A_surplus (secondary), and backstop_opt_in_seasoning_window of N_seasons epochs (tertiary). Y may unilaterally revoke with N_revoke_notice notice period.
+
+**Invariant #116 (#r179):** v2.2 mechanism specification is substantively complete. Five new contracts and all listed contract additions constitute the engineering handoff target.
+
+---
+
+## Run Log Update
+
+- **#r179** — 2026-04-04T03:32Z — Module 3 adversarial closure (DA-M3-1/2/3 + completeness declaration); Module 4 (IMPL_PENDING non-blocking for compaction; epoch_declaration_cid); Module 5 (cross-class backstop: three-layer defence, seasoning window, revocation); v2.2 cumulative contract additions summary; v2.2 substantive completeness declared. Four new invariants (#113–#116).
+
+---
+
+## Open Questions for #r180+ (v2.2 Engineering Handoff Preparation)
+
+1. **v2.2 invariant cross-reference audit:** With 116 invariants spanning v2.1 and v2.2, confirm all contract additions have a governing invariant and no orphaned invariants exist referencing superseded mechanisms.
+
+2. **v2.2 Demo Day narrative update:** How does DISCOVERY_MODE change the institutional pitch? Key framing: does DISCOVERY_MODE make GestAlt harder or easier to explain relative to CLEARING_MODE-only v2.1?
+
+3. **Engineering handoff document structure:** What is the minimum document set for Sarthak/Gaurav to hand to a smart contract engineer as v2.2 spec?
+
+4. **Knowledge marketplace thread synthesis:** After 179 runs, what is the one-paragraph distillation of the knowledge marketplace insight that survived and was actually built? (For institutional memory.)
+
+*Last updated: #r179 — 2026-04-04T03:32Z*
