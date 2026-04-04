@@ -12355,4 +12355,237 @@ Four net-new structural insights:
 
 4. **Zellic brief addendum:** Add Invariants #162–#164 (self-query prohibition, cross-class credibility laundering verification, S_epistemic/S_settlement audit items) to Zellic engagement brief pre-engagement technical pack.
 
-*Last updated: #r194 — 2026-04-04T06:02Z*
+*Last updated: #r195 — 2026-04-04T06:12Z*
+
+---
+
+## #r195 Contributions — 2026-04-04T06:12Z
+
+Addresses all four open questions from #r194.
+
+---
+
+**Q1 (S_epistemic naming rollout — CredibilityAggregator_v1 interface spec update) → Naming-only change; two new view functions; logic unchanged (#r195):**
+
+The interface spec from #r183/Q1 previously exposed `getS_cred(classId)` as a single entry point. This conflated the live estimate (informational) with the committed settlement input. The #r194 naming separation (S_epistemic vs S_settlement) requires two distinct read paths at the contract interface.
+
+**Resolution — interface spec addendum (CredibilityAggregator_v1):**
+
+```solidity
+// --- READ PATHS ---
+
+/// @notice Returns the live, uncommitted S_epistemic for a coordinate class.
+/// For informational use only. Never used as a settlement input after T_anchor.
+/// May change at any block; callers must not cache this as a settlement reference.
+function getLiveS_epistemic(bytes32 classId)
+    external view returns (uint256 s_epistemic, uint256 totalWeight, uint256 epochAge);
+
+/// @notice Returns the committed S_cred (= S_settlement) for a given closed epoch.
+/// Immutable after epoch close + commitEpochBuffer() execution.
+/// This is the only valid input to SettlementEngine.candidate_price.
+function getCommittedS_cred(bytes32 classId, uint256 epoch)
+    external view returns (uint256 s_settlement, uint256 commitBlockHash);
+
+// --- DEPRECATED (to be removed in v1.1) ---
+/// @dev Legacy alias. Returns getCommittedS_cred(classId, latestCommittedEpoch(classId)).
+/// Retained for integration compatibility during transition period; not for new integrations.
+function getS_cred(bytes32 classId)
+    external view returns (uint256);
+```
+
+**Properties:**
+
+- `getLiveS_epistemic` returns a triple: current aggregated estimate, total credibility-weighted stake, and the number of epochs since the last committed S_cred (staleness indicator). Callers can self-select whether the staleness is acceptable for their use case.
+- `getCommittedS_cred` is the canonical settlement reference. SettlementEngine's `freezeForSettlement` calls this exclusively — confirmed as the only path used in T_anchor StateFreeze (#r160/Q2).
+- Legacy `getS_cred` is a deprecated alias to `getCommittedS_cred` for the latest committed epoch. It is kept for external integrations that predate this naming separation. All new integrations must use the named functions.
+
+**Audit item (add to Zellic brief):** Verify no code path inside SettlementEngine or ClaimEscrow reads `getLiveS_epistemic` at or after T_anchor. The only valid T_anchor read is `getCommittedS_cred`. Any call to `getLiveS_epistemic` post-StateFreeze is a settlement-state contamination bug. (#r195)
+
+---
+
+**Q2 (Type B unknowers in CLEARING_MODE — EQ with observable D(c)) → Type B unknowers exist in CLEARING_MODE but EQ mechanics simplify; q_bonus is D(c)-redundant; modified EQ as signal amplifier only (#r195):**
+
+The question is whether an institutional participant in a CLEARING_MODE class would pay an EQ query when D(c) is already observable via the position registry. At first glance, EQ appears redundant: D(c) = Σ |max_loss_if_wrong| is on-chain; knowers already see it; knower attention is already correctly routed.
+
+**Analysis — three scenarios where CLEARING_MODE Type B EQ is non-redundant:**
+
+**Scenario 1 — Pre-registration hedging demand:**
+An institution holds a position that will be registered (and thus visible in WED_clearing) but has not yet been submitted. Between now and T_registration, D(c) is private. The institution may pay a Type B EQ query to attract knower attention to the coordinate before its position is formally visible in the registry.
+
+**Scenario 2 — Precision above clearing threshold:**
+WED_clearing routes knower attention to coordinates with large aggregate position exposure. A single institution with a highly structured position (complex payoff contingent on a narrow value range) may want S_epistemic precision ABOVE the clearing threshold — precision that aggregate WED_clearing does not signal. Their EQ q_bonus/q_fee ratio reveals their need for tight-epsilon accuracy.
+
+**Scenario 3 — Speed priority:**
+An institution expects large positions to register before T_anchor (making the coordinate high-WED_clearing), but the current epoch is low-WED_clearing (positions not yet registered). They can pay an EQ query now to attract knower attention before WED_clearing reflects the forthcoming position flow.
+
+**Mechanism implication — EQ in CLEARING_MODE is an advance-signal mechanism, not a D(c)-revelation mechanism:**
+
+```
+CLEARING_MODE EQ routing:
+
+Type A (passive):     reads S_epistemic directly; no payment; D(c) observable from position registry
+Type B (advance EQ):  pays q_fee + q_bonus_escrow to attract knower attention
+                      before D(c) is fully reflected in position registry
+
+q_bonus_escrow in CLEARING_MODE:
+  q_quality_threshold = oracle clearing price ± tolerance_range (narrower than DISCOVERY_MODE)
+  Settlement at T_finality (per #r151/Q4 finality-coupling rule; unchanged)
+  q_bonus purpose: signal PRECISION requirement, not D(c) magnitude
+```
+
+**Simplified EQ routing for CLEARING_MODE:**
+
+The min_q_bonus_ratio formula (σ_resolve-derived, #r150/Q1) still applies. But the governance minimum may be set lower for CLEARING_MODE: the D(c) revelation purpose is served by the position registry; EQ reveals only precision demand. A lower floor (e.g., min_q_bonus_ratio = 0.10 for CLEARING_MODE vs 0.33 for DISCOVERY_MODE) prevents EQ from over-filtering legitimate advance-signal queries.
+
+**Governance interface addition:** `min_q_bonus_ratio_clearing` as a separate mode-scoped parameter, defaulting to 0.10, bounded [0.05, 0.33]. Distinct from DISCOVERY_MODE's `min_q_bonus_ratio`. Both derived from σ_resolve but capped at different mode-appropriate ceilings.
+
+**Design law (#r195):** EQ escrow-conditioned queries in CLEARING_MODE serve as advance-signal amplifiers (pre-registration precision demand), not D(c) revelation mechanisms. The two modes have distinct EQ semantics even though they share the same escrow contract interface. Mode-scoped min_q_bonus_ratio governs. (#r195)
+
+---
+
+**Q3 (k_a_max_single_stake immutability after registration) → Confirmed immutable; registration-time check only; post-registration governor call reverts (#r195):**
+
+**The risk if mutable:** Bootstrap W_MAX = k_a_max_single_stake × w_max_pct (#r194/Q3). If k_a_max_single_stake can be increased post-registration, a governance actor could inflate W_MAX_bootstrap during a thin-pool epoch (before first non-zero epoch_open), allowing a single high-stake knower to dominate S_epistemic temporarily — the plutocracy window. If decreased post-registration, legitimate claims above the new floor become unexpectedly over-limit.
+
+**Resolution — immutability enforced at contract level:**
+
+```solidity
+// CoordinateRegistry_v1
+
+struct ClassConfig {
+    // ... other fields ...
+    uint256 k_a_max_single_stake;  // immutable after registration
+    bool    registered;
+}
+
+function registerClass(bytes32 classId, ClassConfig calldata config) external onlyGovernance {
+    require(!classes[classId].registered, "already registered");
+    classes[classId] = config;
+    classes[classId].registered = true;
+    // k_a_max_single_stake is part of the struct; no separate setter exists
+}
+
+// No setK_aMaxSingleStake() function exists. Any governance proposal to call it
+// would revert at the call site (no such function selector).
+```
+
+**Explicit invariant:** No setter function for `k_a_max_single_stake` is exposed by CoordinateRegistry_v1. Adding one in a future governance proposal requires a contract upgrade, not a parameter call. Contract upgrade is a higher-threshold governance action than a parameter call — the immutability is structurally enforced by the absence of a setter, not by an access control check.
+
+**Interaction with T_longtail_ref and α_cap derivation:** `k_a_max_single_stake` feeds W_MAX_bootstrap. The α_cap formula (#r142–#r144) uses T_longtail_ref and ρ_effective — not k_a_max_single_stake directly. No circular dependency: α_cap formula is unaffected by k_a_max_single_stake immutability.
+
+**Audit item (add to Zellic brief):** Confirm absence of any setter function for `k_a_max_single_stake` in CoordinateRegistry_v1 bytecode. Check also for delegatecall paths that could write to `k_a_max_single_stake` storage slot without a named setter. (#r195)
+
+---
+
+**Q4 (Zellic audit brief addendum — Invariants #162–#164 + #165 items) → Complete audit check list formulated (#r195):**
+
+All four new invariants from #r194 require specific Zellic verification actions. Consolidated below as an addendum section for the brief.
+
+**Audit addendum — Items from #r194–#r195:**
+
+---
+
+*Item ZA-1 — S_epistemic / S_settlement separation (Invariant #162)*
+
+**Check:** No code path inside `SettlementEngine` or `ClaimEscrow` calls `getLiveS_epistemic()` after `freezeForSettlement()` has executed for the same `(classId, epoch)` pair.
+
+**Method:** Static analysis on `SettlementEngine.freezeForSettlement` and all downstream call graphs. Specifically: confirm that `candidate_price` storage slot is written exactly once (in `freezeForSettlement`) and only ever read thereafter (never overwritten post-freeze).
+
+**Pass condition:** Zero calls to `CredibilityAggregator.getLiveS_epistemic` originate from `SettlementEngine` post-T_anchor for any code path reachable in a settled epoch.
+
+---
+
+*Item ZA-2 — Cross-class credibility laundering (Invariant #163)*
+
+**Check:** `CredibilityAggregator.knowerRecords` storage mapping is keyed by `(classId, address)`, not by `(address)` alone.
+
+**Method:** Inspect storage layout. Verify that the credibility_ratio update function uses `(classId, msg.sender)` as the mapping key everywhere. Confirm no view function aggregates credibility_ratio across distinct classIds for the same address.
+
+**Pass condition:** Positive verification — no cross-class aggregation path exists.
+
+---
+
+*Item ZA-3 — Self-query prohibition (Invariant #164)*
+
+**Check:** An address that is a registered knower on `(classId, coord)` cannot simultaneously pay an EQ query targeting the same `(classId, coord)` in the same epoch.
+
+**Method:** Locate the EQ query escrow entry point (QueryPool or equivalent). Verify `require(msg.sender != claim.knowerAddress, "no self-query")` or equivalent guard.
+
+**Pass condition:** Any transaction where `msg.sender` matches an active knower address on the queried coordinate reverts with the self-query error.
+
+---
+
+*Item ZA-4 — Bootstrap W_MAX transition and k_a_max_single_stake immutability (Invariant #165)*
+
+**Check A:** `W_MAX_bootstrap(classId)` is computed as `k_a_max_single_stake(classId) × w_max_pct` when `total_active_weight_at_epoch_open == 0`. Verify the dynamic transition fires correctly when `total_active_weight_at_epoch_open` first becomes nonzero (emits `W_MAX_transition` EAT event).
+
+**Check B:** `k_a_max_single_stake` has no setter function in `CoordinateRegistry_v1` bytecode. Verify via function selector analysis. Check for any `delegatecall` path that could overwrite the `k_a_max_single_stake` storage slot.
+
+**Pass condition (A):** `commitEpochBuffer` correctly branches on `total_active_weight == 0` vs `> 0` for W_MAX computation. `W_MAX_transition` EAT event is emitted exactly once per class.
+
+**Pass condition (B):** No function selector resolving to a `k_a_max_single_stake` setter exists. No `delegatecall` target writes to the relevant storage slot.
+
+---
+
+*Item ZA-5 — getLiveS_epistemic interface (new from #r195/Q1)*
+
+**Check:** `getLiveS_epistemic` return value is never used as a settlement input in any contract in the v2.1 deployment. The function is marked as informational-only via natspec; any integration that reads it for settlement purposes is a caller error, not a contract bug — but the audit should confirm no internal protocol contract uses it for settlement.
+
+**Method:** Grep for `getLiveS_epistemic` call sites across all v2.1 contracts. Every call should be in view-only helper contexts (UI data feeds, monitoring).
+
+**Pass condition:** Zero `getLiveS_epistemic` call sites within `SettlementEngine`, `ClaimEscrow`, or `CoordinateRegistry`. Acceptable call sites: `EATManager` (for diagnostic logging only) and external read-only view helpers.
+
+---
+
+**Zellic brief addendum summary table:**
+
+| Item | Invariant | Check type | Priority |
+|---|---|---|---|
+| ZA-1 | #162 S_epistemic/S_settlement | Static call graph | Critical — settlement correctness |
+| ZA-2 | #163 Cross-class credibility | Storage key audit | High — systemic incentive integrity |
+| ZA-3 | #164 Self-query prohibition | Guard clause | Medium — EQ economic correctness |
+| ZA-4 | #165 W_MAX bootstrap + immutability | Two-part (logic + no-setter) | High — bootstrap exploit prevention |
+| ZA-5 | #162 (extension) | Grep call sites | High — settlement contamination |
+
+**All five items are additive to the existing Zellic brief scope** (CredibilityAggregator, SettlementEngine, ClaimEscrow, CoordinateRegistry — all already in scope per #r193/Q3 and #r194/Q4). No new contracts added to scope. (#r195)
+
+---
+
+## Structural Synthesis: Audit Readiness Closure (#r195)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| S_epistemic interface naming | Two named view functions; deprecated legacy alias; no logic change | Naming separation at interface level; logic unchanged |
+| Type B EQ in CLEARING_MODE | Advance-signal amplifier, not D(c) revelation; mode-scoped min_q_bonus_ratio_clearing = 0.10 | EQ semantics are mode-dependent; CLEARING_MODE EQ is precision demand, not magnitude revelation |
+| k_a_max_single_stake immutability | No setter function in CoordinateRegistry_v1; structurally enforced by absence | Immutability via absence of setter is stronger than access control |
+| Zellic brief addendum | 5 specific audit items (ZA-1 through ZA-5); all within existing scope | Audit items are additive; no scope expansion required |
+
+---
+
+## Cumulative Invariants (additions through #r195)
+
+**Invariant #167 (#r195):** `getLiveS_epistemic` is informational-only. Zero calls to this function are permitted within `SettlementEngine`, `ClaimEscrow`, or `CoordinateRegistry` post-T_anchor StateFreeze. This is a deployment-time verifiable invariant.
+
+**Invariant #168 (#r195):** EQ semantics in CLEARING_MODE differ from DISCOVERY_MODE. CLEARING_MODE EQ signals precision demand (advance-signal amplifier); DISCOVERY_MODE EQ signals D(c) magnitude (demand revelation). Mode-scoped `min_q_bonus_ratio_clearing` (default 0.10) and `min_q_bonus_ratio` (derived from σ_resolve, default ≈ 0.33) govern each mode independently.
+
+**Invariant #169 (#r195):** `k_a_max_single_stake` immutability is enforced by the structural absence of a setter function in `CoordinateRegistry_v1`. Any governance proposal requiring a change must go through a contract upgrade, not a parameter call. Zellic audit item ZA-4B explicitly checks for this.
+
+---
+
+## Run Log Update
+
+- **#r195** — 2026-04-04T06:12Z — S_epistemic interface spec addendum (two-function CredibilityAggregator view API; deprecated legacy alias); Type B unknowers in CLEARING_MODE (advance-signal EQ, mode-scoped min_q_bonus_ratio_clearing=0.10); k_a_max_single_stake structurally immutable via no-setter design; Zellic audit brief addendum (ZA-1 through ZA-5, additive to prior scope). Invariants #167–#169.
+
+---
+
+## Open Questions for #r196+
+
+1. **Deprecated `getS_cred` legacy alias — sunset timeline:** The deprecated alias is retained for integration compatibility. Should there be a formal sunset epoch (e.g., removed at v1.1 upgrade), and should the contract emit a deprecation warning event on each call to the legacy function?
+
+2. **min_q_bonus_ratio_clearing interaction with mode transition:** When a class transitions from DISCOVERY to CLEARING mode (via migration window per #r160/Q1), the active EQ queries outstanding have been sized against DISCOVERY-mode min_q_bonus_ratio. Do pending EQ queries carry their DISCOVERY-mode ratio through the transition, or are they re-evaluated at CLEARING-mode minimum at the transition epoch?
+
+3. **ZA-5 call site audit — EATManager diagnostic logging:** Item ZA-5 permits `getLiveS_epistemic` calls within `EATManager` for diagnostic logging. Define the exact logging scope: is the EATManager allowed to call `getLiveS_epistemic` unconditionally per epoch, or only outside the T_anchor freeze window? Post-freeze EATManager calls to `getLiveS_epistemic` could log stale values as if they were current — a misleading but non-exploitable inconsistency.
+
+4. **v2.1 contract deployment sequence — safe ordering:** With five contracts (CoordinateRegistry, ClaimEscrow, CredibilityAggregator, SettlementEngine, EATManager), what is the safe deployment order given circular initialisation dependencies? CredibilityAggregator needs CoordinateRegistry address; SettlementEngine needs CredibilityAggregator and CoordinateRegistry addresses; EATManager needs all four. Define the initialisation sequence and any two-phase initialisation pattern required.
+
+*Last updated: #r195 — 2026-04-04T06:12Z*
