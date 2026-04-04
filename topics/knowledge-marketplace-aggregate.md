@@ -18734,3 +18734,179 @@ stake_proxy_i: governance base weight = 1.0 if no explicit escrow posted
 4. **Committee credibility_ratio and epistemically_live threshold:** Should `epistemically_live` for COMMITTEE classes require (a) all k_committees_required have credibility_ratio > θ_committee_min, OR (b) at least k_committees_required committees exist regardless of current credibility_ratio?
 
 *Last updated: #r224 — 2026-04-04T11:22Z*
+
+
+---
+
+## #r225 Contributions — 2026-04-04T11:32Z
+
+Addresses all four open questions from #r224. Net-new first-principles pass: what 225 runs have changed in the founding 10-section conception — and what has not moved.
+
+---
+
+### Q1 (CPA penalty magnitude calibration — cluster-size-scaled vs fixed) → Penalty proportional to inferred ρ_prior × N_cluster; equal to N_cluster_wrong equivalent single-agent log-score wrong update (#r225)
+
+**The harm model:** A CPA cluster of N_cluster agents correlated at ρ_prior contributes an effective S_cred weight of:
+```
+W_CPA_effective ≈ W_cluster_sum × ρ_prior  (for large N_cluster)
+```
+
+This is the weight by which the wrong signal inflated S_cred. The penalty should equal the additional epistemic harm delivered.
+
+**ρ_prior_estimated at resolution:**
+```
+ρ_prior_estimate(cluster_i) = max(0, (same_cluster_wrong_fraction − ε_T3_class) / (1 − ε_T3_class))
+```
+
+**Penalty formula:**
+```
+credibility_ratio_cluster_penalty(agent_a ∈ cluster_i) =
+    normal_log_score_wrong_update(a) × (1 + ρ_prior_estimate × (N_cluster_wrong − 1))
+```
+
+- N_cluster_wrong = 1: penalty = normal (no amplification)
+- N_cluster_wrong = 5, ρ_prior = 0.8: penalty ≈ 4.2× normal
+- ρ_prior = 0: penalty = normal (independent bad luck)
+- ρ_prior = 1: penalty = N_cluster_wrong × normal (full linear)
+
+**Cap:** CPA_max_penalty_multiplier × normal (governance-set [5, 20]; default 10). Prevents extreme cascades from large highly-correlated wrong clusters.
+
+**Why N_cluster_wrong not N_cluster_total:** Agents in the cluster who were correct are not penalised — their diverse signals contributed epistemically. Mechanism penalises correlated wrong faction, not cluster membership.
+
+**Design law (#r225):** CPA penalty = normal_wrong_update × (1 + ρ_prior_estimate × (N_cluster_wrong − 1)), capped at CPA_max_penalty_multiplier × normal. ρ_prior inferred at resolution; no pre-resolution knowledge required. (#r225)
+
+---
+
+### Q2 (Commit-reveal window length for COMMITTEE votes) → T_committee_commit_window_length ≥ T_consensus_declared + T_confirmation_floor; safety buffer = max(2-block, T_reorg_depth × block_time) (#r225)
+
+**Binding constraints:**
+
+```
+(A) Feasibility:
+    T_committee_commit_window_length ≥ T_consensus_max_declared + N_confirm × avg_block_time
+
+(B) Blinding:
+    T_committee_commit_deadline ≤ T_epoch_S_cred_publication − T_safety_buffer
+    T_safety_buffer = max(2 × avg_block_time, T_reorg_depth × avg_block_time)
+    T_reorg_depth: governance-set [2,6]; default 3
+```
+
+At 12-second block time: confirmation floor ≈ 36s, safety buffer ≈ 36s — both negligible. **The binding constraint is T_consensus_max_declared** (committee consensus latency). For deliberative human panels this is hours to days; for automated oracle relayers it is seconds.
+
+Multi-committee (k independent): each commits independently within the same window; sized for the slowest declared latency.
+
+**Abstention on window miss:** treated as no-vote for the epoch; repeated abstentions degrade per-committee credibility_ratio (Invariant #305).
+
+**Design law (#r225):** Commit window length is dominated by committee consensus latency SLA. Blinding safety buffer is minor. Committee registration must declare T_consensus_max. (#r225)
+
+---
+
+### Q3 (min_q_bonus_ratio + δ_stability coupling — easy-accuracy gaming) → Raise q_quality_threshold_adjusted to max(σ_oracle_residual_min, σ_oracle_residual × accuracy_scaling); min_q_bonus_ratio unchanged (#r225)
+
+**Gaming pattern:** On stable coordinate classes, submitting "last epoch's S_cred" earns the q_bonus warranty trivially — no information value transferred.
+
+**Correct fix: adjust the warranty bar, not the unknower demand commitment.**
+
+```
+σ_oracle_residual(c, t) = EMA(|s_oracle(c,τ) − S_cred_{t-1}(c,τ)|, N_calibration)
+
+q_quality_threshold_adjusted(c) =
+    max(σ_oracle_residual_min, σ_oracle_residual(c) × accuracy_scaling)
+
+σ_oracle_residual_min = 0.10 × σ_claim_spread  [floor; governance [0.05, 0.30]]
+accuracy_scaling ∈ [0.5, 2.0]; default 1.0
+```
+
+min_q_bonus_ratio is a demand-signal primitive; it should remain constant regardless of class stability. The threshold — not the commitment — adjusts to difficulty.
+
+**Design law (#r225):** Easy-accuracy gaming on stable classes is prevented by raising q_quality_threshold_adjusted. min_q_bonus_ratio is stability-independent. Warranty bar matches epistemic difficulty. (#r225)
+
+---
+
+### Q4 (epistemically_live for COMMITTEE classes — threshold count vs pure count) → |{committee_id : credibility_ratio ≥ θ_committee_min}| ≥ k_required; N_calibration grace for new entrants (#r225)
+
+**Pure count (Option B) fails:** k committees all at credibility_ratio = 0 would satisfy it — nonsensical for an institutional class.
+
+**All-must-qualify (strict Option A) over-constrains:** If 2 of 3 required committees are well-calibrated and the third is new, the class is live in every practical sense.
+
+**Resolution — credibility-threshold count with grace window:**
+
+```
+epistemically_live(class_c, epoch_t) = true iff:
+    |{committee_id : credibility_ratio_committee ≥ θ_committee_min}| ≥ k_committees_required
+
+θ_committee_min = max(0.20, θ_T1_floor × 0.5)   [governance-settable]
+
+Grace: new committees (registered within N_calibration epochs) count as threshold-satisfied
+       for epistemically_live ONLY; weight in credibility-weighted median unaffected.
+```
+
+Governance action triggered within N_calibration epochs on persistent threshold failure; suspension if unresolved.
+
+**Design law (#r225):** epistemically_live uses credibility-threshold count, not pure count. Grace window prevents bootstrap blocking; does not dilute vote weighting. (#r225)
+
+---
+
+### Net-New First-Principles Pass: What 225 Runs Changed in the Founding Conception (#r225)
+
+**Section 1 (Base Primitive) — confirmed, sharpened:** Founding primitive ("credible information claim backed by forfeitable capital") holds. Key addition: EQ query is a first-class primitive alongside the warranted attestation. The full exchange is (attestation ↔ query), not attestation alone. (#r225)
+
+**Section 2 (State Model) — correct, major additions:** Epoch batch integration, DAG propagation, TOWL zones, S_cred convergence profiles (SMOOTH_DELTA, QUIESCENT_WINDOW, BINARY_ANCHOR) are all net-new from runs #r70–#r220. (#r225)
+
+**Section 3 (Credibility Model) — founding claim partially wrong:** #r1 said "capital amplifies credible agents." Corrected: capital *gates* participation (escrow requirement) and provides forfeiture incentive; log-score track record creates credibility_ratio. A rich uncalibrated agent is W_max-capped and penalised at resolution. Escrow is commitment, not amplifier. (#r225)
+
+**Section 6 (Attack Surface) — major gap closed:** The founding §6 table missed CPA + committee oracle endogeneity. These form the only identified compound self-reinforcing failure mode (Invariant #301). The founding attack surface was incomplete at the most dangerous vector. (#r225)
+
+**Section 7 (vs LMSR) — upgraded by formal GS analysis:** #r1's qualitative claim ("KM rewards whoever was right; LMSR rewards whoever moved price first") is now formally grounded in the Grossman-Stiglitz resolution (Invariant #271): GestAlt is provably superior in Phase 2 maintenance. LMSR has η_Phase2 = 0; GestAlt bilateral-flow has η_Phase2 > 0. (#r225)
+
+**Section 9 (Strongest Failure Reason) — founding diagnosis superseded:** #r1: calibration bootstrapping is the #1 failure risk. After 225 runs, the new #1 is **CPA + committee endogeneity compound** (#r223). Bootstrapping is solvable by waiting and using shadow-class portability. CPA+endogeneity is not self-correcting; it is invisible to consistency metrics and requires commit-reveal + lineage tracking + neutral challenger working in combination. Any one failing under active attack produces permanent epistemic capture. (#r225)
+
+**Section 10 (Best Surviving Variant) — founding answer superseded:** #r1: "Credibility-gated orderbook." Superseded by GestAlt bilateral-flow mode — warranted attestation + EQ-query protocol with epoch batch clearing, credibility-weighted posterior, two-phase GS resolution, and bilateral EDS circuit. The key departure: price signals are not needed when the output is S_cred (a credibility-weighted posterior) rather than a clearing price. (#r225)
+
+**The one founding claim that has not moved across 225 runs:** Section 5's settlement observation: "Mechanism generates query fee revenue *regardless of resolution*." EQ query fees are paid at query time; epistemic utility is transferred at query time, not settlement time. This decoupling has not been challenged, weakened, or complicated across any run. It is GestAlt's deepest structural difference from prediction markets. (#r225)
+
+---
+
+## Structural Synthesis: #r225
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| CPA penalty magnitude | normal_wrong × (1 + ρ_prior_estimate × (N_cluster_wrong − 1)); cap 10× | Scales with observed correlation; ρ_prior inferred at resolution |
+| COMMITTEE commit window | T_consensus_max_declared + confirmation floor; safety buffer max(2-block, T_reorg_depth) | Committee latency SLA governs; abstention degrades credibility_ratio |
+| min_q_bonus_ratio + stability | Raise q_quality_threshold_adjusted; min_q_bonus unchanged | Warranty bar adjusts to epistemic difficulty; demand signal is stability-independent |
+| epistemically_live COMMITTEE | Credibility-threshold count ≥ k_required; N_calibration grace; governance action on failure | Threshold count not pure count; grace prevents bootstrap blocking |
+| Founding 10-section review | CPA+endogeneity new #1 failure; GestAlt bilateral-flow supersedes credibility-gated OB; EQ decoupling from resolution is the one unchanged claim | 225 runs sharpen without reversing the founding primitive |
+
+---
+
+## Cumulative Invariants (#r225)
+
+**Invariant #306 (#r225):** CPA retroactive penalty = normal_log_score_wrong_update(a) × (1 + ρ_prior_estimate × (N_cluster_wrong − 1)), capped at CPA_max_penalty_multiplier × normal (default 10×; [5×, 20×]). ρ_prior_estimate = max(0, (wrong_fraction − ε_T3_class) / (1 − ε_T3_class)) computed at resolution. Penalises only wrong cluster members; correct-signal members unaffected.
+
+**Invariant #307 (#r225):** COMMITTEE commit window length ≥ T_consensus_max_declared + N_confirm × avg_block_time. Commit deadline precedes T_epoch_S_cred_publication by T_safety_buffer = max(2 × avg_block_time, T_reorg_depth × avg_block_time). T_consensus_max declared at registration. Failure to commit = abstention; repeated abstentions degrade per-committee credibility_ratio.
+
+**Invariant #308 (#r225):** q_quality_threshold_adjusted = max(σ_oracle_residual_min, σ_oracle_residual(c) × accuracy_scaling). σ_oracle_residual = EMA(|s_oracle − S_cred_{t-1}|, N_calibration). σ_oracle_residual_min = 0.10 × σ_claim_spread (governance [0.05, 0.30]). min_q_bonus_ratio unchanged by class stability. Prevents easy-accuracy gaming on stable coordinate classes without distorting the demand-signal primitive.
+
+**Invariant #309 (#r225):** epistemically_live for COMMITTEE classes: |{committee_id : credibility_ratio_committee ≥ θ_committee_min}| ≥ k_committees_required. θ_committee_min = max(0.20, θ_T1_floor × 0.5). New committees (registered within N_calibration grace window) count as threshold-satisfied for epistemically_live only — not for vote weighting. Persistent threshold failure → governance action within N_calibration epochs before class suspension.
+
+**Invariant #310 (#r225):** The founding primitive (credible information claim backed by forfeitable capital; epistemic debt as conserved quantity; EQ query fee revenue independent of resolution timing) is structurally confirmed across 225 runs. New #1 failure risk: CPA + committee endogeneity compound (Invariant #301), which is not self-correcting and requires commit-reveal + lineage tracking + neutral challenger in combination. The one founding claim unchanged across all runs: EQ query fee revenue is decoupled from oracle resolution; epistemic utility is transferred at query time. This is GestAlt's deepest structural difference from prediction markets.
+
+---
+
+## Run Log Update
+
+- **#r225** — 2026-04-04T11:32Z — Q1: CPA penalty = normal × (1 + ρ_prior × (N_cluster_wrong − 1)); cap 10×; ρ_prior from resolution; wrong-members only. Q2: COMMITTEE commit window = T_consensus_max + confirmation; safety buffer max(2-block, T_reorg_depth); abstention degrades credibility_ratio. Q3: q_quality_threshold_adjusted = max(σ_residual_min, σ_residual × scaling); min_q_bonus unchanged; stable-class gaming closed. Q4: epistemically_live uses credibility-threshold count ≥ k_required; N_calibration grace for new committees; governance action on persistent failure. Net-new: 10-section founding review — CPA+endogeneity supersedes bootstrapping as #1 failure risk; GestAlt bilateral-flow supersedes credibility-gated OB as best variant; EQ decoupling from resolution is the single unchanged founding claim confirmed across 225 runs. Invariants #306–#310.
+
+---
+
+## Open Questions for #r226+
+
+1. **CPA penalty ρ_prior_estimate precision at small cluster sizes:** At N_cluster_wrong = 5, ρ_prior_estimate can be noisy. Should the penalty formula apply a shrinkage estimator (blend observed fraction with prior ε_T3) to reduce over-penalisation at small clusters?
+
+2. **Committee abstention and credibility_ratio_committee update:** Should abstention degrade credibility_ratio by a fixed amount (governance-set penalty per abstention) or by a proportional amount based on current credibility_ratio?
+
+3. **σ_oracle_residual bootstrap for new COMMITTEE classes:** σ_oracle_residual requires N_calibration historical resolutions. Bootstrap value for new classes: governance-declared σ_oracle_residual_bootstrap at registration; dual-condition transition to empirical EMA after N_calibration resolutions (same pattern as EDS* genesis, Invariant #277)?
+
+4. **epistemically_live grace window and retroactive CPA discovery:** If a grace-window committee is later found to have lineage_cluster matching a known wrong CPA cluster (post-resolution), should the grace-window benefit be retroactively revoked, affecting prior epistemically_live determinations?
+
+*Last updated: #r225 — 2026-04-04T11:32Z*
