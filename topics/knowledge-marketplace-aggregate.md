@@ -25174,3 +25174,179 @@ General rule: For any knower-level track record metric:
 4. **N_calibration oracle-resolution-unit definition and IMPLICATION_CHAIN upstream miss:** IMPLICATION_CHAIN N_calibration counts upstream in-range events. An upstream range miss (A misses upstream_oracle_range) does not advance the downstream class's calibration clock. For a volatile upstream class, downstream calibration may effectively never advance. Define the maximum ratio of upstream misses to in-range events before the class is flagged calibration_slow.
 
 *Last updated: #r255 — 2026-04-04T17:22Z*
+
+---
+
+## #r256 Contributions — 2026-04-04T17:42Z
+
+New thread started to explicitly pressure-test the mechanism as a **knowledge market**, not as prediction-market matching. It intentionally treats capital as a credibility-transfer primitive and keeps LMSR/orderbooks only as reference models. (#r256)
+
+---
+
+## 1) Base primitive
+
+The exchanged object is now explicit as a **pair of claims**:
+
+- `I`: information content claim, represented as a bounded message `x_i` plus confidence metadata `ρ_i`.
+- `B`: credibility bond `b_i` committed by the knower and refundable only under a posterior settlement rule.
+
+A claim is a statement about one coordinate `c` in the global state vector with a type-specific value domain.
+
+**Conserved quantity:** total knowledge-capital at risk in a class/epoch,
+
+`K_t(c) = Σ_{a∈A_t(c)} b_a^{commit}(c,t)`.
+
+This is conserved locally by epoch (escrow lock/unlock), not globally by state. Conserved mass changes only by explicit mint/burn policy outside the mechanism. (#r256)
+
+---
+
+## 2) State model (global state vector)
+
+Global state `S_t` is a vector over coordinates `c∈C`: `S_t(c) ∈ V_c`.
+
+Update is two-stage and batch-based:
+
+1. **Signal proposal:** each epoch receives claims `(x_i, b_i, ρ_i, a)` from knowers.
+2. **Credibility-normalized filter:** each coordinate uses
+
+`S_{t+1}(c) = Π_c( S_t(c), {x_i, w_i})`
+
+where
+
+`w_i = κ_i · f(b_i, history_i, lineage_i, n_i)`.
+
+`f(·)` maps bond and calibration history to a participation weight. `Π_c` is mode-specific:
+
+- discrete: weighted posterior majority / weighted median
+- continuous: weighted precision-weighted estimator with bounded step size
+
+Unlike LMSR, there is no inventory state in `S_t`; unlike a book, there is no limit queue state. Invariant: `S_t` changes only at epoch boundaries (batch semantics). This aligns with the batch-auction comparison objective and avoids intra-epoch message-order dependence. (#r256)
+
+---
+
+## 3) Credibility model
+
+Stake is not a prediction bet; it is a **verifiable commitment**. Credibility transfer has three channels:
+
+- **Pre-commit filter:** higher `b_i` raises minimum claim cost; prevents cheap spam.
+- **Outcome filter:** wrong signal depletes escrow proportionally to measured posterior miss.
+- **History filter:** `κ_i` updates with calibration history, bounded by decay floors.
+
+A truthful, informative claim can be partially rewarded even if fully wrong by oracle; reward schedule uses a convex combination:
+
+`reward_i = b_i·(1−π_i) + q_bonus_i`
+
+where `π_i` is residual disagreement probability inferred from consensus residuals and oracle residual model.
+
+This reframes capital as proof-of-conviction: only credibility-adjusted capital moves when a claim actually improves state quality. If all claims are unhelpful, all committed capital returns partially/fully according to default loss policy but does not transfer to uninformed demand participants. (#r256)
+
+---
+
+## 4) Market roles (askers/knowers and bidders/unknowers)
+
+- **Askers/knowers (sellers of knowledge):** submit `(x_i, b_i, ρ_i)` and receive payside back only if their claim was epistemically useful.
+- **Bidders/unknowers (demand for reliable updates):** pay `q_fee` + optional `q_bonus` to acquire a **timeliness/quality contract**.
+- **Payment direction:** from unknowers to escrow pool is not directional “market spread”; it is an audit fee and optional premium for quality guarantees. Askers receive refunds/rewards from that same pool only if post-verify conditions hold.
+
+This is bilaterally consistent with the conservation view above: `K_t(c)` is allocated between askers as **conditioned returns**, not bought/sold like prediction payoffs. (#r256)
+
+---
+
+## 5) Settlement model
+
+When truth is observable (`oracle_available(c,t)`):
+
+- score each claim against truth residual `e_i = d(x_i, s_true)`
+- pay back `b_i` minus calibrated penalty and distribute any penalty to the queryers who backed the same claim region (or protocol reserve depending on `q_bonus` design).
+
+When truth is only partially observed: settle to a **residual-consistent set** `R_t` (distribution of likely truths):
+
+- score against interval/probability band rather than point values,
+- return partial bond only for claims inside a calibration band,
+- keep unresolved residue in reserve for deferred reprice with next oracle event.
+
+If truth never resolves (`partial-observation horizon expiry`):
+
+- deterministic de-escalation path: no punitive burn-by-default, all active bonds haircut by policy (`h_default`) and return residually by seniority (`age + calibration confidence`).
+- avoids silent extraction where no one can verify.
+
+---
+
+## 6) Attack surface
+
+- **Manipulation/false claims:** solved partially by bond-cost and post-verify penalty.
+- **Bluffing/cheap talk:** mitigated by explicit claim format with domain-specific confidence and mandatory minimal evidence descriptor; empty claims lose by hard zero `π_i`.
+- **Sybil:** limited by diminishing returns function `κ_i` (per-address identity and per-key caps).
+- **Wash credibility:** impossible if every paid return requires independent oracle-compatible witness or independent bidder purchase.
+- **Collusion:** partially possible in clustered claims; defend with lineage / source tags and anti-correlation penalties.
+- **Oracle gaming:** avoid direct oracle dependence in mode; if settlement oracle is influenced by S_cred, use commit-reveal and lagging publication for oracle decision data.
+
+Compared to LMSR/orderbooks, this is stronger on **cheap-talk** because there is no free inventory to manipulate unless backed by bond. Compared to orderbooks, still weak under coordinated source capture unless source-diversity controls are active. (#r256)
+
+---
+
+## 7) LMSR / orderbook / batch comparison
+
+- **LMSR:** excels at continuous aggregate pricing and liquidity guarantees; weak because utility is PnL transfer, not epistemic transfer. State may converge while no credible witness is paid unless prices move.
+- **Orderbook:** strong discovery for explicit risk transfer; no batch conservation, strong MEV/front-running and queue dynamics.
+- **Batch auction:** structural cousin in microstructure (discrete boundary updates), but still quantity/price centric rather than source-trust centric.
+- **This mechanism:** replaces “price impact” objective with “epistemic transfer” objective; requires **proof contracts** not trade matching. If `q_bonus` market disappears in equilibrium, residual value must still exist as query-quality warranty.
+
+---
+
+## 8) Simplest viable mechanism sketch
+
+1. **Ask contract:** knower submits structured claim and fixed-time bond.
+2. **Bid contract:** unknower posts small `q_fee` + optional `q_bonus` for target coordinates.
+3. **Batch verifier:** aggregate claims by calibrated weights, update `S_t`, and settle bonds/bonuses against available truth signal.
+
+No AMM, no prediction book, no maker/taker spread.
+
+---
+
+## 9) Strongest reason this idea fails
+
+If oracle resolution is sparse, noisy, or contested, settlement cannot distinguish signal from luck; then claims are judged against weak proxies. In that regime, incentives drift toward “easy-to-score but unhelpful claims.” This concentrates power in incumbents and hurts sparse-coordinate classes. (#r256)
+
+---
+
+## 10) Best surviving variant if raw idea is wrong
+
+Use a **two-track mechanism**:
+
+- **Discovery track:** this mechanism (claims + conditional refunds)
+- **Validation track:** posterior market only for classes with strong, frequent oracle resolution
+
+If truth is hard, keep state as a source-weighted posterior and reward claims through `S_cred`-bounded updates; only add posterior market in high-resolution coordinates. (#r256)
+
+### Candidate families evaluated this run
+
+- **Family A (Survives):** Batch-attestation + conditional escrow + bidder demand contracts.
+- **Family B (Killed):** “Prediction-like credit tokens” where `q_bonus` is synthetic PnL rebate.
+- **Family C (Killed):** Single-source oracle-only claims (curated oracle + fee).
+
+---
+
+## Cumulative Invariants (#r256)
+
+**Invariant #433 (#r256):** In knowledge-mode, exchange is between claim+bond and query-quality warranty primitives. Conserved mass `K_t(c)=Σ b_i_commit` exits only through settlement rules.
+
+**Invariant #434 (#r256):** `S_t(c)` updates only at batch boundaries from `Π_c` over accepted claims/weights; no intra-epoch queue state.
+
+**Invariant #435 (#r256):** Low-observability classes require partial-credit/haircut settlement and cannot rely on hard payoff discrimination.
+
+**Invariant #436 (#r256):** Family B and Family C are non-viable if the objective is to avoid LMSR/orderbook matching semantics.
+
+---
+
+## Run Log Update
+
+- **#r256** — 2026-04-04T17:42Z — Added explicit first-principles knowledge-market mechanism pass with all 10 required sections, candidate family triage, and invariant set #433–#436; contrasts preserved against LMSR, orderbooks, and batch.
+
+## Open Questions for #r257+
+
+1. **Source diversification bound under sparse oracle visibility:** minimum diversity tax on `w_i` to keep CPA-style correlated claims bounded.
+2. **Observability threshold:** minimum oracle resolution rate / implication depth for Family A self-sustainability without validation subsidy.
+3. **Unresolved residue policy:** return unresolved bonds to reserve or recycle into future `q_bonus`; solvency impact under query spikes.
+4. **Credibility transfer across migration:** if class migrates from discovery to validation track, can `credibility_ratio` transfer without harmful rebasing? 
+*Last updated: #r256 — 2026-04-04T17:42Z*
