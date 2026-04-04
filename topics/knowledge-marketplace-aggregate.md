@@ -25886,11 +25886,131 @@ Family D remains the robust architecture, with these required hardening addition
 
 - **#r260** — 2026-04-04T18:22Z — Resolved all #r260 open questions by adding cluster-level control coupling, explicit oscillation penalty lower-bound logic, immutable schedule digest auditability, and sticky emergency override semantics. Added invariants #449-#452 and confirmed Family D as the surviving architecture.
 
-## Open Questions for #r261+
+## #r261 Contributions — 2026-04-04T18:32Z
 
-1. **Cluster budget calibration:** how should `U_cluster_max` scale with protocol TVL and historical class shock covariance; fixed ratio (e.g., 15% of resolved class reserves) or Bayesian risk budget?
-2. **Penalty decay law after emergency:** during enforced override quarantine, should oscillation penalties decay linearly, exponentially, or remain flat with step-down checkpoints?
-3. **Audit burden:** should schedule digests be committed every epoch or only on state transitions to balance chain costs vs compliance rigor?
-4. **Family D composition:** should Family D include a third channel for **direct venue liquidity** (a bounded liquidity backstop funded by LPs) and is it compatible with the no-orderbook claim?
+Closes all four #r261 questions with calibrated cluster sizing, post-emergency penalty dynamics, bounded-audit commitments, and a controlled liquidity-channel extension for Family D.
 
-*Last updated: #r260 - 2026-04-04T18:22Z*
+### Q1 (Cluster budget calibration: TVL + shock covariance) → Bayesian drawdown-vol scaled cluster ceiling (#r261)
+
+A fixed ratio is too brittle across macro regimes; a pure Bayesian budget is opaque and easy to overfit. Adopt a two-factor bounded budget with transparent terms:
+
+1. **Scale with solvency mass:** base cluster throughput reserve proxy
+
+`S_cluster,curr = Σ_{c∈cluster} (R_c / R_ref)`
+
+where `R_c` is resolved-claim reserve utilization ratio (or available reserve capacity), `R_ref` = protocol-level reserve median of active clusters.
+
+2. **Penalty for systemic co-movement:** compute shock covariance risk from last `L_cov` epochs
+
+`Σ_res[c,i] = Cov(Δu_c, Δu_i)` with `Δu` = unresolved-pressure shocks (or reclaim shortfall shocks), normalized to correlation `ρ_res` and volatility `σ̂_c`.
+
+`risk_cluster = √( w^T Σ_res w )`, where `w` are class weights.
+
+3. **Cluster cap with volatility haircut:**
+
+`U_cluster_max = clip(U_min, U_max, U_base · S_cluster,curr / (1 + κ_cov · risk_cluster))`
+
+`U_cluster_max` is recomputed at each epoch boundary and written as a state-derived quantity, not a governance override.
+
+4. **Sanity and participation floor:** enforce
+
+`U_cluster_max ≥ U_floor × S_cluster,curr` and `U_min <= U_cluster_max` to avoid complete throttling in low-liquidity but calm periods.
+
+**Rationale:** this preserves capacity for larger clusters while down-weighting highly correlated shock regimes. It is equivalent to a shrinkage-style Bayesian risk budget where correlated shocks reduce free throughput.
+
+**Design law (#r261):** cluster control is not a pure governance knob; it is a state-derived risk allocation function with explicit `L_cov`, `κ_cov`, `U_base`, `U_floor` inputs and a public normalization base.
+
+---
+
+### Q2 (Penalty decay after emergency) → Sticky exponential-with-floor decay, freeze first, optional quarantine smoothing (#r261)
+
+Penalty persistence must prevent emergency-as-reset, but permanent carryover is unnecessary once the system stabilizes.
+
+**Rule:**
+
+- During emergency quarantine (`h_q` window), oscillation counters and penalties **freeze**.
+- After freeze ends and no fresh emergency flag, each epoch applies:
+
+`osc_penalty_t = max(osc_penalty_floor, osc_penalty_{t-1} · exp(-δ_decay))`
+
+- During non-quiet periods, if a new oscillation occurs before `H_switch`, add `+ osc_penalty_bump` and clamp at `osc_penalty_cap`.
+
+**Floor anchor:** `osc_penalty_floor` is a persistent minimum deterrence level (typically set from the bound in #r260); only `gov_reduce` governance action with explicit approval can lower `osc_penalty_floor` and only after `T_audit` delay.
+
+**Optional quarantine branch (already introduced in #r260):** if governance marks emergency as verified external stress (`h_q`), then decay starts only after the quarantine and uses a **slower half-life** for `N_quar` epochs.
+
+This preserves anti-reset value and avoids runaway punishment that can trap the system after true incidents.
+
+---
+
+### Q3 (Digest frequency) → Two-layer audit schedule: epoch hash + transition micro-digests (#r261)
+
+Pure every-epoch commitment is audit-rigorous but chain-expensive; transition-only is cheap but can mask drift between transitions. Adopt both:
+
+1. **Epoch digest (compressed state root):** every epoch commits `state_root_t(cluster)` (not full tuple).
+2. **Transition digest (full tuple):** whenever any class changes from NORMAL_DISCOVERY↔HOLDOVER/DEGRADED/SOFT_EXIT, append full `{λ_min,eff, C_max, C, U_t, q_rev_cap, state, oscillation counters, N_pause}` snapshot.
+
+**Replay cost control:** epoch roots are cheap (single hash), while full tuples are sparse. Auditors reconstruct history from roots; for any disputed transition, they request the transition snapshots within the relevant window.
+
+**Compliance guarantee:** both `ω`, `φ`, `H_switch`, `H_λ`, `W_enter/W_exit` remain in immutable schedule artifacts as per #r260; digest granularity now balances cost and rigor without hidden parameter drift.
+
+---
+
+### Q4 (Direct venue-liquidity channel for Family D) → Add third channel as bounded insurance backstop, not matching venue (#r261)
+
+Yes, Family D can include a **third channel** if it is structurally distinct from orderbook matching.
+
+**Allowed form (compliant with the "not orderbook" constraint):**
+
+- `venue_liq_pool` accepts fixed-commitment LP deposits and issues liquidity shares.
+- LP shares mint against **reclaim throughput capacity**, not price quotes.
+- In claim settlement, unresolved `q_rev` outflow can draw up to `L_v` per epoch from this pool at a fixed spread to participants, prioritizing classes below their local `U_t` slack.
+- LPs are repaid from unspent throughput fees and a fixed loss-waterfall; no spread-competition by submitting bid/ask ladders, no matching engine.
+
+**Why it is compatible:** this is an unconditional **capacity backstop**, not a demand/supply clearing venue. Askers and bidders still transact through the knowledge mechanism; venue liquidity only caps settlement latency and tail losses.
+
+**Failure mode:** if LP backstop is callable too cheaply, it can create cross-subsidy extraction. Clamp through:
+`L_v,eff = min(L_v, L_v_max_per_class, q_rev_cap_share)` and require haircut `h_v` on calls into low-observability states (`q_rev` high).
+
+**Design law (#r261):** a liquidity add-on channel is valid iff it is schedule-dictated fixed-capacity support, not an endogenous market where claims are matched by posted prices.
+
+---
+
+### Net-new synthesis for #r261
+
+Family D remains the surviving architecture; this run tightens it into a 3-layer control stack:
+1) local class controls (`U_t`), 2) cluster solvency budget (`U_cluster_max`), and 3) optional bounded venue-liquidity backstop (`L_v`) with explicit risk caps. This preserves non-LMSR, non-orderbook identity while improving systemic fairness under correlated distress.
+
+---
+
+## Structural Synthesis: #r261
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Cluster budget calibration | `U_cluster_max` = reserve-scaled, covariance-shrunk function of active class utilization | Throughput budgets must be state-derived and covariance-aware |
+| Penalty persistence after emergency | freeze then exponential-to-floor decay; no unconditional wipeout | Deterrence persists, then decays with stability evidence |
+| Digest cadence | per-epoch compressed roots + transition full snapshots | Cost-robust auditability via two-layer commitment |
+| Venue-liquidity channel | Allowed if fixed-capacity backstop only, not endogenous match/price venue | Liquidity that only bounds tail settlement is not a prediction-market orderbook |
+
+### New invariants (additions through #r261)
+
+**Invariant #453 (Cluster-Bayesian cap):** `U_cluster_max` must be a monotone function of aggregate reserve depth and inverse monotone in systemic shock covariance; protocol-level risk envelope shrinks as co-movement increases.
+
+**Invariant #454 (Penalty decay):** Oscillation penalties are sticky through emergency freeze, then decay toward `osc_penalty_floor` with explicit half-life; penalties cannot be reset silently.
+
+**Invariant #455 (Audit cadence):** At least epoch-level state roots are always committed; full transition tuple commitment required at every control-mode change.
+
+**Invariant #456 (Liquidity compatibility):** Any optional direct liquidity channel must be fixed-capacity reclaim support, not a matching venue; it is not allowed to perform continuous ask/bid price discovery.
+
+## Run Log Update
+
+- **#r261** — 2026-04-04T18:32Z — Closed all #r261 open questions via covariance-aware cluster cap, sticky-decay penalty rules, two-layer audit commitment, and a constrained liquidity backstop interpretation compatible with Family D’s no-orderbook mandate. Added invariants #453–#456.
+
+## Open Questions for #r262+
+
+1. **Backstop governance interaction:** should `L_v` (venue-liquidity backstop) be governed by global class-agnostic schedule or per-cluster governance committees to avoid one LP pool being drained by a stressed niche class?
+2. **Penalty decay tuning:** what is the safe range for `δ_decay` and `osc_penalty_bump` under adversary capital constraints to guarantee `osc_penalty` does not become the dominant welfare loss driver?
+3. **Compressed-root verifiability:** what minimum witness set (class-level Merkle branch depth / challenge window) is enough for third-party auditors to verify full tuple claims during disputes without downloading all transitions?
+4. **Family D + migration:** when a coordinate migrates from Discovery→Validation, should cluster membership transfer (`w_c`, `Σ_res` history) be hard reset, smooth transfer, or weighted blend to avoid both discontinuity and exploitative membership gaming?
+
+*Last updated: #r261 - 2026-04-04T18:32Z*
