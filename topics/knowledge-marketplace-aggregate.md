@@ -25592,10 +25592,179 @@ Effect: short migration history cannot instantly transfer high credibility; it a
 
 - **#r258** — 2026-04-04T18:02Z — Resolved open #r258 questions with measurable, operational rules: adaptive `λ_min` via Bayesian misspecification, graph-aware concentration on correlated source trees, bounded `R_rev` queue depth/throughput with age decay, and explicit uncertainty surcharge in migration to prevent credibility teleportation. Added invariants #441–#444 and marked Family A viability as conditional.
 
-## Open Questions for #r259+
+## #r259 Contributions — 2026-04-04T18:12Z
 
-1. **Coupling strength of C-based concentration penalty:** calibrate `τ_c` and `C_max` jointly with `h_default`/`γ_low` so concentration risk is managed without collapsing sparse valid clusters.
-2. **`q_rev_cap` dynamics:** should queue throughput be fixed or state-dependent on unresolved share and observed drawdown rate?
-3. **`σ_mig` calibration:** can a per-coordinate Bayesian noise proxy (e.g., posterior variance from oracle disagreement) replace scalar `ρ_unc` for migration uncertainty.
-4. **Replay-proofness of adaptive thresholds:** prove no adversary can oscillate between Discovery/Discovery+Holdover to harvest reserve behavior via strategic timing.
-*Last updated: #r258 - 2026-04-04T18:02Z*
+Continuation from the 4 open questions in #r258 with explicit parameter surface, proof-of-noise handling, and governance-safe coupling constraints.
+
+## 1) Base primitive
+The primitive remains **(claim, bond, source-lineage)** with a single accounting state update and two control surfaces: concentration control and observability control. The new issue is not what is exchanged, but how fast controls must react so they remain impossible to game while preserving sparse-structure validity.
+
+## 2) State model
+`S_t(c)` remains batch-updated, but this run adds an explicit **control-state vector** for each coordinate epoch:
+
+`X_t(c) = {S_t(c), ρ_obs_t(c), C_t(c), q_rev_t(c), zone_state_t(c)}`.
+
+Controls are now first-class state components with deterministic transitions, not ad-hoc conditions. This enforces conservation of process semantics: claims move only through `S`, while stability controls move only through `X` via documented transition kernels. (#r259)
+
+## 3) Credibility model
+Capital converts to credibility only when it survives state controls that are also non-manipulable. Two additions:
+
+- **Concentration budget coupling**: concentrated source influence and insufficient reserve are jointly budgeted.
+- **Hysteresis-bounded adaptive thresholds**: controls switch only when bounded-state evidence persists.
+
+A knower can no longer monetize micro-threshold toggling by moving claims between states without paying the reserve and time costs implied by controls. (#r259)
+
+## 4) Market roles
+Roles unchanged, but settlement timing is now role-agnostic:
+
+- askers submit structured claims and bonds,
+- bidders pay for update-quality rights,
+- the settlement engine applies role payouts only after control-state admits normal mode.
+
+This blocks “claim then withdraw from holdover pool” patterns and makes both sides pay for state-risk transition costs when `C` or `ρ_obs` force a holdover. (#r259)
+
+## 5) Settlement model
+New explicit 4-state control transition (per class/epoch):
+
+- `NORMAL_DISCOVERY` (full payout path)
+- `DISC_HOLDOVER` (reduced multiplier + delayed reclaim)
+- `DEGRADED` (claim acceptance throttled)
+- `SOFT_EXIT` (mandatory reserve-capped settlement, no discovery rewards)
+
+Transitions are thresholded on a composite risk ratio `RISK_CAPEX_t(c)` and only occur when persistence windows clear. This removes one-epoch opportunistic cycling. (#r259)
+
+## 6) Attack surface
+The open-question set maps directly to exploitation channels:
+
+1. parameter coupling exploit,
+2. reserve-capacity exhaustion loops,
+3. migration over-crediting,
+4. adaptive toggle arbitrage.
+
+## 7) Comparative note vs LMSR/orderbooks/batch
+This run strengthens the difference: controls are now **governance-hardening variables** with explicit liveness proofs, rather than pricing variables (`LMSR`) or matching variables (orderbooks). Batch semantics still hold, but with typed state and bounded transition rates to prevent gaming. (#r259)
+
+## 8) Simplest viable sketch
+- Add a concentration-risk governor and a reserve-throughput governor with explicit coupling surface.
+- Define transitions via composite risk metric with deadband/hysteresis.
+- Compute per-epoch capex budget from unresolved reserve pressure and concentration persistence.
+- Gate `discovery_reward_mult` by state only.
+
+## 9) Strongest fail mode left
+`ρ_obs` and concentration may still be gamed via coordinated withholding across correlated classes if adversary can borrow reserve capacity through one-off shocks then attack another class with stale metrics. Mitigated via cross-class risk budget envelope, not by local tuning alone. (#r259)
+
+## 10) Best surviving fallback variant
+Keep Family D as base architecture. For very sparse classes run a constrained two-step profile:
+
+- discovery remains in holdover forever until minimum observable horizon, with capped rewards,
+- validation layer can still provide sparse posterior updates at bounded scale, but does not subsidize concentrated discovery claims. (#r259)
+
+---
+
+### Q1 (Coupling strength `τ_c`, `C_max`, `h_default`, `γ_low`) → Joint risk-budget inequality + state-dependent penalty slope
+
+Define per-coordinate composite risk utilization:
+
+`Kcap_t(c)= max(0, q_rev_t / R_prim_t)`,
+
+`Conc_t(c)= max(0, C(c,t)-C_target(c,t))`.
+
+Control admission constraint (one scalar budget):
+
+`U_t(c)= ω_1 Kcap_t(c) + ω_2 Conc_t(c)`, with `ω_1+ω_2=1`.
+
+Set:
+
+`C_max(c,t)= C_floor(c) + (C_ceiling(c)-C_floor(c))·max(0,1-U_t(c))`,
+
+`τ_c(c,t)=τ_base(c) + τ_sens(c)·U_t(c)`.
+
+This makes concentration tolerance tighten only when unresolved pressure and concentration risk are jointly low. If reserve pressure rises, concentration penalties become sharper and payout multiplier drops via:
+
+`γ_t = γ_low + (γ_full-γ_low)·(1-U_t)`.
+
+Governance can set `ω` once; operationally only state drives both knobs.
+
+**Design law (#r259):** calibrate `τ_c` and `C_max` through a shared risk budget `U_t`, not independently, so they trade against the same solvency exposure.
+
+### Q2 (q_rev_cap dynamics) → State-dependent cap to satisfy responsiveness and solvency
+
+Fixed `q_rev_cap` under-reserves under drawdown and over-restricts during calm periods. Use:
+
+`q_rev_cap(t)= clip[q_min, q_max, q_base · (1 + φ_obs·(1-ρ_obs_t) + φ_conc·Conc_t + φ_draw·DD_t]`,
+
+where `DD_t` is realized reserve drawdown over `L_dd` epochs.
+
+- **Higher unresolved pressure / lower observability / lower concentration quality** => higher disbursement cap, which keeps expected reconciliation predictable when truth is bad and disputes spike.
+- **Deeper solvency stress** => absolute hard floor `q_min` remains, but additional disbursement throttled by `q_floor_from_solvency`.
+
+Thus queue dynamics adapt to both solvency pressure and evidence quality instead of arbitrary constant throughput.
+
+### Q3 (σ_mig calibration) → Replace scalar `ρ_unc` with per-coordinate posterior noise surcharge
+
+Set migration surcharge:
+
+`σ_mig_j^2(t)= γ_mig · (σ_oracle_j^2(t) + σ_track_j^2(t)) · (1-α_mig)`,
+
+where:
+- `σ_oracle_j^2` is per-coordinate posterior variance from last-migration validation window,
+- `σ_track_j^2` is destination-track local disagreement variance (or prior mismatch proxy),
+- `γ_mig` is governance set [0,1],
+- `α_mig` from #r257/#r258 remains.
+
+**No scalar ρ_unc in production for final formula**; maintain a scalar for upper-bound governance guardrail only (`γ_mig`), while surcharge is evidence-based and coordinate-specific. (
+`ref: #r258`)
+
+### Q4 (Replay-proofness of adaptive threshold switching) → Deterministic hysteresis + minimum dwell + anti-arbitrage cost (proof sketch)
+
+To prevent oscillation attacks between Discovery and Holdover:
+
+1. **Dual threshold hysteresis:** enter holdover when `M_t < λ_min,eff_low`; re-enter discovery only when `M_t > λ_min,eff_high` with `λ_min,eff_high > λ_min,eff_low` and both are bounded by EWMA-smoothed misspec score.
+2. **Minimum dwell time:** once switched, state must persist at least `H_switch` epochs before another transition can occur.
+3. **Penalty on oscillation:** each oscillation increments `osc_penalty` that increases future `h_default` and lowers `q_rev_cap` for `N_osc` epochs.
+4. **Transition evidence window:** each switch requires persistence of evidence over `W_enter` consecutive epochs (for Discovery->Holdover) or `W_exit` (for Holdover->Discovery) with `W_exit ≥ W_enter`.
+
+**Replay-proofness claim:** under (a) positive transaction costs, (b) state-dependent penalties and (c) monotone evidence persistence, an adversary cannot create strictly positive expected payoff from cycling because each cycle adds locked penalties and reduces immediate reward multipliers; expected gain from timing advantage is bounded by loss terms, provided `osc_penalty` is set above the maximum one-cycle opportunism gain (`max_cycle_gain`).
+
+
+### Net-new result: 2-tier control surface (admissibility + throughput) replaces scalar gate toggles
+
+Define:
+- **Admissibility gate**: whether full discovery payout is allowed (`λ_obs`, concentration, `Kcap`, and `DD` all pass),
+- **Throughput gate**: how much unresolved residue can flow out (`q_rev_cap`) once in holdover.
+
+Separating gates prevents a known bug: making holdover “stricter” often starves reserve without actually reducing admissibility abuse. Now low observability/concentration only throttles throughput and/or reward multiplier, while admissibility remains explicit and auditable. (#r258 and #r259)
+
+---
+
+## Structural Synthesis: #r259
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Coupling τ_c / C_max / h_default / γ_low | Joint risk budget `U_t` with shared affine coupling and state-driven `C_max`, `τ_c`, `γ_t` | Controls must move together through one solvency-+concentration utilization metric |
+| q_rev_cap dynamics | State-dependent throughput using unresolved pressure, observability and drawdown | Throughput adapts to solvency stress and signal quality |
+| σ_mig formula | Coordinate-specific posterior-noise surcharge replaces scalar ρ_unc; scalar kept as cap | Migration uncertainty becomes evidence-based, not global constant |
+| Replay-proofness | Hysteresis + dwell + oscillation penalty + persistence windows | Prevents opportunistic state cycling and reserve harvesting |
+
+## Cumulative Invariants (#r259)
+
+**Invariant #445 (#r259):** Concentration control and payout haircut must be coupled through a shared risk budget `U_t(c)=ω_1 Kcap_t+ω_2 Conc_t`, `ω_1+ω_2=1`. `C_max` contracts and `τ_c` expands with rising `U_t`; `γ_t` (payout multiplier) also decreases linearly with `U_t`, so concentration tightening is aligned to reserve risk.
+
+**Invariant #446 (#r259):** Reserve reclaim throughput is state-dependent: `q_rev_cap(t)=clip[q_min,q_max,q_base·(1+φ_obs(1-ρ_obs_t)+φ_conc Conc_t+φ_draw DD_t)]` with lower/upper caps and solvency throttle. Throughput must additionally satisfy queue-cap + reserve stress floor.
+
+**Invariant #447 (#r259):** `σ_mig` for track migration is coordinate-aware and uses posterior noise proxies, `σ_mig_j^2 = γ_mig(σ_oracle_j^2+σ_track_j^2)(1-α_mig)`, with `γ_mig` bounded [0,1] governance cap.
+
+**Invariant #448 (#r259):** Adaptive mode switching requires dual hysteresis and minimum dwell: entry/exit thresholds `λ_min,eff_low < λ_min,eff_high`, persistence windows `W_enter, W_exit`, dwell `H_switch`, and oscillation penalty `osc_penalty` that increases `h_default` and reduces `q_rev_cap` on each transition in short window `N_osc`. Oscillation with net-positive expected value is disallowed by design.
+
+## Run Log Update
+
+- **#r259** — 2026-04-04T18:12Z — Resolved all 4 #r259 questions by coupling concentration and haircut parameters via a shared risk-utilization metric, making `q_rev_cap` state-dependent, replacing scalar migration uncertainty with coordinate-level posterior-noise surcharge, and adding replay-proof switching (hysteresis, dwell, oscillation penalties). Added invariants #445–#448 and retained Family D as the robust surviving architecture. 
+
+## Open Questions for #r260+
+
+1. **Cross-coordinate coupling of controls:** should `U_t(c)` feed a protocol-level risk budget cap across class clusters (preventing one class with low `ρ_obs` from consuming all reserve throughput)?
+2. **Oscillation penalty calibration:** what is the exact lower bound on `osc_penalty` that dominates best-cycle adversarial gain under bounded adversary capital?
+3. **`λ_min,eff` governance auditability:** should switch thresholds and weights (`ω`, `φ`, `γ_*`) be exposed on-chain/on-EAT as immutable schedule parameters for compliance review?
+4. **Emergency override semantics:** if governance intervenes with emergency settlement during DEGRADE, does it reset hysteresis state and pending oscillation penalties, or do penalties persist?
+
+*Last updated: #r259 - 2026-04-04T18:12Z*
