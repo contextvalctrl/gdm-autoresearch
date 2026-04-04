@@ -9390,3 +9390,283 @@ With v2.2 mechanism spec complete, three candidate threads evaluated:
 4. **BatchAuction T_anchor StateFreeze atomicity:** Does BatchAuction.sol implement an atomic StateFreeze at the epoch boundary equivalent to T_anchor, or does the batch clearing operate on a rolling window without the freeze guarantee?
 
 *Last updated: #r181 — 2026-04-04T03:52Z*
+
+---
+
+## #r182 Contributions — 2026-04-04T04:02Z
+
+**Phase: Adversarial simulation pass — all four v2.1 scaffold contracts against spec invariants. This run maps attack vectors to on-chain enforcement gaps, not abstract vulnerabilities.**
+
+Source files audited:
+- `gestalt-contracts/src/core/GestAltVault.sol` → ClaimEscrow_v1 analog
+- `gestalt-contracts/src/core/OracleManager.sol` → oracle-authority layer
+- `gestalt-contracts/src/core/MarketFactory.sol` → CoordinateRegistry_v1 analog
+- `gestalt-contracts/src/core/BatchAuction.sol` → SettlementEngine_v1 analog
+
+---
+
+### Q1 (GestAltVault solvency enforcement — TOWL three-zone vs binary) → **GAP: binary solvency only; Zone A/B/C gates are absent (#r182)**
+
+**What the scaffold enforces:**
+
+`GestAltVault._assertSolvent()` checks a single invariant: `totalCollateral >= totalObligations`. This binary pass/fail reverts any transaction that would push the vault insolvent. The vault comments explicitly cite "Core Invariant #11: vault.balance >= sum(all position obligations)."
+
+**What the spec requires (Invariants #2–#5, #r71):**
+
+TOWL is not binary. It is a three-zone capacity model:
+- **Zone A:** `utilization < 70%` — normal operation
+- **Zone B:** `70% ≤ utilization < 90%` — throttled new T3 installations
+- **Zone C:** `utilization ≥ 90%` — T3 new installations suspended; Zone C deferral rules active for escrow outflows
+
+**Spec invariants violated by scaffold:**
+
+| Spec invariant | Scaffold enforcement | Gap |
+|---|---|---|
+| Zone A/B/C threshold gates | Not present | Critical — no TOWL utilization tracking |
+| Zone C outflow deferral | Not present | Critical — slash proceeds routing depends on zone |
+| Zone C challenge-window advance vs SFP deferral | Not present | High — settlement-finality behavior changes at Zone C |
+| TOWL capacity = Σ escrow_warranted × tier_weight | Not present | High — no per-silo tier-weight computation |
+
+**The three-silo structure (SiloA, SiloB, SiloC) is the right structural skeleton** — the three silos map naturally to T1/T2/T3 tier weight differentiation per `tier_weight: T1=0, T2=0.25, T3=1.0` (#r71). The gap is that each silo currently has equal weight in the solvency check; tier-weighted TOWL utilization computation is missing entirely.
+
+**Delta required for v2.1:**
+
+```solidity
+// Add to GestAltVault (or LTRP module):
+uint256 constant ZONE_A_THRESHOLD_BPS = 7000;  // 70%
+uint256 constant ZONE_B_THRESHOLD_BPS = 9000;  // 90%
+uint16[3] constant TIER_WEIGHT_BPS = [0, 2500, 10000]; // T1=0%, T2=25%, T3=100%
+
+function towlUtilization() public view returns (uint256 utilizationBps);
+function towlZone() public view returns (uint8 zone);  // 0=A, 1=B, 2=C
+modifier onlyBelowZoneC();  // reverts new T3 installations in Zone C
+```
+
+**Solvency-first mandate compliance:** The scaffold correctly implements the minimum solvent invariant. The binary check is necessary but not sufficient. Zone C gating is required before v2.1 launch on any production coordinate class. (#r182)
+
+---
+
+### Q2 (OracleManager oracle-authority duality — conflation of attestation and authority) → **GAP: duality absent; proposer and attestor are not distinguished from knower (#r182)**
+
+**What the scaffold implements:**
+
+OracleManager has a two-layer structure:
+- **Layer 1 (WHEN):** 5-of-9 quorum of ATTESTOR_ROLE confirms event occurrence at a timestamp.
+- **Layer 2 (WHAT):** RESOLVER_ROLE proposes an outcome; 1-hour challenge period; RESOLVER_ROLE confirms.
+
+**What the spec requires (Invariant #11, #r151):**
+
+The oracle-authority/knower-attestor duality requires:
+1. **Oracle-as-authority:** `oracle_settlement_override` path — the oracle provides the final authoritative settlement price. When this fires, no knower is slashed. The settlement price changes but the S_cred contributors' capital is protected.
+2. **Knower-as-attestor:** T3 claim warranty path — knowers post forfeitable escrow and are slashed when wrong at oracle resolution.
+
+These are **different epistemic roles with different capital consequences.** The scaffold's OracleManager does not touch escrow, does not emit a `oracle_settlement_override` event type, and has no concept of "knower escrow protection on override."
+
+**Specific gaps:**
+
+| Spec requirement | Scaffold state |
+|---|---|
+| `oracle_settlement_override` event (no slash on authority override) | Absent — `OutcomeConfirmed` fires without distinguishing override-vs-challenge |
+| Challenge-type distinction (`epistemic` vs `settlement_finality`) | Absent — one challenge path only (CHALLENGE_PERIOD = 1 hour, no type routing) |
+| Zone C deferral of settlement-finality challenge window | Absent |
+| Challenger reward = fee refund only on settlement-finality challenge success | Absent |
+| `credibility_ratio` soft recalibration on oracle override (w_override_base × (1−freq)) | Absent — OracleManager has no credibility_ratio awareness |
+
+**What the scaffold gets right:**
+
+The two-layer WHEN/WHAT separation is structurally correct and maps directly to the spec's two oracle authority actions. The `OutcomeConfirmed` event sequence (propose → challenge period → confirm) is exactly the Settlement Freeze Protocol's challenge-window phase. The **skeleton is right; the routing and escrow-protection semantics are missing.**
+
+**Delta required for v2.1:**
+
+```solidity
+enum ResolutionType { STANDARD, SETTLEMENT_OVERRIDE }
+
+event OutcomeConfirmed(uint256 indexed marketId, uint256 outcome, ResolutionType resolutionType);
+event OracleSettlementOverride(uint256 indexed marketId, uint256 candidatePrice, uint256 oraclePrice);
+
+// On confirmResolution(): check if a settlement-finality challenge was filed.
+// If challenge filed AND oracle confirms candidate price: challenger fee forfeited.
+// If challenge filed AND oracle overrides: challenger fee returned; no knower slash.
+// No knower slash in either case — only escrow routing changes.
+```
+
+**CredibilityAggregator must be a downstream consumer of OracleManager events** — it receives the soft recalibration signal from each `OracleSettlementOverride`. Currently there is no CredibilityAggregator in the scaffold at all. (#r182)
+
+---
+
+### Q3 (MarketFactory epistemically-live gate — on-chain enforcement absent) → **GAP: no epistemically_live precondition exists on-chain; entirely off-chain governance today (#r182)**
+
+**What the scaffold implements:**
+
+`MarketFactory.createMarket()` requires `MARKET_CREATOR_ROLE`. The role gate is the entire admission control. No epistemic liveness check exists:
+- No minimum challenger count verification
+- No check that `epistemically_live = true` for ≥ 2 normal-mode macro-epochs
+- No TOWL zone check at market creation time
+
+State transitions (ACTIVE → SHADOW_FROZEN → FROZEN → RESOLVED) are gated by `ORACLE_ROLE` only.
+
+**What the spec requires (Invariant #38, #r160):**
+
+GestAlt v2.1 must not go live on any coordinate class until:
+- `epistemically_live = true` for ≥ 2 consecutive normal-mode macro-epochs
+- `active_challenger_count ≥ max(3, floor(N_T3_active / 5))`
+
+**Risk of gap:** A market can be created, have T3 claims warranted, and enter clearing — all without any challenger in the system. Wrong warranted installations persist undetected. S_cred degrades with no enforcement mechanism. The mechanism's quality guarantee is entirely absent.
+
+**Mitigating factor:** v2.1 launch is not production until the 5-contract audit is complete and the governance team manually enforces epistemic liveness before activating markets. The on-chain gate is missing but the operational gate exists. However, the spec requires the on-chain gate precisely because operational gates are not failure-proof.
+
+**Delta required for v2.1:**
+
+```solidity
+// In MarketFactory or CoordinateRegistry:
+mapping(uint256 => uint256) public activeChallengerCount;   // market -> count
+mapping(uint256 => bool)    public epistemicallyLive;       // market -> liveness flag
+
+modifier requiresEpistemicLiveness(uint256 marketId) {
+    require(epistemicallyLive[marketId], "MarketFactory: market not epistemically live");
+    _;
+}
+
+// createMarket() or activateMarket() should call requiresEpistemicLiveness.
+// CredibilityAggregator updates activeChallengerCount on each successful challenge commit.
+```
+
+**Risk tier: HIGH.** On-chain enforcement of Invariant #38 is a v2.1 launch gate, not a v2.2 deferral. (#r182)
+
+---
+
+### Q4 (BatchAuction T_anchor StateFreeze atomicity — rolling window without freeze guarantee) → **GAP: no atomic StateFreeze; S_cred snapshot capture is absent; state machine skeleton is correct (#r182)**
+
+**What the scaffold implements:**
+
+`BatchAuction` has a well-structured 8-state lifecycle: `OPEN → CLOSE → REVEAL → PRE_FLIGHT → SHEARING → SETTLE → SCHRODINGER → FINALIZED`. The `SCHRODINGER` state is explicitly named for the post-event oracle-scrubbing window — the spec's T_anchor analog.
+
+The `settleBatch()` function transitions `SETTLE → FINALIZED` and records `batch.clearingPrice`. However:
+- The clearing price computation is `// TODO` — a `0` placeholder exists.
+- No S_cred snapshot is captured at `SETTLE` entry (T_anchor analog).
+- No cross-contract `CoordinateRegistry.freezeForSettlement()` atomic call exists.
+- The `SCHRODINGER → FINALIZED` transition via `advanceState()` is not atomic with any S_cred freeze.
+
+**Spec requirement (Invariant #37, #r160):**
+
+Settlement state capture must be a **single atomic transaction** where:
+1. S_cred is read from CredibilityAggregator (snapshot).
+2. Snapshot is written to SettlementEngine.candidate_price storage.
+3. T_anchor EAT event is emitted with block_hash.
+4. `settlement_frozen = true` is set.
+
+The `SCHRODINGER` state is the correct hook for this. The BatchAuction's `SCHRODINGER` state corresponds to the post-oracle, pre-finalization window where the challenge period runs. **The spec's Settlement Freeze Protocol maps cleanly onto the SCHRODINGER phase.**
+
+**Mapping:**
+
+| Spec | BatchAuction scaffold |
+|---|---|
+| T_anchor (S_cred frozen) | Entry into SCHRODINGER state |
+| T_challenge_window | SCHRODINGER duration (currently no enforced duration) |
+| T_finality | SCHRODINGER → FINALIZED transition |
+| oracle_settlement_override | OracleManager.confirmResolution() → triggers FINALIZED (currently does not route to BatchAuction) |
+
+**Critical gap: OracleManager and BatchAuction are not wired together.** OracleManager emits `OutcomeConfirmed` but BatchAuction does not consume it. The `freeze()` / `shadowFreeze()` calls in MarketFactory are not linked to BatchAuction state transitions. The contracts exist in isolation with no cross-contract event handling.
+
+**Delta required for v2.1:**
+
+```solidity
+// In BatchAuction:
+mapping(uint256 => uint256) public candidatePrice;         // batchId -> S_cred snapshot at T_anchor
+mapping(uint256 => bool)    public settlementFrozen;       // batchId -> frozen flag
+
+// freezeForSettlement(batchId) — called by OracleManager/MarketFactory at event confirmation:
+//   1. Read S_cred from CredibilityAggregator (once CredibilityAggregator exists)
+//   2. Write to candidatePrice[batchId]
+//   3. Set settlementFrozen[batchId] = true
+//   4. Advance state to SCHRODINGER
+//   All in a single transaction; no re-entrancy back into CredibilityAggregator.
+
+// Challenge window duration must be set and enforced before SCHRODINGER → FINALIZED.
+uint256 public constant SETTLEMENT_CHALLENGE_PERIOD = 3600;  // 1 hour placeholder
+```
+
+**What the scaffold gets right:** The `SCHRODINGER` state as an explicit lifecycle phase is architecturally correct and a deliberate design choice that aligns with the spec. The commit-reveal order submission (commitHash → revealOrder) is the right foundation for the sealed-bid anti-front-running design. The shearing mechanism (30% imbalance threshold → RFQ reroute) maps to the spec's zone-based clearing. **The skeleton is sound; the wiring and the CredibilityAggregator integration are the primary gaps.**
+
+---
+
+### Net-New Structural Insight: CredibilityAggregator is the Load-Bearing Gap (#r182)
+
+Four contracts audited. Three have correct architectural skeletons with well-defined delta surfaces. One critical observation unifies all four gap analyses:
+
+**Every gap in the scaffold ultimately traces to the absence of CredibilityAggregator.**
+
+| Gap | Root cause |
+|---|---|
+| TOWL Zone A/B/C absent in GestAltVault | Tier-weighted utilization computation requires per-claim credibility_ratio, which lives in CredibilityAggregator |
+| oracle_settlement_override no-slash absent in OracleManager | Soft recalibration signal (w_override × log-score) requires CredibilityAggregator as downstream consumer |
+| epistemically_live gate absent in MarketFactory | activeChallengerCount tracking requires CredibilityAggregator to record successful challenge events |
+| S_cred snapshot absent in BatchAuction | freezeForSettlement requires CredibilityAggregator.getS_credSnapshot() |
+
+CredibilityAggregator_v1 is the one spec contract with no scaffold analog (per #r181/Q2). It is also the root dependency for every v2.1 launch-gate invariant. **Building CredibilityAggregator_v1 is the single highest-leverage engineering action in the v2.1 delta surface.**
+
+**Engineering priority adjustment (#r182):**
+
+Original Document 1 priority (#r180): EATManager first.
+
+Revised: **CredibilityAggregator_v1 must be designed and stubbed first** — even a thin stub with:
+- `getS_credSnapshot(uint256 marketId) → (uint256 snapshot, bytes32 blockHash)`
+- `recordChallengeSuccess(uint256 marketId, address challenger)`
+- `updateCredibilityRatio(uint256 marketId, address knower, int256 logScoreDelta, uint256 weight)`
+
+This stub unblocks all other v2.1 delta work in parallel. The four scaffold contracts can be extended independently once the CredibilityAggregator interface is defined.
+
+**Design law (#r182):** In a multi-contract architecture, the contract with the most downstream dependencies must be interface-designed first, even if it is the most complex to implement. Stubs unblock parallel development; the full implementation follows. CredibilityAggregator_v1 is that contract for GestAlt v2.1. (#r182)
+
+---
+
+## Structural Synthesis: v2.1 Adversarial Simulation Summary (#r182)
+
+| Contract | Skeleton quality | Critical gaps | v2.1 launch-blocking? |
+|---|---|---|---|
+| GestAltVault (ClaimEscrow analog) | ✅ Binary solvency correct; three-silo structure right | TOWL Zone A/B/C gates; tier-weighted utilization | YES — Invariant #2–5 |
+| OracleManager | ✅ Two-layer WHEN/WHAT correct; challenge period skeleton right | oracle_settlement_override no-slash path; challenge type routing; OracleManager↔BatchAuction wiring | YES — Invariant #11 |
+| MarketFactory (CoordinateRegistry analog) | ✅ State machine ACTIVE→RESOLVED correct; role-gated creation | epistemically_live on-chain gate; no TOWL zone check at market creation | YES — Invariant #38 |
+| BatchAuction (SettlementEngine analog) | ✅ SCHRODINGER state correct hook; commit-reveal anti-front-running right | S_cred StateFreeze atomicity; OracleManager wiring; challenge window enforcement; clearing price TODO | YES — Invariant #37 |
+| CredibilityAggregator | ❌ Not present | Entire contract is net-new | YES — root dependency for all above |
+
+**Total v2.1 launch-blocking gaps: 5 contracts × N gaps each, all rooted in CredibilityAggregator absence.**
+
+**Recommended engineering sequence:**
+1. **CredibilityAggregator_v1 interface stub** — unblocks all other work.
+2. **TOWL zone computation module** — extend GestAltVault with tier-weighted utilization.
+3. **OracleManager↔BatchAuction wiring** — freezeForSettlement atomic transaction.
+4. **epistemically_live gate** — MarketFactory.activateMarket() precondition.
+5. **SettlementEngine S_cred StateFreeze** — BatchAuction.SCHRODINGER entry atomic.
+
+---
+
+## Cumulative Invariants (additions through #r182)
+
+**Invariant #124 (#r182):** GestAltVault's binary solvency invariant (`totalCollateral ≥ totalObligations`) is necessary but not sufficient for v2.1. TOWL Zone A/B/C gates with tier-weighted utilization computation are required before production deployment.
+
+**Invariant #125 (#r182):** OracleManager must implement a `ResolutionType` distinction (`STANDARD` vs `SETTLEMENT_OVERRIDE`) before v2.1 launch. The `oracle_settlement_override` no-slash path is a v2.1 invariant (#11), not a v2.2 feature.
+
+**Invariant #126 (#r182):** MarketFactory.createMarket() (or an explicit activateMarket() call) must enforce the on-chain `epistemically_live` precondition (Invariant #38). Off-chain governance checks are insufficient.
+
+**Invariant #127 (#r182):** CredibilityAggregator_v1 must be interface-designed (stub) before any other v2.1 delta work begins. It is the root dependency of TOWL computation, oracle-override recalibration, epistemic liveness tracking, and S_cred StateFreeze.
+
+---
+
+## Run Log Update
+
+- **#r182** — 2026-04-04T04:02Z — Adversarial simulation: all four core v2.1 scaffold contracts audited (GestAltVault, OracleManager, MarketFactory, BatchAuction). Gaps mapped to spec invariants. Root dependency identified: CredibilityAggregator_v1 is absent and load-bearing for all launch-gate invariants. Engineering sequence defined. Four new invariants (#124–#127).
+
+---
+
+## Open Questions for #r183+
+
+1. **CredibilityAggregator_v1 interface spec — full draft:** The stub interface (getS_credSnapshot, recordChallengeSuccess, updateCredibilityRatio) is the minimum needed to unblock parallel development. A full interface spec should include: S_cred storage layout, W_max per-agent cap enforcement, epoch-buffer one-epoch delay, credibility_ratio decay model, and view functions needed by TOWL zone computation. This is Document 4 of the engineering handoff.
+
+2. **GestAltVault silo-to-tier mapping formalisation:** The three silos (SiloA, SiloB, SiloC) map to T1/T2/T3 tiers. The TOWL utilization formula requires `tier_weight[silo] × siloObligations[silo]`. Should the tier-weight constants be storage (governance-adjustable) or immutable (set at deployment)? The spec shows governance-settable tier weights; the scaffold currently has no tier weight concept.
+
+3. **BatchAuction SCHRODINGER duration enforcement:** The SCHRODINGER state is the challenge window. Currently there is no enforced minimum/maximum duration for SCHRODINGER before FINALIZED transition. What is the v2.1 default `SETTLEMENT_CHALLENGE_PERIOD`? The OracleManager's current `CHALLENGE_PERIOD = 1 hour` is the natural starting point — does this remain, or does it become governance-settable per market class?
+
+4. **Cross-contract integration test plan:** With five contracts now gap-assessed, the integration test suite should cover: (a) Zone C gate blocks new T3 during solvency stress, (b) oracle_settlement_override does not slash knower escrow, (c) epistemically_live gate prevents market activation below threshold, (d) StateFreeze is atomic (no S_cred update after T_anchor). Define the test case structure before implementation begins.
+
+*Last updated: #r182 — 2026-04-04T04:02Z*
