@@ -16761,3 +16761,208 @@ Additional metric quantities (W(t), EDS, ECD, σ_oracle) serve governance evalua
 4. **Three-quantity completeness under oracle failure:** If oracle never resolves (Case D3), credibility_ratio_shadow gets partial update (γ_oracle_absent, Invariant #205). WED is partially released via LTRP. S_cred persists as last committed value. Under persistent oracle failure across all classes, all three quantities degrade toward degenerate states. Is there a fourth "structural health" quantity — e.g., fraction of classes with oracle-anchored credibility_ratio updates in the last N_calibration epochs — that the mechanism should conserve or monitor to detect protocol-wide oracle failure?
 
 *Last updated: #r215 — 2026-04-04T09:42Z*
+
+---
+
+## #r216 Contributions — 2026-04-04T09:52Z
+
+Addresses all four open questions from #r215. Net-new first-principles angle: GestAlt and the Grossman-Stiglitz paradox — how the two-phase incentive structure resolves the information-acquisition problem that defeats LMSR.
+
+---
+
+### Q1 (EDS_adjusted ρ_hat staleness — retroactive recomputation vs point-in-time consistency) → Point-in-time consistency; ρ_matrix updates trigger forward-only EDS_adjusted recalculation; historical values immutable (#r216)
+
+**Why retroactive recomputation is wrong:**
+
+EDS_adjusted is a governance advisory signal, not a settlement-critical quantity. Historical governance decisions made on prior EDS_adjusted values cannot be undone retroactively. If historical EDS_adjusted values were recomputed, the EAT record would diverge from the governance action history — a governance auditability failure. Any governance action taken on the basis of EDS_adjusted(c, t_prior) was correct given the information available at t_prior. Retroactive revision would imply the governance action was based on incorrect information, potentially warranting reversal — an unworkable cycle.
+
+**Additional cost:** Retroactive recomputation requires storing all historical q_bonus series (raw bid magnitudes per epoch per class) rather than just the rolling median accumulator. Storage cost grows O(N_epochs × N_classes). Point-in-time consistency requires only the current rolling median accumulator plus the current ρ_matrix snapshot.
+
+**Resolution — forward-only update at ρ_matrix refresh:**
+
+```
+On ρ_matrix update at epoch T_rho_update:
+  For each class c:
+    EDS_adjusted(c, T_rho_update) = EDS_raw(c, T_rho_update) × (1 − ρ_hat_new(c))
+    EAT event: { ρ_matrix_updated, T_rho_update, classes_affected: [c_1, ..., c_n] }
+
+For epochs < T_rho_update:
+  EDS_adjusted uses ρ_hat as-of the epoch it was computed
+  Historical records are immutable; governance decisions are consistent with their information environment
+
+ρ_hat staleness window = N_calibration epochs (the ρ_matrix update cadence)
+Governance UI: display ρ_hat_age (epochs since last ρ_matrix update) alongside EDS_adjusted
+  If ρ_hat_age >= 0.5 × N_calibration: governance advisory "EDS_adjusted staleness approaching calibration boundary"
+```
+
+**Design law (#r216):** EDS_adjusted is point-in-time consistent. Historical values are immutable in EAT. Forward-only recalculation at ρ_matrix refresh. ρ_hat staleness is a disclosed precision limitation, bounded at N_calibration epochs, surfaced via governance UI advisory. Retroactive recomputation is prohibited as a governance auditability requirement. (#r216)
+
+---
+
+### Q2 (Neutral challenger pool treasury model — what exactly the treasury funds) → Treasury funds: bond escrow (returned on success) + gas reserve + challenger_reward_floor shortfall guarantee (#r216)
+
+**Anatomy of a neutral challenge:**
+
+1. **Bond requirement:** The challenger must post a bond to submit a valid challenge. Bond is slashed if challenge fails; returned if challenge succeeds. For the neutral challenger, the bond is drawn from protocol treasury and returned to treasury on success.
+2. **Challenge reward:** On successful challenge, the challenger earns a reward proportional to the slash proceeds from the wrong installation. This comes from slashed knower escrow — not from treasury.
+3. **Gas cost:** Transaction cost to submit the challenge. Small but non-zero. Treasury funds the gas reserve budget.
+4. **Slash shortfall:** If the wrong installation's escrow is unexpectedly small (e.g., the knower exited most of their stake during the challenge window, before slash executes), the slash proceeds may be insufficient to cover the full challenger_reward. The mechanism should not penalise the neutral challenger for adversarial escrow reduction.
+
+**Formal treasury exposure model:**
+
+```
+treasury_at_risk_per_neutral_challenge =
+  + gas_reserve_per_challenge          (operational cost; consumed regardless)
+  + max(0, challenger_reward_floor − slash_proceeds_actual)  (shortfall guarantee)
+  − 0                                  (bond: returned on success; net zero expected cost)
+
+challenger_reward_floor = min_reward_fraction × bond_requirement
+  min_reward_fraction: governance-set [0.5, 2.0]; default 1.0
+
+Pool activation gate:
+  treasury_balance >= K_neutral_buffer × per_epoch_budget
+  K_neutral_buffer = 5 (governance-settable [3, 10])
+```
+
+Challenge rate calibrated to δ_threshold deviations only (not all possible challenges).
+
+**Design law (#r216):** Treasury funds three neutral challenger items: gas reserve (always consumed), bond (returned on success), and challenger_reward_floor shortfall guarantee. Pool activation gate requires K_neutral_buffer × per-epoch budget. Challenge rate is calibrated to δ_threshold deviations only. (#r216)
+
+---
+
+### Q3 (Epoch-boundary simultaneous archive batch — epoch number as definitive grouping unit) → Epoch number is the definitive unit; governance-settlement batch cadence is operational (#r216)
+
+**Resolution:**
+
+```
+simultaneous(archive_A, archive_B) iff:
+  archive_A.epoch_number == archive_B.epoch_number
+  AND both processed in the same CredibilityAggregator.processEpochBoundary(epoch_n) call
+
+NOT: both in the same governance-settlement transaction (which may cover epochs n through n+k)
+
+For a governance-settlement batch covering epochs [n, n+k]:
+  processEpochBoundary called sequentially: epoch n, then n+1, ..., then n+k
+  Archives from epoch n are simultaneous with each other; sequential relative to epoch n+1
+```
+
+Archives in different epochs were submitted at different information states — they are not truly simultaneous even if they arrive in the same governance transaction. Governance batch rollback causes retry from first unprocessed epoch; no partial epoch-n archives become simultaneous with epoch-n+1 archives.
+
+**Design law (#r216):** The epoch number is the definitive grouping unit for simultaneous-archive processing. Governance-settlement batch cadence is operational; it does not redefine simultaneity. Sequential epoch processing within a governance batch preserves per-epoch ordering invariants. Governance batch rollback triggers retry from first unprocessed epoch. (#r216)
+
+---
+
+### Q4 (Three-quantity completeness under persistent oracle failure — Ω as oracle health metric) → Ω(t) is the correct fourth metric (not a fourth conserved quantity); oracle_crisis governance trigger at Ω < Ω_min for K consecutive epochs (#r216)
+
+**Why Ω is needed but is not a fourth invariant:**
+
+Persistent oracle failure is invisible to the three-quantity system in the "frozen corpse" degenerate case:
+- WED: remains high (escrows locked; no resolution to discharge them)
+- S_cred: stable (no updates = no change; appears healthy)
+- credibility_ratio: remains at prior accumulated values (no update events; appears healthy)
+
+Detection requires oracle resolution history — not captured by WED, S_cred, or credibility_ratio.
+
+**Formal oracle health metric Ω:**
+
+```
+Ω(t) = |{c : ∃ epoch t' ∈ [t - N_calibration, t] such that oracle_resolved(c, t')}|
+         / max(1, |{c : epistemically_live(c, t)}|)
+
+Ω(t) ∈ [0, 1]
+Ω = 1: all live classes had oracle resolution within N_calibration epochs
+Ω = 0: no live class had any oracle resolution for N_calibration epochs
+
+oracle_crisis_declared(t) iff:
+  Ω(t) < Ω_min (default 0.10) for K_oracle_crisis consecutive epochs (default N_calibration/2)
+
+oracle_crisis → EAT event; governance emergency session; new class registrations suspended;
+  T_longtail_effective extended by σ_oracle_scalar_max for all affected classes
+```
+
+Why Ω_min = 0.10 (not higher): A specialised protocol focusing on long-horizon or regulatory coordinate classes may legitimately have only 10-20% of classes resolving per N_calibration window. A higher Ω_min would false-trigger on healthy long-duration class portfolios. 0.10 catches the frozen-corpse failure without triggering on deliberate long-horizon composition.
+
+**Relationship to completeness claim (Invariant #266):** Ω is a governance health monitoring metric. WED, S_cred, and credibility_ratio are complete for mechanism correctness guarantees given oracle availability. Ω monitors whether oracle availability is being maintained. The mechanism cannot guarantee oracle arrival; it can only monitor for its absence. (#r216)
+
+---
+
+### Net-New First-Principles Pass: GestAlt and the Grossman-Stiglitz Paradox (#r216)
+
+**The Grossman-Stiglitz problem:** If market prices fully reveal all privately acquired information, informed traders earn zero abnormal returns — rational agents then decline to acquire information at positive cost. But if no one acquires information, prices reveal nothing. LMSR inherits this paradox structurally.
+
+**How LMSR fails:** In LMSR, an informed trader profits only by moving the price. Once the price converges, the marginal trader earns nothing. There is no post-convergence maintenance incentive. The market correctly reveals information, then epistemically empties.
+
+**GestAlt's two-phase incentive structure:**
+
+| Phase | Condition | Incentive | Source |
+|---|---|---|---|
+| Pre-convergence | S_cred far from oracle | τ_bonus × log_score (early-conviction premium) | Knower's correct early revelation |
+| Post-convergence | S_cred near oracle | EQ query fees (maintenance premium) | Unknower demand for credible state |
+
+In Phase 2 (no LMSR analog), GestAlt rewards agents who maintain warranted positions that unknowers need to access. Information already incorporated into S_cred still has consumption value for unknowers acting on it — and GestAlt captures this as ongoing fee revenue.
+
+**Formal: why GestAlt resolves the paradox in the bilateral-flow regime:**
+
+```
+Knower acquires information iff:
+  E[Phase1_reward] + E[Phase2_reward] >= information_acquisition_cost
+
+LMSR: E[Phase2_reward] = 0  → equilibrium breaks when Phase 1 exhausted
+GestAlt: E[Phase2_reward] = EDS(c,t) × credibility_ratio_share × q_fee_base > 0
+
+GS_resolution_condition:
+  per_knower_fee_revenue(c, t) × 1/(1−ρ_discount) >= C_info_acquisition
+  where 1/(1−ρ_discount) is present value factor for perpetual EQ fee stream
+```
+
+**Better than LMSR:** GestAlt provides post-convergence maintenance mechanism. High-EDS institutional classes sustain information production indefinitely after initial price discovery closes.
+
+**Equal to LMSR:** Classes with thin unknower demand — low EDS — revert to LMSR semantics. GestAlt does not improve on LMSR for low-demand coordinates.
+
+**Structural conclusion:** GestAlt's bilateral-flow regime is the partial Grossman-Stiglitz solution for institutional coordinate classes. The three conditions for bilateral flow (Invariant #206) are also the conditions under which GS resolution holds. When bilateral flow collapses, GS applies. The mechanism's institutional positioning — high-EDS regulatory, policy, and macro coordinate classes — is exactly the regime where GS resolution is operative. (#r216)
+
+---
+
+## Structural Synthesis: #r216
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| EDS_adjusted point-in-time consistency | Historical values immutable; ρ_matrix refresh triggers forward-only update | Governance auditability requires immutable historical EDS_adjusted |
+| Neutral challenger treasury model | Treasury: gas + bond (returned on success) + shortfall guarantee; K_neutral_buffer gate | Bond exposure minimal; treasury at risk for gas + rare shortfall only |
+| Epoch number as definitive grouping unit | Governance batch cadence is operational; simultaneous = same epoch_number | Sequential epoch processing preserves per-epoch ordering; batch rollback retries from first unprocessed epoch |
+| Ω(t) oracle health metric | Fraction of live classes with recent oracle resolution; oracle_crisis at Ω < 0.10 for K epochs | Detects "frozen corpse" invisible to three-quantity system; does not invalidate Invariant #266 |
+| GestAlt Grossman-Stiglitz resolution | Two-phase incentives (τ_bonus + EQ fees) resolve GS for high-EDS bilateral-flow classes | GS resolution conditional on bilateral-flow; degrades to LMSR semantics in warranted-attestation-pool mode |
+
+---
+
+## Cumulative Invariants (#r216)
+
+**Invariant #267 (#r216):** EDS_adjusted is point-in-time consistent. Historical EDS_adjusted values in EAT are immutable; retroactive recomputation on ρ_matrix updates is prohibited (governance auditability requirement). ρ_matrix updates trigger forward-only EDS_adjusted recalculation from the update epoch. ρ_hat_age is surfaced in governance UI; advisory fires at ρ_hat_age >= 0.5 × N_calibration.
+
+**Invariant #268 (#r216):** Protocol treasury funds neutral challenger pool for: (1) gas reserve per challenge (always consumed); (2) bond escrow (returned on successful challenge; slashed on failed challenge); (3) challenger_reward_floor shortfall guarantee = max(0, challenger_reward_floor − slash_proceeds_actual). Pool activation gate: treasury_balance >= K_neutral_buffer × per-epoch budget (default K=5). Challenge rate calibrated to δ_threshold deviations only.
+
+**Invariant #269 (#r216):** Epoch number is the definitive grouping unit for simultaneous-archive proportional scaling (Invariant #264). Governance-settlement batch cadence is operational efficiency; it does not redefine simultaneity. Sequential epoch processing within a governance batch preserves per-epoch ordering. Governance batch rollback triggers retry from first unprocessed epoch.
+
+**Invariant #270 (#r216):** Ω(t) = oracle health fraction = |live classes with oracle resolution in [t−N_calibration, t]| / |epistemically_live classes|. Ω is a governance monitoring metric, not a conserved quantity. Oracle crisis declared when Ω(t) < Ω_min (default 0.10) for K_oracle_crisis consecutive epochs. Crisis triggers: new registration suspension, T_longtail extension, governance emergency session. Resolves the "frozen corpse" detection gap in the three-quantity system. Does not invalidate Invariant #266 (completeness claim for mechanism correctness guarantees).
+
+**Invariant #271 (#r216):** GestAlt resolves the Grossman-Stiglitz paradox in the bilateral-flow regime via a two-phase incentive structure: Phase 1 (τ_bonus × log_score for pre-convergence early-conviction premium) and Phase 2 (EQ query fees for post-convergence maintenance premium). GS resolution condition: per_knower_fee_revenue × 1/(1−ρ_discount) >= C_info_acquisition. GS resolution is conditional on bilateral-flow (Invariant #206 three conditions). In warranted-attestation-pool mode, GS applies fully and GestAlt degrades to LMSR semantics for information acquisition incentives.
+
+---
+
+## Run Log Update
+
+- **#r216** — 2026-04-04T09:52Z — Q1: EDS_adjusted point-in-time consistent; retroactive recomputation prohibited; forward-only on ρ_matrix refresh; ρ_hat_age advisory at 0.5×N_calibration. Q2: Neutral challenger treasury — gas + bond (returned on success) + challenger_reward_floor shortfall guarantee; K_neutral_buffer=5 activation gate; δ_threshold challenge rate. Q3: Epoch number is definitive grouping unit; governance-batch cadence is operational; sequential epoch processing; batch rollback retries from first unprocessed epoch. Q4: Ω(t) oracle health metric — Ω < 0.10 for K epochs triggers oracle_crisis; detects frozen-corpse state invisible to three-quantity system; does not invalidate Invariant #266. Net-new: GestAlt Grossman-Stiglitz resolution via two-phase incentive structure; conditional on bilateral-flow; degrades to LMSR semantics in warranted-attestation-pool mode. Invariants #267–#271.
+
+---
+
+## Open Questions for #r217+
+
+1. **Grossman-Stiglitz stability — minimum viable EDS:** The two-phase GS resolution loop (unknower demand → EQ fees → knower acquisition incentive → accurate S_cred → unknower trust → demand) can cascade in reverse. What is the minimum viable EDS level to sustain the GS resolution loop, and is the loop stable against small perturbations?
+
+2. **Ω_min derivation from class duration distribution:** Ω_min = 0.10 was argued as conservative. Derive a principled Ω_min from the relationship between median T_oracle_expected_delay across registered classes and the expected natural Ω at a healthy protocol.
+
+3. **Neutral challenger pool and ZONE_C_WATCH:** Under ZONE_C_WATCH, a class has elevated Zone_C demand risk. Should the neutral challenger pool increase its challenge rate for ZONE_C_WATCH classes above the δ_threshold baseline?
+
+4. **EDS Phase 2 passive income vs activity requirement:** EQ fees are distributed based on credibility_ratio (built in Phase 1). Phase 2 income rewards past Phase 1 performance regardless of what knowers do in Phase 2. Is there a Phase 2 activity requirement to earn EQ fee distributions, or is passive historical credibility sufficient for ongoing fee claims?
+
+*Last updated: #r216 — 2026-04-04T09:52Z*
