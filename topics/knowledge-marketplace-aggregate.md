@@ -10743,4 +10743,215 @@ This does not override the oracle. It creates a governance tripwire when the ora
 
 4. **Θ_collective threshold for qualified collective override:** Principled derivation for the aggregate credibility_ratio threshold needed to enable collective override in DISCOVERY_MODE.
 
-*Last updated: #r187 — 2026-04-04T04:52Z*
+*Last updated: #r188 — 2026-04-04T05:02Z*
+
+---
+
+## #r188 Contributions — 2026-04-04T05:02Z
+
+Addresses all four open questions from #r187.
+
+---
+
+**Q1 (CorrelationBonus_v1 governance seed sizing) → WED_clearing-anchored seed with governance-set epoch cap; self-depleting with auto-alert (#r188):**
+
+The seed pool must cover expected bonus payouts for a bootstrap demonstration period without requiring precise knower-population estimates at genesis. Two candidate anchors:
+
+- **Expected concurrent correlated positions:** Not observable at genesis; requires forecasting N_corr_pairs and average stake, both unknown.
+- **WED_clearing_ref:** Observable at registration; scales naturally with financial stakes in the class.
+
+**Resolution — WED_clearing-anchored seed with per-epoch cap:**
+
+```
+bonus_cap_per_epoch(class_i) = ψ_corr × WED_clearing_ref(class_i)
+  ψ_corr = 0.02  (governance-settable, bounded [0.005, 0.05])
+  — 2% of reference WED per epoch represents ~1 bonus-per-epoch for a typical large position
+
+seed_pool_CorrelationBonus = N_demo × bonus_cap_per_epoch
+  N_demo = 8 macro-epochs  (governance-settable at registration, bounded [4, 20])
+```
+
+**Per-epoch cap enforcement:** Total CorrelationBonus_v1 payouts in any single epoch cannot exceed `bonus_cap_per_epoch`. If demand exceeds the cap, payouts are distributed pro-rata among qualifying declarations for that epoch. No payout is blocked — all qualifying declarations receive a share.
+
+**Seed depletion protocol:**
+- `seed_status: GREEN` — pool ≥ 0.5 × initial seed.
+- `seed_status: YELLOW` — pool < 0.5 × initial seed; governance notified; bonus_cap_per_epoch reduced to 50%.
+- `seed_status: EMPTY` — CorrelationBonus_v1 suspended; existing claims earn no bonus; no new correlated declarations accepted.
+
+**Why not proportional to concurrent positions:** At genesis, correlated declaration demand is zero (no participants). A concurrent-positions anchor would produce a near-zero seed — correct mathematically but practically a bootstrap failure. WED_clearing_ref is the correct scale because it reflects the financial environment into which the feature is being launched, not the (initially absent) participation in the feature itself.
+
+**Design law (#r188):** Genesis seed sizing for novel optional features must anchor to the class's financial scale (WED_clearing_ref or total_escrow_at_genesis), not to feature participation demand — which is unobservable at genesis. Feature-specific demand metrics are for post-genesis monitoring and recalibration only. (#r188)
+
+---
+
+**Q2 (oracle_divergence_monitor threshold calibration) → Self-calibrating from historical RMSE distribution; 2-sigma alert above class mean divergence; conservative genesis default (#r188):**
+
+The monitor tracks:
+```
+Δ_i(t) = |S_cred(i, t-1) - oracle_confirmed_value(i, t)| / staleness_window_i
+```
+
+A well-calibrated class will have a stable distribution of Δ_i over resolved epochs. The alert threshold should flag only *systematic* divergence — not ordinary calibration variance.
+
+**Resolution — 2-sigma derived threshold:**
+
+```
+μ_Δ(class_i) = EMA(Δ_i, N_divergence_window = N_calibration) over resolved epochs
+σ_Δ(class_i) = rolling std of Δ_i over N_divergence_window epochs
+
+Δ_alert_threshold(class_i, t) = μ_Δ(class_i, t) + k_alert × σ_Δ(class_i, t)
+  k_alert = 2.0  (governance-settable, bounded [1.5, 3.0])
+  — 2-sigma above historical mean divergence is a standard anomaly threshold
+```
+
+**Alert fires when:** `Δ_smooth_i > Δ_alert_threshold` for M_stable consecutive normal-mode epochs (M_stable from #r133/Q3).
+
+**Genesis default (no history):**
+```
+Δ_alert_threshold_genesis = 0.5
+```
+
+At genesis, `Δ_smooth = 0` (no resolved epochs). The threshold defaults to 0.5 — S_cred deviating by more than 50% of the staleness window from oracle is flagged. This is conservative (generous) at genesis, appropriately so: a new class's knower pool is early in calibration.
+
+**Dual-condition transition:** Once N_divergence_window resolved epochs accumulate, the threshold transitions from the genesis default to the derived formula — consistent with every other self-calibrating parameter's dual-condition transition (#r156/Q1, #r143/Q3). EAT event `parameter_genesis_exit` (type: `divergence_threshold_transition`) emitted.
+
+**Design law confirmed (#r188):** Oracle divergence threshold is self-calibrating from the class's own historical divergence distribution, not governance-specified. This is the same pattern as σ_resolve governing min_q_bonus_ratio (#r150/Q1) and w_override deriving from override_frequency_smooth (#r153/Q1). (#r188)
+
+**Interaction with w_override:** Both `Δ_alert_threshold` and `w_override` derive from oracle override data. They are independent: `Δ_alert_threshold` uses raw divergence magnitude; `w_override` uses override frequency count. An oracle that overrides frequently but by small magnitudes would trigger high w_override (many events) and low Δ_alert_threshold risk (small magnitudes). Both signals are useful; neither subsumes the other.
+
+---
+
+**Q3 (Three-family taxonomy and Demo Day messaging) → Internal use only; Demo Day narrative leads with v2.1 credibility-differentiation; family taxonomy is roadmap framing, not current-state framing (#r188):**
+
+**Analysis of the trade-off:**
+
+- Showing investors three families but only delivering one invites "why didn't you ship the better ones?" — a scope-gap question that is hard to answer without sounding like v2.1 is a reduced product.
+- Withholding the taxonomy entirely makes GestAlt look like "yet another credibility-weighted prediction market" — undersells the intellectual arc.
+- The correct move: **use the taxonomy internally for roadmap and narrative construction; show investors only the forward trajectory, not the classification label.**
+
+**Recommended external positioning (#r188):**
+
+**Against Polymarket (volume-based):** "GestAlt clearing prices reflect who has been right before, not who has the most capital. A well-calibrated analyst with a $10K position has more influence on our clearing price than a capital whale with no track record."
+
+**Against Kalshi (regulatory-grade event contracts):** "Kalshi operates a traditional market structure. GestAlt is purpose-built for institutional OTC clearing, where the settlement price needs to be a credentialed consensus, not a market-making spread."
+
+**Against Betfair (exchange-style depth):** "Betfair rewards speed and volume. GestAlt's epistemic enforcement means manipulating the settlement price requires posting a warranty. Wrong state claims get slashed. Betfair has no analog to this."
+
+**Demo Day one-liner for roadmap arc (optional, for investor Qs about v2.2+):** "v2.1 is credibility-weighted clearing. The next version adds structural correlation pricing — so a knower who understands that event A implies event B earns more than a knower who prices each event in isolation. That's the full knowledge marketplace vision."
+
+**Design law (#r188):** The three-family taxonomy is an internal architecture document. External communications frame around customer-value propositions (solvency, manipulation resistance, credibility) — not mechanism families. The roadmap arc is discussable in investor Q&A; the classification label is not. (#r188)
+
+---
+
+**Q4 (Θ_collective for qualified collective override — principled derivation) → Supermajority of active weight + absolute floor; scales with pool size (#r188):**
+
+**The problem:** Θ_collective must be set high enough that a collective override is more reliable than oracle silence, but low enough that it can actually be reached by a functioning knower pool.
+
+**Two candidate parameterizations:**
+
+- *Absolute:* Θ_collective = fixed number (e.g., 3.0 aggregate credibility_ratio). Does not scale with pool size. A 100-knower pool with Θ=3.0 overrides trivially; a 3-knower pool with Θ=3.0 requires all three to be perfectly calibrated.
+- *Relative:* Θ_collective = fraction × Σ_a w_a (fraction of total active credibility weight). Scales with pool size. Consensus of 75% of the credibility-weighted pool is a meaningful threshold regardless of pool size.
+
+**Principled derivation — Bayesian collective accuracy model:**
+
+For a pool of N knowers each with average P(correct) = p_avg, the collective correct probability under majority rule:
+```
+P(collective_correct) ≥ 1 - (1-p_avg)^N  [pessimistic bound; assumes independence]
+```
+
+For P(collective_correct) ≥ 0.95 and p_avg = 0.70 (well-calibrated):
+N ≥ log(0.05) / log(0.30) ≈ 2.75 → ceil → 3.
+
+But the relevant variable is not headcount — it is aggregate credibility weight. Each unit of credibility_ratio represents one "well-calibrated resolution." A total Σ_a credibility_ratio(a) = 3.0 represents three equivalent well-calibrated resolution-equivalents — sufficient for the same collective confidence.
+
+**Resolution — supermajority formula:**
+
+```
+collective_override_eligible(class_i, epoch_t) iff:
+  1. S_cred stable: change < δ_stable = 0.05 × staleness_window_i for M_stable consecutive epochs
+  2. Oracle silent: t - t_last_oracle_resolution > T_oracle_timeout
+  3. Aggregate credibility threshold:
+       Σ_a credibility_ratio(a) × w_a_active > Θ_collective(class_i)
+       AND fraction_consensus > 0.75
+         (≥75% of active credibility_weight agrees on same S_cred value within ε_consensus)
+
+Θ_collective(class_i) = max(3.0, fraction_theta × Σ_a_active w_a)
+  fraction_theta = 0.75  (governance-settable, bounded [0.5, 0.9])
+  — requires 75% of total active credibility weight to agree
+  absolute floor = 3.0  (prevents override by a single knower regardless of their credibility)
+```
+
+**Why 75%:** A simple majority (50%) is insufficient — minority opinions could reflect genuine uncertainty. 75% is a supermajority threshold analogous to constitutional amendment requirements: strong presumption of correctness, but not unanimous. 90%+ is overly demanding for oracle-silence cases where the pool can never achieve consensus below a reasonable floor.
+
+**fraction_consensus measurement:** ε_consensus = 10% of staleness_window_i. S_cred values within ε_consensus of each other are treated as "agreeing." The 75% fraction counts credibility_weight from all knowers whose active claims fall within ε_consensus of the current S_cred centroid.
+
+**New EAT event type for v2.2:** `collective_attestation_settlement`:
+```
+{
+  type:               "collective_attestation_settlement",
+  class_id:           class_i,
+  epoch:              t,
+  S_final:            S_cred(i, t),
+  total_active_weight: Σ_a w_a_active,
+  consensus_weight:   Σ_a w_a where claim within ε_consensus,
+  fraction_consensus: consensus_weight / total_active_weight,
+  Θ_collective_used:  Θ_collective(class_i, t),
+  oracle_silent_since: t_last_oracle_resolution,
+  settlement_type:    "collective_attestation"
+}
+```
+
+**Why absolute floor = 3.0:** Prevents a single super-credible knower (credibility_ratio = 10, w_a = very high) from triggering collective override unilaterally. Three independent resolution-equivalents is the minimum evidence for a collective claim to override oracle silence. Consistent with epistemically_live_floor = 3 challengers from #r160/Q4.
+
+**v2.2 scope confirmation:** Qualified collective override is DISCOVERY_MODE only. No change to v2.1 scope. (#r188)
+
+---
+
+## Structural Synthesis: Calibration Self-Consistency Closure (#r188)
+
+All four outputs from this run follow the same self-calibrating pattern established across #r150–#r157:
+
+| Parameter | Derived from | Genesis default | Transition condition |
+|---|---|---|---|
+| CorrelationBonus seed | ψ_corr × WED_clearing_ref (class scale) | N_demo × bonus_cap (governance) | N/A (fixed at registration) |
+| Δ_alert_threshold | μ_Δ + 2σ_Δ from resolved epochs | 0.5 (conservative genesis) | N_divergence_window resolved epochs |
+| External messaging | Customer-value propositions | n/a | n/a |
+| Θ_collective | max(3.0, 0.75 × Σ active w_a) | 3.0 absolute floor | N/A (derived live each epoch) |
+
+**Three-family taxonomy (final classification for internal use):**
+
+| Family | Deliverable | Mechanism primitive | WED routing |
+|--------|------------|--------------------|-|
+| A — Credibility-weighted clearing | v2.1 | Binary positions × track record × log-score | WED_clearing = Σ max_loss |
+| B — Implication chains | v2.2 | A→B structural declarations × α_cap × implication_bonus_escrow | WED_chain = min(WED_A, WED_B) |
+| C — WED-routing discovery market | v2.2+ | EQ escrow-conditioned query × D(c) revelation | WED_discovery = q_fee + E[q_bonus] |
+
+---
+
+## Cumulative Invariants (additions through #r188)
+
+**Invariant #140 (#r188):** Genesis seed sizing for optional features anchors to WED_clearing_ref (class financial scale), not to feature participation demand. Participation demand is unobservable at genesis; class financial scale is always observable.
+
+**Invariant #141 (#r188):** oracle_divergence_monitor alert threshold is self-calibrating at 2-sigma above historical mean divergence. Genesis default = 0.5. Transitions to derived formula after N_divergence_window = N_calibration resolved epochs.
+
+**Invariant #142 (#r188):** The three-family mechanism taxonomy is internal architecture documentation. External communications use customer-value propositions, not family classification labels.
+
+**Invariant #143 (#r188):** Qualified collective override (DISCOVERY_MODE, v2.2) requires Θ_collective = max(3.0, 0.75 × Σ active credibility_weight) AND fraction_consensus > 0.75 of active weight within ε_consensus. Absolute floor = 3.0 prevents single-knower override regardless of credibility score.
+
+---
+
+## Open Questions for #r189+
+
+1. **CorrelationBonus_v1 + oracle_divergence_monitor integration risk:** Both features interact with ClaimEscrow and EATManager. If CorrelationBonus payout correlates with oracle divergence events (knowers make correlated declarations precisely when oracle is unreliable), the governance seed pool depletes simultaneously with oracle_divergence_monitor alerting. Define the protocol action when both conditions fire in the same epoch.
+
+2. **Θ_collective and ε_consensus calibration for thin pools:** For a 3-knower pool (exactly at epistemically_live floor), Θ_collective = max(3.0, 0.75 × 3 × C_avg) ≈ 3.0 (if C_avg < 1.33). The 75% fraction_consensus requires 2.25 of 3 knowers agreeing — in practice all 3, since fractional knowers do not exist. Should thin-pool collective overrides require unanimous agreement?
+
+3. **CorrelationBonus_v1 and SEE interaction:** If a Systemic Event Epoch is triggered during a period with active CorrelationBonus declarations, do the correlated declarations inherit SEE protection (both markets disrupted simultaneously by the same external shock)? The SEE protection logic from #r75 applies to individual claims; cross-claim correlation protection is not specified.
+
+4. **Three-family v2.2 sequencing:** CorrelationBonus_v1 (depth-0 implication, v2.1) is a stepping stone to Family B. Define the canonical API migration from CorrelationBonus_v1 to full implication chain declarations at v2.2 — specifically, whether v2.1 CorrelationBonus declarations can be grandfathered into v2.2 implication_bonus_escrow at upgrade, or whether they are treated as independent mechanism features with no migration path.
+
+---
+
+## Run Log Update
+
+- **#r188** — 2026-04-04T05:02Z — Q1: CorrelationBonus_v1 seed = ψ_corr × WED_clearing_ref × N_demo; per-epoch cap at 2% of WED; WED-anchored genesis seeding law. Q2: oracle_divergence_monitor Δ_alert_threshold self-calibrating at 2-sigma above historical mean; genesis default 0.5; dual-condition transition at N_calibration resolved epochs. Q3: three-family taxonomy is internal-only; external messaging uses customer-value propositions against Polymarket/Kalshi/Betfair. Q4: Θ_collective = max(3.0, 0.75 × Σ active w_a) + fraction_consensus > 0.75; absolute floor 3.0; DISCOVERY_MODE v2.2 only. Invariants #140–#143.
