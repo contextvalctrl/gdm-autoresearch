@@ -15268,3 +15268,194 @@ Three concurrent Zone_C events at 33% each consume 100% of treasury — the surv
 4. **W(t) during cold-start:** When no class is epistemically_live, I(S_cred, oracle) is undefined (no S_cred). Should W(t) include an epistemic coverage term — fraction of registered coordinates that are epistemically_live — to capture the cold-start welfare deficit?
 
 *Last updated: #r208 — 2026-04-04T08:27Z*
+
+---
+
+## #r209 Contributions — 2026-04-04T08:42Z
+
+Addresses all four open questions from #r208. Net-new first-principles angle: claim revelation timing and the early-information premium.
+
+---
+
+### Q1 (W(t) loss function — L1 vs L2) → L2 for aggregate welfare; log-score for individual credibility_ratio; the two objectives are distinct and require distinct loss functions (#r209)
+
+**The question is not uniform:** Two distinct objects are being measured —
+
+| Object | Optimisation target | Correct loss |
+|---|---|---|
+| Individual credibility_ratio update | Calibration under uncertainty; proper scoring rule | Log-score (KL-based; unique proper scoring rule) |
+| Aggregate social welfare W(t) | Social cost of settlement error across all classes | L2 (quadratic; captures nonlinear systemic risk of large misses) |
+
+**Why L2 for W(t):**
+
+For institutional settlement, large misses create nonlinear social costs. A settlement error of 10% on a high-WED coordinate does not cost twice as much as a 5% error — it costs more, because: (1) correlated Zone_C events are triggered by large misses, exhausting challenge pools simultaneously; (2) institutional position holders suffer margin calls that compound; (3) credibility_ratio collapses on multiple related coordinates propagate via DAG.
+
+L1 is appropriate for linear loss settings. The Zone_C cascade mechanism makes the social loss strictly superlinear in miss magnitude. L2 captures this correctly.
+
+**Formal separation:**
+
+```
+W(t) = Σ_{c: epistemically_live} [
+    − (S_cred(c,t) − oracle(c))²  / range(c)²    // L2 accuracy; normalised
+    − transaction_cost(c, t)
+  ]
+
+credibility_ratio_update(a) = Δ log_score(claim_a, oracle)  // log-score; unchanged
+```
+
+These operate at different layers: W(t) is the mechanism designer's evaluation criterion; log_score is the knower's incentive structure. Using the same loss function for both would be correct only if the mechanism designer and the individual knower have identical objectives — they do not. The designer cares about systemic resilience (L2 penalises catastrophic misses); the knower cares about calibrated individual returns (log-score is Bayes-optimal).
+
+**Design law (#r209):** W(t) uses L2 loss (normalised squared error). Individual credibility_ratio updates use log-score. These are different loss functions for different agents at different layers — the distinction is principled, not a design inconsistency. (#r209)
+
+---
+
+### Q2 (33% treasury gate — bootstrapping with zero correlation history) → Conservative genesis assumption: all classes correlated; relax to empirical after N_history_min resolved epochs (#r209)
+
+**Resolution — tiered bootstrap rule:**
+
+```
+PHASE_A (Genesis, epoch 0 to epoch N_history_min):
+  Treat all registered classes as fully correlated (ρ = 1.0).
+  Effective zone_C_capacity = treasury_balance / N_classes_registered.
+  gate: class registration rejected if effective_zone_C_capacity < zone_C_demand(class_new).
+
+PHASE_B (Post-N_history_min, empirical):
+  Compute ρ_matrix from observed Zone_C co-occurrence across resolved epochs.
+  33% gate uses principal eigenvalue of ρ_matrix to estimate worst-case simultaneous demand.
+
+N_history_min = N_calibration × 2  (governance-settable)
+Transition: PHASE_A → PHASE_B is automatic at N_history_min.
+EAT event: treasury_gate_mode_transition { from: PHASE_A, to: PHASE_B, epoch }
+```
+
+**Design law (#r209):** Parameters requiring historical correlation data use a conservative fully-correlated prior at genesis. Transition to empirical estimation occurs automatically after N_history_min epochs. Classes registered under PHASE_A remain registered under PHASE_B. (#r209)
+
+---
+
+### Q3 (max_k_batch lower bound ≥ 4 — mechanism correctness vs engineering) → Engineering minimum only; no mechanism-correctness argument for floor > 1 (#r209)
+
+The mechanism-correctness property (atomic reveal; no selective front-running) holds for any k ≥ 1. The floor of 4 is purely an engineering minimum — below 4, the two-transaction commit-reveal overhead exceeds any batching benefit, but there is no mechanism error at k=1.
+
+**Corrected bound:** Contract lower bound is [1, 64]. The UI may recommend ≥4 for efficiency. This corrects Invariant #227.
+
+**Design law (#r209):** Correctness arguments and efficiency arguments are distinct. Contract enforcement tracks correctness; governance UI guides efficiency. Setting a contract lower bound for a purely efficiency reason obscures the distinction. (#r209)
+
+---
+
+### Q4 (W(t) during cold-start — epistemic coverage term) → W(t) extended with coverage(t) as welfare multiplier (#r209)
+
+**Resolution:**
+
+```
+coverage(t) = |{ c : epistemically_live(c, t) }| / max(1, |{ c : registered(c, t) }|)
+
+W(t) = coverage(t) × accuracy(t) − transaction_cost(t)
+
+accuracy(t) = Σ_{c: epistemically_live} [− (S_cred(c,t) − oracle(c))² / range(c)²]
+              / max(1, |{c: epistemically_live}|)
+            = 0 when coverage(t) = 0
+```
+
+At t=0 (coverage=0): W(t) = −transaction_cost < 0. This correctly captures the cold-start welfare deficit.
+
+**Three independent welfare levers:** (1) increase coverage — epistemically_live new classes; (2) increase accuracy — improve knower calibration; (3) decrease transaction_cost — fee efficiency.
+
+DELIST_PENDING zombie classes occupy the denominator without contributing the numerator — they degrade coverage and therefore W(t).
+
+**Design law (#r209):** W(t) = coverage(t) × accuracy(t) − transaction_cost(t). Coverage is a continuously-measurable welfare KPI. Zombie classes degrade W(t) even when their accuracy is undefined. (#r209)
+
+---
+
+### Net-New First-Principles Pass: Claim Revelation Timing and the Early-Information Premium (#r209)
+
+**The unaddressed problem:** The mechanism rewards accuracy but does not differentiate *when* an accurate claim was submitted. A knower who submits at t=0 with private signal v=0.55 (when common knowledge supports only 0.50) earns the same credibility_ratio update as a knower who waits until T_anchor−1, when S_cred has already converged to 0.54 through 200 intermediate claims.
+
+**Social value differential:** The early knower moved S_cred toward truth earlier; institutions consuming S_cred benefited for the full [t=0, T_anchor] window. The late conformist added marginal precision. Social value of early information is strictly higher. The current mechanism underincentivises early private-signal revelation and overincentivises late conformist free-riding.
+
+**Bilateral-flow connection:** The cron's "bilateral flow between high-information and low-information zones" is most meaningfully realised when high-information agents reveal *early*, before S_cred has incorporated their signal. Once common knowledge converges, there is no bilateral flow — only late confirmation.
+
+**Formal: early-information timing bonus (τ_bonus):**
+
+```
+credibility_update(a, t_submit, T_anchor) =
+    log_score(claim_a, oracle) × τ_bonus(t_submit, T_anchor)
+
+τ_bonus(t_submit, T_anchor) = 1 + τ_scale × (1 − t_submit / T_anchor)
+  τ_scale ∈ [0, 0.33]; hard contract upper bound
+  t_submit = 0    → τ_bonus = 1 + τ_scale  (maximum; first claiment)
+  t_submit = T_anchor → τ_bonus = 1.0       (baseline; no bonus)
+```
+
+**Properties:**
+1. Monotone decreasing in t_submit. Earlier claims earn higher multiplier.
+2. Wrong early claims are *more costly*: log_score < 0, τ_bonus > 1 → more negative credibility update. Early claimants bear more accountability.
+3. Settlement-neutral. S_cred computation uses credibility_weight from historical accuracy, not τ_bonus directly.
+4. Single governance parameter: τ_scale per class.
+
+**DSIC interaction:** τ_bonus strengthens the DSIC property. δ*_early = G_max / (G_max + τ_bonus × ΔC_total × log(1+k_a) × base_rate) < δ*_base ≈ 0.10. At τ_scale=0.25, δ*_early ≈ 0.08. Reinforces, not undermines, Invariant #183.
+
+**τ_scale ≤ 0.33 hard bound:** Above this threshold, first-mover dominance begins to outweigh diversification benefits. At 0.33, early claimant earns 1.33× the log-score credit of T_anchor claimant — meaningful incentive without monopolisation. This is a contract-enforced bound, not an advisory.
+
+**Conserved-quantity impact:** τ_bonus affects credibility_ratio dynamics only — not WED, not S_cred settlement computation. All three quantities in Invariant #197 are intact.
+
+**T4 update (extending #r203 minimal mechanism):**
+
+```
+T4 RESOLVE(oracle_truth, T_finality):
+  for each k with active claim:
+    τ = 1 + τ_scale × (1 − t_submit_k / T_anchor)
+    credibility_ratio[k] += τ × log_score_delta(claim_k_v, oracle_truth)
+    if |claim_k_v − oracle_truth| < tolerance: return escrow_k
+    else: slash escrow_k
+  WED -= Σ discharged_escrow
+```
+
+One-line change to T4. No new contracts. τ_scale in GovernanceParams (class-scoped). (#r209)
+
+---
+
+## Structural Synthesis: #r209
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| L2 for W(t); log-score for credibility_ratio | Different loss functions for designer vs knower; principled | Governance proposals evaluated on L2; individual incentives unchanged |
+| Genesis 33% gate: PHASE_A conservative prior | ρ=1.0 at genesis; relax to empirical after N_history_min | Over-blocking at cold-start is the correct conservative posture |
+| max_k_batch floor = 1; 4 is engineering advisory | No mechanism-correctness argument for floor > 1 | Contract floor [1, 64]; UI recommends ≥4 for efficiency |
+| coverage(t) welfare multiplier | W(t) = coverage × accuracy − cost; well-defined at cold-start | Zombie classes degrade W(t); coverage is a first-class KPI |
+| τ_bonus early-information premium | credibility_ratio × (1 + τ_scale × (1−t/T_anchor)); τ_scale ≤ 0.33 hard bound | Rewards early revelation; penalises early errors more; DSIC strengthened |
+
+---
+
+## Cumulative Invariants (#r209)
+
+**Invariant #231 (#r209):** W(t) uses L2 loss (normalised squared error) for aggregate accuracy. Individual credibility_ratio updates use log-score. The distinction is principled: L2 penalises systemic miss risk; log-score is Bayes-optimal for individual calibration.
+
+**Invariant #232 (#r209):** Treasury Zone_C gate operates in two phases: PHASE_A (genesis to N_history_min, ρ=1.0, per-class limit = treasury/N_classes); PHASE_B (post-N_history_min, empirical ρ_matrix). Automatic transition. Classes registered under PHASE_A remain valid under PHASE_B.
+
+**Invariant #233 (#r209 corrects #r227):** max_k_batch contract lower bound is [1, 64], not [4, 64]. k=1 is the degenerate commit-reveal case and is mechanically correct. Governance UI recommends ≥4 for efficiency. No contract enforcement for the efficiency floor.
+
+**Invariant #234 (#r209):** W(t) = coverage(t) × accuracy(t) − transaction_cost(t). coverage(t) = |epistemically_live classes| / |registered classes|. At cold-start (coverage=0): W(t) = −transaction_cost < 0. Coverage is a continuously-measurable welfare KPI. DELIST_PENDING zombie classes degrade coverage without contributing accuracy.
+
+**Invariant #235 (#r209):** τ_bonus early-information premium: credibility_ratio_update(a) = log_score(a) × (1 + τ_scale × (1 − t_submit/T_anchor)). τ_scale ∈ [0, 0.33]; hard contract upper bound 0.33 prevents first-mover epistemic dominance. τ_scale = 0 (disabled) is governance-selectable per class. τ_bonus does not affect S_cred settlement computation. Wrong early claims incur more negative credibility_ratio updates under τ_bonus.
+
+**Invariant #236 (#r209):** δ*_early = G_max / (G_max + τ_bonus × ΔC_total × log(1+k_a) × base_rate) < δ*_base. τ_bonus strengthens the DSIC property for early claimants. Reinforces Invariant #183.
+
+---
+
+## Run Log Update
+
+- **#r209** — 2026-04-04T08:42Z — Q1: W(t) uses L2; credibility_ratio uses log-score; distinct loss functions for designer vs knower. Q2: 33% gate bootstrap PHASE_A (ρ=1, treasury/N_classes); PHASE_B (empirical ρ_matrix); automatic transition at N_history_min. Q3: max_k_batch floor corrected to [1,64]; 4 is efficiency advisory. Q4: W(t) extended with coverage(t) multiplier; well-defined at cold-start; zombie classes degrade W(t). Net-new: τ_bonus early-information premium — credibility_ratio × (1 + τ_scale × (1−t/T_anchor)); τ_scale ≤ 0.33 hard bound; bilateral-flow improvement; DSIC strengthened; settlement-neutral. Invariants #231–#236.
+
+---
+
+## Open Questions for #r210+
+
+1. **τ_scale oracle-gaming risk — single-entity oracle classes:** τ_bonus increases the value of early oracle-correlated information. Should τ_scale_max be lower (e.g., 0.1) for oracle_type = SINGLE_ENTITY vs. 0.33 for multi-source oracles? Define the oracle-type taxonomy and τ_scale_max mapping.
+
+2. **coverage(t) and epistemically_live acceleration:** Is there a mechanism to accelerate coverage growth — e.g., bootstrap calibration runs using shadow classes — without compromising the epistemically_live gate's correctness?
+
+3. **PHASE_A to PHASE_B treasury gate transition — existing class grandfathering:** Classes registered under PHASE_A may have been admitted with Zone_C demand that would be rejected under PHASE_B empirical ρ. Are they grandfathered, or must they pass the PHASE_B gate retroactively?
+
+4. **τ_bonus and T_anchor shifts:** If governance extends T_anchor post-submission (e.g., Zone_C delay), claims submitted "close to original T_anchor" now appear as early claims under the extended window. Should τ_bonus compute (1 − t_submit / T_anchor_at_submission) using the T_anchor declared at the epoch of submission, not the final T_anchor?
+
+*Last updated: #r209 — 2026-04-04T08:42Z*
