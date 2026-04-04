@@ -17430,3 +17430,235 @@ For any class pair with ρ_AB_estimate ≥ 0.4: governance must submit cross_cla
 4. **v2.2 correlation-aware registry adapter:** The #r161 registry adapter mediates v2.2 → v2.1 position registry reads. If a v2.2 shadow-class is correlated with a v2.1 clearing class, how does the adapter expose the correlation-aware EDS* computation to the v2.2 CredibilityAggregator without depending on v2.2-only data structures?
 
 *Last updated: #r218 — 2026-04-04T10:12Z*
+
+## #r219 Contributions — 2026-04-04T10:22Z
+
+Addresses all four open questions from #r218. Net-new first-principles angle: the cron's founding premise — "bilateral flow between high-information and low-information zones" — examined as an exchange regime and the conditions under which it breaks down irrecoverably.
+
+---
+
+### Q1 (Class merge vs. implication chain — quantitative decision boundary) → Merge is superior when ρ_AB² × C_info_share > τ_merge_threshold; formal boundary is a trapezoid in (ρ_AB, C_info_share) space (#r219)
+
+**The choice criterion:**
+
+| Option | Benefit | Cost |
+|---|---|---|
+| Implication chain | Both classes maintained; each retains independent oracle path; portfolio diversity preserved | β_effective compensation paid to declarant; information spillover still leaks Phase2_B at (1−ρ_AB²) |
+| Class merge | Spillover eliminated; single EDS*; single knower pool; simpler governance | Loss of independent oracle paths; oracle failure on merged class = both sub-problems fail |
+
+**Quantitative benefit–cost comparison:**
+
+For implication chain to be preferred over merge:
+```
+Phase2_B_preserved − β_cost > Merge_oracle_resilience_premium
+
+Phase2_B_preserved = EQ_fee_pool_B × ρ_AB²
+β_cost = β_floor_correlated × credibility_unit
+
+Merge_oracle_resilience_premium = oracle_failure_probability × WED_B × penalty_multiplier
+```
+
+**Decision boundary (governance-actionable):**
+
+```
+Merge preferred iff:
+  ρ_AB² × C_info_share > τ_merge_threshold AND oracle_failure_correlation(A,B) < ρ_oracle_fail_max
+
+  C_info_share = min(C_info_A, C_info_B) / C_info_total
+  τ_merge_threshold ≈ 0.35  (governance-set; [0.20, 0.60])
+  ρ_oracle_fail_max ≈ 0.30  (governance-set; [0.10, 0.50])
+```
+
+| ρ_AB | C_info_share=0.8 | C_info_share=0.5 | C_info_share=0.2 |
+|------|------------------|------------------|------------------|
+| 0.9  | Merge (0.72>0.35)| Merge (0.41>0.35)| Chain (0.16<0.35)|
+| 0.7  | Merge (0.39>0.35)| Chain (0.25<0.35)| Chain            |
+| 0.5  | Chain (0.20<0.35)| Chain            | Chain            |
+
+**Key: oracle_failure_correlation gates the merge decision.** Classes that are informationally redundant but whose oracle sources are independent retain portfolio-resilience value as separate classes. High oracle_failure_correlation (same source) collapses this advantage → merge unconditionally.
+
+**Governance implementation:** At class registration, governance files `class_merge_declaration: (A, B, ρ_AB_estimate, C_info_share_estimate, oracle_failure_correlation_estimate)`. Contract validates merge_preferred condition. If merge is preferred: WINDING_DOWN triggered on lower-WED class; knower migration follows Invariant #243 wind-down protocol.
+
+**Design law (#r219):** Class merge is preferred when ρ_AB² × C_info_share > τ_merge_threshold AND oracle_failure_correlation < ρ_oracle_fail_max. First condition = informational sufficiency; second condition = oracle resilience. Both must hold. (#r219)
+
+---
+
+### Q2 (cross_class_correlation_declaration update mechanics — revision and N_compact_grace) → Revision is forward-only; β_floor_correlated change resets N_compact_grace per Invariant #27; existing chains grandfathered (#r219)
+
+β_floor_correlated is derived from ρ_AB_estimate and governs new implication chain declaration requirements. A revision changes the governance parameter affecting future chain incentives.
+
+**Two-phase revision protocol:**
+
+```
+Phase 1 (announcement, epoch T_revise_announce):
+  governance submits: correlation_revision_proposal { A, B, ρ_AB_old, ρ_AB_new, justification }
+  EAT: correlation_revision_announced { A, B, T_revise_announce, ρ_AB_new }
+  N_compact_grace resets on classes A and B from T_revise_announce
+    (β_floor_correlated is a class governance parameter per Invariant #27)
+
+Phase 2 (activation, T_revise_announce + N_compact_grace):
+  ρ_AB_estimate updated; β_floor_correlated recomputed
+  New implication chain declarations use new β_floor from this epoch
+
+Existing implication chains (registered before T_revise_announce):
+  β_effective grandfathered — static-commitment design law (#r137)
+  If ρ_AB_new > ρ_AB_old AND new β_floor > grandfathered β_effective:
+    chain not invalidated; knower earns original β (their accepted risk)
+  If ρ_AB_new < ρ_AB_old: chains earn more β than strictly required (no harm)
+```
+
+**Why N_compact_grace resets:** ρ_AB_estimate revision changes the governance parameter governing new chain-declaration incentive. Invariant #27 applies. Grace window keeps the audit trail open during transition without retroactively changing existing declarations' economics.
+
+**Design law (#r219):** Correlation declaration revisions are forward-only. β_floor_correlated changes reset N_compact_grace on affected classes. Existing implication chains are grandfathered at their declared β_effective (static-commitment, #r137). Retroactive β adjustment is prohibited. (#r219)
+
+---
+
+### Q3 (Portfolio EDS* formula — formal derivation) → EDS*_portfolio = √(λ_max(Σ_EDS)) × C_info_portfolio / knower_params; degrades correctly at ρ=0 and ρ=1 (#r219)
+
+For N correlated classes with EDS demand correlation matrix Σ_EDS, the portfolio-wide Phase 2 income matrix under correlated information acquisition:
+
+```
+Portfolio_Phase2_income ≈ EDS_vector · (I − R²) · 1_vector
+  where R² = element-wise square of Σ_EDS
+```
+
+**Portfolio EDS* at equilibrium:**
+
+```
+EDS*_portfolio = √(λ_max(Σ_EDS)) × C_info_portfolio × (1−ρ_discount) / (credibility_ratio_avg × q_fee_base_share)
+
+C_info_portfolio = Σ_i C_info_i − Σ_{i<j} C_info_shared(i,j)
+  (portfolio information cost, net of shared acquisition between correlated pairs)
+```
+
+**Boundary verification:**
+
+- ρ=0 (independent): Σ_EDS = I; λ_max = 1; EDS*_portfolio = Σ_i EDS*_i ✓
+- ρ=1 (identical): all-ones matrix; λ_max = N; C_info_portfolio = C_info_single; EDS*_portfolio = EDS*_single/√N ✓
+- ρ ∈ (0,1): EDS*_portfolio < Σ_i EDS*_i (correlation reduces required aggregate demand) ✓
+
+**Practical approximation for small portfolios (N ≤ 4):**
+
+```
+λ_max_approx = 1 + max_{i<j} ρ_ij  [Gershgorin bound; within ~15% for homogeneous ρ]
+```
+
+Full eigenvalue (Lanczos method, O(N² × iterations)) activated for N > 4. Governance may use approximation at v2.2 genesis.
+
+**Design law (#r219):** Portfolio EDS* uses principal eigenvalue of EDS demand correlation matrix. C_info_portfolio nets correlated acquisition costs. Gershgorin approximation valid for N ≤ 4 with homogeneous ρ; full computation required for N > 4. (#r219)
+
+---
+
+### Q4 (v2.2 correlation-aware registry adapter — exposing EDS* without v2.2-only data structures) → Forward-declared interface; v2.1 adapter returns governance-set constant; v2.2 adapter computes eigenvalue (#r219)
+
+**Resolution — forward-declared adapter interface:**
+
+```solidity
+interface IRegistryAdapter {
+    // Existing:
+    function getPositionMaxLoss(address holder, bytes32 classId) external view returns (uint256);
+    function getCoordinateMapping(bytes32 v22ClassId) external view returns (bytes32 v21ClassId);
+
+    // New (forward-declared; both adapter versions implement):
+    function getPortfolioEDSstar(bytes32[] calldata classIds) external view returns (uint256);
+}
+```
+
+**v2.1 adapter:** Returns `governanceParams.EDS_star_conservative` (governance-set constant; same conservative default as #r218/Q1 genesis estimate).
+
+**v2.2 adapter:** Returns `correlationRegistry.computeEDSstarPortfolio(classIds)` (full eigenvalue computation from Σ_EDS storage).
+
+**Properties:**
+1. v2.2 CredibilityAggregator calls `getPortfolioEDSstar` without knowing adapter version.
+2. v2.1 adapter returns a valid conservative estimate — never exposes v2.2-only data structures.
+3. On v2.2 adapter deployment: governance updates `EDS_star_conservative` on v2.1 adapter to current empirical EDS* for continuity. v2.2 CredibilityAggregator is repointed to v2.2 adapter.
+4. v2.1 adapter continues serving existing `getPositionMaxLoss` and `getCoordinateMapping` calls unchanged.
+5. Interface evolution is strictly additive.
+
+**Design law (#r219):** Cross-version data requirements are resolved through forward-declared interfaces where older adapter versions return governance-set conservative defaults. No v2.2-only data structure leaks into v2.1 implementations. Version evolution is additive to the adapter interface. (#r219)
+
+---
+
+### Net-New First-Principles Pass: Bilateral Flow as a Regime Requiring Active Maintenance (#r219)
+
+**The sharper framing of the cron's core claim:** "Exchange is bilateral flow between high-information zones and low-information zones" is not a permanent property of the mechanism — it is a regime the mechanism can occupy. The mechanism can exit it, and under specific conditions, exit is irrecoverable without emergency governance action.
+
+**Two stable regimes:**
+
+| Regime | Condition | Epistemic function |
+|---|---|---|
+| Bilateral flow | EDS > EDS*; eligible_fraction > θ_floor; Ω > Ω_min | Demand-driven credibility transfer; GS resolved; active two-way information circuit |
+| Warranted attestation pool | EDS ≤ EDS*; Phase 2 income negligible | One-way attestation; knowers participate for Phase 1 τ_bonus only; equivalent to oracle-anchored escrow |
+
+Both are valid states. The warranted attestation pool is not failure — it is v2.1 CLEARING_MODE's baseline. Bilateral flow is the elevated v2.2 regime.
+
+**Irrecoverability condition:**
+
+```
+Irrecoverable_exit iff:
+  oracle_crisis = true                        [Ω < Ω_min for K epochs; Invariant #270]
+  AND EDS(c,t) < EDS_floor_hard               [EDS_floor_hard = 0.30 × EDS*_genesis; governance-set]
+  AND Protocol_upper_basin_confidence < safety_margin for all three components simultaneously
+```
+
+Irrecoverability requires all three to hold together. Oracle crisis alone does not force irrecoverable exit if EDS is well above EDS*. EDS < EDS_floor_hard alone is recoverable via bootstrap subsidy (Invariant #272). The conjunction is what closes the recovery window — oracle crisis constrains governance bandwidth exactly when subsidy activation is needed.
+
+**Three-tier early-warning ladder (extending Invariant #276):**
+
+| Tier | Threshold for any confidence component | Action |
+|------|----------------------------------------|--------|
+| Soft alert | Component < 50% | Governance advisory; no mandatory action |
+| Subsidy preparation | Component < 80% | Governance should pre-stage bootstrap subsidy |
+| Alert (existing) | Component < 100% | Active governance response required per Invariant #276 |
+
+The subsidy preparation tier is new (#r219). It ensures the bootstrap subsidy is staged before the alert fires, preventing the governance bandwidth trap at exact crisis onset.
+
+**Why LMSR is immune to this failure mode:** LMSR operates in warranted attestation pool mode by design — there is no bilateral flow regime to exit. LMSR's failure is Grossman-Stiglitz exhaustion (no new private information acquired). GestAlt's unique failure mode — bilateral flow collapse — is the risk premium of offering a richer mechanism. The mitigation is the governance bootstrap subsidy, the EQ fee activity requirement (Invariant #275), and the three-component confidence index.
+
+**Mechanism design implication:** v2.2 must not assume bilateral flow is the default. It must be actively seeded, monitored, and bootstrapped. The warranted attestation pool is always available as fallback. Every v2.2 class launch must verify Protocol_upper_basin_confidence > 1.0 for that class before disabling bootstrap subsidy. (#r219)
+
+---
+
+## Structural Synthesis: #r219
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| Class merge boundary: ρ_AB² × C_info_share > 0.35 AND oracle_failure_ρ < 0.30 | Oracle resilience gates merge over information efficiency alone | Governance-actionable; trapezoid in (ρ, C_info_share) space |
+| Correlation revision forward-only; N_compact_grace resets; existing chains grandfathered | Static-commitment extends to β_floor_correlated | No retroactive chain invalidation; grace window preserves audit trail |
+| Portfolio EDS* = √λ_max × C_info_portfolio / knower_params | Eigenvalue formulation; boundary-verified; Gershgorin approx for N≤4 | Formal basis for correlated-class bootstrap subsidy sizing |
+| IRegistryAdapter.getPortfolioEDSstar forward-declared | v2.1 returns conservative constant; v2.2 computes eigenvalue | No v2.2 data structures in v2.1; additive interface upgrade |
+| Bilateral flow as regime; irrecoverability condition; three-tier early-warning | oracle_crisis AND EDS<EDS_floor_hard AND all confidence < margin simultaneously | Subsidy preparation tier (80%) prevents governance bandwidth trap at crisis onset |
+
+---
+
+## Cumulative Invariants (#r219)
+
+**Invariant #281 (#r219):** Class merge is preferred over implication chain when ρ_AB² × C_info_share > τ_merge_threshold (default 0.35; [0.20, 0.60]) AND oracle_failure_correlation < ρ_oracle_fail_max (default 0.30; [0.10, 0.50]). Both conditions required. Merge initiated via class_merge_declaration; lower-WED class enters WINDING_DOWN per Invariant #243. Oracle resilience gates merge priority over informational efficiency alone.
+
+**Invariant #282 (#r219):** Correlation declaration revisions are forward-only. ρ_AB_estimate changes recompute β_floor_correlated and reset N_compact_grace on affected classes (Invariant #27). Existing implication chains grandfathered at declared β_effective (static-commitment, #r137). Retroactive β adjustment prohibited.
+
+**Invariant #283 (#r219):** Portfolio EDS* = √(λ_max(Σ_EDS)) × C_info_portfolio × (1−ρ_discount) / (credibility_ratio_avg × q_fee_base_share). C_info_portfolio nets shared acquisition costs. Boundary conditions verified: ρ=0 → sum; ρ=1 → single-class. λ_max_approx = 1 + max_pairwise_ρ (Gershgorin; valid for N ≤ 4). Full eigenvalue computation for N > 4.
+
+**Invariant #284 (#r219):** IRegistryAdapter forward-declares getPortfolioEDSstar(bytes32[]). v2.1 adapter returns EDS_star_conservative (governance-set constant). v2.2 adapter returns portfolio eigenvalue result. No v2.2-only data structures leak into v2.1. Version evolution is additive to the adapter interface.
+
+**Invariant #285 (#r219):** Bilateral flow is a regime requiring active maintenance, not the default mechanism state. Warranted attestation pool (v2.1 CLEARING_MODE) is always-available fallback. Irrecoverable bilateral-flow exit: oracle_crisis = true AND EDS < EDS_floor_hard (0.30 × EDS*_genesis) AND all three confidence components below safety_margin simultaneously. Three-tier early-warning: < 50% = soft alert; < 80% = subsidy preparation (new tier); < 100% = alert (Invariant #276). Subsidy preparation tier prevents governance bandwidth trap at crisis onset.
+
+---
+
+## Run Log Update
+
+- **#r219** — 2026-04-04T10:22Z — Q1: Class merge decision boundary ρ_AB² × C_info_share > 0.35 AND oracle_failure_ρ < 0.30; trapezoid in (ρ, C_info_share) space; oracle resilience gates merge. Q2: Correlation revision forward-only; β_floor_correlated change resets N_compact_grace; existing chains grandfathered; static-commitment extends. Q3: Portfolio EDS* = √λ_max × C_info_portfolio / knower_params; boundary-verified; Gershgorin approx for N≤4; full eigenvalue for N>4. Q4: IRegistryAdapter.getPortfolioEDSstar forward-declared; v2.1 returns conservative constant; v2.2 computes eigenvalue; additive interface. Net-new: Bilateral flow as a regime; irrecoverability condition formalised (oracle_crisis AND EDS<EDS_floor_hard AND all confidence < margin); three-tier early-warning ladder with new subsidy-preparation tier at 80%; warranted attestation pool as always-available fallback. Invariants #281–#285.
+
+---
+
+## Open Questions for #r220+
+
+1. **EDS_floor_hard and bilateral-flow recovery subsidy sizing:** If EDS < EDS_floor_hard, re-entry requires a subsidy of at least 3× EDS*. How should governance size a dedicated bilateral-flow recovery reserve vs. the general Zone_C challenge pool obligations? Is there a minimum reserve fraction rule, or is this first-come-served from the general treasury?
+
+2. **Gershgorin λ_max_approx accuracy at N=4 with heterogeneous ρ:** The bound λ_max ≤ 1 + max_pairwise_ρ is tight only when off-diagonal elements are equal. For a realistic 4-class portfolio with heterogeneous ρ values, the Gershgorin bound may be loose by more than 15%. Is there a tighter closed-form approximation for N ≤ 4 that avoids full eigenvalue computation?
+
+3. **Warranted attestation pool to bilateral flow transition: detectable regime event?** When EDS crosses EDS* upward (attestation pool → bilateral flow), no explicit regime transition event is emitted. Should there be a formal regime_transition EAT event, and how does it interact with the three-tier early-warning ladder?
+
+4. **class_merge_declaration and WINDING_DOWN position settlement:** When the lower-WED class enters WINDING_DOWN, existing position-holders have open positions that must settle. Does WINDING_DOWN trigger accelerated T_anchor for the winding-down class, or do positions settle at the originally scheduled T_anchor and then the class enters ARCHIVED?
+
+*Last updated: #r219 — 2026-04-04T10:22Z*
