@@ -13400,3 +13400,157 @@ A compromised CredibilityAggregator could:
 4. **DSIC and epistemically_live gate interaction:** The DSIC guarantee requires δ > δ*. The epistemically_live gate requires ≥1 challenger per 5 T3 installations. These interact: a mechanism that is DSIC for knowers does not guarantee challengers are incentivised at the same δ threshold. Is the challenger population covered by the same DSIC argument, or does challenger incentive compatibility require a separate analysis?
 
 *Last updated: #r199 — 2026-04-04T06:52Z*
+
+---
+
+## #r200 Contributions — 2026-04-04T07:02Z
+
+Addresses all four open questions from #r199.
+
+---
+
+**Q1 (δ* phase diagram — W_MAX and base_rate interaction) → DSIC_majority preserved at W_MAX ≤ 0.15 across 3 orders of base_rate magnitude; thin-market genesis risk identified (#r200):**
+
+From #r199: `δ* = G_max / (G_max + ΔC_total × log(1+k_a) × base_rate)`
+
+DSIC_majority condition (δ* < 0.5):
+
+```
+W_MAX < sqrt(ΔC_total × log(1+k_a) × base_rate / S_cred_scale)
+```
+
+At representative v2.1 params (ΔC_total = 1.5, log(1+k_a) = 2.1, S_cred_scale = 0.80):
+
+| base_rate (normalised) | W_MAX for δ*=0.5 | W_MAX for δ*=0.1 |
+|---|---|---|
+| 0.001 (very thin) | 0.062 | 0.014 |
+| 0.01 (thin) | 0.197 | 0.044 |
+| 0.10 (moderate) | 0.624 | 0.139 |
+| 1.0 (deep) | 1.97 | 0.440 |
+
+Default W_MAX ≈ 0.15 maintains DSIC_majority down to base_rate ≈ 0.006. At very thin markets (base_rate = 0.001), W_MAX must tighten to ≤ 0.062. The bootstrap risk: thin early markets may not provide sufficient base_rate to support DSIC majority. Thin markets failing DSIC_majority are also likely to fail the epistemically_live gate — double protection against premature live deployment.
+
+**Bootstrap defense:** Genesis W_MAX should be set conservatively (e.g., 0.05) and raised as WED_clearing_smooth grows. W_MAX_schedule (W_MAX as step function of WED_clearing_smooth bands) is v2.2; the genesis W_MAX governance config is a v2.1 launch parameter that must be calibrated against expected initial WED_clearing_smooth.
+
+**Design law (#r200):** W_MAX tracks WED_clearing_smooth. DSIC_majority is scale-invariant when W_MAX ≤ sqrt(market_scale_factor). Genesis W_MAX must be set below the thin-market DSIC boundary for expected initial position registry size. (#r200)
+
+---
+
+**Q2 (WED_clearing floor for band-premium pricing) → MVF per-band fee floor; band-spread-preserving; MVF_base × max_band ≥ challenge_fee hard constraint; treasury subsidy; alert at 4 consecutive binding epochs (#r200):**
+
+When WED_clearing_smooth < WED_clearing_ref × 0.20, absolute query fees may fall below specialist knower participation thresholds.
+
+**Resolution — Minimum Viable Fee (MVF) per σ_resolve band:**
+
+```
+fee_effective(c, t) = max(
+    base_fee × band_multiplier(σ_resolve(c)),
+    MVF_base × band_multiplier(σ_resolve(c))
+)
+MVF_base = 3 × challenge_submission_fee_class  (bounded [1×, 10×])
+```
+
+MVF is band-multiplier-scaled, preserving the relative spread invariant from #r199/Q4. High-σ band always earns 6× low-σ band even at floor.
+
+**Hard constraint:** MVF_base × max_band_multiplier ≥ challenge_submission_fee. If violated, a challenger earns less than submission cost even on successful high-σ challenge — inverts challenge incentive. Contract-enforced at MVF_base update.
+
+**Funding:** MVF overage from governance treasury subsidy. Alert when MVF binding for ≥ 4 consecutive normal-mode macro-epochs.
+
+**Design law (#r200):** MVF is band-spread-preserving. A flat MVF applied equally to all bands would eliminate the epistemic pricing premium — prohibited. Any fee floor on banded pricing must scale by the same band_multiplier. (#r200)
+
+---
+
+**Q3 (CredibilityAggregator formal verification feasibility) → Feasible; 5 target properties; Halmos P1–P4 + Certora P5; 3-week parallel; 20–30% audit compression (#r200):**
+
+Core CredibilityAggregator_v1 logic: ~300–500 Solidity LOC; no recursive calls or complex data structures. Well within FV scope.
+
+**Five formal properties:**
+
+```
+P1 (log-score sign): correct claim → credibility_ratio non-decreasing; wrong → non-increasing
+P2 (W_MAX cap): ∀ epoch, agent: effective_weight(a) ≤ W_MAX × Σ effective_weight(all)
+P3 (epoch-buffer): clearing_feed(epoch_t) == S_cred_snapshot(epoch_{t-1}) — never current-epoch
+P4 (weight non-negativity): ∀ agent, epoch: effective_weight(a, t) ≥ 0
+P5 (EAT commit atomicity): Merkle_root_committed(epoch_t) == state_used_by_SettlementEngine(epoch_t)
+```
+
+**Toolchain:** Halmos (symbolic EVM) for P1–P4; Certora Prover (multi-contract rule) for P5. ~3 weeks parallel. FV precedes traditional audit; verified properties excluded from manual review, compressing audit 20–30%.
+
+**P5 caveat:** Full P5 requires EATManager in Certora scope. Without EATManager, P5 is a bounded proof under EATManager behavioural assumptions — acceptable for Tier 1 audit; full cross-contract proof is a Certora engagement item.
+
+**Design law (#r200):** FV and traditional audit are complementary. FV proves bounded arithmetic invariants with machine certainty; audit covers business logic and contextual attack surfaces. FV targets are numerical invariants where overflow, underflow, or sign error creates epistemically invisible silent failures — precisely the CredibilityAggregator surface. (#r200)
+
+---
+
+**Q4 (Challenger IC vs knower DSIC — separate analysis) → Challenger IC is single-period; P_success > 0.167–0.25; no δ* required; MVF calibration guarantees IC in thin markets; asymmetry is a stability feature (#r200):**
+
+Knower DSIC is intertemporal (lying now vs. credibility_ratio cost over future epochs). Challenger IC is single-period: challenge this specific claim or not.
+
+**Challenger expected payoff:**
+
+```
+E[challenge] > 0  iff  P_success > challenge_fee / (r_floor + challenge_fee)
+                                  = 1 / (r_floor/challenge_fee + 1)
+```
+
+At r_floor = 3× challenge_fee: threshold = 0.25. At r_floor = 5×: threshold = 0.167.
+
+**No δ* for challengers.** Single-period structure eliminates discount factor dependence. Challenger IC holds at any planning horizon > 0.
+
+**Thin-market protection via MVF:** MVF ensures slash ≥ r_floor = MVF_base × band_multiplier / r_challenger_cap ≥ 18 × challenge_fee at default params. At P_success = 0.167: expected payoff = 0.167 × 19 × challenge_fee = 3.17 × challenge_fee > 0. Challenger IC guaranteed in thin markets under MVF calibration.
+
+**Knower/challenger IC asymmetry:**
+
+| Property | Knower (DSIC) | Challenger (static IC) |
+|---|---|---|
+| IC type | Intertemporal DSIC | Single-period |
+| δ* threshold | ≈ 0.10 | None |
+| Market-scale dependence | Yes (base_rate) | Only via slash > fee |
+| Thin-market fragility | Yes (W_MAX calibration needed) | No (MVF protects) |
+
+Challenger IC is structurally more robust than knower DSIC. The enforcement layer must have simpler, more robust IC than the contribution layer — asymmetry is a deliberate stability feature. If knower incentives degrade (thin market, high W_MAX), challengers continue enforcing quality.
+
+**Design law (#r200):** Enforcement IC must be structurally simpler and more robust than contribution IC. Designing enforcement as a single-period problem while contribution is intertemporal creates a stability asymmetry that protects epistemic quality even when contribution incentives degrade. (#r200)
+
+---
+
+## Structural Synthesis: Mechanism Equilibrium — Closed (#r200)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| DSIC phase diagram | W_MAX ≤ 0.15 maintains DSIC_majority to base_rate ≈ 0.006; genesis W_MAX must be calibrated to expected thin-market WED_clearing | W_MAX tracks market scale; static W_MAX is insufficient |
+| WED_clearing floor for band pricing | MVF = MVF_base × band_multiplier; band-spread-preserving; MVF_base × max_band ≥ challenge_fee hard constraint; treasury below 0.20 × ref | Relative epistemic pricing premium preserved at floor |
+| CredibilityAggregator FV | P1–P4 Halmos; P5 Certora; 3 weeks; 20–30% audit compression | FV + audit complementary; FV targets numerical invariants |
+| Challenger IC | P_success > 0.167; no δ*; MVF protects thin markets; asymmetry is stability feature | Enforcement IC simpler and more robust — by design |
+
+---
+
+## Cumulative Invariants (additions through #r200)
+
+**Invariant #190 (#r200):** W_MAX tracks WED_clearing_smooth. DSIC_majority holds at W_MAX ≤ sqrt(ΔC_total × log(1+k_a) × base_rate / S_cred_scale). Genesis W_MAX must be calibrated against expected initial WED_clearing_smooth, not set statically.
+
+**Invariant #191 (#r200):** MVF is band-spread-preserving: MVF_base × band_multiplier for each band. MVF_base × max_band_multiplier ≥ challenge_submission_fee is a hard contract constraint. MVF activates below WED_clearing_ref × 0.20; treasury-subsidised; alert at 4 consecutive binding epochs.
+
+**Invariant #192 (#r200):** CredibilityAggregator FV scope: P1 (log-score sign), P2 (W_MAX cap), P3 (epoch-buffer delay), P4 (weight non-negativity) via Halmos; P5 (EAT commit atomicity) via Certora. FV precedes audit; compresses audit scope 20–30%.
+
+**Invariant #193 (#r200):** Challenger IC: P_success > 1/(r_floor/challenge_fee + 1) ≈ 0.167–0.25 at default params. Single-period; no δ*; no multi-period planning. MVF calibration guarantees IC in thin markets. Enforcement layer IC asymmetry is a deliberate stability design.
+
+---
+
+## Run Log Update
+
+- **#r200** — 2026-04-04T07:02Z — Q1: DSIC phase diagram; DSIC_majority at W_MAX ≤ 0.15 across 3 orders of base_rate; genesis W_MAX must be calibrated to expected thin-market WED_clearing. Q2: MVF per-band fee floor; band-spread-preserving; MVF_base × max_band ≥ challenge_fee hard constraint; treasury subsidy below 0.20 × WED_clearing_ref. Q3: CredibilityAggregator FV feasible; P1–P4 Halmos, P5 Certora; ~3 weeks; 20–30% audit compression. Q4: Challenger IC single-period; P_success > 0.167; no δ*; MVF protects thin markets; enforcement/contribution IC asymmetry is a stability feature. Invariants #190–#193.
+
+---
+
+## Open Questions for #r201+
+
+1. **W_MAX_schedule simplified v2.1 config:** W_MAX_schedule is v2.2. Should v2.1 include a two-phase static advisory (W_MAX_genesis for first N_genesis epochs; W_MAX_steady thereafter) without dynamic WED_clearing coupling?
+
+2. **MVF treasury subsidy cap:** If WED_clearing_smooth is persistently below the floor, MVF becomes a structural drain. Should there be a maximum cumulative MVF subsidy per class per epoch-window, above which the class is delisted for insufficient organic demand?
+
+3. **Bounded P5 proof for Demo Day:** Full cross-contract P5 (EAT atomicity) requires EATManager in Certora scope. Is the bounded P5 proof under EATManager behavioural assumptions acceptable for Demo Day audit disclosure, or must the full proof be in scope?
+
+4. **Mechanism thread termination criterion:** 200 runs, 193 invariants, 5-contract v2.1 spec, FV plan, challenger IC closure. Is there a natural termination for this thread (e.g., v2.1 contract implementation handoff), or does it continue as a living document through v2.2+?
+
+*Last updated: #r200 — 2026-04-04T07:02Z*
