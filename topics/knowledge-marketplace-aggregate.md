@@ -20363,3 +20363,219 @@ oracle_carry is governance measure; positions settle from carried oracle. Challe
 4. **ProtocolAddressRegistry and multi-chain deployment:** For eventual L2 expansion, the registry's own address must be known at construction for each new-chain deployment. How should the registry address be communicated without breaking single-source-of-truth?
 
 *Last updated: #r232 — 2026-04-04T13:12Z*
+
+---
+
+## #r233 Contributions — 2026-04-04T13:22Z
+
+Addresses all four open questions from #r232.
+
+**Q1 (ProtocolAddressRegistry partial-finalization) → All-or-nothing finalize(); required vs optional slot declaration at construction; partial-deployment safety via optional slots (#r233):**
+
+If CommitteeStateEngine_v2 is deployed but CredibilityAggregator_v2 is not yet deployed, finalizing with a partial address set leaves some required slots at address(0). Contracts querying a missing required slot at call-time would receive address(0) — a silent misconfiguration that could route calls to null. This is a safety hazard that could corrupt state before the deployment is detected.
+
+**Resolution — slot-type declaration at registry construction:**
+
+```solidity
+constructor(
+  bytes32[] memory required_slot_ids,
+  bytes32[] memory optional_slot_ids
+) {
+  _required = required_slot_ids;  // set() must be called for each before finalize()
+  _optional = optional_slot_ids;  // may remain address(0) after finalize()
+}
+
+function finalize() external onlyDeployer {
+  for (bytes32 slot in _required) {
+    require(_slots[slot] != address(0), "REGISTRY: required slot unset");
+  }
+  _finalized = true;
+}
+
+function get(bytes32 slot) external view returns (address) {
+  require(_finalized, "REGISTRY: not finalized");
+  return _slots[slot];  // caller must handle address(0) for optional slots
+}
+```
+
+**Required vs optional categorisation for v2.2:**
+
+| Slot | Category | Reason |
+|---|---|---|
+| CoordinateRegistry_v2 | Required | All other contracts resolve class metadata from it |
+| ClaimEscrow_v2 | Required | Escrow operations on all claim types |
+| CredibilityAggregator_v2 | Required | S_cred used in every epoch |
+| SettlementEngine_v2 | Required | Settlement Freeze Protocol |
+| EATManager_v2 | Required | All state commits |
+| CommitteeStateEngine_v2 | Optional | COMMITTEE classes only; some deployments may omit initially |
+| ImplicationBonusEngine | Optional | v2.2 feature; deferrable |
+
+**Why CommitteeStateEngine_v2 is optional:** Not all v2.2 coordinate class types require COMMITTEE mode. A v2.2 deployment targeting only CREDIBILITY_ATTESTATION classes can legitimately finalize with CommitteeStateEngine_v2 = address(0). Required-slot enforcement prevents accidental omission; optional-slot design allows incremental feature deployment.
+
+**Multi-contract staging protocol:** Required slots are populated in dependency order (no contract requires another required contract at construction — only at call-time via registry.get()). Finalize() gates class registration. No class can be registered until finalization: `CoordinateRegistry_v2.register()` calls `registry.isFinalized()` as a precondition.
+
+**Design law (#r233):** ProtocolAddressRegistry distinguishes required and optional slots at construction. finalize() enforces required-slot completeness. Optional slots return address(0) post-finalization; callers must handle gracefully. Required-slot enforcement eliminates partial-finalization safety hazards without blocking incremental feature deployment. (#r233)
+
+---
+
+**Q2 (oracle_carry_epoch and η_realized) → η_realized undefined for carry-epoch T_anchor; excluded from EMA; `oracle_carry_epoch_settlement` EAT type (#r233):**
+
+During oracle_carry_epoch, oracle_declared is the prior epoch's value — not a fresh committee vote. weighted_variance(votes, T_anchor) requires fresh committee votes at T_anchor. In a carry epoch, no new votes are cast at T_anchor; the committee density gap that triggered the carry means some seats may have produced no vote.
+
+**Resolution:**
+
+η_realized is undefined for carry-epoch T_anchor resolutions. Formally:
+
+```
+if oracle_declared(class_i, T_anchor) == oracle_carried_prior:
+  η_realized(class_i, T_anchor) = undefined
+  exclude from η_realized EMA (consistent with exceptional-mode exclusion rule, #r132/Q2)
+```
+
+**Three consequences:**
+
+1. **Settlement proceeds from carry value:** Positions settle at oracle_declared = carry. No mechanism block on settlement.
+
+2. **credibility_ratio not updated:** No fresh vote at T_anchor → no calibration event for any committee member in this epoch. Committee track record is frozen at last pre-carry state. Consistent with the principle that calibration scoring requires an actual oracle/resolution event, not a carry.
+
+3. **`oracle_carry_epoch_settlement` EAT event type:**
+
+```
+EAT event: {
+  type:              "oracle_carry_epoch_settlement",
+  class_id:          class_i,
+  T_anchor:          epoch,
+  oracle_declared:   carry_value,
+  oracle_source:     "carry_from_prior_epoch",
+  eta_realized:      null,
+  credibility_updates: []  // empty — no calibration event
+}
+```
+
+Distinct from normal `oracle_settlement` to allow auditors to identify carry epochs in the EAT without ambiguity.
+
+**Attack vector — manufactured carry:** An adversary who can trigger a density gap (sabotage committee member identity bonds, cause mass abstention) may force carry epochs to persist oracle_declared at a stale favourable value. Defence: N_carry_max = N_calibration / 2 (#r232/Q4) bounds the carry duration; DELIST_PENDING_IRRECOVERABLE fires if not resolved. Additionally, challenger eligibility to file governance challenges on carry values is preserved — governance challenges (not epistemic challenges) allow dispute of carried oracle accuracy.
+
+**Design law (#r233):** Carry-epoch settlements are a degenerate case of normal settlement. η_realized and credibility_ratio updates require genuine oracle-resolution events; carry epochs provide neither. EAT event type distinguishes carry settlements for auditor clarity. Carry duration is bounded by N_carry_max; mechanism terminates class if carry cannot be resolved. (#r233)
+
+---
+
+**Q3 (τ_bonus analogue for COMMITTEE mode) → Pre-vote commit phase; τ_commit_bonus for early hash-commitment; consistent with τ_bonus incentive theory (#r233):**
+
+τ_bonus (T3 claims) rewards submission before information congests — early private-signal revelation accelerates S_cred convergence. In COMMITTEE mode, members vote in a designated per-epoch window. There is no continuous submission; the incentive structure needs adaptation.
+
+**Resolution — two-phase vote protocol with τ_commit_bonus:**
+
+```
+Phase 1 — commit window (first 1/3 of epoch vote period):
+  Committee members submit: commit_hash = keccak256(vote_value || salt || member_id || epoch)
+  Member who commits during this window: eligible for τ_commit_bonus
+
+Phase 2 — reveal window (remaining 2/3 of epoch vote period):
+  Committee members submit: (vote_value, salt) — reveals commit
+  Vote is counted only if reveal matches commit_hash
+
+τ_commit_bonus_eligibility:
+  member committed in Phase 1
+  AND reveal is valid
+  AND fewer than ⌈k/2⌉ other members have committed before this member's commitment
+  (i.e., member is among the early commiters, not following a crowd)
+```
+
+**τ_commit_bonus formula:**
+
+```
+τ_commit_bonus = τ_bonus_rate × committee_slot_base_reward × committee_weight_fraction_a
+
+committee_weight_fraction_a = w_a / Σ_j w_j   (member a's credibility share of committee)
+τ_bonus_rate: same governance parameter as T3 τ_bonus — single unified parameter
+```
+
+**Why this is structurally correct:**
+
+1. *Incentive alignment:* Early commit reveals the member's private signal (directional commitment) before observing others' signals. This is exactly the information-acceleration behaviour τ_bonus targets in T3 claims.
+
+2. *Staleness insensitivity:* τ_commit_bonus is insensitive to staleness decay — it rewards signal revelation, not signal quality. Consistent with T3 τ_bonus design.
+
+3. *No forced commitment:* Phase 1 is voluntary. A member who needs to gather additional information before voting may wait for Phase 2. No penalty for Phase-2-only voting beyond forgoing τ_commit_bonus.
+
+4. *Anti-coordination:* The ⌈k/2⌉ threshold prevents mass simultaneous early-commitment as a coordination strategy to all earn bonuses — early movers are rewarded; late majority-followers are not.
+
+**Governance parameter:** τ_bonus_rate is unified across T3 and COMMITTEE modes. No new primitive introduced.
+
+**Design law (#r233):** The τ_bonus incentive (early private-signal revelation before crowd information) is mode-agnostic in theory. COMMITTEE mode implements it via a commit-reveal two-phase vote rather than continuous claim submission. The parameter (τ_bonus_rate) and staleness-insensitivity principle are preserved unchanged. (#r233)
+
+---
+
+**Q4 (ProtocolAddressRegistry multi-chain deployment — address predictability) → CREATE2 with deterministic salt; pre-computable address; no out-of-band dependency (#r233):**
+
+For multi-chain (e.g., Ethereum L1 + Arbitrum + OP Stack), the ProtocolAddressRegistry address must be known by other v2.2 contracts at deployment time on each chain. If the address is unpredictable (standard CREATE deployment with nonce-dependent address), every cross-chain integration must independently verify the registry address — an error-prone out-of-band dependency.
+
+**Resolution — CREATE2 with deterministic salt:**
+
+```
+registry_address = CREATE2(
+  deployer:  protocol_deployer_EOA,   // same address on all chains
+  salt:      keccak256("GestAlt_ProtocolAddressRegistry_v2.2"),
+  bytecode:  ProtocolAddressRegistry_bytecode  // same on all EVM chains
+)
+```
+
+**Pre-computable registry address:** Any party can compute `registry_address` from: (1) deployer address, (2) salt (public string), (3) contract bytecode hash (from audit artifacts). No out-of-band communication of registry address required. Contracts built on top of v2.2 can compute and hardcode the registry address at compile time.
+
+**Consistency invariant across chains:** Same deployer address + same salt + same bytecode → same registry address on all EVM-compatible L1/L2 chains. This is guaranteed by the CREATE2 specification. If bytecode differs across chains (e.g., chain-specific constructor arguments), the salt must include the chain_id to maintain per-chain uniqueness and prevent address collisions.
+
+**Recommended salt formula:**
+
+```
+salt = keccak256(abi.encodePacked("GestAlt_PAR_v2.2", chain_id))
+```
+
+Including chain_id in salt: registry addresses differ by chain (no address collision), but the address derivation is still deterministic and pre-computable from chain_id alone.
+
+**Multi-chain registry cross-reference:** Each chain's ProtocolAddressRegistry is independent. Cross-chain position data (for L2 clearing classes reading L1 position registries) must be bridged via a governance-registered oracle or messaging layer — not via ProtocolAddressRegistry, which is per-chain. The adapter pattern from #r161/Q1 is the correct interface for cross-chain position data.
+
+**Design law (#r233):** ProtocolAddressRegistry is deployed via CREATE2 with deterministic chain-specific salt. Registry address is pre-computable from public parameters; no out-of-band address communication is required. Cross-chain position data uses the adapter pattern (#r161), not cross-chain registry lookups. (#r233)
+
+---
+
+## Structural Synthesis: Infrastructure Closure (#r233)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Registry partial-finalization | Required vs optional slot declaration; finalize() enforces required-slot completeness | Required slots block finalization; optional slots allow incremental deployment |
+| η_realized during carry epoch | Undefined; excluded from EMA; `oracle_carry_epoch_settlement` EAT event type; no credibility updates | Calibration requires genuine oracle event; carry is degenerate settlement |
+| τ_bonus analogue for COMMITTEE | Two-phase commit-reveal; τ_commit_bonus for early Phase-1 committers (< ⌈k/2⌉ threshold); unified τ_bonus_rate | Mode-agnostic incentive principle; commit-reveal adapts to committee structure |
+| Multi-chain registry address | CREATE2 with chain_id-inclusive salt; pre-computable; no out-of-band dependency; cross-chain data via adapter | Deterministic deployment; adapters for cross-chain data |
+
+---
+
+## Cumulative Invariants (#r233)
+
+**Invariant #342 (#r233):** ProtocolAddressRegistry distinguishes required and optional slots at construction. finalize() reverts if any required slot is address(0). Optional slots may be address(0) post-finalization; callers must handle gracefully. CommitteeStateEngine_v2 and ImplicationBonusEngine are optional; all five core v2.1 contracts are required slots.
+
+**Invariant #343 (#r233):** η_realized is undefined for oracle_carry_epoch settlements. These epochs are excluded from η_realized EMA. credibility_ratio is not updated. `oracle_carry_epoch_settlement` EAT event type distinguishes carry from normal oracle settlements for audit clarity.
+
+**Invariant #344 (#r233):** COMMITTEE mode τ_commit_bonus: two-phase commit-reveal within epoch vote window; bonus for Phase-1 commiters among first ⌈k/2⌉; staleness-insensitive; unified τ_bonus_rate with T3 mode.
+
+**Invariant #345 (#r233):** ProtocolAddressRegistry deployed via CREATE2 with salt = keccak256(abi.encodePacked("GestAlt_PAR_v2.2", chain_id)). Registry address is pre-computable from public parameters. Cross-chain position data uses the adapter pattern (#r161); no cross-chain registry lookups.
+
+---
+
+## Run Log Update
+
+- **#r233** — 2026-04-04T13:22Z — Q1: ProtocolAddressRegistry required vs optional slot types; finalize() all-or-nothing for required slots; CommitteeStateEngine optional. Q2: η_realized undefined for carry-epoch T_anchor; excluded from EMA; oracle_carry_epoch_settlement EAT type; no credibility updates in carry epoch. Q3: Two-phase commit-reveal for COMMITTEE τ_commit_bonus; < ⌈k/2⌉ early-committer threshold; unified τ_bonus_rate. Q4: CREATE2 with chain_id-inclusive salt; pre-computable registry address; cross-chain via adapter. Invariants #342–#345.
+
+---
+
+## Open Questions for #r234+
+
+1. **Optional slot address(0) caller handling:** Contracts that access optional slots (e.g., CommitteeStateEngine_v2) must check for address(0) at call-time and degrade gracefully. Define a standard capability-check pattern: `registry.isAvailable(COMMITTEE_ENGINE_SLOT)` vs raw `registry.get()` with address(0) check in caller. Which is the canonical interface?
+
+2. **oracle_carry_epoch and ZC-LTRP interactions:** During oracle_carry_epoch, no new oracle_declared is produced. Does carry epoch affect the zone-C computation for the class? Zone C depends on TOWL utilisation, not on oracle freshness — but if oracle_declared is stale, TOWL-warranted installations may be of lower quality. Should TOWL zone C thresholds be tightened during carry epochs?
+
+3. **τ_commit_bonus and CONSENSUS_LOCK:** CONSENSUS_LOCK fires when all committee members vote identically. Under the two-phase protocol, if all members commit identical votes in Phase 1, do all earn τ_commit_bonus (all were early) or only the first ⌈k/2⌉? CONSENSUS_LOCK is a positive epistemic signal — uniform early conviction — and may warrant a different bonus treatment.
+
+4. **CREATE2 registry and contract upgrade (v2.2→v2.3):** CREATE2 with deterministic salt means the v2.2 registry address is taken permanently on each chain. A v2.3 registry would need a different salt or a different deployer. Define the registry upgrade path: new salt (different address) vs proxy pattern over the same CREATE2 address.
+
+*Last updated: #r233 — 2026-04-04T13:22Z*
