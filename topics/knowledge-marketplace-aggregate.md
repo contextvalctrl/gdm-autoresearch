@@ -24740,3 +24740,163 @@ If either leg's service ratio is below floor at oracle resolution: β multiplier
 4. **anti_snipe_blocks per-class override:** Should individual coordinate classes be permitted to override the protocol-wide governance default anti_snipe_delay_blocks (e.g., fast-resolution classes need shorter; slow deliberative COMMITTEE classes need longer), or is the bounded [50, 500] governance range sufficient for all cases?
 
 *Last updated: #r253 — 2026-04-04T17:02Z*
+
+---
+
+## #r254 Contributions — 2026-04-04T17:12Z
+
+Addresses all four open questions from #r253. Net-new structural insight: **Zone C and Zone C_oracle orthogonality was fully resolved in #r244 — supplementation is the confirmed architecture; no revision needed.** The genuinely new structural work this run is the post-recovery service floor formula and the per-class anti_snipe override pattern.
+
+---
+
+### Q1 (eps_service_floor_impl and level-correlation mid-life recovery — full-lifetime vs post-recovery window) → Post-recovery-window check with N_calibration minimum contribution requirement; full-lifetime average prohibited (#r254)
+
+**Why full-lifetime average is wrong:**
+
+A class that reverts to level-correlation for K epochs has near-zero effective_weight contributions during those K epochs. The cumulative service ratio is contaminated by a dead segment that is not the knower's epistemic fault — the class mechanism was degraded, not the knower's signal quality. Penalising the knower's service ratio for a period when the mechanism could not produce high effective_weight is epistemically unjust.
+
+**Why post-recovery-window only is wrong:**
+
+A knower can wait until after recovery, submit a single epoch of claims, and satisfy the floor on a trivially short horizon. The β multiplier would be earned on near-zero epistemic work.
+
+**Resolution — post-recovery window with minimum length gate:**
+
+```
+implication_bonus_service_check(leg_j, resolution_epoch):
+
+  recovery_epoch_j = first epoch where oracle_resolution_mode(class_j) = NORMAL
+                     continuously from that point to resolution_epoch
+  [If class_j was never in fallback: recovery_epoch_j = class_live_epoch]
+
+  post_recovery_epochs_j = resolution_epoch - recovery_epoch_j
+
+  if post_recovery_epochs_j < N_calibration:
+    service_ratio_j = INSUFFICIENT (treat as below floor)
+
+  else:
+    service_ratio_j = Σ_epochs_in_post_recovery eff_weight_j(e) /
+                      (base_weight_j × post_recovery_epochs_j)
+    eligible iff service_ratio_j >= eps_service_floor_impl (default 0.10)
+```
+
+Multiple recovery cycles: only the most recent contiguous normal-mode window of length >= N_calibration is eligible. Fragmented windows are not concatenated.
+
+**Design law (#r254):** Service floor check uses only post-recovery normal-mode window. Dead segments during fallback are excluded as mechanism-degraded, not knower-degraded. Minimum contribution = N_calibration normal-mode epochs to prevent trivial post-recovery service ratio gaming. (#r254)
+
+---
+
+### Q2 (MEMBER_COUNT_ONLY quorum at N_calibration boundary — mid-vote mode switch) → HYBRID_DUAL_THRESHOLD governs at mode-switch epoch close; T_anchor defers if new threshold not met (#r254)
+
+The mode switch from MEMBER_COUNT_ONLY to HYBRID_DUAL_THRESHOLD occurs at the epoch-close of the N_calibration-th qualifying epoch. All parameter activations are epoch-boundary-atomic (Invariant #418). The mode governing T_anchor evaluation at that epoch close is the NEW mode.
+
+**Why the new mode governs:** The exact activation epoch is deterministic and publicly observable. Applying the old mode at the switch epoch would allow one final T_anchor fire under weaker rules at the exact moment the mechanism deems credibility differentiation informative — a predictable and exploitable window.
+
+```
+At epoch_close of N_calibration-th qualifying epoch:
+  quorum_mode transitions to HYBRID_DUAL_THRESHOLD atomically.
+  Any pending vote accumulation evaluated against HYBRID_DUAL_THRESHOLD.
+
+  if HYBRID_DUAL_THRESHOLD satisfied: T_anchor fires normally.
+  if HYBRID_DUAL_THRESHOLD NOT satisfied (but MEMBER_COUNT_ONLY would have been):
+    T_anchor defers to next epoch.
+    EAT: committee_quorum_mode_activated { epoch }
+    EAT: t_anchor_deferred_mode_switch { class_id, epoch, votes_received, credibility_weight_pct }
+```
+
+**Design law (#r254):** Epoch-boundary-atomic activations apply new mode at activation epoch close. Exploitable final-old-mode-epoch is prevented by deterministic switch timing known in advance. T_anchor deferral is the correct mechanical consequence when new threshold not satisfied. (#r254)
+
+---
+
+### Q3 (oracle_portfolio_expected_loss as Zone C trigger — supplement or replace) → Confirmed supplement, not replace; architecture fully resolved in #r244 (Invariant #381); no revision (#r254)
+
+Zone C (operational over-extension): TOWL / EDS* monitors realized capital exposure.
+Zone C_oracle (correlated oracle failure risk): expected_oracle_loss / EDS* monitors tail-risk concentration.
+
+These are orthogonal (Invariant #381). Mixing EL_oracle into the Zone C TOWL numerator conflates realized obligations with expected-loss contingencies — a category error. The accounting separation from #r244 stands.
+
+```
+Zone C solvency dashboard (two independent lines):
+  Line 1: TOWL / EDS*               → Zone C (operational)
+  Line 2: expected_oracle_loss / EDS* → Zone C_oracle (concentration)
+```
+
+No new invariant required — Invariant #381 captures this completely. Open question closed by reference. (#r254)
+
+---
+
+### Q4 (anti_snipe_blocks per-class override — governance range vs per-class declaration) → Per-oracle-mode governance defaults + per-class registration override; immutable post-registration (#r254)
+
+A single protocol-wide governance parameter cannot serve AUTOMATED (near-real-time resolution) and COMMITTEE (multi-hour deliberation) classes with the same default.
+
+```
+Protocol governance parameters (governance-set, bounded [50, 500]):
+  anti_snipe_blocks_default_AUTOMATED:       100
+  anti_snipe_blocks_default_COMMITTEE:       250
+  anti_snipe_blocks_default_HYBRID_EXTERNAL: 150
+  anti_snipe_blocks_default_IMPLICATION:     200
+
+Per-class declaration at registration:
+  anti_snipe_delay_blocks_override: uint16 | null
+    Must be within [50, 500] if specified.
+    If null: uses oracle_mode governance default.
+    Once committed to EAT at registration: immutable for class lifetime.
+
+Effective anti_snipe_delay_blocks(class_j):
+  = anti_snipe_delay_blocks_override(j) if non-null
+    else anti_snipe_blocks_default_{oracle_mode_j}
+```
+
+COMMITTEE override < 150: governance reasoning declaration required at registration (documentation, not a veto).
+
+Override is immutable post-registration: oracle resolution dynamics do not change after registration; mid-lifetime changes would create exploitable inconsistencies during ongoing vote accumulations.
+
+**Design law (#r254):** Per-oracle-mode governance defaults acknowledge structurally different resolution timescales. Per-class override at registration within [50, 500] is permitted; immutable post-registration. (#r254)
+
+---
+
+## Net-New Structural Insight: Degraded-Mode Epoch Exclusion Generalises (#r254)
+
+Whenever a mechanism feature has a degraded-mode state (level-correlation, MEDIUM_CONSENSUS_FALLBACK, independence_degraded, etc.), knower contributions during degraded-mode epochs should be excluded from service quality metrics gating bonuses or eligibility transitions. The relevant reference period is always the contiguous normal-mode post-recovery window.
+
+**Applies to:** implication service floor (this run), CPA null-distribution block-bootstrap (Invariant #420 already handles), COMMITTEE independence posterior (Invariant #382 rehabilitation: forward-only, same principle).
+
+**Exception:** COMMITTEE independence posterior retains degraded history intentionally to detect idiosyncratic structural capture — this is the defined exception, not a counter-example. (#r254)
+
+---
+
+## Structural Synthesis: #r254
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| eps_service_floor mid-life recovery | Post-recovery window; N_calibration minimum; most recent contiguous only; full-lifetime excluded | Dead segments excluded; N_calibration minimum prevents trivial gaming |
+| Mode-switch epoch T_anchor | HYBRID_DUAL_THRESHOLD at activation epoch close; T_anchor defers if not met | Epoch-boundary-atomic; new mode at activation epoch |
+| Zone C + EL_oracle | Confirmed supplement not replace; Invariant #381 stands | Realized exposure ≠ expected-loss concentration; orthogonal |
+| Anti-snipe per-class override | Per-oracle-mode defaults (100/250/150/200); override at registration within [50,500]; immutable | Oracle-mode-specific defaults; override locks at registration |
+
+---
+
+## Cumulative Invariants (#r254)
+
+**Invariant #424 (#r254):** implication_bonus_service_floor check (Invariant #423) uses post-recovery window: `recovery_epoch_j` = first epoch of contiguous normal-mode from that point to resolution. Service_ratio_j computed over post-recovery epochs only. Eligibility = post_recovery_epochs_j >= N_calibration AND service_ratio_j >= eps_service_floor_impl. Full-lifetime cumulative prohibited. Multiple recovery cycles: only most recent contiguous normal-mode window of length >= N_calibration eligible.
+
+**Invariant #425 (#r254):** COMMITTEE quorum mode switch (Invariant #421) is epoch-boundary-atomic: HYBRID_DUAL_THRESHOLD governs T_anchor evaluation at mode-switch epoch close. If HYBRID_DUAL_THRESHOLD not satisfied but MEMBER_COUNT_ONLY would have been: T_anchor defers; EAT `t_anchor_deferred_mode_switch { class_id, epoch, votes_received, credibility_weight_pct }`.
+
+**Invariant #426 (#r254) [standing confirmation]:** Zone C (TOWL/EDS*) and Zone C_oracle (expected_oracle_loss/EDS*) are confirmed orthogonal supplement architecture (Invariant #381). EL_oracle does not enter Zone C TOWL numerator. No revision to prior invariants.
+
+**Invariant #427 (#r254):** anti_snipe_delay_blocks per-oracle-mode governance defaults: AUTOMATED=100, COMMITTEE=250, HYBRID_EXTERNAL=150, IMPLICATION_CHAIN=200 (all governance-settable, bounded [50, 500]). Per-class override declared at registration within [50, 500]; null = use mode default; immutable for class lifetime. COMMITTEE override < 150: governance reasoning declaration required at registration. Effective value committed to EAT at registration.
+
+**Invariant #428 (#r254) [general]:** Mechanism quality metrics (service ratios, track records, calibration_ratio components) gating bonus eligibility or status transitions must exclude degraded-mode epochs from numerators. Degraded-mode history is audit-trail-only; normal-mode post-recovery windows are the epistemically valid reference period. Exception: COMMITTEE independence posterior retains degraded history to detect idiosyncratic structural capture (Invariant #382) — this is an intentional exception, not a counter-example.
+
+---
+
+## Open Questions for #r255+
+
+1. **calibration_ratio track record and degraded-mode epoch exclusion:** Invariant #428 asserts degraded-mode epochs should be excluded from quality-gate numerators. Does this apply to `calibration_ratio` as well — should oracle resolution epochs during a class's level-correlation fallback be excluded from the knower's calibration_ratio computation, or is calibration_ratio always full-lifetime?
+
+2. **Multiple anti_snipe governance defaults and null-override upgrade path:** If governance votes to change `anti_snipe_blocks_default_COMMITTEE` from 250 to 350, do already-registered classes with null override (using mode default) get the updated value, or is the effective value locked at registration?
+
+3. **T_anchor deferral at mode-switch — maximum deferral count:** When T_anchor defers at mode-switch epoch, is there a maximum deferral limit (e.g., 3 epochs) beyond which the class is flagged governance-stuck, or is indefinite deferral permitted?
+
+4. **Post-recovery contiguous window and epoch granularity for slow-oracle classes:** For a COMMITTEE class resolving once per macro-epoch, does N_calibration mean N_calibration macro-epoch resolutions, or N_calibration × macro_epoch_duration finer-grained epochs? A slow-oracle class might need years of monthly resolutions to satisfy the service floor on this interpretation.
+
+*Last updated: #r254 — 2026-04-04T17:12Z*
