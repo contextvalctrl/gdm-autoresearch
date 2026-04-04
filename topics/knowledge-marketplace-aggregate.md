@@ -13947,3 +13947,254 @@ The systematic audit from Q1 yields the classification:
 4. **#r-CLOSE readiness:** Is there an outstanding first-principles question warranting one more run before closure? Candidate: full formal statement of the three-quantity GestAlt invariant (WED, epistemic capital, S_cred) as a testable claim distinguishing GestAlt from LMSR and orderbooks at the spec level. If the founders confirm this is addressed sufficiently in #r201/net-new, #r203 can be #r-CLOSE.
 
 *Last updated: #r202 — 2026-04-04T07:22Z*
+
+---
+
+## #r203 Contributions — 2026-04-04T07:32Z
+
+**Phase: Addresses Q1–Q4 from #r202 (enforcement gap tickets, W_MAX_genesis provenance, DELIST+Zone C priority, #r-CLOSE readiness). Cron-directed fresh first-principles pass on the knowledge marketplace. Final Spec Run.**
+
+---
+
+### Q1 (10 Enforcement Gaps — Implementation Tickets by Contract Owner) (#r203)
+
+Each gap is a spec change, not an architecture change. All implementable in existing contract boundaries.
+
+**SettlementEngine_v1 (1 item):**
+
+| Gap | Inv | Change |
+|---|---|---|
+| SE-1: oracle_override no-slash hard assert | #11 | In `applyOracleSettlementOverride()`: add `assert(ClaimEscrow.escrowBalance(classId, knower) == escrowBalance_before)` after oracle-override path executes. No escrow mutation permitted. Alternative: structural guard via `oracleOverrideMode` flag that disables ClaimEscrow write-access for the duration of the call. Engineering decision pending. |
+
+**EATManager_v1 (2 items):**
+
+| Gap | Inv | Change |
+|---|---|---|
+| EAT-1: compaction eligibility invalidation | #26 | In `CoordinateRegistry.setParam(name, value)`: emit `CompactionEligibilityInvalidated(classId, epoch)` for all affected classIds. EATManager listens and sets `compaction_eligible[classId] = false` until next epoch boundary. |
+| EAT-2: arweave_absence_acknowledged co-submission gate | #32 | In `EATManager.submitEpochRecord(classId, epoch, payload)`: `require(payload.arweave_mirror_status != CLOSED \|\| payload.arweave_absence_acknowledged == true, "arweave_mirror gate")`. Companion field required in calldata when mirror is closed. |
+
+**CoordinateRegistry_v1 (6 items):**
+
+| Gap | Inv | Change |
+|---|---|---|
+| CR-1: v2.1 feature-flag deny-list | #36 | `require(!hasV22Feature(config), "v2.2 feature prohibited in v2.1 class")`. Deny-list: DISCOVERY_MODE, SHADOW_CLASS, CORRELATION_BONUS, EQ_CONDITIONED_QUERY. Bitmask check at registerClass. |
+| CR-2: epistemically_live gate at T3 install | #38 | In `registerT3Install(classId, ...)`: `require(class.epistemically_live_epochs >= 2, "epistemically_live required")`. |
+| CR-3: band table spread minimum | #188 | In `setClassBandTable(classId, bands[])`: `require(max(bands) / min(bands) >= BAND_SPREAD_MIN)`. Atomic update enforced: all 4 bands submitted together. |
+| CR-4: W_MAX phase separation via disjoint bounds | #194 | GovernanceParams struct adds `w_max_phase: enum {GENESIS, STEADY}`. At `setW_MAX(classId, value)`: enforce `value in [w_max_genesis_min, w_max_genesis_max]` if phase GENESIS, else `[w_max_steady_min, w_max_steady_max]`. |
+| CR-5: DELIST_PENDING state machine | #195 | Add `ClassLifecycle enum {NORMAL, DELIST_PENDING, RETIRED}` to ClassConfig. Add `mvf_subsidy_cumulative[classId]` accumulator. On cap hit: `lifecycle = DELIST_PENDING; delist_window_remaining = N_calibration`. |
+| CR-6: SFP-DELIST precedence (clock toll) | #201 | In lifecycle tick (called each macro-epoch): if `lifecycle[classId] == DELIST_PENDING && sfp_active_count[classId] > 0`: skip delist_window_remaining decrement. Resume when `sfp_active_count == 0`. |
+
+**ClaimEscrow_v1 (1 item):**
+
+| Gap | Inv | Change |
+|---|---|---|
+| CE-1: epistemically_live check in installT3() | #38 | `require(CoordinateRegistry.isEpistemicallyLive(classId), "class not epistemically live")`. Dual-check with CR-2: defense-in-depth. |
+
+**Summary: 10 changes across 4 contracts. All additive guards — no existing logic paths modified.** (#r203)
+
+---
+
+### Q2 (W_MAX_genesis Provenance Flag — Tooling Design) (#r203)
+
+**Resolution — required calldata field, on-chain queryable:**
+
+```solidity
+struct ClassRegistrationInput {
+    // ... other fields ...
+    uint256 w_max_genesis;           // required; no zero, no default
+    uint8   w_max_genesis_source;    // required: 1=active_deliberation, 2=confirmed_suggestion
+}
+
+// CoordinateRegistry.registerClass:
+require(input.w_max_genesis_source == 1 || input.w_max_genesis_source == 2,
+        "w_max_genesis_source must be declared");
+require(input.w_max_genesis > 0, "w_max_genesis must be set");
+
+emit ClassRegistered(classId, input.w_max_genesis, input.w_max_genesis_source, epoch);
+```
+
+**Why calldata (not just event):** Events can be emitted with any value. Calldata is committed; `registeredClasses[classId].w_max_genesis_source` is on-chain queryable. Governance UI sets source=1 if value was modified, source=2 if UI suggestion was confirmed unchanged. Transaction fails if field omitted — prevents UI bugs from silently defaulting.
+
+**Design law (#r203):** Safety-critical parameters with suggested defaults carry a `_source` enum (1=active_deliberation, 2=confirmed_suggestion) as a required calldata field. On-chain queryable. Cannot be fabricated post-registration. (#r203)
+
+---
+
+### Q3 (DELIST_PENDING + Zone C Combined State Priority Ordering) (#r203)
+
+**Priority ordering (strict, no exceptions):**
+
+```
+Priority 1 — SFP active:
+  Overrides all lifecycle state transitions.
+  Delist clock TOLLS; Zone C gates may still fire (new claim blocking is orthogonal to settlement).
+  Rationale: settlement is a financial obligation; lifecycle is a governance decision.
+
+Priority 2 — Zone C (no active SFP):
+  New T3 claim submissions blocked.
+  Delist clock NOT tolled. Zone C is an operational condition (high volatility), not a capital condition.
+  Rationale: Zone C does not fix insufficient organic demand — it is NOT a valid delist clock pause.
+
+Priority 3 — DELIST_PENDING only:
+  Clock counts down normally.
+```
+
+**State machine tick (per macro-epoch):**
+
+```
+if sfp_active_count[classId] > 0:
+    // SFP priority: toll delist; Zone C gates run independently
+    skip delist_window_remaining decrement
+elif lifecycle[classId] == DELIST_PENDING:
+    delist_window_remaining -= 1
+    if delist_window_remaining == 0: lifecycle = RETIRED
+```
+
+**Edge case — Zone C entry during DELIST_PENDING:** Zone C does not extend the governance window. If Zone C caused the WED_clearing shortfall triggering MVF, governance must address the structural demand problem — Zone C is not a valid excuse.
+
+**Zone C + SFP simultaneously:** SFP settlement uses T_anchor-frozen S_cred; Zone C blocks new claims. No interaction with frozen settlement price.
+
+**Design law (#r203):** SFP_active > Zone_C > DELIST_PENDING. Zone C and DELIST_PENDING are orthogonal conditions with independent clocks. SFP tolls only the delist clock; Zone C tolls nothing. (#r203)
+
+---
+
+### Q4 (#r-CLOSE Readiness Assessment) (#r203)
+
+| Precondition | Status |
+|---|---|
+| 1. 10 enforcement gaps resolved (spec) | SPEC-CLOSED this run (Q1). Implementation: code freeze 2026-04-21. |
+| 2. P1-P4 FV complete | Pending. ~3 weeks post code freeze (Halmos). |
+| 3. Audit firm engaged | Pending. Zellic gate: 2026-04-07. |
+| 4. v2.1 production readiness on >=1 class | Pending. Requires implementation + epistemically_live epochs. |
+| 5. EATManager_v1 interface spec committed | Complete. Cross-referenced in IPositionRegistryAdapter spec (#r191). |
+
+**Verdict: #r203 = FINAL SPEC RUN. #r-CLOSE is pending preconditions 2, 3, 4.**
+
+Future entries in this document: `[AUDIT]` tags, `[IMPL]` tags, and the `#r-CLOSE` entry when all five preconditions are confirmed. No new mechanism design content after #r203.
+
+---
+
+### Cron First-Principles Pass: Knowledge Marketplace — Terminal Synthesis (#r203)
+
+**What the mechanism IS, stated with maximum precision:**
+
+The knowledge marketplace is a **track-record-gated, warrant-backed, oracle-arbitrated state estimation mechanism** for coordinate variables.
+
+Five differentiating words:
+- **Track-record-gated:** participation weight is earned through oracle-resolved accuracy; capital alone does not grant influence.
+- **Warrant-backed:** every claim is a forfeitable escrow commitment; the estimate is insured against error.
+- **Oracle-arbitrated:** truth is defined externally and independently of S_cred.
+- **State estimation:** output is a point estimate (S_cred) with uncertainty (sigma_resolve), not a probability distribution.
+- **Coordinate-scoped:** applies to measurable real-valued or discrete quantities, not arbitrary event descriptions.
+
+Each word eliminates a mechanism family: LMSR fails oracle-arbitrated (market price IS the truth reference); orderbooks fail warrant-backed (positions are exitable, not forfeitable); batch auctions fail state estimation (they clear positions, not produce state estimates); scoring rules fail track-record-gated (no persistent weight accumulation).
+
+**The mechanism is unique in this exact intersection.** No existing production mechanism satisfies all five simultaneously.
+
+---
+
+**The conserved quantity — final formal statement (#r203):**
+
+WED(t) = sum_{i: active_claims} escrow_i * max_loss_fraction_i
+
+WED is constant on any interval (tau_k, tau_{k+1}) between consecutive oracle resolutions, under normal operation (no net new submissions). WED changes only at claim submission and oracle resolution events. Within an epoch, WED is monotone-nondecreasing.
+
+**Why WED and not the LMSR cost function:** C(q) decreases as participants update beliefs toward truth — it is a financial loss buffer absorbed by the AMM provider. WED is not a loss buffer; it is a liability schedule. Conservation of WED enables TOWL as a meaningful solvency constraint: the protocol can guarantee solvency without observing every individual position, only the aggregate WED vs. solvency envelope.
+
+---
+
+**Mechanism Comparison — Final (#r203):**
+
+| Property | Knowledge Marketplace (GestAlt v2.1) | LMSR | Orderbook PM | Batch Auction |
+|---|---|---|---|---|
+| Base primitive | (claim, escrow, track-record) warrant | Market position on shared cost function | Limit order (price, size, direction) | Allocated position at clearing price |
+| Conserved quantity | WED (warrant liability) | None (C(q) is loss buffer) | Open interest | None |
+| Source of truth | External oracle (independent of S_cred) | Market price IS truth reference | Market price IS truth reference | External oracle |
+| Manipulation cost | Track record + W_MAX + capital | Capital only | Capital only | Track record + W_MAX + capital |
+| Incentive compatibility | DSIC for delta > delta* ~= 0.10 | BIC only | BIC only | DSIC for delta > delta* |
+| Bootstrap requirement | Epistemically live knower pool | Zero participants viable | One counterparty | Position registry |
+| Settlement certainty | SFP: frozen at T_anchor | Continuous (no freeze) | Continuous (no freeze) | T_anchor frozen |
+| Oracle arbitration | Explicit: knower != oracle | None | None | Explicit |
+
+**Single-sentence institutional superiority:**
+
+> GestAlt is the only mechanism where market influence scales with verifiable accuracy rather than capital size, settlement prices are frozen at a governance-defined anchor rather than being continuously manipulable, and solvency is guaranteed by a conserved warrant-liability (WED) rather than a loss-buffer.
+
+---
+
+**Strongest Failure Mode (unchanged after 203 runs):**
+
+The mechanism requires a credible knower pool that does not naturally exist at genesis. Unlike LMSR (launchable with one liquidity provider), GestAlt requires N_calibration oracle-resolved epochs of history before the epistemically_live gate opens. This cold-start problem has no purely mechanical solution — bootstrapping requires governance subsidy, calibration_warmup_oracle, or LMSR hybrid Phase 1. The shadow-class architecture operationalises the hybrid answer.
+
+**This failure mode has not weakened across 203 runs. It remains the correct residual failure.**
+
+---
+
+**Simplest Viable Mechanism — Five Transitions (#r203):**
+
+```
+State: (credibility_ratio[], S_cred, WED)
+Initial: (floor[], 0, 0)
+
+T1 STAKE(k, v, e):
+  WED += e * max_loss_fraction(v)
+  candidate_claims[k] = (v, e)
+
+T2 COMMIT(epoch):
+  w_k = min(credibility_ratio[k] * log(1 + e_k), W_MAX)
+  S_cred = sum(w_k * claim_k_v) / sum(w_k)
+  S_cred_history[epoch] = S_cred
+
+T3 FREEZE(epoch, T_anchor):
+  S_settlement = S_cred_history[epoch - 1]   // one-epoch buffer
+  S_settlement immutable until RESOLVE
+
+T4 RESOLVE(oracle_truth, T_finality):
+  for each k with active claim:
+    credibility_ratio[k] += log_score_delta(claim_k_v, oracle_truth)
+    if |claim_k_v - oracle_truth| < tolerance: return escrow_k
+    else: slash escrow_k -> winner_pool + challenger_pool + protocol_fee
+  WED -= sum_k discharged_escrow_k * max_loss_fraction
+
+T5 QUERY(u, coord, fee):
+  require fee >= fee_fraction * WED_clearing * sigma_banded(coord)
+  distribute fee to knowers proportional to credibility_ratio
+  return S_cred_history[latest_committed_epoch]
+```
+
+Five transitions. No AMM. No order matching. No market maker. All mechanism richness emerges from the interaction of WED (conserved), credibility_ratio[] (monotone-trending), and S_cred (derived) under the log-score update rule.
+
+---
+
+## Cumulative Invariants (additions — #r203)
+
+**Invariant #203 (#r203):** The GestAlt knowledge marketplace is uniquely characterised by simultaneous satisfaction of five properties: track-record-gated (weight = f(accuracy history)); warrant-backed (claims are forfeitable escrow); oracle-arbitrated (truth is external to S_cred); state estimation (output is a point estimate with uncertainty); coordinate-scoped (applies to measurable quantities). No existing production mechanism satisfies all five. This five-property intersection is the mechanism's legally and economically defensible differentiation from LMSR, orderbooks, scoring rules, and batch auctions.
+
+---
+
+## Run Log Update
+
+- **#r203** — 2026-04-04T07:32Z — FINAL SPEC RUN. Q1: 10 enforcement gaps assigned to contract owners (SE*1, EAT*2, CR*6, CE*1); all spec-closed; implementation before code freeze 2026-04-21. Q2: w_max_genesis_source as required calldata enum (1=active_deliberation, 2=confirmed_suggestion); on-chain queryable via CoordinateRegistry. Q3: SFP_active > Zone_C > DELIST_PENDING; Zone C does not toll delist clock; SFP tolls only delist clock; orthogonal conditions. Q4: #r-CLOSE preconditions 2+3+4 still open; #r203 = Final Spec Run; future entries [AUDIT]/[IMPL]/#r-CLOSE only. Cron first-principles pass: five-word mechanism definition; WED conservation theorem (formal); five-transition minimal state machine; LMSR/orderbook/batch comparison table; confirmed strongest failure mode unchanged. Invariant #203 (final mechanism statement).
+
+---
+
+## Forward Plan (Implementation Phase)
+
+1. **Engineering:** Close 10 gap items before code freeze 2026-04-21. SE-1 guard pattern decision needed.
+2. **Audit:** Zellic confirmation by 2026-04-07. Trail of Bits fallback on 2026-04-08.
+3. **FV:** Halmos P1-P4 on CredibilityAggregator_v1, begin post-code-freeze (~3 weeks).
+4. **#r-CLOSE:** Triggered by P1-P4 FV completion + audit engagement + production readiness on >=1 class.
+5. **v2.2:** Continues in knowledge-marketplace-v22.md (founded #r193, D(c) revelation as first primitive).
+
+*Last updated: #r203 — 2026-04-04T07:32Z — FINAL SPEC RUN*
+
+---
+
+## #r-CLOSE (pending — awaiting P1-P4 FV completion, audit firm engagement, v2.1 production readiness on >=1 class)
+
+```
+When all five preconditions from Invariant #202 are confirmed:
+  - Append #r-CLOSE entry with date, final invariant count, forward references
+  - Set document status: READ-ONLY
+  - Future corrections: [AUDIT] or [IMPL] tags only
+  - v2.2 design: knowledge-marketplace-v22.md
+```
