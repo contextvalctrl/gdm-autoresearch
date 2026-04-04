@@ -21920,3 +21920,213 @@ If X oracle resolves, A-side stake is evaluated normally. B-side claim is evalua
 4. **Mechanism comparison: knowledge marketplace vs proper scoring rules without capital:** Proper scoring rules (Brier score, log score) elicit calibrated beliefs without capital at risk. GestAlt adds capital commitment to the scoring rule. Under what conditions does capital commitment improve over pure scoring — and is there a regime where large capital requirements deter high-quality knowers who cannot afford the escrow (adverse selection on wealth, not knowledge)?
 
 *Last updated: #r239 — 2026-04-04T14:24Z*
+
+---
+
+## #r240 Contributions — 2026-04-04T14:34Z
+
+Addresses all four open questions from #r239.
+
+**Q1 (Oracle-resistance threshold formalisation — class-registration eligibility criterion) → P_oracle_independent > 0.50 × (1 − CPA_max); governance-attested; challengeable via oracle_integrity_dispute (#r240):**
+
+The informal threshold from #r239/§9 is: mechanism epistemically productive iff oracle independence probability > 0.50 × (1 − CPA_probability). For this to function as a hard registration gate, both quantities must be operationally defined and governance-attested.
+
+**Formal definitions:**
+
+```
+P_oracle_independent(class_i) = governance-attested probability that oracle_declared(x_i)
+  is determined by external reality rather than by any actor with ≥1% effective_weight in S_cred(x_i).
+  Required attestation fields:
+    oracle_type: AUTOMATED | COMMITTEE | HYBRID_EXTERNAL  (Invariant #327)
+    oracle_capture_risk: LOW | MEDIUM | HIGH | CRITICAL
+    evidence_of_independence: [citation or on-chain reference]
+    P_oracle_independent_estimate: scalar in [0, 1]
+
+CPA_max(class_i) = max observed or estimated fraction of S_cred influence attributable
+  to any single correlated-action cluster (CPA cluster, Invariants #311-#316).
+  At registration: governance-estimated, default 0.30 (conservative).
+  Post-launch: computed dynamically from CPA detection outputs.
+```
+
+**Registration gate (hard contract precondition):**
+
+```
+eligible_for_T3_installation(class_i) iff:
+  P_oracle_independent(class_i) > 0.50 × (1 − CPA_max(class_i))
+```
+
+At registration with CPA_max default 0.30, the effective gate: P_oracle_independent > 0.35. For AUTOMATED oracle types with independently verifiable data feeds, P_oracle_independent = 0.95+ satisfies easily. For COMMITTEE oracles on ambiguous coordinates, governance justification is required.
+
+**Challenge mechanism — oracle_integrity_dispute:**
+
+Any participant may post an `oracle_integrity_dispute` with:
+- Evidence that oracle_declared is co-determined by an actor with ≥1% effective_weight in S_cred.
+- Dispute bond ≥ r_floor_per_class.
+
+If dispute upheld by governance within 2 macro-epochs: class demoted from T3 to T2; P_oracle_independent updated in EAT. If dispute rejected: bond forfeited to challenger_pool.
+
+**Design law (#r240):** Oracle independence is a first-class registration eligibility criterion, not a best-effort recommendation. Classes whose oracle can be captured by their own knower population produce bluffing contests, not knowledge markets. Governance attestation + challenge mechanism is the dual-accountability approach. (#r240)
+
+---
+
+**Q2 (Green Lumber boundary for rivalrous knowledge — Family B variant coexistence with Family A) → Rivalrous-knowledge Family B is valid as a separate protocol layer; must not share S_cred with Family A; oracle exogeneity still required for settlement (#r240):**
+
+**Is some knowledge genuinely rivalrous on-chain?**
+
+Rivalrous knowledge = knowledge whose value diminishes when disclosed to additional parties (e.g., proprietary model parameters, non-public data, access credentials, pre-publication research). The Green Lumber reselling attack applies specifically to non-rivalrous knowledge (the information itself has no diminishing value from re-disclosure).
+
+For genuinely rivalrous knowledge:
+1. The buyer must be able to verify the claim is genuine without full disclosure (zero-knowledge proof of knowledge).
+2. After disclosure to one buyer, the value to subsequent buyers must be structurally reduced — not just contractually restricted.
+
+**On-chain rivalrous knowledge examples that satisfy both conditions:**
+- ZK proofs of private computation outputs (verifiable without revealing inputs).
+- Commitment-reveal schemes where the revealed preimage has one-time economic value (e.g., cryptographic lottery seed).
+- NFT-gated access where transfer burns the original.
+
+**Family B variant (rivalrous-only Knowledge Transfer Market):**
+
+Permitted as a separate protocol layer with three mandatory constraints:
+1. **No S_cred sharing with Family A:** Family B knowledge claims do NOT feed into S_cred (the shared public state vector). Family B is strictly bilateral; Family A is strictly collective.
+2. **Separate escrow pool (claim_escrow_bilateral):** Not counted toward TOWL of any coordinate class. Family B does not create TOWL obligations on shared coordinates.
+3. **Oracle exogeneity still required for settlement:** Even rivalrous knowledge claims must settle against an external oracle, not against the buyer's self-reported satisfaction. Without exogenous settlement, buyers will always claim dissatisfaction; knowers will always claim delivery.
+
+**What Family B cannot do:** Family B cannot issue credibility certificates for use in Family A. A knower with strong Family B performance gains no credibility_ratio credit in Family A. The two systems are protocol-layer isolated. Cross-layer contamination would allow Family B wash-trading to build Family A credibility_ratio — a corruption of the calibration track record.
+
+**Coexistence verdict:** Family B can exist as a separate, oracle-anchored, TOWL-isolated bilateral layer. It does NOT undermine Family A when properly isolated. For GestAlt v2.1, Family B is deferred. Family B is a v2.3+ research surface.
+
+**Design law (#r240):** Non-rivalrous knowledge markets (Family A) and rivalrous knowledge markets (Family B) are protocol-layer isolated. No S_cred sharing, no TOWL coupling, no credibility portability. Bilateral oracle-anchored settlement is the only valid settlement mechanism for either family. (#r240)
+
+---
+
+**Q3 (Implication chain as oracle-resolution path for oracle-resistant coordinate class — minimum upstream verifiability requirement) → At least one Tier-1 oracle-independent upstream coordinate per chain; effective_oracle_independence = P(upstream) × γ_oracle^(depth-1); depth limit ~4 (#r240):**
+
+**The question:** When ALL dimensions of a coordinate class are oracle-resistant, can an implication chain from an oracle-verifiable upstream coordinate provide oracle coverage for the downstream class?
+
+**Analysis:**
+
+An implication chain A→B asserts: "IF oracle_declared(A) in declared range THEN state(B) in claimed range." If A is oracle-verifiable (P_oracle_independent(A) > threshold), then:
+- A resolves with known truth.
+- B's claim is evaluated conditional on A's resolution.
+- B's calibration_ratio updates based on how accurately B's value was predicted given A's resolution.
+
+**Valid resolution path — strict requirements:**
+
+```
+Condition 1 (upstream verifiability):
+  ∃ at least one upstream coordinate A_k in the chain such that:
+    P_oracle_independent(A_k) ≥ 0.70  (stronger than direct registration gate)
+    AND A_k has ≥ N_calibration resolved epochs
+
+Condition 2 (chain scope):
+  The B-side claim must be scoped to the conditional on A:
+    claim(B | A in [lo, hi])  — not unconditional claim(B)
+
+Condition 3 (governance opt-in):
+  B's coordinate class must register as oracle_via_implication_chain: true at registration.
+  oracle_chain_source: class_id(A_k)
+  This declaration is permanent — class B cannot convert to a direct oracle class
+  without re-registration (reset of calibration_ratio history).
+```
+
+**Oracle-resistance propagation discount:**
+
+```
+effective_oracle_independence(B) = P_oracle_independent(A) × γ_oracle^(chain_depth - 1)
+γ_oracle = 0.85  (governance-settable, bounded [0.7, 1.0])
+```
+
+At depth 2 (A→B), A with P=0.90: effective = 0.90 × 0.85 = 0.765. Satisfies registration gate easily.
+At depth 5 from A with P=0.90: effective = 0.90 × 0.85^4 ≈ 0.47. Falls below gate threshold. Chains beyond depth 4 cannot provide adequate oracle coverage even from a 0.90 oracle.
+
+**Design law (#r240):** Oracle coverage degrades at rate γ_oracle^(depth-1) through implication chains. Chain-gated oracle coverage is a second-class oracle path — valid only for coordinates with no direct oracle. Governance must explicitly opt-in to this classification. (#r240)
+
+---
+
+**Q4 (Knowledge marketplace vs proper scoring rules without capital — conditions where capital improves; adverse selection on wealth) → Capital unconditionally necessary for bilateral demand; delegated escrow with 10% personal stake floor mitigates wealth adverse selection (#r240):**
+
+**When does capital commitment improve over pure scoring rules?**
+
+A proper scoring rule (Brier score, log score) is incentive-compatible for rational Bayesian agents without requiring capital. Three conditions determine when capital strictly improves:
+
+**Condition A — Cheap-talk attack rate:**
+When participation is costless, agents with no private signal can post random claims (zero expected cost, non-zero expected lucky reward). Capital escrow filters this: only agents with positive-expected-value signals rationally post escrow. Capital improves over pure scoring iff the no-signal-claimant fraction in a costless system degrades S_cred below the quality threshold of a single oracle query.
+
+**Condition B — Track record manipulation resistance:**
+Sophisticated adversaries can game pure scoring by selecting coordinates where their private information is irrelevant but statistically favorable. Capital commitment imposes proportional cost on all claims including manipulative ones. Capital improves iff cost-of-manipulation at required escrow level exceeds expected manipulation benefit.
+
+**Condition C — Bilateral demand signal validity (unconditional):**
+The q_bonus demand signal (EQ) requires unknowers to commit capital as proof of genuine decision-relevance. A pure scoring rule has no mechanism for demand signal revelation. Capital is structurally necessary for bilateral-flow update rule. This condition is unconditional: capital is required for knowledge marketplace demand pricing to function at all.
+
+**Conclusion:** Capital commitment is unconditionally necessary in this mechanism (Condition C always applies). Therefore capital is not a design choice — it is a structural requirement.
+
+**Adverse selection on wealth:**
+
+A knower with genuine private signal but insufficient capital to post required escrow is excluded — adverse selection on wealth, not on knowledge quality.
+
+*Case 1:* Escrow floor exceeds expected return for small-signal knowers → moderate-confidence signals suppressed from S_cred → S_cred quality degrades toward high-certainty-only representation.
+
+*Case 2:* Wealth concentration in knower population → wealthy-but-less-informed knowers selected over capital-constrained domain experts.
+
+**Mitigation — delegated escrow protocol (new mechanism feature, #r240):**
+
+```
+delegated_escrow:
+  Third-party delegator provides escrow on behalf of knower k.
+  Delegation terms:
+    delegator earns fraction δ of k's log-score bonus if correct
+    delegator shares fraction δ of slash if wrong
+    δ = governance-settable floor ≥ 0.10; default 0.30
+
+  effective_weight(k) is unaffected by escrow source.
+  Slash allocated to delegator balance first, then k's balance.
+  credibility_ratio update applies to k (knowledge holder), not delegator.
+
+  personal_escrow_min(k) = 0.10 × escrow_total_required
+    (governance-settable, bounded [0.05, 0.25])
+    Knowers with zero personal stake have no skin-in-the-game and may bluff
+    without personal capital consequence.
+```
+
+This separates epistemic quality (knower) from capital constraint (delegator). A poor domain expert can participate via delegation; a wealthy non-expert cannot gain credibility_ratio by backing another's claim. The credibility accrues to the attesting knower only.
+
+**Design law (#r240):** Capital commitment is unconditionally necessary in a bilateral knowledge marketplace (required for demand signal validity). Adverse selection on wealth is real and is mitigated via delegated escrow with mandatory personal stake floor. Delegation preserves the epistemic signal (credibility_ratio to knower) while separating it from the capital constraint. (#r240)
+
+---
+
+## Structural Synthesis: Knowledge-Marketplace Founding Layer — Closed (#r240)
+
+| Question | Resolution | Law |
+|---|---|---|
+| Oracle-resistance registration gate | P_oracle_independent > 0.50 × (1 − CPA_max); governance-attested; challengeable | Oracle independence is a first-class registration precondition |
+| Family B (rivalrous knowledge) coexistence | Valid as isolated bilateral layer; no S_cred sharing; no TOWL coupling; oracle exogeneity still required | Protocol-layer isolation mandatory; no cross-contamination |
+| Implication chain as oracle-resistance substitute | effective_oracle_independence = P(upstream) × γ_oracle^(depth-1); depth limit ~4 | Chain-gated oracle is second-class; governance opt-in required |
+| Capital vs pure scoring; adverse selection | Capital unconditionally necessary (bilateral demand); delegated escrow mitigates wealth selection | Delegation separates epistemic signal from capital constraint; personal stake floor required |
+
+**New mechanism feature (#r240):** Delegated escrow protocol with 10% personal stake floor; δ split of log-score/slash between knower and delegator; credibility_ratio accrues to knower only.
+
+**Invariant #240-A:** Oracle independence is a hard registration gate (P_oracle_independent > threshold). Classes failing the gate may not have T3 warranted installations.
+
+**Invariant #240-B:** Family A (attested-signal) and Family B (rivalrous bilateral) are protocol-layer isolated. No S_cred sharing, no TOWL coupling, no credibility portability across layers.
+
+**Invariant #240-C:** Delegated escrow preserves epistemic signal assignment (credibility_ratio to knower). Personal stake floor ≥ 10% prevents zero-skin-in-the-game delegation abuse.
+
+---
+
+## Run Log Update
+
+- **#r240** — 2026-04-04T14:34Z — Addresses all four open questions from #r239. Oracle-resistance threshold formalised as hard registration gate with challenge mechanism. Family B (rivalrous bilateral) confirmed viable as isolated layer distinct from Family A. Implication chains as oracle-resistance path formalised; depth limit ~4 from γ_oracle decay. Capital unconditionally necessary; adverse selection mitigated by delegated escrow protocol with 10% personal stake floor. Three new invariants (#240-A, #240-B, #240-C).
+
+---
+
+## Open Questions for #r241+
+
+1. **Delegated escrow and CPA detection:** If a capital delegator backs multiple knowers on the same coordinate, their correlated capital exposure may look like a CPA cluster. Should the CPA detector treat delegator-backed knowers as identity-distinct or flag shared delegator backing as a correlation signal?
+
+2. **γ_oracle calibration basis:** The chain-depth oracle-independence discount γ_oracle = 0.85 is reasoned but not derived. Can it be derived from empirical oracle-alignment data as oracle_alignment_cross_class(A, B) for resolved pairs, analogous to how γ for implication bonus was calibrated (#r73)?
+
+3. **Family B oracle requirement — cryptographic proof-of-disclosure as oracle_type:** For rivalrous knowledge (ZK proofs, commitment-reveal), the "oracle" at settlement verifies cryptographic disclosure, not external factual truth. Is cryptographic proof-of-disclosure a valid oracle_type under the oracle_declared exogeneity invariant?
+
+4. **P_oracle_independent estimation methodology — minimum attestation standard:** Governance attests P_oracle_independent at registration. Define the minimum attestation standard: (a) expert judgment (subjective), (b) market-implied probability from observable oracle override rates across similar oracle types, or (c) protocol-mandated oracle structural audit. Which is required at minimum?
+
+*Last updated: #r240 — 2026-04-04T14:34Z*
