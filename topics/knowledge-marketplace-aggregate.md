@@ -5125,3 +5125,270 @@ GestAlt can tolerate bugs in secondary contracts (EATManager bugs = audit gaps; 
 4. **Mechanism completeness declaration:** With 42 invariants, 5-contract v2.1 scope, full audit scope defined, and three Demo Day narratives ready, is the knowledge-marketplace mechanism design complete enough to hand off to the smart contract engineering team? What is the minimum readable engineering spec format — invariants + 10-point framework (#r148) + 5-contract launch checklist (#r160) — that constitutes a handoff-ready document?
 
 *Last updated: #r161 — 2026-04-04T00:32Z*
+
+---
+
+## #r162 Contributions — 2026-04-04T00:42Z
+
+Addresses all four open questions from #r161. Adds one net-new structural insight: the mechanism specification is complete; the remaining gap is the translation layer to an engineering specification.
+
+---
+
+**Q1 (CredibilityAggregator upgrade governance gate — multi-step with time-lock) → Four-phase gate with minimum epoch separations; emergency path reduces but cannot eliminate the hold (#r162):**
+
+The trust-root designation (#r161) requires the most conservative upgrade path of any v2.1 contract. An upgrade to the credibility_ratio update logic that introduces a subtle manipulation surface may be undetectable until settlement damage has accumulated — so the gate must be proportionately strict.
+
+**Standard upgrade path (four phases):**
+
+```
+Phase 1 — Audit:
+  Independent auditor submits scoped audit of the diff to the credibility_ratio update path.
+  Minimum duration: 2 macro-epochs (review window; cannot be shortened by governance).
+  EAT event: credibility_aggregator_audit_submitted { diff_hash, auditor_address, scope }
+
+Phase 2 — Governance vote:
+  Begins at first macro-epoch boundary after audit_submitted.
+  Passes with: standard k-of-n multisig threshold.
+  EAT event: credibility_aggregator_upgrade_voted { vote_result, upgrade_contract_address }
+
+Phase 3 — epistemically_live re-evaluation window:
+  Minimum: N_calibration macro-epochs after vote passes.
+  Condition: all active coordinate classes must maintain epistemically_live = true throughout the window.
+  Rationale: new credibility_ratio logic should be validated against live epoch data before settlement-critical deployment.
+  If any class is epistemically_live = false during the window, the window extends until all classes are live for N_calibration consecutive normal-mode epochs.
+  EAT event: credibility_aggregator_reeval_start { vote_epoch, required_window }
+
+Phase 4 — Deploy:
+  At the first epoch boundary after re-evaluation window completes.
+  Contract-enforced time-lock: pendingUpgrade state machine in CredibilityAggregator requires
+    block.timestamp >= vote_epoch + N_timelock_macro_epochs x macro_epoch_length.
+    N_timelock_macro_epochs = N_calibration (governance-settable, hard floor = 2).
+  EAT event: credibility_aggregator_deployed { old_contract_address, new_contract_address }
+```
+
+**Total minimum standard upgrade duration:** 2 (audit) + 1 (vote) + N_calibration (re-eval) macro-epochs. Default N_calibration=4: minimum 7 macro-epochs end-to-end.
+
+**Emergency path:**
+
+Emergency upgrades (e.g., live exploit in credibility_ratio update) require speed but cannot entirely bypass safety:
+
+```
+Emergency path:
+  Phase 1 (shortened): Emergency auditor review, minimum 1 macro-epoch.
+             Requires auditor_emergency_certified flag (governance pre-approved auditor list).
+  Phase 2 (elevated threshold): k-of-n emergency multisig with elevated threshold
+             (e.g., 4-of-5 vs 3-of-5 for standard; governance-set emergency_k).
+  Phase 3 (shortened): 1 macro-epoch epistemically_live hold (not N_calibration).
+  Phase 4: Deploy. Time-lock minimum = 1 macro-epoch hard floor (not removable, even in emergency).
+```
+
+**Why the 1 macro-epoch hard floor cannot be removed:** An emergency with zero time-lock means the CredibilityAggregator can be replaced atomically by governance in a single transaction. This collapses the trust-root guarantee entirely — the credibility_ratio can be silently reset or corrupted by a governance capture event with zero detection window. One macro-epoch minimum ensures at least one public EAT event (the vote) is visible before the deployment executes.
+
+**Design law (#r162):** The CredibilityAggregator time-lock minimum is 1 macro-epoch, immutable at the contract level, even for emergency fixes. The trust-root designation mandates a non-zero detection window. No governance vote, multisig configuration, or emergency parameter can set this floor to zero. (#r162)
+
+---
+
+**Q2 (IPositionRegistry adapter trust model — adapter address and time-lock) → Epoch-snapshot isolation; adapter changes are prospective only; time-lock = max(N_calibration, 4) macro-epochs (#r162):**
+
+Two failure modes for the adapter:
+1. **Broken reference (adapter address goes stale):** v2.1 clearing-class contracts are upgraded/deprecated; adapter no longer returns valid data.
+2. **Malicious replacement:** Governance replaces adapter with a fabricated one; future WED_clearing signals are compromised.
+
+**Resolution — epoch-snapshot isolation with prospective-only changes:**
+
+```
+CredibilityAggregator.computeWEDClearing(class_id, epoch_E):
+  adapter_address = CoordinateRegistry.getAdapterAddressAtEpochOpen(class_id, epoch_E)
+  return IPositionRegistry(adapter_address).getWEDClearing(class_id, epoch_E)
+```
+
+`getAdapterAddressAtEpochOpen(class_id, epoch_E)` returns the adapter address that was registered at the **start** of epoch E — snapshotted at epoch boundary, immutable for that epoch, stored in EAT. Any governance change to the adapter address takes effect only at the next epoch boundary.
+
+**Time-lock on adapter changes:**
+
+```
+adapter_change_timelock = max(N_calibration, 4) macro-epochs
+
+Governance submits adapter_change_proposal -> EAT event emitted immediately (public)
+  -> time-lock countdown begins
+  -> at T_change_epoch = proposal_epoch + adapter_change_timelock: change activates at epoch boundary
+
+During time-lock: shadow-class operators, knowers, and participants can inspect proposed adapter
+  and challenge or exit positions if the proposed adapter is suspected malicious.
+```
+
+**Stale reference (adapter goes dead):** If a v2.1 clearing class is decommissioned and its adapter stops returning valid data, CoordinateRegistry flags the class as `adapter_stale = true`. CredibilityAggregator treats `adapter_stale` classes as WED_clearing = 0 (no incentive signal; knowers stop earning from WED routing for that class but are not slashed). Governance must submit a new adapter or decommission the shadow-class.
+
+**Why not full immutability at registration:** Fully immutable adapter = no recovery path when the underlying clearing class upgrades. Time-lock = detection window + exit option. The time-lock replaces immutability with a prospective-only change window that preserves historical integrity while allowing maintenance.
+
+**Design law (#r162):** Governance-upgradeable references that serve as external data sources for S_cred must use epoch-snapshot isolation (changes prospective-only) and a time-lock of max(N_calibration, 4) epochs. Historical S_cred computations are never retroactively affected by adapter changes. (#r162)
+
+---
+
+**Q3 (Declaration queue depth, expiry, and priority on throttle recovery) → Queue cap = 2x normal-epoch-capacity; FIFO default with WED-priority opt-in on recovery; expiry at N_queue_expiry = 8 epochs (#r162):**
+
+When effective_installation_throttle < 1.0 for sustained periods, declarations pile up. Two failure modes:
+1. **Unbounded queue:** Memory/state cost grows without limit.
+2. **Stale declarations:** A declaration submitted during Zone C may be epistemically stale by the time throttle lifts — the knower's information has decayed.
+
+**Queue design:**
+
+```
+N_queue_max(class_i) = 2 x K_normal  where K_normal = installations per normal epoch (class-level)
+  Default: governance-set per class at registration; auto-derived from historical install rate post-genesis.
+
+N_queue_expiry = 8 macro-epochs  (governance-settable, bounded [4, 16])
+
+Queue entry expires if: declaration has been in queue for > N_queue_expiry macro-epochs.
+  On expiry:
+    - Escrow fully refunded (static-escrow design law: no forced lockup past knower intent)
+    - declaration_queue_expired EAT event committed
+    - Knower notified (governance-alert channel)
+  No credibility_ratio penalty for expiry: expiry is a mechanism operational event, not a knower error.
+```
+
+**Priority on throttle recovery:**
+
+Default priority: FIFO — oldest declarations processed first. Simple, fair, manipulation-resistant.
+
+Opt-in per class at registration: `queue_drain_policy = FIFO | WED_priority`. If `WED_priority`:
+
+```
+On throttle recovery (effective_installation_throttle returns to 1.0):
+  Queue drain order: descending WED_clearing(c) at recovery epoch
+  (WED_clearing re-evaluated at recovery epoch, not at submission epoch)
+  Rationale: highest-decision-impact declarations should enter the state first when capacity opens.
+```
+
+**WED_priority gaming surface:** Knowers could inflate WED_clearing(c) by registering large positions to front-run the queue. Defence: WED_clearing is already protected by real position risk (positions must be registered before T_anchor; see #r150 pre-T_anchor requirement). Inflating WED_clearing to jump the queue requires real capital at risk — economically self-limiting.
+
+**Partial-throttle epoch handling:** If throttle rate = 0.5 and queue has N entries, exactly floor(0.5 x K_normal) entries are processed per epoch from the queue. Remainder stays in queue. Queue expiry clock continues running during partial-drain epochs.
+
+**Design law (#r162):** Declaration queues for throttled installation are capacity-bounded (2x normal) and time-bounded (N_queue_expiry epochs). Expiry is a mechanism safety valve, not a knower penalty. Queue drain default is FIFO; WED-priority is opt-in for classes where decision-impact ordering is valued over fairness. (#r162)
+
+---
+
+**Q4 (Mechanism completeness declaration and handoff format) → Mechanism specification is complete for v2.1 handoff; engineering spec requires a separate translation pass; canonical handoff format defined (#r162):**
+
+**Completeness declaration:**
+
+The knowledge-marketplace mechanism design is **complete as a mechanism specification** for GestAlt v2.1. After 162 runs, the following are fully specified:
+- All 42 invariants (now 46 with #r162) with source run provenance
+- 10-point primitive framework (#r148, updated through #r162)
+- 5-contract v2.1 scope with attack surface analysis and audit priority (#r160, #r161)
+- v2.1 production readiness gates (6-gate checklist, #r160)
+- Governance parameter registry (all bounded primitives derived throughout #r1-#r162)
+- Three Demo Day narratives (#r160/Q3, #r161/Q3)
+- CLEARING_MODE and DISCOVERY_MODE specifications with regime split (#r149)
+- Settlement Freeze Protocol and oracle-authority/attestor duality (#r151)
+- Complete escrow taxonomy (5-component, #r146)
+- Upgrade path and cross-version architecture (#r160, #r162)
+
+**The gap between mechanism spec and engineering spec:**
+
+The aggregate document is a **mechanism specification** — it defines what the system must do, its invariants, its state transitions, and its attack surfaces. An engineering team needs an **engineering specification** — how to implement: ABI-level interfaces, Solidity storage layouts, test vectors, and oracle registration formats.
+
+The translation from mechanism spec to engineering spec requires:
+1. Deriving function signatures and parameter types from each contract's role (#r160/Q2)
+2. Specifying Solidity storage layouts for each contract (EAT Merkle tree, TOWL FIFO, credibility_ratio rolling window)
+3. Generating test vectors for log-score edge cases (zero probability, extreme stake sizes, rounding)
+4. Specifying the oracle registration format and governance approval process for oracle_address
+
+This translation pass is estimated at ~1 day of focused engineering specification work, given the mechanism spec's completeness.
+
+**Canonical handoff document format (minimum viable):**
+
+```
+GestAlt v2.1 Engineering Handoff Pack:
+
+Section 1 — Mechanism Spec Index (3 pages)
+  - 46 invariants with run references (from this aggregate)
+  - Governance parameter registry: all bounded params with defaults and derivation
+  - 6-gate production readiness checklist
+
+Section 2 — 10-Point Primitive Framework (5 pages)
+  - From #r148 (base primitive, state model, credibility model, roles,
+    settlement, attack surface, LMSR comparison, mechanism sketch,
+    failure mode, surviving variant)
+
+Section 3 — 5-Contract Specifications (10 pages)
+  - Per contract: role, key invariants, primary attack surface,
+    cross-contract dependencies, upgrade governance gate
+  - T_anchor StateFreeze call ordering diagram
+
+Section 4 — Parameter Registry (3 pages)
+  - All governance-settable parameters: name, bounded range, default,
+    derived-from relationship, governing invariant
+
+Section 5 — Audit Briefing (2 pages)
+  - Three-contract primary audit scope (CredibilityAggregator,
+    ClaimEscrow, SettlementEngine) with four highest-risk code paths
+
+Total: ~23 pages from existing aggregate content. No new mechanism design required.
+```
+
+**Mechanism design loop status:** The knowledge-marketplace thread is at a **natural handoff boundary** after #r162. Future runs should address:
+(a) adversarial stress-testing of the v2.1 minimal scope under novel attack models
+(b) v2.2 discovery-mode and shadow-class mechanism extensions
+(c) specific mechanism gaps surfaced by the engineering team during spec translation
+
+**Design law (#r162):** A mechanism specification is complete when: (1) all invariants are stated with provenance; (2) the 10-point primitive framework is fully answered; (3) the minimal viable implementation scope is bounded; (4) the three Demo Day narratives are ready; (5) the audit scope is defined; (6) the upgrade governance gates are specified. The knowledge-marketplace mechanism satisfies all six criteria as of #r162. (#r162)
+
+---
+
+## Net-New Structural Insight: The Mechanism-Engineering Gap as a First-Class Design Artifact (#r162)
+
+After 162 runs, the autoresearch loop has produced a mechanism specification of unusual completeness. The key architectural observation is that **mechanism completeness and engineering readiness are distinct properties** — and conflating them is the most common cause of failed protocol deployments.
+
+**Mechanism completeness** (this document): all invariants hold, all attack surfaces identified, all state transitions specified in logical terms.
+
+**Engineering readiness**: all interfaces specified, all storage layouts determined, all edge-case behaviours codified in test vectors, all oracle integrations validated.
+
+**Why the gap matters for GestAlt v2.1:**
+
+The three-contract primary audit scope (#r161/Q4) can only be audited against an engineering specification, not a mechanism specification. An auditor who receives this aggregate document and a GitHub repository will spend significant time inferring implementation choices that the mechanism spec leaves open. The 1-day engineering spec translation pass is not optional — it is the prerequisite for the audit to be productive.
+
+**Operational recommendation:** Before the audit engagement begins, Gaurav or Sarthak should schedule a focused 1-day session with the smart contract engineering team. Input: this aggregate document (Sections 1-5 of the handoff pack). Output: engineering spec with ABIs, storage layouts, and test vectors. Audit engagement begins after the engineering spec is reviewed and signed off.
+
+---
+
+## Structural Synthesis: Complete Mechanism Design Closure (#r162)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| CredibilityAggregator upgrade gate | 4-phase; 1 macro-epoch hard floor on time-lock; emergency reduces but cannot eliminate | Trust root = minimum detection window always enforced |
+| Adapter trust model | Epoch-snapshot isolation; prospective-only changes; time-lock = max(N_calibration, 4) | Historical S_cred immutable against adapter changes |
+| Declaration queue | 2x capacity cap; N_queue_expiry=8; FIFO default; WED-priority opt-in on recovery | Queue bounded in size and time; expiry not penalty |
+| Mechanism completeness | Complete as mechanism spec; engineering spec = 1-day translation pass; handoff format defined | Mechanism spec and engineering spec are distinct; gap is explicit and bounded |
+
+---
+
+## Cumulative Invariants (additions through #r162)
+
+**Invariant #43 (#r162):** CredibilityAggregator time-lock minimum = 1 macro-epoch, enforced at the contract level. No governance configuration can set this to zero.
+
+**Invariant #44 (#r162):** IPositionRegistry adapter changes are prospective-only (epoch-snapshot isolation) with time-lock = max(N_calibration, 4) epochs. Historical S_cred computations are never retroactively affected.
+
+**Invariant #45 (#r162):** Declaration queues are bounded: N_queue_max = 2x normal epoch capacity; N_queue_expiry = 8 macro-epochs. Expiry triggers full escrow refund and is not a credibility_ratio penalty event.
+
+**Invariant #46 (#r162):** A mechanism specification is complete when: invariants stated with provenance; 10-point framework answered; minimal viable scope bounded; Demo Day narratives ready; audit scope defined; upgrade gates specified. The knowledge-marketplace mechanism satisfies all six as of #r162.
+
+---
+
+## Status: Mechanism Specification Complete (#r162)
+
+The knowledge-marketplace mechanism is **specification-complete** for GestAlt v2.1.
+
+**Remaining work before v2.1 launch (not mechanism research):**
+1. Engineering spec translation pass (~1 day, engineering team + this document)
+2. Three-contract primary audit (CredibilityAggregator + ClaimEscrow + SettlementEngine, together)
+3. Secondary audit (CoordinateRegistry + EATManager)
+4. v2.1 production readiness gate verification (6-gate checklist, #r160)
+5. Demo Day narrative selection (Sarthak: three variants available from #r160/Q3 and #r161/Q3)
+
+**Future autoresearch on this topic should be scoped to:**
+- Adversarial stress-testing of v2.1 minimal scope under novel attack models
+- v2.2 extension design (discovery mode, shadow-classes, implication chains, archive tiers)
+- Specific mechanism gaps surfaced by the engineering team during spec translation
+
+*Last updated: #r162 — 2026-04-04T00:42Z*
