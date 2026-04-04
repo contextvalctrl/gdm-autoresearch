@@ -5592,3 +5592,164 @@ All five are v2.1-relevant. Four require additions to the v2.1 engineering spec 
 4. **Remaining adversarial surface for #r164:** Four attack families not yet evaluated: (a) oracle registration attacks (governance approves a malicious oracle address); (b) EAT Merkle root manipulation; (c) credibility_ratio integer precision attacks (log-score rounding exploitation); (d) TOWL capacity inflation via phantom escrow registration. Recommend #r164 addresses these four.
 
 *Last updated: #r163 — 2026-04-04T00:52Z*
+
+---
+
+## #r164 Contributions — 2026-04-04T01:02Z
+
+**Phase: Adversarial stress-testing continued. Addresses all four open questions from #r163, then evaluates the four remaining attack families.**
+
+---
+
+**Q1 (γ_corr cluster detection — governance commit latency) → Provisional new-address floor + SLA-gated governance update; latency gap covered (#r164):**
+
+Cluster detection is off-chain (gas-prohibitive on-chain). Until governance commits a γ_corr update, a newly formed adversarial cluster operates at γ_corr = 1.0 — full S_cred weight. The gap between cluster formation and γ_corr update is the attack window.
+
+**Resolution — two-layer defence:**
+
+Layer 1 (contract-enforced, no governance latency):
+```
+γ_corr_provisional(a) = min(1.0, log(1 + resolved_claims_a) / log(1 + N_track_threshold))
+N_track_threshold = N_calibration  (default 4)
+```
+New addresses with fewer than N_track_threshold resolved claims have a provisional γ_corr less than 1.0 — decaying from ~0 to 1.0 as the track record grows. This is automatic and doesn't require governance action. A fresh Sybil account with no history contributes near-zero S_cred weight regardless of stake — consistent with the credibility model (#r1).
+
+Layer 2 (governance SLA for cluster update):
+```
+cluster_detection_sla = 2 macro-epochs from EAT S_cred_concentration_index alert to governance γ_corr commit
+If SLA breached: auto-throttle S_cred weight contributions from unvetted-cluster addresses to γ_corr_floor = 0.5
+```
+The provisional formula (Layer 1) handles cold-start Sybil attacks. The SLA (Layer 2) handles the narrower window where established addresses coordinate after building individual track records. (#r164)
+
+---
+
+**Q2 (T_anchor_lock eliminates T_grace window?) → Substantially yes; T_grace window is now residual-only; collapses to the N_lock_epochs minimum (#r164):**
+
+With T_anchor_lock = T_anchor − N_lock_epochs, position registration closes at T_anchor_lock. SFP challenge eligibility is anchored to T_anchor_lock. The T_grace window from #r151/Q3 was introduced for the case where T_anchor fired unexpectedly early.
+
+T_anchor_lock makes the closing event predictable by N_lock_epochs of advance notice. "Unexpected early T_anchor" was the threat; T_anchor_lock with N_lock_epochs ≥ 1 eliminates it. T_grace post-T_anchor is superseded. (#r164)
+
+---
+
+**Q3 (S_cred commit-reveal for v2.1?) → Not required; T_anchor_lock is sufficient; deferred to v2.2 (#r164):**
+
+After T_anchor_lock, position registration is closed. S_cred convergence observable during [T_anchor_lock, T_anchor] cannot be used to register new positions. The only remaining channel is secondary-market trading — an external market microstructure problem, not a mechanism design problem.
+
+Commit-reveal adds: (a) delayed unknower epistemic access; (b) delayed challenger detection; (c) significant contract complexity. Benefits do not exceed costs for v2.1 CLEARING_MODE. Deferred to v2.2 discovery-mode evaluation. (#r164)
+
+---
+
+**Q4 (Four remaining adversarial surfaces) — evaluated below (#r164):**
+
+---
+
+#### A6 — Oracle Registration Attack
+
+**Attack:** Governance approves a malicious oracle_address returning adversary-controlled values at T_anchor. Settlement_price is fabricated; positions settle incorrectly.
+
+**Existing defence:** k-of-n multisig for oracle registry. Standard governance attack vector.
+
+**Additional v2.1 defence — expected_range + oracle_anomaly auto-SFP:**
+
+```
+oracle_registration includes: expected_range = [min_value, max_value]  (governance-declared)
+oracle_anomaly fires if: oracle_resolution outside expected_range
+  → auto-opens SFP challenge window
+  → governance alert: oracle_anomaly_detected
+  → ≥ 2 consecutive anomalies: oracle_address flagged for mandatory governance review
+```
+
+Expected-range catches extreme manipulation (a malicious oracle returning 0 or 1e18 for a financial rate). (#r164)
+
+---
+
+#### A7 — EAT Merkle Root Manipulation
+
+**Attack:** Compromised protocol operator submits a fraudulent Merkle root to Ethereum calldata; malicious state survives audit.
+
+**Additional v2.1 defence — multi-attester Merkle root commits:**
+
+```
+merkle_root_commit(epoch_E):
+  ≥ N_attester independent attester nodes sign root
+  Ethereum commitment includes: root + attester_signatures[]
+  N_attester default = 3 (governance-settable, hard minimum)
+  fraud_proof path: any participant can submit Merkle inconsistency proof within N_compact_grace window
+```
+
+Requires compromising N_attester independent parties — meaningfully harder than single-operator. (#r164)
+
+---
+
+#### A8 — Log-Score Precision Attack
+
+**Attack:** Exploit fixed-point arithmetic rounding discontinuities in on-chain log-score computation to build credibility_ratio faster than honest calibration.
+
+**Assessment:** Implementation-level attack, not mechanism-level. Correct defence is rigorous fixed-point arithmetic audit — already the primary target of the three-contract primary audit scope (#r161/Q4). Invariant #42 covers this. No new spec addition needed. (#r164)
+
+---
+
+#### A9 — TOWL Capacity Inflation via Phantom Escrow
+
+**Attack:** Register large escrow on coordinates with insider oracle knowledge — effectively unlosable positions that inflate Zone A capacity without genuine solvency backing.
+
+**v2.1 defence — TOWL_concentration_anomaly flag:**
+
+```
+post_resolution_TOWL_audit(epoch_E):
+  if actual_slash_rate(class_i) < ε_floor (e.g., 0.01) for ≥ N_audit_window epochs for any large knower:
+    flag: TOWL_concentration_anomaly
+    governance review: genuine expertise vs. insider advantage?
+```
+
+Genuine experts have non-zero loss rates. Near-zero long-run loss rate on large positions is an informational governance trigger, not automatic action. (#r164)
+
+---
+
+### Adversarial Stress-Test Summary: Nine Attack Families
+
+| Attack | Covered? | v2.1 spec addition |
+|--------|----------|--------------------|
+| A1 — Credibility laundering | Partial → fixed | Provisional γ_corr formula; SLA-gated governance |
+| A2 — Zone C timing exploit | No → fixed | zone_at_T_anchor; SFP immunity at anchor |
+| A3 — Pre-resolution withdrawal | Spec gap → fixed | Escape paths closed; Invariant #47 |
+| A4 — Oracle timing arbitrage | Partial → fixed | T_anchor_lock; Invariant #49; no commit-reveal v2.1 |
+| A5 — Flood-challenge pool drain | Partial → fixed | Rate limit; γ_corr_challenger; Invariant #50 |
+| A6 — Oracle registration attack | Partial → hardened | expected_range; oracle_anomaly auto-SFP; Invariant #52 |
+| A7 — EAT Merkle root manipulation | Partial → hardened | Multi-attester sigs; N_attester ≥ 3; Invariant #53 |
+| A8 — Log-score precision attack | Yes (audit scope) | None; confirmed by Invariant #42 |
+| A9 — Phantom escrow inflation | No → flagged | TOWL_concentration_anomaly; Invariant #54 |
+
+**Net new v2.1 contract additions from #r163–#r164:**
+
+1. **CredibilityAggregator:** Provisional γ_corr formula; S_cred_concentration_index per epoch; γ_corr_challenger floor 0.5; R_max challenge rate limit.
+2. **SettlementEngine:** zone_at_T_anchor EAT field; SFP Zone C immunity when zone_at_T_anchor ∈ {A,B}; oracle_anomaly auto-SFP trigger.
+3. **ClaimEscrow:** Escape path enum closed; voluntary withdrawal prohibited.
+4. **CoordinateRegistry:** T_anchor_lock (N_lock_epochs ≥ 1); position registration gate; expected_range oracle field; TOWL_concentration_anomaly; WED_clearing from T_anchor_lock snapshot.
+5. **EATManager:** attester_signatures on Merkle commits; N_attester ≥ 3; fraud_proof path.
+
+---
+
+## Cumulative Invariants (additions through #r164)
+
+**Invariant #51 (#r164):** N_lock_epochs ≥ 1 is a hard contract floor. T_anchor_lock must precede T_anchor by at least one macro-epoch. T_grace post-T_anchor is superseded. (#r164)
+
+**Invariant #52 (#r164):** oracle_anomaly fires when oracle_resolution falls outside expected_range. Auto-opens SFP challenge window; ≥2 consecutive anomalies trigger mandatory governance oracle review. (#r164)
+
+**Invariant #53 (#r164):** EAT Merkle root commits require ≥ N_attester independent attester signatures (minimum 3). Single-operator Merkle root authority is prohibited. (#r164)
+
+**Invariant #54 (#r164):** actual_slash_rate < ε_floor over N_audit_window epochs for a large knower triggers TOWL_concentration_anomaly governance review. Informational; not punitive. (#r164)
+
+---
+
+## Open Questions for #r165+
+
+1. **Provisional γ_corr and established-address coordination:** The provisional formula covers cold-start Sybil attacks; established addresses (resolved_claims_a >> N_track_threshold) retain γ_corr = 1.0. Does S_cred_concentration_index + governance SLA adequately cover established-address coordination, or is a persistent cluster-correlated penalty needed?
+
+2. **expected_range statistical tightening:** Hard governance-set bounds can be gamed by keeping oracle output just inside the range. Should expected_range be replaced with a statistical envelope (e.g., 3-sigma from historical oracle data) updated per epoch?
+
+3. **N_attester set management — rotation and failure:** Who selects attesters? How are offline attesters replaced? Requires a governance-managed attester registry with N_attester_min = 3, N_attester_target = 5, and a rotation SLA specification.
+
+4. **MEV/block-ordering attack on StateFreeze transaction (#r160/Q2):** A validator controlling transaction ordering could delay StateFreeze to insert a last-second S_cred update before T_anchor capture. Should StateFreeze be a protocol-reserved transaction slot, or should v2.1 tolerate this as a residual miner-extractable-value risk?
+
+*Last updated: #r164 — 2026-04-04T01:02Z*
