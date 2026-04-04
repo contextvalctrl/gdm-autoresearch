@@ -1,3 +1,46 @@
+# Knowledge Marketplace Mechanism — New Thread Addendum
+
+## Run Log Addendum
+- **#r2** — 2026-04-04T17:32Z — Paused MatchingEngine line and restarted knowledge-marketplace mechanism design thread. Reframed the primitive as capped, escrow-bonded credible-information transfer; added unresolved-truth settlement branch; performed 3-family viability triage.
+
+## 1. Base primitive — what exactly is being exchanged?
+The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
+
+## 2. State model — what is the global state vector and update rule?
+Global state is still `S = {s_i}` (domain posterior/interval objects), but `S` now updates by **bounded fusion of claims** into epoch batches, then **oracle correction** with confidence weighting. One epoch’s claims cannot instantly retune the same-epoch payout; state-influencing updates and query settlement are separated by the mechanism clock.
+
+## 3. Credibility model — how does stake convert into trust?
+Stake becomes *weight* only through: (a) bounded function of escrow, (b) prior calibration, (c) recent consistency, (d) anti-correlation/identity penalties. The key conversion is loss: miscalibration destroys escrow and reduces future weight, so cheap lying is no longer affordable.
+
+## 4. Market roles — askers/knowers vs bidders/unknowers?
+**Askers/knowers** post claims and back them with escrow. **Bidders/unknowers** buy access to state updates (not hedge positions). Payment flows from bidder pool to validated claimers; oracle is a separate truth-lane, and protocol collects only predefined fees.
+
+## 5. Settlement — full truth vs partial truth?
+If truth resolves: apply bounded proper scoring and release/forfeit escrow proportionally. If partially observed: score on observed functionals first, defer unresolved components with haircut. If unresolved indefinitely: unlock principal minus fixed protocol fee; do not mint future credibility from unresolved evidence.
+
+## 6. Attack surface
+Retained: bluffing, Sybil, wash trades, collusion, oracle gaming, cheap talk, and free-riding. Hardenings: commit-reveal windows, cluster penalties, cap on correlation-based boost, challenge/dispute, and explicit unresolved-claim branch. New correction: unresolved branch cannot silently reward credibility.
+
+## 7. Why better/worse than LMSR/orderbooks/batch auctions?
+Better than LMSR/orderbooks when truth quality matters more than immediacy and depth is thin: influence tied to calibration, not raw buy-side power. Worse in hard-observability domains and early bootstrap (needs resolved truth and query willingness).
+
+## 8. Simplest viable mechanism sketch
+(1) claim-commit epoch: knower locks escrow and submits claim signal. (2) reveal & fuse epoch: bounded credibility-weighted update to `S` and Merkle commitment. (3) query epoch: unknowers buy authenticated state snapshots. (4) resolve epoch: score claims, pay/penalize escrow, update `cred`. Optional fallback query fee split by freshness.
+
+## 9. Strongest failure mode
+If no reliable resolving process, the system becomes costly signaling and the “credibility” metric becomes manipulable narrative rank. This is structural, not implementation-only.
+
+## 10. Best surviving variant if raw idea fails
+Keep **credibility-gated continuous price layer** as companion: traditional orderbook/batch matching for liquidity and derivatives use, but order and quote impact must be capped by credibility and bounded escrow-backed accountability. Direct marketplace survives only where truth can be observed/reconciled.
+
+### Candidate families tested in this run
+- **A) direct knowledge-market**: kept as base, with unresolved-truth safety branch
+- **B) credibility-gated orderbook**: kept as robust production companion
+- **C) reputation-only auctions**: rejected (identity inflation, no downside)
+
+(ref: #r1, #r185, #r255)
+
+---
 # Knowledge Marketplace Mechanism — Aggregate Document
 
 *Auto-maintained by Richard (ValCtrl). Do not edit manually.*
