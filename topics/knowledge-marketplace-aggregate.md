@@ -18553,3 +18553,184 @@ High-value COMMITTEE classes (WED > WED_institutional_threshold): committee_s_cr
 4. **Multi-committee oracle and credibility_ratio model:** If k_independent_committees vote and their votes are medianised, should each committee (as a unit) have its own credibility_ratio tracked? Or is the committee tracked as an oracle source (with credibility at the oracle-type level, not the committee level)?
 
 *Last updated: #r223 — 2026-04-04T11:12Z*
+
+---
+
+## #r224 Contributions — 2026-04-04T11:22Z
+
+Addresses all four open questions from #r223.
+
+---
+
+**Q1 (CPA detection threshold calibration — false-positive basis for 0.70) → Binomial-derived per-class threshold; absolute floor N_cluster_min = 5; 0.70 default recovers from ε_T3 ≈ 0.10 at N_cluster ≈ 10–15 (#r224):**
+
+The 0.70 fixed threshold from #r223 was an intuitive choice. This run derives it from a false-positive constraint.
+
+**Null hypothesis (no CPA, just correlated bad luck):** N_cluster knowers from the same lineage class each have independent error probability ε_T3. Under the null:
+
+```
+E[same_cluster_wrong_fraction]   = ε_T3
+Var[same_cluster_wrong_fraction] = ε_T3(1 − ε_T3) / N_cluster
+```
+
+For acceptable false-positive rate α_fp = 0.001 (one-in-a-thousand chance of false CPA trigger):
+
+```
+CPA_threshold(N_cluster, ε_T3) =
+    max(
+      0.50,   // floor: never trigger when wrong_fraction ≤ 50%
+      ε_T3 + z_{0.999} × sqrt(ε_T3 × (1 − ε_T3) / N_cluster)
+    )
+z_{0.999} ≈ 3.09
+```
+
+**Calibration table (ε_T3 = 0.10, α_fp = 0.001):**
+
+| N_cluster | CPA_threshold | Note |
+|---|---|---|
+| 5 | max(0.50, 0.10 + 3.09 × 0.134) = max(0.50, 0.51) = 0.51 | floor barely binding |
+| 10 | 0.10 + 3.09 × 0.095 = 0.39 → floor = 0.50 | floor binding; threshold = 0.50 |
+| 15 | 0.10 + 3.09 × 0.078 = 0.34 → floor = 0.50 | floor binding |
+| 20 | 0.10 + 3.09 × 0.067 = 0.31 → floor = 0.50 | floor binding |
+| 50 | 0.10 + 3.09 × 0.042 = 0.23 → floor = 0.50 | floor binding; large clusters easier to detect |
+
+The 0.70 default from #r223 is conservative — approximately 6 standard deviations above the null mean for N_cluster = 10 — a near-zero false-positive rate. The principled boundary is the floor = 0.50 with α_fp = 0.001.
+
+**Minimum cluster size gate:** Below N_cluster_min = 5, even wrong_fraction = 1.0 is plausibly noise for ε_T3 ≤ 0.20. CPA_penalty never fires for N_cluster < 5. Logged as `cpa_cluster_too_small` diagnostic.
+
+**Updated CPA trigger formula (#r224, supersedes #r223 0.70 threshold):**
+
+```
+CPA_trigger(cluster_i, epoch_resolution):
+  IF N_cluster(i) < N_cluster_min (=5): skip (log diagnostic only)
+  ELSE IF same_cluster_wrong_fraction(i) > CPA_threshold(N_cluster(i), ε_T3_class):
+    emit CPA_penalty event
+```
+
+**Governance interface addition:** (ε_T3_class, α_fp_CPA=0.001, N_cluster_min=5) → CPA_threshold derived per-class. ε_T3_class is already a registration parameter from #r160/Q4. No new primitive required. (#r224)
+
+---
+
+**Q2 (S_cred blinding on public blockchains — commit-reveal is the correct mechanism; one-epoch lag is insufficient) → Commit-reveal for COMMITTEE oracle votes; extension of existing claim submission pattern (#r224):**
+
+**Why one-epoch lag fails:** S_cred is on-chain and changes incrementally. A committee member observing prior-epoch S_cred has a strong proxy for current-epoch S_cred: `S_cred_current ≈ S_cred_{t-1} × (1 − decay) + new_claim_contribution`. For stable coordinate classes with low claim volume, the proxy is accurate. Endogeneity feedback persists at reduced but non-zero level.
+
+**Resolution — commit-reveal for COMMITTEE oracle votes:**
+
+The mechanism already uses commit-reveal for knower claims (#r71 round lifecycle). The identical pattern applies:
+
+```
+T_committee_commit:    committee_member submits hash(vote_distribution || nonce) on-chain
+                       BEFORE T_epoch_S_cred_publication
+T_epoch_S_cred_publication: S_cred for epoch t published (Merkle root committed to EAT)
+T_committee_reveal:   committee_member reveals (vote_distribution, nonce)
+                      Protocol verifies hash match; vote recorded with T_committee_commit proof
+```
+
+**Cryptographic guarantee:** Commitment before S_cred publication is verifiable on-chain. A committee member who committed at T_committee_commit cannot have incorporated S_cred published after that timestamp. No trust assumptions required.
+
+**Residual prior-epoch exposure:** Commit-reveal closes the same-epoch feedback loop. Committee members can still observe S_cred_{t-1}. For stable coordinate classes where `|S_cred_t − S_cred_{t-1}| < δ_stability` (slow-changing), the requirement is stricter: committee must commit at least 2 macro-epochs before S_cred publication (two-epoch prior-lag). `δ_stability = median epoch-over-epoch S_cred change over N_calibration epochs`. Governance-registered per class.
+
+**Non-COMMITTEE oracle types:** Automated oracles (price feeds, on-chain event reporters) do not read S_cred before reporting. Commit-reveal applies to COMMITTEE oracle_type only. (#r224)
+
+---
+
+**Q3 (GestAlt's bid-ask spread equivalent — does EQ market collapse at self_computation_cost → 0?) → q_fee collapses to operational floor; q_bonus survives as warranty-transfer and demand-signal primitive; EQ is a quality-warranty market, not an information-access market (#r224):**
+
+**EQ cost structure:**
+
+```
+unknower_EQ_cost = q_fee + E[q_bonus] × Pr(within threshold)
+self_computation_cost = RPC_cost + parse_time + EAT_expertise_cost
+```
+
+As EAT tooling improves and S_cred computation becomes commoditised, `self_computation_cost → 0` for sophisticated unknowers. q_fee becomes pure friction.
+
+**Market response: q_fee → operational floor.** The equilibrium q_fee settles at `max(gas_cost + protocol_minimum, ε_fee)`. Market competition drives q_fee down. This is correct: q_fee was always secondary; q_bonus is primary.
+
+**Why q_bonus survives even at self_computation_cost = 0:**
+
+q_bonus is not a fee for information access. It serves two functions self-computation cannot replicate:
+
+1. **Demand revelation (D(c) signalling):** Locking q_bonus conditional on accuracy reveals the unknower's quality-sensitivity to knowers. An unknower who self-computes sends no such signal — knowers have no reason to invest more heavily in that coordinate.
+
+2. **Quality warranty transfer:** q_bonus is paid ONLY if S_cred resolves within q_quality_threshold. Self-computation provides no warranty. For institutional users where settlement depends on state accuracy, the warranty has real economic value even at zero self_computation_cost.
+
+**EQ market equilibrium at self_computation_cost → 0:**
+
+Market concentrates on q_bonus. q_fee → operational floor. The EQ spread analogue:
+
+```
+EQ_spread ≈ q_bonus × Pr(within threshold) − q_fee ≈ q_bonus × σ_resolve
+```
+
+**Design law (#r224):** EQ q_fee is an operational friction; q_bonus is the value-creating primitive. Protocol governance should minimise q_fee friction and maximise q_bonus expressiveness. EQ is a warranty-transfer and demand-signal market, not an information-access market. Setting q_fee high to capture information rents is economically wrong and drives sophisticated unknowers to self-computation. (#r224)
+
+---
+
+**Q4 (Multi-committee oracle credibility_ratio — per-committee or per-oracle-type) → Per-committee_id tracking; credibility-weighted median at resolution; oracle-credibility update path (#r224):**
+
+**Per-committee_id is correct.** The multi-committee pattern was introduced to differentiate committee quality (#r223 Invariant #301). Shared credibility_ratio across committees defeats the anchoring-bias detection mechanism.
+
+**Per-committee_id credibility_ratio:**
+
+```
+committee_id: registered at class registration
+  oracle_address may host multiple committee_ids
+  each committee_id: credibility_ratio_committee, n_resolutions_committee, log_score_history
+
+credibility_weighted_median at oracle resolution:
+  votes v_1..v_k with weights w_i = C_committee_i × stake_proxy_i
+  settlement_oracle_value = argmin_x Σ w_i × |v_i − x|
+
+stake_proxy_i: governance base weight = 1.0 if no explicit escrow posted
+```
+
+**Credibility_ratio update for committees:** At oracle resolution, each committee's vote is scored against ground truth via the `w_override` path (#r152, #r153) — oracle credibility, not knower log-score. Committees are oracle sources, not knowers; the oracle-authority/knower-attestor duality (#r151) is preserved.
+
+**New entrant committee:** Starts at neutral weight (credibility_ratio_committee = 0.5). First N_calibration resolutions bootstrap the track record.
+
+**Anchoring-bias detection interaction:** A committee with α_ind → 1 (always votes near S_cred_{t-1}) shows `|v_i − S_cred_{t-1}|` small but `|v_i − truth|` large. Per-committee credibility_ratio degrades over time regardless of short-term S_cred alignment. This is the correct de-weighting mechanism. (#r224)
+
+---
+
+## Structural Synthesis: CPA, Blinding, EQ Economics, Committee Credibility (#r224)
+
+| Thread | Resolution | Law |
+|---|---|---|
+| CPA threshold | Binomial-derived: max(0.50, ε_T3 + 3.09×σ_cluster); N_cluster_min=5; supersedes 0.70 | False-positive constraint governs; not governance fiat |
+| S_cred blinding | Commit-reveal before T_epoch_S_cred_publication; two-epoch lag for stable classes | Cryptographic commitment is the only complete blinding |
+| EQ spread collapse | q_fee → operational floor; q_bonus survives as warranty + demand signal | EQ is warranty-transfer market; minimise q_fee friction |
+| Multi-committee credibility | Per-committee_id; credibility-weighted median; w_override update | Per-committee accountability enables anchoring-bias de-weighting |
+
+---
+
+## Cumulative Invariants (#r224)
+
+**Invariant #302 (#r224):** CPA trigger threshold is per-class-derived: max(0.50, ε_T3 + z_{0.999}×sqrt(ε_T3(1-ε_T3)/N_cluster)). N_cluster < N_cluster_min (=5) → trigger suppressed (diagnostic only). Supersedes fixed 0.70. Parameters (ε_T3_class, α_fp_CPA=0.001, N_cluster_min=5) governance-settable.
+
+**Invariant #303 (#r224):** COMMITTEE oracle votes require commit-reveal: hash commitment before T_epoch_S_cred_publication; reveal after. For stable coordinates (|ΔS_cred| < δ_stability), two-epoch prior-lag required. Timestamp-only is insufficient. Non-COMMITTEE automated oracles exempt.
+
+**Invariant #304 (#r224):** EQ q_fee → operational floor at self_computation_cost → 0. q_bonus is the value-creating primitive: warranty-transfer + demand-signal. EQ is a quality-warranty market, not an information-access market. Protocol minimises q_fee friction; min_q_bonus_ratio is the key governance parameter.
+
+**Invariant #305 (#r224):** Multi-committee credibility_ratio is per-committee_id. Credibility-weighted median at resolution. New committees start at neutral weight (0.5). Updates via w_override path. Anchoring-bias detection operates through per-committee credibility_ratio degradation over time.
+
+---
+
+## Run Log Update
+
+- **#r224** — 2026-04-04T11:22Z — CPA threshold derived from binomial false-positive constraint (max(0.50, ε_T3 + 3.09×σ_cluster)); supersedes fixed 0.70. COMMITTEE oracle S_cred blinding requires commit-reveal (timestamp lag insufficient); two-epoch lag for stable classes. EQ market: q_fee → operational floor; q_bonus = warranty-transfer + demand-signal; EQ ≠ information-access. Multi-committee credibility_ratio per-committee_id; credibility-weighted median; w_override update; anchoring-bias via per-committee degradation. Invariants #302–#305.
+
+---
+
+## Open Questions for #r225+
+
+1. **CPA penalty magnitude calibration:** The retroactive `credibility_ratio_cluster_penalty` for the resolved wrong cluster is not yet formally sized. How large should it be relative to a single normal log-score update for a wrong claim? Should it scale with N_cluster (larger clusters cause more epistemic harm) or be fixed?
+
+2. **Commit-reveal window length for COMMITTEE votes:** The commit window must close before T_epoch_S_cred_publication. What is the correct minimum T_committee_commit_window_length relative to macro-epoch length, balancing committee consensus latency against blinding efficacy?
+
+3. **EQ q_bonus minimum ratio and δ_stability coupling:** For stable coordinate classes, σ_resolve may be artificially high — easy to be within q_quality_threshold by stating last epoch's value. Should min_q_bonus_ratio use a stability-adjusted σ_resolve to prevent easy-accuracy gaming?
+
+4. **Committee credibility_ratio and epistemically_live threshold:** Should `epistemically_live` for COMMITTEE classes require (a) all k_committees_required have credibility_ratio > θ_committee_min, OR (b) at least k_committees_required committees exist regardless of current credibility_ratio?
+
+*Last updated: #r224 — 2026-04-04T11:22Z*
