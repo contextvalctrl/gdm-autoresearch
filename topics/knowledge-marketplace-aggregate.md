@@ -10550,3 +10550,197 @@ All five handoff documents are specification-complete and committed to `gestalt-
 ## Run Log Update
 
 - **#r186** — 2026-04-04T04:42Z — Engineering handoff delivery: all five v2.1 docs written to gestalt-contracts/docs/; EATManager keeper architecture (keeper-failure vs DA outage distinction); candidatePrice canonical formula confirmed; PositionToken WED_clearing view added to CoordinateRegistry spec; documents committed and pushed. Invariant #136. Mechanism design phase closed.
+
+---
+
+## #r187 Contributions — 2026-04-04T04:52Z
+
+**Phase: First-principles audit of the mechanism after 186 engineering runs. Task: detect concept drift, surface buried flaws, identify what the 186-run engineering layer obscured.**
+
+---
+
+### The Drift Question
+
+186 runs produced 136 invariants, 5 contracts, an Arweave backup strategy, and a 23-page handoff spec. The founding commitment was:
+
+> *"Capital is not mainly for side-betting on crowd belief; it is a credibility transfer mechanism."*
+
+Is that still true in v2.1? This run tests it.
+
+---
+
+### Finding 1: The Conserved Quantity Has Drifted in CLEARING_MODE (#r187)
+
+**Original WED definition (#r69):**
+```
+WED = Σ_c D(c) × A(c) × P(c)
+```
+where D(c) is *decision-loss* — an epistemic, not financial, quantity. Capital is its proxy.
+
+**WED in CLEARING_MODE (#r149):**
+```
+WED_clearing(c) = Σ_positions |max_loss_if_wrong|
+```
+
+This is **capital-denominated WED**. When D(c) = max_loss_if_wrong, the distinction between epistemic debt and financial exposure collapses. CLEARING_MODE WED is just "total open interest at risk" — a standard financial market quantity, not a novel epistemic one.
+
+**Regime distinction (explicit for first time):**
+
+| Mode | Conserved quantity | Capital's role | Novel vs LMSR |
+|------|-------------------|-----------------|----|
+| DISCOVERY_MODE | Epistemic debt (WED = D×A×P, non-financial D) | Proxy for conviction | High — D(c) is private; capital reveals it imperfectly |
+| CLEARING_MODE | Financial exposure (WED = Σ max_loss) | IS the quantity | Low — mechanism is LMSR + credibility filter |
+
+**Net-new (#r187):** The founding "capital is a credibility proxy, not the signal" claim holds only in DISCOVERY_MODE. v2.1 is CLEARING_MODE only — capital IS the signal. GestAlt v2.1 should be described internally as a "credibility-weighted clearing protocol," not a "knowledge marketplace." The knowledge marketplace design is what v2.2+ delivers. (#r187)
+
+---
+
+### Finding 2: Oracle Supremacy — Knowers Cannot Outperform the Oracle (#r187)
+
+**Current design (#r151):** Oracle is the final settlement authority. `oracle_settlement_override` is not a knower penalty. Knowers are "provisional attestors."
+
+**The epistemic consequence:** The mechanism can reach the oracle's answer faster and with better-calibrated uncertainty, but cannot produce a *better* answer. If the oracle is wrong, settlement is wrong. The knower pool has no collective override path.
+
+**For CLEARING_MODE:** This is correct. Oracle is the legal settlement authority; collective override would be a fraud attack vector.
+
+**For DISCOVERY_MODE:** This is a gap. A well-calibrated knower pool on a slow-oracle class (annual regulatory ruling, clinical trial outcome) may be more accurate than any single oracle source. The mechanism as designed cannot represent this.
+
+**Net-new (#r187) — Qualified Collective Override sketch for DISCOVERY_MODE (v2.2 scope):**
+
+```
+qualified_override_conditions:
+  1. S_cred(c) stable (change < δ) for M_stable consecutive normal-mode epochs
+  2. Σ_active_contributors credibility_ratio(a) > Θ_collective
+  3. Registered oracle for class_i silent for T_oracle_timeout
+  4. Governance-approved collective-override eligibility for coordinate class
+
+On qualified_override:
+  S_final(c) = S_cred(c)  (no external oracle)
+  settlement_type = "collective_attestation" (new EAT record type)
+  Knower rewards from query_fee_pool + governance reserve
+```
+
+Not appropriate for v2.1 (clearing oracle is contractually bound). Appropriate for DISCOVERY_MODE slow-oracle classes in v2.2. (#r187)
+
+---
+
+### Finding 3: Implication Chains Are the Principal Epistemic Differentiator — Deferring to v2.2 Loses the Core Thesis (#r187)
+
+**Three-family mechanism taxonomy (explicit for first time in #r187):**
+
+| Family | Core primitive | Novel vs LMSR | v2.1? |
+|--------|---------------|---------------|-------|
+| A. Credibility-weighted clearing | Binary positions × track record | Low (filter on capital) | YES |
+| B. Implication-chain marketplace | Structural A→B claims × credibility | High (novel causal pricing) | NO (deferred) |
+| C. WED-routing discovery market | Query-conditioned D(c) revelation | Highest (genuine info transfer) | NO |
+
+v2.1 delivers Family A only. Families B and C are the founding claim. The Demo Day narrative should not conflate v2.1 scope with the full knowledge-marketplace thesis.
+
+**Minimal implication primitive for v2.1 — CorrelationBonus_v1:**
+
+To avoid launching with zero evidence of Family B capability, a minimal depth-0 implication primitive is feasible within v2.1 contract scope:
+
+```
+CorrelationBonus_v1 (single function in ClaimEscrow):
+  knower A stakes simultaneously on (market_X, direction_X) AND (market_Y, direction_Y)
+    with declared_correlation ∈ {+1, -1}
+  if both markets resolve in declared direction: bonus = 0.15 × min(stake_X, stake_Y)
+    sourced from governance seed pool (not loser pool)
+  if either resolves wrong: no bonus; no additional slash
+  No credibility_ratio change; no new escrow category; no CredibilityAggregator touch
+  Cap: governance seed pool depletes when allocated; no new minting
+```
+
+This demonstrates the mechanism can price structural correlation between events — the core Family B primitive — without requiring implication_bonus_escrow, α_cap, or implication_reserve. Adds ~50 lines to ClaimEscrow. Requires a governance seed pool at class registration. Risk: correlation-bonus farming bounded by 0.15× cap and seed pool depletion. (#r187)
+
+---
+
+### Finding 4: The Bootstrap Calibration Gap — Mechanism Is Plutocratic During Phase 1 (#r187)
+
+In bootstrap epochs (Phase 1), all credibility_ratios are zero or initialized at floor. The effective weight formula `w_a = C_a × log(1 + k_a)` reduces to `w_a ≈ log(1 + k_a)` — purely capital-weighted. This is LMSR. The mechanism's epistemic advantage activates only after resolved epochs accumulate.
+
+**Net-new (#r187) — Calibration Warmup Oracle for v2.2:**
+
+```
+calibration_warmup_oracle:
+  governance registers K_warmup historical questions per class at genesis
+    (past events with oracle-confirmed ground truth; T_warmup_age ≥ 8 epochs old)
+  new knowers submit claims on warmup questions: no real capital locked (simulated stake)
+  warmup log-scores count at α_warmup = 0.3 × live-epoch weight
+  after N_warmup = 4 warmup completions: knower has partial credibility_ratio
+  warmup scores decay after 2 × N_calibration normal-mode epochs (do not accumulate forever)
+```
+
+Reduces plutocracy window from N_calibration live epochs to a curated warmup set.
+Gaming defence: warmup questions must be oracle-resolved ≥ T_warmup_age epochs ago. Applicable to v2.2 CoordinateRegistry extension. (#r187)
+
+---
+
+### Finding 5: Oracle Capture Is the Post-#r148 Strongest Failure Mode (#r187)
+
+**Prior strongest failure (#r148/§9):** D(c) demand-side revelation problem. Resolved in CLEARING_MODE (#r149).
+
+**New strongest failure mode:** Oracle capture in CLEARING_MODE. The mechanism is invulnerable to knower manipulation, challenger fraud, and Sybil attacks — but if the oracle is compromised, all 136 invariants fire correctly on wrong settlement prices.
+
+The challenge path (#r151) invokes the oracle. Oracle capture makes challenge worse.
+
+**Net-new (#r187) — oracle_divergence_monitor for v2.1 EATManager:**
+
+```
+oracle_divergence_monitor(class_i, epoch_t):
+  Δ_i(t) = |S_cred(i, t-1) - oracle_confirmed_value(i, t)| / staleness_window_i
+  Δ_smooth_i = EMA(Δ_i, N_divergence = N_calibration)
+  
+  if Δ_smooth_i > Δ_alert_threshold for M_stable consecutive normal-mode epochs:
+    emit oracle_divergence_persistent_flag (EATManager, governance alert)
+    suspend oracle_settlement_override eligibility pending explicit governance re-approval
+    (not permanent; governance can re-approve after investigation)
+```
+
+This does not override the oracle. It creates a governance tripwire when the oracle systematically contradicts the high-credibility knower pool. Governance decides: oracle correct (knowers miscalibrated) or oracle suspect (investigate). Implementation: monitoring logic in EATManager only; no new state or contract required. Applicable to v2.1. (#r187)
+
+---
+
+## Structural Synthesis: First-Principles Audit (#r187)
+
+| Finding | Status | Action |
+|---------|--------|--------|
+| Conserved quantity drift | CLEARING_MODE WED = financial exposure (not epistemic) | Update internal framing; Demo Day Polymarket narrative still correct |
+| Oracle supremacy gap | DISCOVERY_MODE only; v2.2 scope | Qualified collective override specification above |
+| Implication chains deferred | Principal differentiator missing from v2.1 | CorrelationBonus_v1 in ClaimEscrow for v2.1 |
+| Bootstrap calibration gap | Mechanism is LMSR during Phase 1 | calibration_warmup_oracle for v2.2 |
+| Oracle capture | Strongest post-#r149 failure mode | oracle_divergence_monitor in EATManager for v2.1 |
+
+**v2.1 scope addenda (minimal, low-risk):**
+1. `CorrelationBonus_v1` — single ClaimEscrow function + governance seed pool
+2. `oracle_divergence_monitor` — monitoring logic in EATManager; governance alert only
+
+---
+
+## Cumulative Invariants (additions through #r187)
+
+**Invariant #137 (#r187):** GestAlt v2.1 is a credibility-weighted clearing protocol (Family A). The founding knowledge-marketplace thesis (Families B and C) is delivered by v2.2+ features. These must not be conflated in external or internal documentation.
+
+**Invariant #138 (#r187):** CLEARING_MODE WED is capital-denominated (Σ max_loss). DISCOVERY_MODE WED is epistemic (D×A×P with private D). The conserved quantity differs between modes; mechanism design choices follow accordingly.
+
+**Invariant #139 (#r187):** The oracle_divergence_monitor tripwire is required in v2.1. Systematic divergence between S_cred and oracle must surface to governance before it accumulates settlement damage. Monitor is alerting-only; oracle authority is not automatically revoked.
+
+---
+
+## Run Log Update
+
+- **#r187** — 2026-04-04T04:52Z — First-principles audit post-186-run engineering. Five findings: (1) CLEARING_MODE WED = financial (not epistemic) — v2.1 is credibility-weighted clearing, not epistemic marketplace; (2) oracle supremacy — qualified collective override sketch for DISCOVERY_MODE in v2.2; (3) three-family taxonomy formalised — implication chains are principal differentiator; CorrelationBonus_v1 proposed for v2.1; (4) bootstrap calibration gap — calibration_warmup_oracle for v2.2; (5) oracle capture = post-#r149 strongest failure mode — oracle_divergence_monitor for v2.1 EATManager. Invariants #137–#139.
+
+---
+
+## Open Questions for #r188+
+
+1. **CorrelationBonus_v1 governance seed sizing:** Principled formula for seed pool at class genesis — should it be proportional to expected concurrent correlated positions or to WED_clearing?
+
+2. **oracle_divergence_monitor threshold calibration:** Δ_alert_threshold derivation from class track record variance (analogous to min_q_bonus_ratio calibration from σ_resolve, #r150/Q1).
+
+3. **Three-family taxonomy and Demo Day messaging:** Should the taxonomy appear in external materials? Honest about v2.1 scope but may undercut messaging by flagging incompleteness.
+
+4. **Θ_collective threshold for qualified collective override:** Principled derivation for the aggregate credibility_ratio threshold needed to enable collective override in DISCOVERY_MODE.
+
+*Last updated: #r187 — 2026-04-04T04:52Z*
