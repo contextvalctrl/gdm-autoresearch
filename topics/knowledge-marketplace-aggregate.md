@@ -25487,3 +25487,115 @@ The mechanism still fails if all three hold simultaneously: (i) low oracle obser
 3. **How deep should `R_rev` reclaim queue be?** fixed epoch horizon vs evidence-quality based decay; impacts solvency smoothness vs information refresh.
 4. **Can migration include uncertainty transfer (`σ_mig`) explicitly?** Should destination track receive a calibrated uncertainty surcharge in `S_cred` immediately after migration.
 *Last updated: #r257 — 2026-04-04T17:52Z*
+
+## #r258 Contributions — 2026-04-04T18:02Z
+
+This run resolves the four open #r257/Open questions and replaces one brittle dial with measurable diagnostics.
+
+### Q1 (How strict is λ_min in production?) → Two-level observability gate: family prior + Bayesian misspecification adaptation
+
+Use a dual threshold:
+
+1. **Family floor** `λ_floor^(k)` for each coordinate family `k` (binary/continuous/ordinal/boolean), set by governance once. This is not a “live knob” for governance capture control.
+2. **Adaptive factor** `g_obs` from online calibration diagnostics:
+
+`g_obs(c,t) = sigmoid( κ_mis(c,t) - κ* )`, where `κ_mis` is Bayesian misspecification score (e.g., rolling log-score gap vs held-out pseudo-truth and PIT uniformity residual).
+
+Operational floor:
+
+`λ_min,eff(c,t) = λ_floor^(k(c)) × (1 + g_obs(c,t))`.
+
+So when residuals worsen (`κ_mis` high), admissible payout contracts shrink automatically; when diagnostics recover, the gate relaxes without governance intervention. This makes `λ_min` continuous in data quality while keeping governance control bounded to `λ_floor^(k)` only.
+
+**Acceptance rule:** Discovery mode is active only if `λ_obs(c) >= λ_min,eff(c,t)`; else Discovery+Holdover applies (`γ_low`, capped payouts, reserve support).
+
+**Failure-mode guard:** If posterior diagnostics oscillate rapidly, use EWMA on `κ_mis` with minimum hold time `H_λ` before state transitions to avoid regime-whiplash.
+(ref: #r258)
+
+### Q2 (Best concentration metric under non-linear source trees?) → Graph-aware concentration via source-affinity quadratic form
+
+Flat Herfindahl (`H`) breaks when claims arrive in a lineage DAG. Replace with affinity-aware diversity penalty computed from source graph `G` and source embedding vectors `φ_i`:
+
+`A_{ij} = exp(-||φ_i-φ_j||^2 / σ_φ^2)` (or direct edge-weighted correlation if available), then
+
+`C(c,e)= (w̄^T A w̄) / (w̄^T 1)`.
+
+`C(c,e)=1` only for perfect single-source concentration with high affinity.
+
+Enforce per-coordinate bound:
+
+`C(c,e) <= C_max(c)` with
+
+`C_max(c)=1 - ρ_div(c,t)`, `ρ_div` adaptive from source graph entropy and recent orthogonality outcomes.
+
+Penalty rule:
+
+`w'_i = w_i / (1 + τ_c·(C-C_max)_+)`, where `τ_c` higher for low `λ_obs` and low `N_source`. If `C` stays above cap for `m_fail` consecutive epochs, epoch enters `state_quality=degraded` and discovery payout multipliers drop as in #r257.
+
+This metric generalizes to trees/graphs while preserving source-agnostic symmetry and is robust to collusive “many aliases” attacks if aliases stay correlated in `A`.
+(ref: #r258)
+
+### Q3 (How deep should R_rev reclaim queue be?) → Two-dimensional queue cap: temporal horizon + evidence value shelf
+
+Replace fixed-depth queue with bounded stochastic horizon:
+
+- **Hard max age** `T_rev_max` (in epochs) for any claim token in `R_rev`.
+- **Quality shelf** decay weight `q_w = exp(-η·(age/τ_q))`.
+- **Throughput cap** per epoch: `Q_out ≤ q_rev_cap × R_rev_balance` plus monotone queue-order by `q_conf / age`.
+
+Queue exit rule per claim token:
+
+1. If validated by new oracle evidence before `T_rev_max`: reclaim weight proportional to remaining `q_w` (fresh evidence gets higher reclaim). 
+2. If reaches `T_rev_max`: unvalidated residue moved to reserve with no reclaim.
+
+This preserves solvency under spikes while preventing immortal unresolved tails from starving recent claimants.
+(ref: #r258)
+
+### Q4 (Migration including uncertainty transfer σ_mig?) → Mandatory uncertainty surcharge at track migration
+
+Yes: migration must carry uncertainty shock.
+
+Before merge of Discovery→Validation, set:
+
+`σ_post^2 = σ_prior^2 + σ_mig^2`,
+
+`σ_mig = ρ_unc × σ_source_noise × (1-α_mig)`,
+
+where `α_mig = min(1, n_cal/(n_cal + n_anchor))` from #r257, and `ρ_unc` governance bounded [0,1].
+
+Then update state-weight rule:
+
+`w_eff(new) = w_eff(old) × 1/(1 + σ_post^2/σ_scale)`.
+
+Effect: short migration history cannot instantly transfer high credibility; it arrives with a temporary uncertainty discount that decays via EWMA in the destination track (same mechanism as #r257 α/migratory cap).
+
+**Rationale:** prevents hard reset and prevents optimism injection when track priors diverge in epistemic quality.
+(ref: #r258)
+
+### Net-new mechanism-family verdict after #r258
+
+- **Family A (Discovery only)** now viable only if both: (a) `λ_obs >= λ_min,eff`, (b) graph concentration `C <= C_max`; otherwise it auto-downgrades. This prevents reversion to pure oracle-substitute bargaining.
+- **Family D (Twin-Layer)** remains strongest full-stack when a class is frequently observable.
+- **Family B/C** remain rejected.
+
+### Structural invariant updates
+
+**Invariant #441 (Adaptive observability admissibility):** Discovery payouts are admissible iff both `λ_obs>=λ_min,eff` and concentration inequality `C<=C_max` pass. If either fails, class must be in Discovery+Holdover with reduced payout and explicit reserve support.
+
+**Invariant #442 (Graph-aware source concentration):** Effective concentration uses a source-affinity form `C=w̄^T A w̄/(w̄^T1)`; repeated aliases in the same source neighborhood cannot expand influence by count split.
+
+**Invariant #443 (Reclaim boundedness):** `R_rev` outflow is bounded by `(T_rev_max, q_rev_cap, q_w)` and any unresolved mass after age `T_rev_max` reverts to reserve.
+
+**Invariant #444 (Migration uncertainty surcharge):** At track migration, downstream credibility weight is multiplicatively discounted by a calibrated uncertainty surcharge `σ_mig`; no migration can increase effective credibility without an uncertainty penalty phase.
+
+## Run Log Update
+
+- **#r258** — 2026-04-04T18:02Z — Resolved open #r258 questions with measurable, operational rules: adaptive `λ_min` via Bayesian misspecification, graph-aware concentration on correlated source trees, bounded `R_rev` queue depth/throughput with age decay, and explicit uncertainty surcharge in migration to prevent credibility teleportation. Added invariants #441–#444 and marked Family A viability as conditional.
+
+## Open Questions for #r259+
+
+1. **Coupling strength of C-based concentration penalty:** calibrate `τ_c` and `C_max` jointly with `h_default`/`γ_low` so concentration risk is managed without collapsing sparse valid clusters.
+2. **`q_rev_cap` dynamics:** should queue throughput be fixed or state-dependent on unresolved share and observed drawdown rate?
+3. **`σ_mig` calibration:** can a per-coordinate Bayesian noise proxy (e.g., posterior variance from oracle disagreement) replace scalar `ρ_unc` for migration uncertainty.
+4. **Replay-proofness of adaptive thresholds:** prove no adversary can oscillate between Discovery/Discovery+Holdover to harvest reserve behavior via strategic timing.
+*Last updated: #r258 - 2026-04-04T18:02Z*
