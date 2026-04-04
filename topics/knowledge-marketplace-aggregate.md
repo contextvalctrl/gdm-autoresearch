@@ -23376,3 +23376,200 @@ The aggregate signal serves legitimate epistemic updating. Post-period attributi
 4. **Retraction EAT record and post-epoch CPA attribution:** At epoch close, retraction records are fully attributed. Define the CPA detection variant for retraction-correlated events: is "many high-credibility knowers retracted in the same epoch" itself a CPA-triggerable event, or is retraction correlation categorically different from S_cred claim-movement correlation and treated as non-adversarial?
 
 *Last updated: #r246 — 2026-04-04T15:42Z*
+
+---
+
+## #r247 Contributions — 2026-04-04T15:52Z
+
+Addresses all four open questions from #r246. Net-new structural observation: **de-meaned correlation as the regime-invariant CPA primitive** — the correct CPA baseline removes the common market consensus signal, not just the structural conditioning term, making detection robust across bull/bear regimes.
+
+---
+
+### Q1 (Epoch-frozen TOWL and correlated mass retraction — per-epoch cap vs epoch-boundary protection) → No per-epoch retraction cap; mass retraction is a legitimate epistemic signal; `B_side_thinning_alert` EAT event replaces hard gate; Zone C_oracle recalculates on surge (#r247)
+
+**First-principles analysis:**
+
+A per-epoch retraction rate cap would gate capital exit by limiting knowers from acting on genuine new information about p_upstream falling. This is epistemic suppression — the mechanism would be forcing knowers to hold commitments they no longer endorse. The static-commitment law (#r137) applies to escrow pricing at declaration, not to the right to retract upon new information.
+
+**TOWL cliff direction:** Mass retraction *reduces* outstanding TOWL obligations (escrow returns to knowers, commitments withdrawn). This improves the solvency posture (lower TOWL / EDS* ratio). The solvency cliff moves in the favourable direction. The genuine concern is not solvency degradation but (a) S_cred quality collapse when B-side coverage falls sharply, and (b) the reinstallation surge capacity freed at epoch close.
+
+**On (b) — reinstallation surge:** Freed TOWL enters the next epoch-open TOWL snapshot normally. Any reinstallation attempt at epoch N+1 faces the N+1 throttle, which already incorporates the freed capacity. Symmetric with normal TOWL dynamics. No additional protection needed beyond existing epoch-frozen accounting.
+
+**On (a) — S_cred quality degradation:**
+
+```
+Retraction surge alert (not a gate):
+  retraction_rate_epoch(class_B, t) = retracted_claims(t) / B_side_active_claims_at_epoch_open(t)
+  retraction_surge_threshold: governance-set; default 0.25
+
+  if retraction_rate_epoch > retraction_surge_threshold:
+    EAT event: B_side_thinning_alert { class_id, epoch, retraction_rate, remaining_claims }
+    Action: Zone C_oracle expected_oracle_loss recalculated immediately at epoch close
+            (not standard next-epoch scheduled recalculation)
+    No installation freeze from this alert alone.
+```
+
+**Why alert not gate:** The mechanism's epistemics improve when knowers with changed beliefs exit. Suppressing exit via a cap would force corrupted S_cred contributions from knowers who no longer hold their declared beliefs. A corrupted signal is worse than a thinner honest signal. The alert informs unknowers and governance to adjust demand accordingly.
+
+**Design law (#r247):** No per-epoch retraction rate cap. Mass retraction is a legitimate epistemic event and a price-discovery signal about p_upstream. `B_side_thinning_alert` at ≥25% retraction rate triggers informational EAT event and immediate Zone C_oracle recalculation, not an installation freeze. Epoch-boundary TOWL recapture is the complete solvency protection. (#r247)
+
+---
+
+### Q2 (p_upstream_smooth and knower escrow factor at regime shift — lock-at-declaration vs retrospective top-up) → Lock at claim-declaration epoch; static-commitment law applies to escrow pricing; governance warning at p_smooth floor breach (#r247)
+
+**First-principles argument for lock-at-declaration:**
+
+The implication_escrow_factor at declaration epoch is the market price for the conditional risk a knower accepted at that moment. The static-commitment design law (#r137) states that capital commitment is fixed at installation. Retrospective top-up violates this law: if the escrow requirement could change after declaration, knowers face an uncertain liability on committed capital — deterring long-horizon participation.
+
+**The asymmetry between early and late knowers is economically correct:**
+
+Early knowers (p_smooth = 0.80, factor = 1.25×) and late knowers post-regime-shift (p_smooth = 0.50, factor = 2.0×) face different escrow minimums. This reflects their different timing relative to market information — late knowers have access to the information that caused the shift and price it in. Identical to yield-curve asymmetry between existing and new bondholders: economically correct, not an inequity to correct.
+
+**The case where existing knowers are materially under-staked:** If p_smooth falls sharply, existing escrow may be below current risk-profile warrant. The mechanism's existing forfeiture regime captures this: if A misses its upstream range, the existing knower forfeits their declared escrow. The mechanism does not promise to make them whole if their declared confidence was misplaced.
+
+**Governance warning at floor breach:**
+
+```
+if p_upstream_smooth(class_B, t) <= 0.50:  [escrow factor ceiling 2.0× reached]
+    EAT event: implication_class_high_miss_risk { class_id, epoch, p_smooth, factor }
+    Governance may (by vote) suspend new T3 installations on class_B.
+    Existing claims unaffected.
+    Suspension lifts when p_smooth recovers above 0.60 (hysteresis).
+```
+
+**Design law (#r247):** implication_escrow_factor locks at claim-declaration epoch. Static-commitment law (#r137) applies to escrow pricing. Regime-shift asymmetry between early and late knowers is economically correct. `implication_class_high_miss_risk` governance alert at p_smooth ≤ 0.50 enables discretionary installation suspension without mechanistic compulsion. (#r247)
+
+---
+
+### Q3 (Population-average corr(B, A_range) prior and systematic bull-regime bias — de-meaned vs level-based baseline) → De-meaned cross-pair correlation as the regime-invariant CPA baseline; level-based corr_prior² subtraction eliminated (#r247)
+
+**The bug in the level-based grace formula from Invariant #392:**
+
+`residual_correlation_grace(a, b) = corr(B_claim_a, B_claim_b) − corr_prior²`
+
+In a bull regime, corr_prior is elevated (all knowers think A will enter range → all B|A claims are optimistic → population-average corr(B, A_range) is high). Subtracting a high corr_prior² deflates the residual. The CPA test becomes less sensitive precisely when collective optimism is highest — the failure mode where coordinated manipulation is hardest to distinguish from genuine consensus.
+
+**De-meaned cross-pair correlation:**
+
+```
+mean_B_epoch(t) = mean over all active B-side knowers of B_claim_a at epoch t
+                  [captures common market consensus at epoch t]
+
+residual_correlation_demeaned(a, b) =
+    corr(B_claim_a − mean_B_epoch, B_claim_b − mean_B_epoch)
+    [common regime signal removed; idiosyncratic co-movement remains]
+```
+
+**Why de-meaned is regime-invariant:**
+
+Two genuinely independent knowers who both estimate B|A ≈ 0.90 in a bull regime have zero residual co-movement after de-meaning. Two coordinating knowers who submit identical claims regardless of their signals have perfectly correlated de-meaned residuals, regardless of regime level. De-meaned correlation measures *excess similarity beyond market consensus* — the correct CPA target.
+
+**Full residual formula update (supersedes Invariant #392 grace formula and refines Invariant #389 post-grace):**
+
+```
+Grace window (< N_calibration B-side resolved epochs):
+  residual_correlation(a, b) = corr(B_claim_a − mean_B, B_claim_b − mean_B)
+
+Post-grace (≥ N_calibration B-side resolved epochs, per Invariant #389):
+  residual_correlation_full(a, b) =
+    corr(B_a − mean_B, B_b − mean_B)
+    − corr(A_range, B_a − mean_B) × corr(A_range, B_b − mean_B)
+    [removes: (1) common consensus via de-meaning; (2) structural A-range conditioning driver]
+```
+
+The level-based `corr_prior²` subtraction and population-average corr_prior from Invariant #392 are superseded. Epoch-mean de-meaning is the sole first correction.
+
+**Design law (#r247):** CPA correlation tests must use de-meaned claim series for regime invariance. Level-based correlation tests are systematically biased by common market consensus. De-meaning removes the consensus component; A-range structural removal adds the second correction post-grace. The two corrections are independent and composable. Protocol-wide: all oracle-mode CPA tests should adopt de-meaned base correlation. (#r247)
+
+---
+
+### Q4 (Retraction EAT record and post-epoch CPA attribution — is correlated retraction CPA-triggerable?) → Categorically distinct from directional S_cred CPA; `retraction_clustering_flag` as separate governance signal; no automatic penalty (#r247)
+
+**First-principles distinction:**
+
+CPA (Coordinated Positioning Anomaly) is defined as coordinated directional movement of S_cred claims by a correlated actor cluster (Invariants #311–#316). The adversarial action is forcing S_cred in a direction inconsistent with independent private signals. Retraction removes a knower from S_cred entirely — it does not move S_cred in a controlled direction (direction depends on whether the retracting knower was above or below S_cred_aggregate, which varies). Correlated retraction cannot produce a directional S_cred manipulation.
+
+**Two correlated retraction cases:**
+
+- Case A (legitimate epistemic convergence): Multiple high-credibility knowers receive the same genuine negative signal about p_upstream (e.g., public announcement A will likely miss its range). They retract independently at the same epoch. Timing correlation is high; epistemic action is independent. Correct mechanism response.
+- Case B (adversarial coordination): Knowers coordinate to retract from a class to trigger `B_side_thinning_alert` or degrade B-side S_cred for downstream manipulation (e.g., implication chain sabotage). Adversarial, but the damage is coverage quality, not directional S_cred corruption.
+
+**Resolution — separate governance signal:**
+
+```
+retraction_clustering_flag(class_B, epoch_t):
+  Trigger (at epoch close, using un-masked retraction records):
+    Condition 1: retraction_rate_epoch(t) > retraction_surge_threshold (default 0.25)
+    Condition 2: retraction_cluster_score > cluster_threshold
+      cluster_score = fraction of retracting knowers with ANY of:
+        - shared delegator (Invariant #368)
+        - shared declaration epoch (declared within 2 epochs of each other)
+        - pairwise claim correlation > CPA_correlation_threshold in prior N_calibration epochs
+
+  Response: EAT event `retraction_clustering_flag { class_id, epoch, cluster_score, n_retracting }`
+  Action: governance alert only; NO CPA penalty; NO credibility_ratio reduction.
+  
+Separate from CPA:
+  retraction_clustering_flag does not feed into CPA_score.
+  Two events may co-occur (coordinating knowers who retract may also previously have CPA-coordinated
+  their claims), but evaluated by separate detectors with separate evidence standards.
+```
+
+**Why no automatic penalty:** Applying CPA-style capital penalty to correlated retraction would create a mechanism trap — knowers who correctly update on shared public information are punished for synchronised epistemic updating. This would deter mass retraction even when A's range miss probability is genuinely high, forcing corrupted S_cred contributions to persist.
+
+**Design law (#r247):** Correlated retraction is categorically distinct from directional S_cred CPA. `retraction_clustering_flag` is a governance-alert signal with no automatic penalty. CPA penalties apply only to directional claim co-movement. Post-epoch un-masked retraction records enable but do not mandate adverse action against clustering knowers. (#r247)
+
+---
+
+## Net-New Structural Observation: De-Meaned Correlation as a Universal CPA Primitive (#r247)
+
+The regime-bias analysis (Q3) reveals a principle extending beyond the IMPLICATION_CHAIN grace window:
+
+**All CPA correlation tests across all oracle modes should use de-meaned claim series.** Level-based pairwise correlation is contaminated by common market consensus in high-consensus epochs, inflating apparent coordination signals regardless of actual coordination. De-meaned correlation is the regime-invariant primitive.
+
+Applies to: AUTOMATED and HYBRID_EXTERNAL classes during high-consensus epochs; COMMITTEE classes where members receive similar expert briefings; IMPLICATION_CHAIN classes during regime shifts.
+
+**Protocol-level update:** Invariants #311–#316 (core CPA detection) should be updated to read `corr(B_a − mean_B_epoch, B_b − mean_B_epoch)` in place of `corr(B_claim_a, B_claim_b)`. The CPA_correlation_threshold may need recalibration when switching to de-meaned base — flagged as Q1 for #r248. (#r247)
+
+---
+
+## Structural Synthesis: #r247
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Mass retraction cap | No cap; `B_side_thinning_alert` ≥25% rate; Zone C_oracle immediate recalculation at epoch close | Cap produces corrupted S_cred; thin honest signal is epistemically superior |
+| Escrow factor at regime shift | Lock at declaration epoch (static-commitment law); late knowers face updated factor correctly; governance warning at p_smooth ≤ 0.50 | Retrospective top-up deters long-horizon participation; asymmetry is economically correct |
+| Regime bias in CPA baseline | De-meaned cross-pair correlation; level-based corr_prior² eliminated; regime-invariant | Common consensus removed by de-meaning; adversarial coordination = excess alignment above consensus |
+| Correlated retraction as CPA | Categorically different; `retraction_clustering_flag` = governance alert only; no automatic penalty | Synchronised exit ≠ directional S_cred manipulation; epistemic updating is not adversarial |
+
+---
+
+## Cumulative Invariants (#r247)
+
+**Invariant #394 (#r247):** No per-epoch retraction rate cap on IMPLICATION_CHAIN B-side claims. Retraction surge alert: when retraction_rate_epoch > retraction_surge_threshold (default 0.25; governance [0.10, 0.50]), emit EAT event `B_side_thinning_alert { class_id, epoch, retraction_rate, remaining_claims }` and trigger immediate Zone C_oracle expected_oracle_loss recalculation at epoch close. No installation freeze triggered by thinning alert alone. Epoch-boundary TOWL recapture is the complete solvency mechanism (Invariant #390).
+
+**Invariant #395 (#r247):** implication_escrow_factor locks at claim-declaration epoch. Static-commitment law (#r137) applies to escrow pricing. Post-declaration regime shift does not trigger retrospective top-up. New declarations use current p_upstream_smooth at their declaration epoch. Governance alert `implication_class_high_miss_risk` emitted when p_upstream_smooth ≤ 0.50; governance may suspend new T3 installations (vote required); suspension lifts at p_smooth > 0.60 (hysteresis). Existing claims unaffected by suspension.
+
+**Invariant #396 (#r247):** CPA correlation tests use de-meaned claim series: `residual_correlation_demeaned(a, b) = corr(B_claim_a − mean_B_epoch, B_claim_b − mean_B_epoch)`. Supersedes level-based corr_prior² formula in Invariant #392 (grace window) and refines Invariant #389 (IMPLICATION_CHAIN post-grace). Post-grace full formula: `corr(B_a − mean_B, B_b − mean_B) − corr(A_range, B_a − mean_B) × corr(A_range, B_b − mean_B)`. Protocol-wide extension: all CPA tests across all oracle modes should adopt de-meaned base correlation; Invariants #311–#316 update flagged for #r248.
+
+**Invariant #397 (#r247):** Correlated retraction is categorically distinct from directional S_cred CPA. `retraction_clustering_flag` fires at epoch close when: retraction_rate > retraction_surge_threshold AND cluster_score > cluster_threshold (cluster_score = fraction of retracting knowers with shared delegator, shared declaration epoch ≤ 2 epochs, or pairwise claim correlation > CPA_correlation_threshold in prior N_calibration epochs). Response: governance alert EAT event only; no CPA penalty; no credibility_ratio reduction for retracting knowers. CPA_score computation excludes retraction events.
+
+---
+
+## Run Log Update
+
+- **#r247** — 2026-04-04T15:52Z — Q1: No per-epoch retraction cap; `B_side_thinning_alert` at ≥25% triggers EAT + immediate Zone C_oracle recalculation; cap suppresses legitimate epistemic updating. Q2: implication_escrow_factor locks at declaration epoch; static-commitment law applies to escrow pricing; governance warning at p_smooth ≤ 0.50 with optional suspension. Q3: De-meaned cross-pair correlation replaces level-based corr_prior² as regime-invariant CPA base; supersedes Invariant #392 grace formula; generalises to all oracle modes (Invariants #311–#316 update flagged for #r248). Q4: Correlated retraction categorically separate from CPA; `retraction_clustering_flag` = governance-alert-only; no automatic penalty. Net-new: de-meaned correlation is the universal CPA primitive; regime-invariant across all oracle modes. Invariants #394–#397.
+
+---
+
+## Open Questions for #r248+
+
+1. **Invariants #311–#316 CPA update — de-meaned correlation protocol-wide adoption and threshold recalibration:** Invariant #396 flags that all CPA tests across all oracle modes should adopt de-meaned base correlation. Does the CPA_correlation_threshold (originally calibrated against level correlation) need recalibration when switching to de-meaned correlation, or is the threshold portable across the transformation?
+
+2. **`B_side_thinning_alert` and unknower demand repricing:** When a `B_side_thinning_alert` fires, unknowers with q_bonus commitments on class_B are holding demand signals against a thinning knower pool. Should unknowers receive an automatic q_bonus refund option (opt-out) when retraction surpasses the surge threshold, or must they wait for T_anchor to resolve normally?
+
+3. **Governance suspension at p_smooth ≤ 0.50 and existing unknower EQ:** If governance suspends new T3 installations on class_B (Invariant #395), existing unknower q_bonus commitments remain on record with no new knower supply entering. Does the suspension state give existing unknowers an automatic early-exit from their q_bonus commitment, or does it only block new knower supply?
+
+4. **De-meaned CPA and low-participation classes (k_min = 3):** In a class with only 3 active knowers, `mean_B_epoch` is computed from three values. De-meaning a group of three produces cross-pair correlations highly sensitive to outliers; the common factor is poorly estimated from three points. Define a minimum participation threshold below which de-meaned CPA is suspended and replaced by a simpler individual-threshold monitor.
+
+*Last updated: #r247 — 2026-04-04T15:52Z*
