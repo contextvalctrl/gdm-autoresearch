@@ -18909,4 +18909,210 @@ Governance action triggered within N_calibration epochs on persistent threshold 
 
 4. **epistemically_live grace window and retroactive CPA discovery:** If a grace-window committee is later found to have lineage_cluster matching a known wrong CPA cluster (post-resolution), should the grace-window benefit be retroactively revoked, affecting prior epistemically_live determinations?
 
-*Last updated: #r225 — 2026-04-04T11:32Z*
+*Last updated: #r226 — 2026-04-04T11:42Z*
+
+---
+
+## #r226 Contributions — 2026-04-04T11:42Z
+
+Addresses all four open questions from #r225. Adds one net-new structural insight: the abstention-credibility floor as a participation incentive that resolves a latent free-rider problem in COMMITTEE-mode classes.
+
+---
+
+**Q1 (CPA ρ_prior shrinkage at small cluster sizes) → James-Stein shrinkage blend; effective ρ_prior bounded away from noise floor (#r226):**
+
+At small N_cluster_wrong (≤ 5), the point estimate ρ_prior_estimate = max(0, (wrong_fraction − ε_T3_class) / (1 − ε_T3_class)) is a high-variance quantity: three agents coincidentally all wrong produces the same formula value as three colluding agents. Over-penalising coincident clusters would deter small-knower participation.
+
+**Resolution — James-Stein shrinkage estimator:**
+
+```
+ρ_prior_shrunk(cluster_c) =
+    (1 − λ_shrink) × ρ_prior_estimate(cluster_c)
+    + λ_shrink × ε_T3_class
+
+λ_shrink = N_shrink_anchor / max(N_shrink_anchor, N_cluster_wrong)
+N_shrink_anchor = 10  (governance-settable, bounded [5, 20])
+```
+
+At N_cluster_wrong = 3: λ_shrink = 10/10 = 1.0 → ρ_prior_shrunk = ε_T3_class → penalty is normal_wrong × (1 + ε_T3_class × (2)) — a modest multiplier, not a cluster collapse.
+At N_cluster_wrong = 10: λ_shrink = 10/10 = 1.0 → still full shrinkage — the cluster must be larger than the anchor to escape full shrinkage.
+At N_cluster_wrong = 20: λ_shrink = 10/20 = 0.5 → half shrinkage — meaningful cluster signal blended with prior.
+At N_cluster_wrong = 50: λ_shrink = 10/50 = 0.2 → nearly full observed signal.
+
+**Practical consequence:** Penalty formula is unchanged structurally; ρ_prior_estimate is replaced by ρ_prior_shrunk. Small innocent-coincidence clusters receive near-prior penalties. Large collusion clusters (N >> N_shrink_anchor) receive near-full observed penalty.
+
+**N_shrink_anchor governance calibration:** N_shrink_anchor should approximately equal the maximum plausible innocent cluster size for a coordinate class (e.g., if a class routinely has 8-10 agents and 5 all happen to be wrong due to shared oracle source, N_shrink_anchor = 10 is correct). For classes with very large participant populations where coincident errors are rare at any cluster size, governance may raise N_shrink_anchor toward 20.
+
+**EAT record:** ρ_prior_shrunk, N_cluster_wrong, N_shrink_anchor, λ_shrink committed at resolution settlement event. Auditors can verify shrinkage was applied correctly. (#r226)
+
+---
+
+**Q2 (Committee abstention credibility degradation — fixed vs proportional) → Fixed decrement with governance-set floor; mirrors wrong-claim update semantics (#r226):**
+
+**Analysis:**
+
+- *Proportional to current credibility_ratio:* New committees start near 0; abstention reduces by e.g. 10% of current value = 0.0x → near-zero penalty for new entrants. High-credibility committees lose more per abstention in absolute terms but retain relative rank. Inconsistent: a high-credibility committee can abstain many more times before breaching θ_committee_min than a new committee.
+
+- *Fixed decrement:* Every abstention costs the same absolute amount regardless of current ratio. Consistent across seniority. A long-standing committee with high credibility_ratio has a finite abstention budget before breaching the threshold — this is the correct incentive for high-credibility committees to maintain participation.
+
+**Resolution — fixed decrement Δ_abstain with floor θ_abstain_floor:**
+
+```
+credibility_ratio_committee(a, t+1) = max(
+    credibility_ratio_committee(a, t) − Δ_abstain,
+    θ_abstain_floor
+)
+
+Δ_abstain = governance-settable, default 0.05, bounded [0.01, 0.20]
+θ_abstain_floor = θ_committee_min − 0.01  (just below threshold; triggers epistemically_live check)
+```
+
+**Abstention budget for high-credibility committee:**
+
+```
+abstention_budget(a) = (credibility_ratio_committee(a) − θ_committee_min) / Δ_abstain
+```
+
+At credibility_ratio = 0.80, θ_committee_min = 0.20, Δ_abstain = 0.05: abstention budget = (0.80 − 0.20) / 0.05 = 12 abstentions before breaching threshold. A stable, well-credentialed committee has ~12 epochs of permitted absence before triggering governance action — a reasonable operational tolerance.
+
+**Abstention vs wrong-claim update semantics:** A wrong-claim log-score update is roughly −0.10 to −0.30 per resolution (depending on distance from truth). Δ_abstain = 0.05 is softer than a wrong-claim update but is triggered by *inaction*, not by an attempted claim that was wrong. Deliberate abstention by a well-credentialed committee should be treated as mild — possibly the committee had insufficient information, not that it was dishonest. Wrong-claim updates penalise dishonest or inaccurate participation; abstention updates penalise non-participation. The magnitudes should be ordered: Δ_wrong > Δ_abstain.
+
+**Design law (#r226):** Fixed decrements with a bounded floor are the correct model for penalising non-participation. Proportional decay is incorrect because it is lenient to new entrants (near-zero credibility absorbs proportional penalty trivially) and creates inconsistent threshold distances across the participant population. Fixed decrements create a uniform abstention budget above threshold. (#r226)
+
+---
+
+**Q3 (σ_oracle_residual bootstrap for new COMMITTEE classes) → Governance-declared σ_bootstrap with dual-condition transition; same structural pattern as EDS* genesis (#r226):**
+
+σ_oracle_residual requires N_calibration historical oracle resolutions to be computed empirically. For a new COMMITTEE class with no resolution history, the empirical EMA is undefined.
+
+**Resolution — dual-condition bootstrap (consistent with Invariant #277 pattern):**
+
+```
+σ_oracle_residual_effective(class_c, epoch_t) =
+    σ_oracle_residual_bootstrap(c)               if n_resolutions(c, t) < N_calibration
+    EMA(|s_oracle − S_cred_{t-1}|, N_calibration)  otherwise
+
+σ_oracle_residual_bootstrap(c) = governance-declared at registration
+    required field; no default (governance must reason about expected oracle variability)
+    soft guidance: σ_bootstrap ∈ [0.05, 0.30] × σ_claim_spread_governance_estimate
+    hard bounds: [0.01 × σ_claim_spread, 1.0 × σ_claim_spread]
+```
+
+**Transition event:** When n_resolutions first reaches N_calibration, a `parameter_genesis_exit` EAT event (type: `sigma_oracle_residual_transition`) is emitted. q_quality_threshold_adjusted transitions from bootstrap-based to empirical-EMA-based computation from the next epoch.
+
+**Why "required field with no default" is correct for σ_bootstrap:** A default value (e.g., 0.15 × σ_claim_spread) would be usable without thought for any coordinate class, regardless of how predictable or unpredictable its oracle is. The σ_oracle_residual governs the difficulty of earning EQ q_bonus — too low means q_bonus is nearly unearnable (oracle is too precise relative to threshold); too high means q_bonus is trivially earnable (threshold is too loose). This parameter is consequential enough to require explicit governance reasoning at registration.
+
+**Governance accountability:** The declared σ_bootstrap is retrospectively verifiable at the N_calibration-epoch transition. If empirical σ_oracle_residual diverges significantly from σ_bootstrap (more than 2× or less than 0.5× in the first N_calibration resolutions), governance receives an auto-alert (`sigma_bootstrap_divergence_flag`). No automatic recalibration; governance may adjust σ_bootstrap or accept the empirical divergence. (#r226)
+
+---
+
+**Q4 (Grace-window committee and retroactive CPA discovery) → No retroactive epistemically_live revocation; forward CPA penalty applies; credibility_ratio decay is the natural correction (#r226):**
+
+**The scenario:** A new committee (registered within N_calibration grace window, counting as threshold-satisfied for epistemically_live) is later discovered at resolution to have lineage_cluster matching a known CPA wrong cluster. Should the epistemically_live determinations from the grace window be retroactively voided?
+
+**Analysis of retroactive revocation:**
+
+1. *EAT immutability:* epistemically_live determinations are committed to EAT at each epoch boundary. Retroactive revocation would require amending prior EAT records — explicitly prohibited (#r74).
+
+2. *Downstream dependencies:* T3 installation eligibility, query fee distribution, and WED_clearing routing depended on epistemically_live = true during the grace window. Retroactive revocation would invalidate those downstream operations — cascading state invalidation across committed EAT records.
+
+3. *CPA is forward-correcting:* The CPA penalty applied at resolution degrades the committee's credibility_ratio immediately. With shrinkage-corrected CPA penalty from Q1 and fixed abstention decrements from Q2, the committee's credibility_ratio may fall below θ_committee_min quickly after resolution. The epistemically_live count will reflect this in the next epoch.
+
+**Resolution — forward-only correction; no retroactive revocation:**
+
+```
+On CPA detection affecting a grace-window committee:
+  1. Apply CPA retroactive penalty to credibility_ratio_committee immediately.
+  2. If credibility_ratio_committee < θ_committee_min post-penalty:
+       committee no longer contributes to epistemically_live count from next epoch.
+  3. All prior epistemically_live = true determinations REMAIN VALID.
+  4. EAT commit: `CPA_penalty_applied_to_grace_committee` event with committee_id,
+     pre-penalty credibility_ratio, post-penalty credibility_ratio, CPA_cluster_ref.
+
+No retroactive void of epistemically_live epochs.
+```
+
+**Why grace-window benefit cannot be weaponised:** A committee in the grace window has N_calibration epochs of protected epistemically_live contribution. During those epochs, they have zero resolution history — they cannot yet have demonstrated collusion in this class. If they are part of a wrong CPA cluster, the CPA event only fires at oracle resolution (post-grace-window, given dual-condition). The grace-window-to-CPA discovery timeline is:
+
+```
+[Grace window: epochs 1 to N_calibration] → [Oracle resolution fires post-N_calibration]
+   → [CPA detected] → [Forward correction applied from N_calibration+1 onward]
+```
+
+The epistemically_live benefit (epochs 1 to N_calibration) was genuine — the committee contributed to the class before collusion was detectable. The forward correction removes them after collusion is proven.
+
+**Degenerate attack: pre-resolution CPA evidence from cross-class data.** If a committee has a known CPA cluster membership established from a *different* coordinate class before the grace-window resolution fires, can governance proactively revoke the grace-window benefit? This is a cross-class CPA propagation question — left as an open question for #r227, as it requires cross-class identity tracking not yet formally specified.
+
+**Design law (#r226):** EAT-committed state transitions are irreversible. CPA discovery that post-dates an epistemically_live commitment is a forward-only correction event — it adjusts credibility_ratio and removes future contributions, but does not void past determinations. The natural credibility_ratio decay is the correction mechanism; no retroactive state invalidation is permitted. (#r226)
+
+---
+
+## Net-New Structural Insight: Abstention Floor as Participation-Incentive Resolution (#r226)
+
+The abstention credibility floor θ_abstain_floor = θ_committee_min − 0.01 reveals a structural property not previously formalised: the COMMITTEE model has a **latent free-rider problem** that the fixed-decrement mechanism resolves.
+
+**The latent free-rider problem:**
+
+A COMMITTEE participant who is already at high credibility_ratio and has no private information about a given epoch can rationally abstain: they preserve their capital (no escrow risk on a claim they are uncertain about) while free-riding on the epistemic contributions of other committee members. If enough high-credibility members abstain, S_cred relies only on the remaining (possibly lower-credibility) claims.
+
+Without a participation incentive, COMMITTEE classes degrade toward a thin-participant problem: high-credibility members abstain when uncertain; low-credibility members make speculative claims; S_cred quality deteriorates.
+
+**The fixed-decrement resolution:**
+
+The abstention budget `(credibility_ratio − θ_committee_min) / Δ_abstain` is finite. A high-credibility committee that consistently abstains loses credibility_ratio at rate Δ_abstain per epoch until it approaches θ_committee_min. The threat of losing threshold status creates participation incentives proportional to how much the committee values its epistemic standing.
+
+**The resulting equilibrium:**
+
+Committees with private information participate (they gain log-score credit on correct claims). Committees without private information either:
+(a) Abstain (temporary; they spend down their abstention budget and must eventually participate or lose threshold status), or
+(b) Submit claims near the current S_cred consensus (low-information claim; earns near-zero log-score but does not burn abstention budget).
+
+Option (b) is informationally neutral but keeps the committee active. Option (a) is tolerated for a finite budget. Neither option results in a committee permanently free-riding without consequence.
+
+**Structural contrast with LMSR:** In LMSR, informed traders cannot free-ride without losing participation rewards (they must trade to extract value). Uninformed traders who participate move the price adversely against themselves. COMMITTEE abstention-budget is the analogous mechanism: abstention is free short-term, costly long-term. (#r226)
+
+---
+
+## Structural Synthesis: #r226
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| CPA small-cluster noise | James-Stein shrinkage: ρ_prior_shrunk = (1−λ)×ρ_estimated + λ×ε_T3; λ = N_anchor/max(N_anchor,N_cluster) | Shrinkage scales down small-cluster over-penalisation toward prior |
+| Abstention decrement | Fixed Δ_abstain = 0.05; floor θ_committee_min − 0.01; abstention budget = (ratio − threshold)/Δ | Fixed decrement creates uniform threshold distance; proportional is inconsistent |
+| σ_oracle_residual bootstrap | Required governance field; no default; dual-condition transition; σ_bootstrap divergence alert | Consequential parameter requires explicit governance reasoning at registration |
+| Grace-window CPA discovery | No retroactive revocation; forward CPA penalty → credibility_ratio decay; EAT immutability governs | Past EAT-committed state is irreversible; correction is always forward |
+| Abstention free-rider insight | Fixed abstention budget is finite participation incentive; resolves COMMITTEE free-rider latency | Abstention budget mirrors LMSR's informed-trader participation incentive |
+
+---
+
+## Cumulative Invariants (#r226)
+
+**Invariant #311 (#r226):** CPA ρ_prior shrinkage: ρ_prior_shrunk = (1 − λ_shrink) × ρ_prior_estimate + λ_shrink × ε_T3_class; λ_shrink = N_shrink_anchor / max(N_shrink_anchor, N_cluster_wrong); N_shrink_anchor = 10 (governance [5, 20]). At N_cluster_wrong ≤ N_shrink_anchor, full shrinkage toward ε_T3_class — coincident small clusters receive near-prior penalties. At large clusters, penalty approaches the unadjusted observed estimate.
+
+**Invariant #312 (#r226):** Committee abstention credibility update: credibility_ratio_committee(a, t+1) = max(credibility_ratio_committee(a, t) − Δ_abstain, θ_abstain_floor); Δ_abstain = 0.05 (governance [0.01, 0.20]); θ_abstain_floor = θ_committee_min − 0.01. Abstention budget = (current_ratio − θ_committee_min) / Δ_abstain. Δ_wrong > Δ_abstain enforced: non-participation penalised less than dishonest participation but finitely.
+
+**Invariant #313 (#r226):** σ_oracle_residual bootstrap: governance-declared σ_oracle_residual_bootstrap required field at COMMITTEE class registration (no protocol default). Hard bounds: [0.01 × σ_claim_spread, 1.0 × σ_claim_spread]. Dual-condition transition to empirical EMA after N_calibration resolutions. σ_bootstrap_divergence_flag auto-alert if empirical diverges > 2× or < 0.5× of bootstrap within N_calibration resolutions.
+
+**Invariant #314 (#r226):** Grace-window CPA discovery: prior epistemically_live determinations (EAT-committed) are irreversible. CPA discovery post-dates the grace window by construction (oracle fires post-N_calibration). Forward correction: CPA penalty applied to credibility_ratio_committee immediately at resolution; epistemically_live count adjusts from next epoch. No retroactive void of committed state.
+
+**Invariant #315 (#r226):** COMMITTEE abstention budget resolves the free-rider problem: high-credibility committees with no private information face a finite abstention budget before breaching θ_committee_min. Equilibrium: informed committees participate; uninformed committees either spend abstention budget (tolerated short-term) or submit near-consensus low-information claims (informationally neutral). No permanent free-riding without consequence.
+
+---
+
+## Run Log Update
+
+- **#r226** — 2026-04-04T11:42Z — Q1: CPA James-Stein shrinkage: λ = N_anchor/max(N_anchor, N_cluster); small clusters → prior penalty. Q2: Fixed Δ_abstain = 0.05 with floor θ_committee_min−0.01; abstention budget finite. Q3: σ_oracle_residual_bootstrap required governance field; dual-condition transition; divergence alert. Q4: No retroactive epistemically_live revocation on CPA discovery; forward-only correction via credibility_ratio decay; EAT immutability governs. Net-new: COMMITTEE abstention free-rider analysis — fixed-decrement creates finite abstention budget, mirrors LMSR informed-trader participation incentive structurally. Invariants #311–#315.
+
+---
+
+## Open Questions for #r227+
+
+1. **Cross-class CPA propagation for pre-resolution committee CPA evidence:** If a committee has established CPA cluster membership on a different coordinate class before the current class's grace window completes, should the epistemically_live grace benefit be proactively revoked or denied? This requires cross-class identity tracking; the mechanism currently treats each class's CPA detection as class-local.
+
+2. **Δ_abstain and Δ_wrong consistency constraint:** Invariant #312 states Δ_wrong > Δ_abstain should be enforced. Is this a hard contract constraint (governance cannot set Δ_abstain ≥ Δ_wrong), or an advisory recommendation? Define the precise Δ_wrong computation used for comparison (class-specific average, minimum observed, or per-committee trailing average).
+
+3. **σ_bootstrap divergence alert response options:** When σ_bootstrap_divergence_flag fires (empirical diverges > 2× from bootstrap), governance has two policy options: (a) update σ_bootstrap to empirical EMA (q_quality_threshold_adjusted recalibrates prospectively), or (b) accept the divergence and take no action. Should the mechanism define a maximum divergence window before forced recalibration (e.g., if divergence persists for 2 × N_calibration epochs, a forced transition applies the empirical EMA without governance vote)?
+
+4. **Abstention budget and Zone C interaction:** During Zone C, new T3 installations are throttled. If a COMMITTEE class is in Zone C and committees cannot earn new log-score credit (no new resolutions due to throttling), their abstention budgets drain without an offset path. Should abstention budget decay be suspended during Zone C epochs for COMMITTEE classes, or does Zone C by design permit budget drain as a solvency-stress signal?
+
+*Last updated: #r226 — 2026-04-04T11:42Z*
