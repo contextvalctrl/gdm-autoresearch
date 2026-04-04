@@ -8607,3 +8607,180 @@ If k_impl × (T_longtail_B + T_longtail_C) exceeds the cap for a deep chain, the
 3. **k_impl and LTRP pre-funding at class registration.** T_impl_pending_max = k_impl × T_longtail(B) affects LTRP exposure for the IMPL_PENDING tail. Should the LTRP_seed formula for cross-class implication chains include a k_impl-sensitive term?
 
 4. **IMPL_PENDING_B Zone C deferral interaction with T_impl_pending_max expiry.** Zone C defers IMPL_PENDING release. Does T_impl_pending_max expiry also toll during Zone C (analogous to T_longtail tolling during degraded mode), or does the clock advance regardless?
+
+---
+
+## #r178 Contributions — 2026-04-04T03:22Z
+
+**Phase: v2.2 Module 3 — Implication Chains, edge cases. Addresses all four open questions from #r177.**
+
+---
+
+### Q1 (Oracle fires out of order — B before A in A→B→C chain) → Immediate IMPL_PENDING_AB closure using EAT-committed B result; no re-evaluation (#r178)
+
+**Scenario:** A→B→C declared at epoch t_0. B's oracle fires at t_1 (B-correct). A's oracle fires at t_2 > t_1. At t_2, IMPL_PENDING_AB is created by the lazy cascade model. B has already resolved — its outcome is committed to the EAT as an immutable record.
+
+**Should IMPL_PENDING_AB wait for re-evaluation or close immediately?**
+
+Re-evaluation is meaningless: B's oracle outcome is immutable in the EAT. There is nothing to await. The IMPL_PENDING_AB is created and immediately resolved in the same transaction.
+
+**Resolution — same-block close:**
+
+```
+At T_anchor_A (A-correct, B-already-resolved):
+  IMPL_PENDING_AB created as usual
+  Protocol checks: eats_record(B_class_id).oracle_resolved == true
+  If true: IMPL_PENDING_AB closes immediately in the same transaction
+    if B_result == correct: implication_bonus_residual_AB -> declarant (immediate)
+    if B_result == wrong:   implication_bonus_residual_AB -> B-class loser pool
+  No IMPL_PENDING_AB enters a waiting state
+
+At T_anchor_A (A-correct, B-already-resolved-correct, C-unresolved):
+  IMPL_PENDING_AB closes immediately (B-correct path above)
+  IMPL_PENDING_BC created for C oracle (normal lazy cascade continues)
+```
+
+**EAT lookup gas cost:** One EAT read to confirm B's resolution status. O(1). Negligible.
+
+**Why no re-evaluation complexity:** The lazy cascade model (#r177/Q1) explicitly prevents eagerly creating IMPL_PENDING objects. The same principle applies in reverse: when A fires after B, we create IMPL_PENDING_AB and immediately check if B is already in the EAT. The "pending" state is a degenerate zero-duration state in this case. No new contract state required.
+
+**Design law (#r178):** When the IMPL_PENDING primary trigger's awaited oracle is already resolved in the EAT at IMPL_PENDING creation time, the IMPL_PENDING closes immediately in the same transaction using the committed EAT result. No waiting state is entered. (#r178)
+
+---
+
+### Q2 (Chain declaration partial failure recovery — C's reward when A-correct, B-wrong) → C earns standard base claim reward only; no reduced chain bonus; chain bonus is non-bifurcatable (#r178)
+
+**Scenario:** A→B→C chain declaration. A resolves correct; B resolves wrong; IMPL_PENDING_AB slashes residual_AB to loser pool. IMPL_PENDING_BC is never created. C's oracle has not yet fired.
+
+**What does C earn?**
+
+C's base claim on the C-coordinate is a standard T3 claim, independently staked and independently assessed by the oracle. Its reward is the standard credibility_ratio-weighted log-score reward plus any CLEARING or DISCOVERY mode query fee credits on C's class. This reward is **unchanged** by the chain failure.
+
+**Why no reduced chain bonus:** The implication chain bonus (alpha_cap structure, bifurcated bonus from #r145) compensates the declarant for correct prediction of a conditional causal structure. If B is wrong, the causal chain A->B was incorrect. C's accuracy on C's coordinate is independent of whether A->B was a correct implication — the chain bonus was for the declarant believing and being correct about the conditional structure. A->B was wrong; the chain bonus for the full chain is forfeit.
+
+C's reward tracks C's independent accuracy, not the chain's accuracy. The chain bonus is non-bifurcatable: you earn it for the chain being correct, not for individual links.
+
+**Why this is the right incentive:** If declarants could earn partial chain bonuses on partial chains, they would be incentivised to construct long chains where the early links are high-confidence (earning direct bonuses) and the late links are speculative (upside-only bets). The non-bifurcatable structure prevents this: the chain bonus is all-or-nothing for each sequential segment.
+
+**Audit note for ClaimEscrow:** C's escrow must not be affected by A->B->C chain failure. C's standard claim escrow is lifecycle-independent of the chain declaration. Confirm in audit that chain_declaration_id on C's ClaimEscrow is reference-only (no escrow modifier). (#r178)
+
+**Design law (#r178):** Chain bonus is non-bifurcatable. A failed intermediate link forfeits the chain bonus for all subsequent links. Each coordinate's standard base claim reward remains unaffected by chain failure. (#r178)
+
+---
+
+### Q3 (k_impl and LTRP pre-funding — should LTRP_seed formula include k_impl-sensitive term?) → Yes; implication_reserve_buffer with 100% coverage floor; k_impl is pre-funding adequacy parameter (#r178)
+
+**The exposure:** T_impl_pending_max = k_impl x T_longtail(B). The IMPL_PENDING_AB residual is held for up to k_impl x T_longtail(B) epochs. This is additional tail exposure beyond the standard T_longtail escrow: the implication_bonus_residual is protocol reserve, separately tracked.
+
+**The actual exposure is on the implication_reserve account, not the class-specific LTRP.** The implication_reserve is the protocol-level holding account for all IMPL_PENDING balances.
+
+**Resolution — implication_reserve_buffer:**
+
+```
+implication_reserve_buffer_target = sum of all outstanding IMPL_PENDING residuals across all classes and chains
+
+implication_reserve_buffer_funded_by:
+  gamma_escrow_excess components already posted to the reserve at declaration time (#r146)
+  + governance-seed at protocol genesis
+
+implication_reserve_buffer_floor = max(
+  sum(residual_XY),       // full coverage of outstanding IMPL_PENDING
+  gamma_reserve_floor_fraction x sum(implication_bonus_escrow_initial)
+)
+gamma_reserve_floor_fraction = 1.0 (100% -- implication reserve must fully cover outstanding IMPL_PENDING)
+```
+
+**k_impl-sensitive term for implication_reserve_buffer_target:**
+
+The k_impl parameter affects the duration of IMPL_PENDING exposure but not the per-unit funding requirement: each outstanding residual_XY is fully funded from declaration-time escrow. k_impl is a pre-funding adequacy governance parameter — it informs how much implication_bonus_escrow_initial to pre-fund at declaration when k_impl is large. This is a registration-time governance check, not an on-chain runtime variable.
+
+**Design law (#r178):** Implication reserve (IMPL_PENDING balances) maintains 100% coverage as a hard floor. k_impl affects the duration of exposure but not the per-unit funding requirement: each outstanding residual_XY is fully funded from declaration-time escrow. The k_impl sensitivity is a governance pre-funding adequacy parameter, not a runtime variable. (#r178)
+
+**v2.2 spec addition:** Protocol-level implication_reserve_buffer with full coverage floor; implication_reserve_buffer adequacy check at class registration.
+
+---
+
+### Q4 (IMPL_PENDING_B Zone C deferral and T_impl_pending_max expiry — does Zone C toll the clock?) → Zone C tolls T_impl_pending_max; same pattern as T_longtail during degraded mode (#r178)
+
+**The question:** Zone C on class B defers release of IMPL_PENDING_AB. Does the T_impl_pending_max clock also pause during Zone C?
+
+**Resolution — yes, Zone C tolls T_impl_pending_max:**
+
+IMPL_PENDING_AB cannot release when Zone C is active on class B. If T_impl_pending_max continues advancing during Zone C, the IMPL_PENDING would expire and route to LTRP while legitimate resolution is pending but deferred by solvency constraints. The declarant would lose the implication bonus not because B resolved wrong — but because Zone C triggered LTRP routing before B's oracle could settle.
+
+This is the same asymmetry that motivated T_longtail tolling during DA outage (#r137): the deadline must toll when the mechanism itself cannot act on the deadline's outcome.
+
+**Formal rule:**
+
+```
+T_impl_pending_max tolls (does not advance) when:
+  zone_status(class_B) == C
+  OR SFP_challenge_active(class_B) == true
+
+T_impl_pending_max resumes advancing when:
+  zone_status(class_B) in {A, B}
+  AND SFP challenge resolved or expired
+
+Actual_expiry_epoch = T_anchor_A + T_impl_pending_max + sum(tolled_epochs)
+EAT event: impl_pending_zone_c_toll_applied { impl_id, tolled_epochs, new_expiry }
+```
+
+**Edge case — Zone C persists indefinitely:** If Zone C on class B persists beyond B's own longtail maximum, governance review is already required. The IMPL_PENDING tolling does not block Zone C resolution — it simply prevents LTRP expiry from firing while Zone C is active.
+
+**Design law (#r178):** T_impl_pending_max tolls when zone_status(awaited_class) == C or when SFP challenge is active on the awaited class. The clock only advances when the mechanism is capable of acting on the IMPL_PENDING outcome. Toll is epoch-granular; each tolled period is committed to the EAT. (#r178)
+
+**v2.2 contract addition:** SettlementEngine: T_impl_pending_max toll logic; zone_status(class_B) check per epoch; SFP_challenge_active(class_B) check; tolled_epoch accumulator; EAT impl_pending_zone_c_toll_applied event.
+
+---
+
+## Structural Synthesis: Module 3 — Implication Chains, Edge Cases Closed (#r178)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Out-of-order oracle (B before A) | Same-block IMPL_PENDING_AB creation and closure; EAT lookup only; no wait state | Out-of-order resolution = immediate zero-duration IMPL_PENDING close |
+| Partial chain failure (A-correct, B-wrong) | C earns standard base claim only; chain bonus is non-bifurcatable | Chain bonus = all-or-nothing per sequential segment |
+| k_impl and LTRP pre-funding | Implication reserve maintains 100% coverage floor; k_impl is pre-funding adequacy parameter | Full coverage from declaration-time escrow; k_impl affects duration not unit cost |
+| Zone C tolling of T_impl_pending_max | Zone C tolls the clock; same principle as T_longtail tolling during degraded mode | Clock only advances when mechanism can act on IMPL_PENDING outcome |
+
+---
+
+## v2.2 Contract Spec Additions from #r178
+
+| Contract | Addition |
+|---|---|
+| **SettlementEngine** | Same-block IMPL_PENDING close when awaited oracle already in EAT |
+| **ClaimEscrow** | Audit note: chain_declaration_id is reference-only; no escrow modifier from chain failure |
+| **Protocol-level** | implication_reserve_buffer with 100% coverage floor; pre-funding adequacy check at class registration |
+| **SettlementEngine** | T_impl_pending_max toll: zone_status(class_B) == C OR SFP_active; tolled_epoch accumulator; EAT event |
+
+---
+
+## Cumulative Invariants (additions through #r178)
+
+**Invariant #109 (#r178):** When IMPL_PENDING_AB is created and the awaited oracle (B) is already resolved in the EAT, IMPL_PENDING_AB closes immediately in the same transaction. No waiting state is entered for out-of-order oracle resolution.
+
+**Invariant #110 (#r178):** Chain bonus is non-bifurcatable. A failed intermediate link forfeits the chain bonus for all subsequent links in that chain. Each coordinate's standard base claim reward is unaffected by chain failure — the two are accounting-independent.
+
+**Invariant #111 (#r178):** Implication_reserve_buffer maintains a 100% coverage floor over all outstanding IMPL_PENDING residuals. Full coverage is funded from declaration-time gamma_escrow_excess. k_impl is a pre-funding adequacy governance parameter, not a runtime coverage variable.
+
+**Invariant #112 (#r178):** T_impl_pending_max tolls when zone_status(awaited_class) == C or when SFP challenge is active on the awaited class. The effective expiry is T_anchor + T_impl_pending_max + sum(tolled_epochs). Toll is epoch-granular; each tolled period is committed to the EAT.
+
+---
+
+## Run Log Update
+
+- **#r178** — 2026-04-04T03:22Z — Module 3 implication chains edge cases: out-of-order oracle resolution (same-block IMPL_PENDING close), partial chain failure (non-bifurcatable bonus), k_impl LTRP pre-funding (100% coverage floor via implication_reserve_buffer), Zone C tolling of T_impl_pending_max. Invariants #109-#112. Four v2.2 contract additions.
+
+---
+
+## Open Questions for #r179+ (v2.2 Module 3 closure / Module 4 entry)
+
+1. **Module 3 completeness gate:** Remaining implication chain adversarial candidates: (a) declaration front-running (adversary registers same chain first via mempool observation); (b) implication_bonus_residual flash-loan attack at IMPL_PENDING_BC closure; (c) multi-chain entanglement (A->B, A->C, A->D simultaneously creating excessive IMPL_PENDING from one oracle event).
+
+2. **Module 4 entry: three-tier archive integration and lazy compaction eligibility.** CID chain, Arweave/IPFS mirror, retry SLA specified (#r156-#r158). Remaining: what criteria make an EAT epoch eligible for lazy compaction? Can an epoch be compacted if it contains unresolved IMPL_PENDING references?
+
+3. **Module 5 preview: cross-class LTRP backstop adversarial.** Bilateral opt-in and Zone C gating (#r158/Q4) specified. Remaining: can a class entering Zone C opportunistically trigger cross-class backstop opt-in to extract capital from healthier classes?
+
+4. **v2.2 cumulative contract additions summary:** Canonical list of new v2.2 contracts and additions, structured analogously to the v2.1 summary table at #r166, for engineering handoff.
+
+*Last updated: #r178 — 2026-04-04T03:22Z*
