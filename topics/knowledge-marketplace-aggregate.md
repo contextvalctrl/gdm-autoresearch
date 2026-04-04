@@ -16332,4 +16332,247 @@ One additional operation to T5. No new contracts. EDS requires one new storage v
 
 4. **BINARY_ANCHOR early oracle notification and S_cred manipulation window:** Once notifyOracleAvailable fires, anyone who reads the oracle value first can submit claims aligned with it before full propagation. Does BINARY_ANCHOR require a simultaneous notification mechanism or propagation delay, or is τ_bonus already sufficient (early correct claims were submitted before notification; late-aligned claims earn lower τ_bonus)?
 
-*Last updated: #r213 — 2026-04-04T09:22Z*
+*Last updated: #r214 — 2026-04-04T09:32Z*
+
+---
+
+## #r214 Contributions — 2026-04-04T09:32Z
+
+Addresses all four open questions from #r213. Net-new structural insight: the dual-role actor problem — entities who are simultaneously knowers and unknowers, and why the mechanism's clean role separation is load-bearing but partially violated by design.
+
+---
+
+### Q1 (EDS adversarial cost — transfer vs. burn) → Self-referential loop exists; closed by non-self-distribution rule and knower EDS contribution cap (#r214)
+
+**The exact attack:** An adversary who is simultaneously a knower on class c pays q_bonus into the EDS accumulator. The q_bonus is distributed to active S_cred contributors on class c — which includes the adversary themselves (as a knower). If the adversary holds dominant credibility weight on class c (e.g., W_max fraction), they recover a large share of their own q_bonus payment, reducing net adversarial cost asymptotically toward zero.
+
+At adversary credibility weight w_adversary / W_total:
+```
+adversary_net_cost = q_bonus × (1 - w_adversary / W_total)
+```
+
+If w_adversary = W_max = 0.30 × W_total, net cost = 0.70 × q_bonus — substantial but not full deterrence. If adversary controls multiple identities summing to high credibility, effective cost falls further.
+
+**Resolution — two complementary rules:**
+
+**Rule 1 — Non-self-distribution:** A knower's query fee share from a query they submitted is zero. Fee-to-self flows are suppressed at the CredibilityAggregator fee distribution layer.
+
+```
+fee_share(knower_a, query_q) =
+  0                     if query_q.submitter == knower_a
+  w_a / Σ_{b≠submitter} w_b   otherwise  (redistribution normalised across non-submitters)
+```
+
+Non-self-distribution already exists in standard prediction market theory (you cannot bet against yourself in a way that is profitable in expectation). Formalising it here is a direct application.
+
+**Rule 2 — EDS contribution cap:** Any single address contributes at most q_bonus_cap_fraction × q_fee_base(c) per epoch to the EDS accumulator. High q_bonus from a single address is clamped:
+
+```
+EDS_contribution(address_a, c, epoch_t) = min(q_bonus_a, q_bonus_cap_fraction × q_fee_base(c))
+q_bonus_cap_fraction = 5.0  (governance-settable; bounded [2.0, 20.0])
+```
+
+This caps any single actor's ability to spike EDS without burning real cost.
+
+**Residual risk after both rules:** The adversary still directs knower attention at the cost of (1 - w_self_normalised) × q_bonus per query. For a W_max-capped adversary, this is always ≥ 0.70 × q_bonus. For a rational adversary, the informational-edge payoff from redirecting knower attention must exceed 0.70 × q_bonus — a meaningful real cost. EDS signal manipulation is expensive relative to its directional effect.
+
+**Design law (#r214):** Fee self-referential loops must be broken by non-self-distribution. EDS signal injection must be capped per-address to prevent single-actor signal flooding at reduced personal cost. Both rules are required; neither alone closes the loop. (#r214)
+
+---
+
+### Q2 (EDS threshold calibration derivation) → Equilibrium-anchored; EDS_threshold_high = 2× cross-class median at registration; EDS_threshold_low = 0.25× (#r214)
+
+**The principled calibration criterion:** EDS_threshold_high should fire at the point where additional q_bonus signal reliably induces marginal knower entry. Below that point, the signal is insufficient to overcome knower entry costs; above it, the mechanism over-fires (frequent signals lose informational content through Bayesian updating — the boy-who-cried-wolf effect).
+
+**Equilibrium condition for marginal entry:** A knower enters a class when expected query fee income ≥ opportunity cost. Expected fee income scales with EDS (more unknower demand → higher fees). The tipping point is where knower expected income at current EDS would exactly cover entry costs — which is class-specific and unobservable.
+
+**Tractable approximation from cross-class empirical distribution:**
+
+At a healthy functioning protocol, classes that attract active knowers have a characteristic EDS level. Classes near the median EDS are neither over-demanded nor under-demanded. Classes at 2× median EDS are attracting knowers above the normal rate. This is the empirically observable proxy for the equilibrium tipping point.
+
+```
+EDS_threshold_high(class_i) = 2.0 × rolling_median_EDS_cross_class_at_registration
+EDS_threshold_low(class_i)  = 0.25 × rolling_median_EDS_cross_class_at_registration
+
+rolling window: N_calibration normal-mode epochs
+cross-class scope: same market_structure_tier (following #r157/Q3 tier scoping)
+```
+
+**Threshold recalibration:** Thresholds update at each macro-epoch boundary (same cadence as S_cred updates). Percentile changes as new classes register and EDS distributions shift.
+
+**Governance clamp:** EDS_threshold_high in [1.2×, 5.0×] cross-class median; EDS_threshold_low in [0.05×, 0.5×] cross-class median. Prevents governance from silencing EDS signals by setting extreme thresholds.
+
+**Bootstrap (no cross-class data at genesis):** EDS_threshold_high defaults to 2× q_fee_base(c) / q_fee_base_protocol_median (relative to fee size, not cross-class EDS). Transitions to EDS-derived formula after N_calibration cross-class data epochs are available — consistent with dual-condition transition pattern (Invariant #21). (#r214)
+
+---
+
+### Q3 (Multi-shadow-class portability chaining) → Per-knower cross-source carry-over ceiling = 1× credibility_ratio_shadow_max in receiving clearing class (#r214)
+
+**The chaining problem:** Knower participates in 3 shadow classes (A, B, C) targeting the same clearing class X. Each reaches credibility_ratio_shadow_max. Carry-over applies independently:
+
+```
+carry_over_A = carry_over_fraction_A × credibility_ratio_shadow_max
+carry_over_B = carry_over_fraction_B × credibility_ratio_shadow_max
+carry_over_C = carry_over_fraction_C × credibility_ratio_shadow_max
+
+total_carry_over = carry_over_A + carry_over_B + carry_over_C
+```
+
+At carry_over_fraction = 0.25 (one-shot each): total = 0.75 × credibility_ratio_shadow_max. At carry_over_fraction = 0.5 (two resolutions each): total = 1.5 × credibility_ratio_shadow_max — exceeds the per-class cap.
+
+With N shadow classes at high carry_over_fraction, total could reach N × carry_over_fraction × max — far exceeding any reasonable bootstrapping intent.
+
+**Resolution — cross-source total carry-over ceiling:**
+
+```
+total_carry_over(knower_a, clearing_class_X) =
+    Σ_{shadow_i : source of clearing_class_X} carry_over_fraction_i × credibility_ratio_shadow_i
+
+ceiling: total_carry_over ≤ 1.0 × credibility_ratio_shadow_max
+```
+
+Capped at one full shadow-max equivalent. Additional shadow-class carry-overs are truncated proportionally:
+
+```
+if total_carry_over > credibility_ratio_shadow_max:
+    scale_factor = credibility_ratio_shadow_max / total_carry_over
+    carry_over_i_effective = carry_over_i × scale_factor  (for all i)
+```
+
+**Rationale:** The clearing class's genesis credibility_ratio should be bootstrapped from *at most* one equivalent "full shadow credential" regardless of how many shadow classes were run. Multiple shadow classes provide more resolution data (better count-based carry-over fractions) but should not stack beyond the ceiling.
+
+**Interaction with Invariant #253:** credibility_ratio_shadow_max caps each individual shadow class's contribution. The cross-source ceiling caps the aggregate. Both apply. The effective rule:
+
+```
+each carry_over_i ≤ 1 × credibility_ratio_shadow_max × carry_over_fraction_i
+total_carry_over ≤ 1 × credibility_ratio_shadow_max
+```
+
+**New governance parameter:** cross_source_carry_over_ceiling (default 1.0 × credibility_ratio_shadow_max; range [0.5×, 2.0×]). Stored per clearing-class registration.
+
+**Design law (#r214):** Shadow portability chaining from multiple shadow sources is capped at a single total ceiling per receiving clearing class. Diversity of shadow evidence (multiple shadow classes) improves carry-over fractions via count-based formula but does not stack the absolute magnitude beyond one equivalent shadow credential. (#r214)
+
+---
+
+### Q4 (BINARY_ANCHOR early oracle notification and S_cred manipulation window) → τ_bonus is structurally sufficient for late-aligned claims; oracle read-lock until notifyOracleAvailable is required (#r214)
+
+**Two distinct manipulation windows to distinguish:**
+
+**Window A — before oracle value is on-chain:** Knowers submit claims based on private information or off-chain signal about oracle direction. τ_bonus rewards early correct submissions. No manipulation window here; this is the intended incentive.
+
+**Window B — oracle value is on-chain but notifyOracleAvailable has not fired yet:** A participant reads the oracle contract directly (bypassing the protocol's notification mechanism) and submits a claim aligned with the known oracle value. They earn τ_bonus at T_anchor_locked − t_submit (some residual bonus for submitting before T_anchor), and their claim is guaranteed correct. This is back-running at the oracle layer.
+
+**The τ_bonus defense against Window B:**
+
+τ_bonus at submission time t_submit:
+```
+τ_bonus(t_submit) = 1 + τ_scale × (1 − t_submit / T_anchor_max)
+```
+
+If oracle fires at T_anchor_effective << T_anchor_max, and an adversary reads it at T_anchor_effective and submits at T_anchor_effective:
+```
+τ_bonus_adversary = 1 + τ_scale × (1 − T_anchor_effective / T_anchor_max)
+```
+
+This could be substantially > 1 if T_anchor_effective is early. τ_bonus does NOT fully close Window B — it only reduces the bonus relative to truly early legitimate claimants.
+
+**Required fix — oracle read-lock:**
+
+```
+Oracle contract (e.g., Chainlink feed, Pyth network, on-chain event):
+  oracle_value is readable only via CredibilityAggregator.getOracleValue(class_id)
+    which requires: T_anchor_status(class_id) == POST_T_ANCHOR
+    (i.e., after notifyOracleAvailable has been processed and T_anchor has fired)
+
+  Protocol does NOT whitelist direct oracle contract reads for claims purposes.
+  Any claim submission referencing oracle-available data must go through
+  CoordinateRegistry, which enforces T_anchor status check.
+```
+
+**Implementation:** The oracle source is not the oracle contract directly — it is the protocol-registered oracle proxy. The proxy exposes oracle_value only after the notifyOracleAvailable event has been accepted and T_anchor has fired. The on-chain event data is still publicly readable via raw blockchain state; this read-lock does not prevent observation, only prevents *claim credit* for post-oracle-availability claims that are submitted with oracle-informed values.
+
+**Residual risk:** Raw blockchain reading of the oracle contract before notifyOracleAvailable allows off-chain observation but not protocol-level claim credit. A sophisticated adversary can read the raw oracle and submit claims, but these claims cannot receive τ_bonus credit that exceeds what honest early-submission knowers received — because the τ_bonus formula depends on t_submit relative to T_anchor_locked, not on whether the adversary had oracle knowledge.
+
+**Key insight:** The τ_bonus formula's dependence on T_anchor_locked (fixed at submission, not at oracle availability) means that claims submitted after oracle availability but before T_anchor can still earn some bonus — but they are bounded by (1 + τ_scale × (1 − t_submit / T_anchor_max)) which is strictly less than an equivalent claim submitted at the same t_submit but before oracle availability. The only way to abuse Window B is to submit very early (when oracle value is unknown). This is exactly the behaviour the mechanism wants to reward.
+
+**Summary:** τ_bonus + oracle read-lock together fully close Window B. Oracle read-lock (claims via oracle proxy, not raw contract) is required. Without it, the adversary can back-run the oracle with full τ_bonus credit. With it, back-running is possible only off-chain; claim credit is restricted to τ_bonus formula which incentivises genuine early submission. (#r214)
+
+---
+
+### Net-New Structural Insight: The Dual-Role Actor Problem (#r214)
+
+**The violated assumption:** Across all 214 runs, the mechanism has maintained a clean separation: knowers produce information, unknowers consume it. Capital flows from unknowers to knowers as a fee for credible state updates. This role separation is load-bearing for the mechanism's incentive properties.
+
+**The dual-role actor:** Many institutional participants in GestAlt CLEARING_MODE are simultaneously:
+1. **Knowers:** They hold warranted positions in S_cred for coordinates they have private information about.
+2. **Unknowers:** They need credible state estimates for coordinates they *don't* hold positions in, to price their correlated holdings or derivatives.
+
+This is not an edge case — it is the typical institutional profile. A market maker on bond event contracts (the clearing class) is also an information producer about interest rate movements (correlated clearing classes). They are simultaneously a knower (for rate classes), an unknower (for bond event classes they don't have private information about), and a position-holder (for the settlement classes).
+
+**Why this matters for mechanism design:**
+
+1. **EDS manipulation:** Q1 above is a specific manifestation — a dual-role actor can manipulate EDS by paying q_bonus (as unknower) while receiving fee distribution (as knower on the same class). The non-self-distribution rule patches the explicit loop but not the indirect loop: an actor can pay q_bonus on class A to attract knower attention to A, then benefit from better S_cred(A) on a correlated class B where they hold positions.
+
+2. **Challenge incentive distortion:** A dual-role actor who is a position-holder may deliberately *not* challenge a wrong warranted installation (even if they detect it) if the wrong S_cred benefits their position. The challenger population (#r160/Q4) assumes challengers are epistemically motivated; dual-role actors may be financially motivated to suppress correct challenges.
+
+3. **TOWL capacity gaming:** A dual-role actor as knower controls TOWL capacity through their escrow. As unknower/position-holder, they have incentive to observe TOWL zones (Zone A vs Zone C) and time their unknower activity accordingly — creating correlated strategies that the mechanism modelled as independent.
+
+**The mechanism's current defence level:**
+
+- EDS non-self-distribution (#r214/Q1): patches the immediate loop, not correlated-class manipulation.
+- W_max per-agent cap: limits individual influence on S_cred regardless of role.
+- Settlement Freeze Protocol + challenge window: settlement price is oracle-authority not knower-determined; direct position gaming via warranted installation is hard.
+
+**The gap not yet closed:** No rule prevents a dual-role actor from using EQ q_bonus on class A to improve S_cred(A), then profiting from correlated position on class B. This is information arbitrage via the demand mechanism, not a mechanism design flaw per se — but it does mean the EDS bilateral circuit (#r213 net-new) can be exploited for cross-class advantage rather than genuine epistemic demand signalling.
+
+**Minimal forward fix:** EDS-weighted welfare (#r213 net-new) should use position-registry-adjusted EDS weighting. Unknower EQ bids from entities with registered positions on correlated classes are flagged with a `position_adjusted_EDS_flag`. This does not block their bids but allows the EDS signal to be interpreted with context: a high-EDS class where demand is dominated by position-holders on correlated classes carries a different epistemic interpretation than demand from genuine unknowers.
+
+**This is not closed in #r214.** It is identified as the most important structural gap for the mechanism's v2.2 design pass. The dual-role actor problem does not prevent v2.1 CLEARING_MODE launch — the v2.1 feature set (5 contracts, 20 invariants, no EDS) is insulated from dual-role distortion because EDS is a v2.2+ feature. But any v2.2 deployment of EDS must first resolve the dual-role EQ incentive structure formally. (#r214)
+
+---
+
+## Structural Synthesis: #r214
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| Non-self-distribution + q_bonus_cap_fraction | Closes EDS self-referential knower loop | Both rules required; residual cost ≥ 0.70 × q_bonus for W_max-capped adversary |
+| EDS threshold at 2× / 0.25× cross-class median | Equilibrium-anchored thresholds; transition after N_calibration | Cross-class median is observable proxy for marginal entry tipping point |
+| Cross-source carry-over ceiling = 1× shadow_max | Chaining from multiple shadows capped at one equivalent credential | Diversity improves fractions; magnitude is capped |
+| Oracle read-lock + τ_bonus | Together close Window B back-running; read-lock is required | τ_bonus alone insufficient without oracle proxy gating claim credit |
+| Dual-role actor structural gap | EDS bilateral circuit exploitable cross-class; v2.2 unresolved | v2.1 insulated (EDS deferred); v2.2 must resolve position-adjusted EDS before deployment |
+
+---
+
+## Cumulative Invariants (#r214)
+
+**Invariant #256 (#r214):** EDS fee distribution applies non-self-distribution: a knower's query fee share from their own submitted query is zero. Fees redistribute among all other active knowers proportionally. Self-referential EDS cost loops are closed.
+
+**Invariant #257 (#r214):** EDS contribution from any single address is capped at q_bonus_cap_fraction × q_fee_base(c) per epoch (default 5.0×; range [2.0×, 20.0×]). Single-actor EDS signal flooding at reduced personal cost is bounded.
+
+**Invariant #258 (#r214):** EDS_threshold_high = 2× rolling cross-class median EDS (same tier); EDS_threshold_low = 0.25× same. Thresholds update each macro-epoch boundary. Governance clamp: [1.2×, 5.0×] high; [0.05×, 0.5×] low. Bootstrap default: relative to q_fee_base until N_calibration cross-class data available.
+
+**Invariant #259 (#r214):** Total cross-source carry-over from multiple shadow classes into a single clearing class is capped at cross_source_carry_over_ceiling (default 1.0 × credibility_ratio_shadow_max; range [0.5×, 2.0×]). Excess is proportionally scaled down. Diversity of shadow sources improves individual carry-over fractions but does not stack magnitude above the ceiling.
+
+**Invariant #260 (#r214):** BINARY_ANCHOR oracle manipulation Window B requires oracle read-lock (claim credit only via oracle proxy after T_anchor fires, not via raw oracle contract reads). τ_bonus alone is insufficient without the read-lock; together they fully close Window B. Oracle proxy access control is a v2.1 deployment requirement for BINARY_ANCHOR classes.
+
+**Invariant #261 (#r214):** Dual-role actors (simultaneously knower and unknower/position-holder) are a structural feature of institutional clearing markets, not an edge case. v2.1 (no EDS, no shadow-class) is insulated from dual-role EDS distortion. v2.2 EDS deployment requires position-adjusted EDS weighting before launch. This is the highest-priority structural design debt for v2.2.
+
+---
+
+## Run Log Update
+
+- **#r214** — 2026-04-04T09:32Z — Q1: Non-self-distribution + q_bonus_cap_fraction close EDS self-referential loop; residual adversarial cost ≥ 0.70 × q_bonus for W_max-capped actor. Q2: EDS thresholds calibrated at 2× / 0.25× rolling cross-class median (same tier); dual-condition bootstrap until N_calibration data available. Q3: Cross-source carry-over ceiling = 1× credibility_ratio_shadow_max; multiple shadow inputs improve fractions but magnitude is hard-capped. Q4: BINARY_ANCHOR Window B closed by oracle read-lock + τ_bonus together; read-lock is a v2.1 deployment requirement for ON_CHAIN_EVENT classes. Net-new: Dual-role actor structural gap identified — entities simultaneously knower and unknower can exploit EDS bilateral circuit cross-class; v2.1 insulated; v2.2 requires position-adjusted EDS before deployment. Invariants #256–#261.
+
+---
+
+## Open Questions for #r215+
+
+1. **Position-adjusted EDS weighting — formal design:** How precisely should EQ bids from position-holders on correlated classes be weighted in the EDS accumulator? Option A: weight by inverse of correlation between the EQ class and the position-holder's position class (low-correlation unknowers get full EDS credit; high-correlation get discounted). Option B: binary flag only (position-adjusted EDS published alongside raw EDS; downstream consumers apply their own interpretation). Option C: position-holders' EDS contributions are excluded from the EDS accumulator entirely.
+
+2. **Non-self-distribution implementation in ClaimEscrow vs CredibilityAggregator:** The non-self-distribution rule requires knowing the query submitter's address at fee distribution time. In the current architecture, T5 QUERY runs through CredibilityAggregator. Is the submitter address propagated through to the fee distribution step, or must a new query registry map be added?
+
+3. **Cross-source carry-over proportional scaling — order dependency:** When total_carry_over exceeds the ceiling and proportional scaling is applied, the scale_factor depends on the sum of all carry-overs. If two shadow classes archive simultaneously, both are scaled together. If they archive sequentially (A first, then B), A is credited first (possibly at full fraction) and B is scaled to fit the remaining ceiling space. Is simultaneous vs sequential archiving order-dependent in a way that creates a shadow-class registration race?
+
+4. **Dual-role challenger suppression — detection:** The mechanism lacks a way to detect if a position-holder is deliberately *not* challenging a wrong warranted installation that benefits their position. Wrong installations that persist long enough may reflect challenger suppression by dual-role actors. Is there a detection heuristic (e.g., a wrong installation that oracle eventually overrides but was not challenged before T_finality is flagged for retroactive governance review of challenger composition)?
+
+*Last updated: #r214 — 2026-04-04T09:32Z*
