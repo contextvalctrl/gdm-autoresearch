@@ -7965,3 +7965,210 @@ All four are closed. No currently unaddressed DISCOVERY_MODE adversarial surface
 4. **Adversarial MONOPOLY_MODE persistence via second-knower suppression:** An adversary who is the incumbent knower on a DISCOVERY_MODE shadow-class and wants to maintain MONOPOLY_MODE (weaker adversarial protections) could suppress second-knower entry by front-running their escrow (e.g., DoS on escrow submission transactions). Is claim submission permissioned or permissionless?
 
 *Last updated: #r174 — 2026-04-04T02:42Z*
+
+---
+
+## #r175 Contributions — 2026-04-04T02:52Z
+
+**Focus: v2.2 Module 2 — Shadow-class lifecycle adversarial stress-test. Addresses all four open questions from #r174.**
+
+---
+
+### Q1 (Wind-down timing attack — adversary-accessible triggers vs governance-only) → Wind-down trigger is governance-exclusive; no permissionless trigger path exists; two adversarial fronts confirmed and closed (#r175)
+
+**Wind-down trigger review:**
+
+From #r155/Q3: WINDING_DOWN is entered by the shadow-class when the linked clearing-class oracle fires (`oracle_resolved` EAT event on the clearing class). This is not a governance action — it is an oracle event. The question is whether an adversary can accelerate or manufacture this trigger.
+
+**Trigger 1 — oracle manipulation to force premature wind-down:**
+
+Oracle manipulation to fire `oracle_resolved` prematurely requires either (a) corrupting the registered oracle source, or (b) meeting a governance-registered quorum early (if clearing uses k/n quorum). The mechanism defends oracle integrity at the clearing-class level (#r71 quorum, #r75 SEE defence). This is within-scope for v2.1 CLEARING_MODE threat model and carries over to the shadow-class trigger. No additional defence required in v2.2.
+
+**Trigger 2 — governance manipulation of shadow-class wind-down directly:**
+
+`shadow_class_wind_down_initiated` requires governance action only for the clearing-class pair (archiving an already-resolved clearing class). An adversary who controls governance could sunset a shadow-class early. Defence: governance action requires k-of-n multisig per #r70; sustained governance capture is a systemic threat, not a shadow-class-specific one.
+
+**What the adversary actually gains from premature wind-down:**
+
+The genesis prior export captures S(T_winding_down_trigger). If the shadow-class has been adversarially shifted (via noise injection, DA1 style) just before wind-down, the exported prior is biased. **This is the real attack vector** — not the trigger mechanism itself, but the state at trigger time.
+
+**Primary defence — SELF_CALIBRATED gate on exportGenesisPrior (#r174/DA3, Invariant #93):**
+
+exportGenesisPrior is blocked unless mode_mismatch_discount_status == SELF_CALIBRATED. A shadow-class whose alignment history is advisory (not enough clearing resolutions) cannot export at all. An adversary who biases S just before wind-down, if the class is in SELF_CALIBRATED status, will see the bias absorbed and attenuated by alpha_prior_effective × (1 − mode_mismatch_discount). If mode_mismatch_discount is self-calibrating (as designed, #r155/Q1), a biased terminal epoch that departs from historical alignment will raise the alignment-score RMSE → raise mode_mismatch_discount → reduce effective alpha_prior_effective → attenuate the adversarial injection.
+
+**Secondary defence — two-epoch terminal prior averaging (new, #r175):**
+
+Analogous to two-epoch terminal_credibility_ratio averaging for accuracy_bonus_pool (#r174/DA4), the genesis prior snapshot uses:
+
+```
+S_genesis_prior_effective = (S(T_winding_down) + S(T_winding_down - 1)) / 2
+  weighted by effective_weight(T) per coordinate
+```
+
+A single adversarially manipulated final epoch shifts the genesis prior by at most 50% of the single-epoch manipulation magnitude. The adversary must sustain the bias across ≥2 epochs — doubling the cost.
+
+**Design law (#r175):** Shadow-class genesis prior export uses two-epoch terminal averaging. Single-epoch state manipulation at wind-down trigger is bounded to 50% penetration. Combined with the SELF_CALIBRATED gate, the defence is two-layer: export gating + prior attenuation. (#r175)
+
+**v2.2 contract addition:** ShadowClearingPairRegistry.exportGenesisPrior: two-epoch terminal averaging of S at T_winding_down and T_winding_down − 1, both weighted by effective_weight.
+
+---
+
+### Q2 (Bootstrap prior staleness during slow-genesis clearing-class — re-export at T_actual_genesis) → Re-export on request from clearing-class genesis event; staleness cap enforced; no automatic live feed (#r175)
+
+**The problem:**
+
+At shadow-class wind-down, S is exported as a genesis prior for the linked clearing-class. If clearing-class genesis is delayed by months (slow position registration, TOWL bootstrap, oracle availability), the exported prior ages. The staleness model (κ, staleness_window) decays alpha_prior_effective to near-zero before clearing-class ever uses it.
+
+**Options:**
+
+1. **Static export only:** Export S at wind-down; clearing-class uses it with staleness decay. Acceptable if T_clearing_genesis − T_winding_down < staleness_window_shadow_class / 2.
+
+2. **Live shadow-class feed during clearing-class bootstrap:** Shadow-class in WINDING_DOWN continues updating S (new claims accepted). Clearing-class genesis reads a live S rather than a static snapshot. This violates the WINDING_DOWN state definition (#r155/Q3: "No new claims accepted" on WINDING_DOWN entry).
+
+3. **Re-export at T_actual_genesis:** At clearing-class genesis event, if the shadow-class is still in WINDING_DOWN (not yet ARCHIVED), clearing-class requests a fresh export snapshot. This captures a more recent S from WINDING_DOWN activity.
+
+**Resolution — option 3 with staleness cap:**
+
+Contradiction with #r155: WINDING_DOWN accepts no new claims. But WINDING_DOWN does update S from existing claims' staleness decay and effective_weight evolution. S is not frozen — it continues to evolve as existing claims age.
+
+Re-export at T_actual_genesis: permitted if:
+1. Shadow-class is still in WINDING_DOWN (not ARCHIVED).
+2. T_actual_genesis − T_wind_down_entry < T_wind_down_max (within wind-down window).
+3. Clearing-class governance declares `genesis_prior_re_export_request` EAT event.
+
+Re-export snapshot = S(T_actual_genesis_epoch) computed from existing WINDING_DOWN claims at current effective_weights (staleness-decayed). Two-epoch terminal averaging applies: (S(T_actual_genesis) + S(T_actual_genesis − 1)) / 2.
+
+**Staleness cap for re-export:**
+
+```
+alpha_prior_effective_re_export = alpha_prior_base × max(0, 1 − (T_actual_genesis − T_wind_down_entry) / staleness_window_shadow) × (1 − mode_mismatch_discount)
+```
+
+Same formula as original genesis prior, evaluated at T_actual_genesis. If shadow-class has fully stale S by T_actual_genesis (all effective_weights ≈ 0), the re-export is numerically equivalent to the uniform prior — harmless default behaviour.
+
+**What if shadow-class is already ARCHIVED at T_actual_genesis?** ARCHIVED state commits a final credibility_ratio snapshot and freezes S at zero effective_weight. Re-export from ARCHIVED returns the last committed S snapshot (stored in EATManager, retrievable via CID). Staleness decay continues to apply from T_ARCHIVED onward, so re-export still uses the staleness formula.
+
+**Design law (#r175):** Genesis prior re-export is permitted at clearing-class genesis event if shadow-class is WINDING_DOWN or ARCHIVED. Re-export uses two-epoch terminal averaging and staleness-decayed alpha_prior_effective at T_actual_genesis. No live feed during WINDING_DOWN — re-export is a point-in-time snapshot request, not a streaming update. (#r175)
+
+---
+
+### Q3 (DISCOVERY_MODE shadow-class with no linked clearing-class — standalone mode) → Permitted; terminal event is governance-declared; economic model uses accuracy_bonus_pool only; mechanism is a pure information market (#r175)
+
+**Definition — standalone shadow-class (SSC):**
+
+A DISCOVERY_MODE class registered without a linked clearing-class. No `position_registry`, no WED_clearing, no Settlement Freeze Protocol. The class runs purely on:
+
+- Query fees from unknowers (who pay for S(t) estimates).
+- accuracy_bonus_pool: funded by unknowers pre-paying conditional bonuses for accurate final-epoch state.
+- Standard log-score slash/reward at oracle resolution.
+
+**Terminal event:** Without a clearing-class oracle trigger, wind-down must be governance-declared or oracle-triggered by an independent event oracle registered to the coordinate. Two sub-cases:
+
+1. **Oracle-terminated SSC:** Coordinate has a natural resolution event (e.g., "who wins the 2028 US Presidential election"). Oracle fires at T_resolve; standard DISCOVERY_MODE log-score settlement runs. Shadow-class enters WINDING_DOWN → ARCHIVED via #r155/Q3 state machine.
+
+2. **Governance-terminated SSC:** Coordinate has no natural terminal event (e.g., "what is the annual average CPI for 2027?"). Governance declares T_wind_down_trigger; at that epoch, oracle is invoked to confirm final state; normal settlement follows. No special mechanism required.
+
+**Economic model for standalone SSC:**
+
+- Knowers earn: query fees (ongoing) + log-score accuracy reward at oracle resolution + accuracy_bonus_pool share.
+- Unknowers pay: query fees (immediate) + accuracy_bonus (conditional on precision at resolution).
+- No position registry → no WED_clearing → base reward is query fee pool only.
+
+This is a viable pure information market: knowers provide calibrated beliefs on any verifiable coordinate; unknowers pay for that information directly. The mechanism generalises cleanly.
+
+**What SSC cannot do:**
+
+- No Settlement Freeze Protocol (no position registry to settle).
+- No genesis prior export to clearing-class (no linked pair).
+- Cannot enter CLEARING_MODE — SSC is definitionally standalone.
+
+**Governance registration:** SSC registers with `clearing_class_id: null` and `terminal_event: oracle | governance`. Standard v2.2 DISCOVERY_MODE contracts apply except ShadowClearingPairRegistry has no entry for this class.
+
+**Design law (#r175):** Standalone shadow-classes are valid mechanism objects. They are pure information markets with no settlement coupling. The mechanism fully generalises to this use case at zero additional contract cost. SSC adds no new attack surface beyond the DISCOVERY_MODE adversarial surfaces already closed in #r174. (#r175)
+
+---
+
+### Q4 (Adversarial MONOPOLY_MODE persistence via claim submission DoS) → Permissionless claim submission; DoS resistance from on-chain escrow-based anti-spam; MONOPOLY_MODE defined and exit conditions formal (#r175)
+
+**Threat model:**
+
+In DISCOVERY_MODE, if only one knower is active (no competitors), the mechanism operates in what informally has been called MONOPOLY_MODE: single-agent S_cred, weaker credibility pressure, no diversity penalty applicable (only one agent). An adversary who is the incumbent knower might suppress second-knower entry to maintain this weaker state.
+
+**Permissioned vs permissionless claim submission:**
+
+The mechanism has no stated permission requirement for claim submission. Any address meeting the minimum stake threshold can submit a claim. This is permissionless by design (consistent with the open participation model from #r1 through present).
+
+**DoS via front-running escrow:**
+
+An adversary could attempt to DoS second-knower escrow submission by front-running with spam transactions that consume block gas and increase submission cost. This is a general EVM MEV problem, not a mechanism-specific vulnerability. Standard Ethereum anti-MEV tooling (private mempools, EIP-1559, commit-reveal on submission) addresses this at the infrastructure layer. The mechanism does not add protocol-level DoS defence for this attack class; it defers to the base layer.
+
+**MONOPOLY_MODE formal definition and exit conditions:**
+
+```
+MONOPOLY_MODE(class_i, epoch_t):
+  active_knower_count(class_i, t) == 1  AND
+  that knower's cumulative_eff_weight / total_effective_weight_class == 1.0
+
+Exit conditions:
+  (a) Second knower submits claim with stake ≥ min_entry_stake(class_i) → COMPETITIVE_MODE
+  (b) Existing single knower's escrow expires → VACANT_MODE (no active S_cred; S reverts to uniform prior)
+```
+
+**MONOPOLY_MODE epistemically-live degradation:**
+
+During MONOPOLY_MODE, epistemically_live = false by Invariant #38 (challenger count < 3). The 50% throttle on new installations applies. This is the correct response — a single unchallenged knower is not epistemically trustworthy for new T3-equivalent warranty obligations in DISCOVERY_MODE.
+
+**Anti-monopoly entrant subsidy:**
+
+When MONOPOLY_MODE persists for ≥ N_monopoly_alert = N_calibration consecutive epochs, the challenger_pool bootstrap mechanism (#r160/Q4) applies: governance auto-seeds `entry_subsidy_pool` to incentivise second-knower entry.
+
+```
+entry_subsidy(class_i) = min(
+  entry_subsidy_cap,          // governance-settable at class registration
+  fraction × query_fee_pool_balance(class_i)
+)
+entry_subsidy_cap = governance-set at registration; default 3 × r_floor_class
+```
+
+The entry subsidy is available to any new knower who submits a valid claim within one epoch of the subsidy being published. First claimant gets the subsidy. If unclaimed after 2 epochs, the subsidy returns to challenger_pool. This creates a positive incentive for second-knower entry without permissioning or gatekeeping.
+
+**Design law (#r175):** Claim submission is permissionless. MONOPOLY_MODE is a formal mechanism state with defined exit conditions. Persistent MONOPOLY_MODE triggers epistemically_live = false (throttle) and an entry_subsidy. The mechanism does not attempt to prevent monopoly through permissioning; it reduces monopoly incentive through subsidy and reduces monopoly's epistemic authority through the liveness gate. (#r175)
+
+---
+
+## Structural Synthesis: Shadow-class Lifecycle Adversarial Pass — Closed (#r175)
+
+| Attack | Defence | v2.2 spec addition |
+|--------|---------|---------------------|
+| Wind-down timing (biased genesis prior at trigger) | Two-epoch terminal prior averaging + SELF_CALIBRATED gate (dual layer) | ShadowClearingPairRegistry: two-epoch terminal S averaging |
+| Stale genesis prior on delayed clearing genesis | Re-export at T_actual_genesis from WINDING_DOWN or ARCHIVED; staleness formula at T_actual_genesis | ShadowClearingPairRegistry: genesis_prior_re_export_request handler |
+| Standalone SSC economic model gap | SSC is valid; oracle-terminated or governance-terminated; pure information market; no new contracts | CoordinateRegistry_v2: clearing_class_id = null registration |
+| MONOPOLY_MODE persistence via DoS | Permissionless submission (base-layer DoS, not mechanism); formal MONOPOLY_MODE state; entry_subsidy on N_monopoly_alert | DiscoveryCredibilityAggregator: MONOPOLY_MODE flag + entry_subsidy_pool trigger |
+
+**Four adversarial scenarios addressed. No currently unaddressed shadow-class lifecycle attack surface known after this pass.**
+
+---
+
+## Cumulative Invariants (additions through #r175)
+
+**Invariant #96 (#r175):** Shadow-class genesis prior export uses two-epoch terminal averaging: (S(T_wind_down) + S(T_wind_down − 1)) / 2, weighted by effective_weight. Single-epoch wind-down manipulation is bounded to 50% penetration.
+
+**Invariant #97 (#r175):** Genesis prior re-export is permitted at clearing-class genesis event if shadow-class is in WINDING_DOWN or ARCHIVED. Re-export is a point-in-time snapshot, not a live feed. Staleness formula applies at T_actual_genesis.
+
+**Invariant #98 (#r175):** Standalone shadow-classes (no linked clearing-class) are valid mechanism objects. They are permissionless pure information markets with oracle-terminated or governance-terminated lifecycles.
+
+**Invariant #99 (#r175):** Claim submission is unconditionally permissionless. MONOPOLY_MODE is a formal mechanism state; it does not gate submission. Persistent MONOPOLY_MODE (≥ N_calibration epochs) triggers entry_subsidy and epistemically_live = false.
+
+---
+
+## Open Questions for #r176+ (v2.2 Module 2 continuation / Module 3 entry)
+
+1. **Entry subsidy gaming:** A group of coordinated addresses could rotate through "second-knower entry" to repeatedly claim the entry_subsidy pool without genuinely competing. After one epoch of second-knower presence, the group withdraws, allowing MONOPOLY_MODE to recur and triggering another subsidy. Is there an anti-cycling gate (e.g., second-knower must remain active for ≥ N_calibration epochs before the entry_subsidy resets)?
+
+2. **SSC accuracy_bonus_pool solvency when oracle is delayed:** A standalone SSC accumulates accuracy_bonus in escrow pending oracle resolution. If the oracle is delayed indefinitely (e.g., governance-terminated SSC where governance fails to declare T_wind_down_trigger), the accuracy_bonus escrow is locked without T_finality. Define a maximum accuracy_bonus escrow holding period and release condition on governance inaction.
+
+3. **WINDING_DOWN S evolution vs re-export consistency:** WINDING_DOWN allows no new claims but allows existing claims to evolve (effective_weight decays per κ). If two re-export snapshots are taken at T1 and T2 (T2 > T1, both during WINDING_DOWN), they may differ due to staleness decay alone — not due to new information. Should re-export be limited to one occurrence (first clearing-class genesis request wins) to prevent multiple clearing-classes from getting different genesis priors from the same shadow-class?
+
+4. **Module 3 entry: implication chain settlement routing in CLEARING_MODE.** With Module 2 adversarial pass complete, the next major v2.2 surface is the settlement routing for A→B implication declarations under the bifurcated bonus (#r141). Key question: in CLEARING_MODE, how does partial-resolution settlement of the implication bonus escrow interact with the Settlement Freeze Protocol at T_anchor? Specifically: if A's T_anchor fires but B's oracle has not yet resolved, does the implication_bonus_escrow enter a partial settlement-frozen state at T_anchor, or is it fully deferred to B's T_anchor?
+
+*Last updated: #r175 — 2026-04-04T02:52Z*
