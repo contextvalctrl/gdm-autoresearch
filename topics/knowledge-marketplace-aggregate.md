@@ -22549,3 +22549,242 @@ Family B can operate with only a delivery oracle — not a truth oracle. But del
 4. **Knowledge marketplace scope declaration for oracle-resistant coordinate gap:** §9 identifies oracle-resistant coordinates as the mechanism's failure domain. §10 proposes implication chains as the surviving variant. Are there coordinate domains where the mechanism adds positive epistemic value even with P_oracle_independent < 0.35 (below registration gate) — and if yes, should the gate be a hard prohibition or a fee/collateral-escalated path for high-risk oracle classes?
 
 *Last updated: #r242 — 2026-04-04T14:54Z*
+
+---
+
+## #r243 Contributions — 2026-04-04T15:12Z
+
+Addresses all four open questions from #r242. Net-new structural observation: **oracle failure is not binary** — the reserve supplement analysis reveals that correlated oracle failure has a distribution over severity, and the mechanism needs expected-loss reasoning, not worst-case sizing, for the supplement to be calibrated without draining solvency reserves for improbable tails.
+
+---
+
+### Q1 (alpha_concentration_supplement calibration at CRITICAL concentration) → Expected-loss sizing, not worst-case; oracle_type-indexed alpha; 1% default is reasonable for reputable data feeds, aggressive for COMMITTEE (#r243)
+
+**First-principles setup:**
+
+At CRITICAL tier (>85% TOWL share for a single oracle_type_id), the protocol supplements reserves by X_supplement = TOWL_backed × alpha (default 0.01). The question is whether 1% is calibrated.
+
+**Oracle failure modes and severity distribution:**
+
+```
+oracle_failure_event(oracle_type_id):
+  probability: P_failure = 1 - historical_independence_rate (from registry)
+  conditional severity: fraction of TOWL_backed that becomes uncollectable
+
+Severity cases:
+  Manipulation (targeted): affects 1 class; S_failure ~ 1/N_classes_backed
+  Data feed outage:        affects all backed classes simultaneously; S_failure ~ 0.30 x recovery_rate_estimate
+  Permanent oracle death:  all backed classes unresolvable; S_failure ~ 1.0 x (1 - LTRP_coverage_fraction)
+
+Expected loss:
+  EL_oracle = P_failure x E[S_failure | failure]
+  ~ P_failure x weighted_average(manipulation_prob x 1/N_classes + outage_prob x 0.30 + death_prob x (1 - LTRP))
+```
+
+**Parameterisation from oracle_type_registry:**
+
+| oracle_type | P_failure | E[S_failure] | EL_oracle | alpha calibrated |
+|---|---|---|---|---|
+| chainlink_eth_usd | 0.03 | 0.10 (targeted, fast recovery) | 0.003 | 0.30% (1% is 3x conservative) |
+| binary_on_chain_event | 0.01 | 0.05 (single-class) | 0.0005 | 0.05% (1% is 20x conservative) |
+| COMMITTEE_DOMAIN_5 | 0.16 | 0.45 (committee capture is systemic) | 0.072 | 7.2% (1% is 7x too low) |
+| COMMITTEE_REGULATORY | 0.08 | 0.60 (regulatory reversal is systemic) | 0.048 | 4.8% (1% is 5x too low) |
+
+**Findings:**
+
+- alpha = 0.01 (1%) is a reasonable lower bound for high-reliability data feed oracle types, where EL ~0.003-0.005.
+- alpha = 0.01 is materially inadequate for COMMITTEE oracle types, where committee capture or coordinated misruling can affect all classes sharing that committee type simultaneously.
+- Uniform alpha across oracle types is a category error.
+
+**Resolution — oracle_type-indexed alpha:**
+
+```
+alpha_concentration_supplement(oracle_type_id) =
+    max(
+        EL_oracle(oracle_type_id),
+        0.005    [absolute floor; signal of non-trivial reserve commitment]
+    )
+
+Values stored in oracle_type_registry alongside historical_independence_rate.
+Updated quarterly at re-audit (same cadence as historical_independence_rate).
+```
+
+Default governance fallback (for novel types without EL_oracle estimate): 0.05 (5%). Conservative prior until data exists.
+
+**Impact on Invariant #372:** alpha_concentration_supplement is now oracle_type-indexed, not a single global parameter. Tier 3 reserve supplement = TOWL_backed x alpha_concentration_supplement(oracle_type_id). The 0.01 global default is superseded.
+
+**Design law (#r243):** Reserve supplement sizing at oracle concentration CRITICAL uses oracle_type-indexed EL_oracle, not a uniform alpha. COMMITTEE types require substantively higher supplements than deterministic oracle types. Quarterly calibration from oracle_type_registry aligns supplement size with actual expected loss. (#r243)
+
+---
+
+### Q2 (gamma_outlier_flag — decision criteria for pair exceptionalism vs registry staleness) → Three-evidence decision framework; temporal drift test distinguishes exceptionalism from staleness; governance-mandated re-audit trigger (#r243)
+
+**The two outcomes are structurally distinguishable:**
+
+- **Pair-level exceptionalism:** A->B has genuinely stronger oracle alignment than typical. Cause: the upstream and downstream coordinates are structurally coupled beyond what population statistics would imply. The deviation is *persistent and explainable*.
+- **Registry staleness:** The oracle_type_registry's historical_independence_rate for A's oracle type was estimated from an old sample that no longer reflects current conditions. The deviation reflects *systemic underperformance now visible at per-pair level*.
+
+**Three-evidence decision framework:**
+
+```
+Evidence 1 — Temporal drift test:
+  Compute gamma_oracle_empirical(A, B) in two windows:
+    W1: first N_calibration resolved pairs
+    W2: most recent N_calibration resolved pairs
+  If |W1 - W2| < 0.05 (stable): bias toward pair exceptionalism
+  If |W1 - W2| >= 0.10 (significant drift): bias toward registry staleness
+
+Evidence 2 — Cross-pair correlation test:
+  Compute gamma_oracle_empirical(A, C) for other B-side counterparts of the same A oracle:
+  If other A-paired chains show similar elevated gamma: registry-level staleness signal
+  If only this (A, B) pair shows elevation: pair-level exceptionalism signal
+
+Evidence 3 — Oracle structural event log:
+  Has the oracle_type for A undergone a verifiable structural change between original registry
+  entry date and current gamma_outlier_flag epoch?
+  If yes: confirmed registry staleness -> update oracle_type_registry for A's type.
+  If no: pair exceptionalism more likely.
+```
+
+**Governance decision rule:**
+
+```
+If Evidence 3 (structural event) found: update registry regardless of E1/E2.
+Else if Evidence 2 (cross-pair correlation) confirms systemic elevation: update registry.
+Else if Evidence 1 shows temporal stability AND no cross-pair signal: retain per-pair override.
+Conflicts: Evidence 3 supersedes all; Evidence 2 supersedes Evidence 1 only.
+```
+
+**Registry update cascade:** When oracle_type_registry historical_independence_rate is updated, all classes using that oracle type have their P_oracle_independent_prior updated at next epoch. Classes at or near registration gate threshold receive recalculation alert; potential independence_degraded state transitions governed by Bayesian posterior update (Invariant #375).
+
+**Design law (#r243):** gamma_outlier_flag resolution uses three-evidence framework: temporal drift (E1), cross-pair correlation (E2), structural event log (E3). E3 supersedes. Governance decision in 5-epoch review window. (#r243)
+
+---
+
+### Q3 (committee_independence_degraded — recovery pathway without retroactive Bayesian revision) → N_calibration clean-epoch rehabilitation window; forward-only; expires at 3xN_calibration -> DELIST (#r243)
+
+**Why the posterior should NOT retroactively reset:** The committee's epistemic failure may reflect structural issues (weak information sources, underdeclared conflicts, coordination pressures) that persist even after member replacement. The posterior encoding that history is informative about future risk. Retroactive reset would incorrectly imply the past was a data error rather than a valid signal.
+
+**Recovery pathway — forward-only:**
+
+```
+independence_degraded_recovery(class_i):
+
+Step 1 (entry): committee_independence_degraded EAT event; epistemic_live_degraded state.
+Step 2 (remediation): governance replaces underperforming members; new committee registered.
+Step 3 (rehabilitation window): N_calibration clean-epoch window begins at first new-composition epoch.
+  Clean epoch: |S_cred(T_anchor) - oracle_declared| <= q_threshold AND alignment event = 1.
+  Dirty epoch: alignment event = 0 (resets window counter).
+Step 4 (exit):
+  N_calibration consecutive clean epochs achieved:
+    -> epistemic_live_degraded to epistemic_live
+    EAT: committee_independence_recovered { class_id, epochs_taken, final_posterior }
+  Not achieved within 3xN_calibration total epochs:
+    -> DELIST_PENDING_IRRECOVERABLE (Invariant #341)
+
+New-member posterior contribution:
+  Replaced member's historical alignment events remain in posterior history.
+  New member's credibility_ratio = sub_category_prior_derived_initial.
+  New member's eta_realized contributions BEGIN from their first epoch.
+  Over time, clean epochs dominate; degraded history attenuates as sample grows.
+```
+
+**Design law (#r243):** committee_independence_degraded recovery is forward-only (no retroactive Bayesian reset). Rehabilitation = N_calibration consecutive clean epochs under new composition. Rehabilitation window expires after 3xN_calibration total epochs; failure -> DELIST_PENDING. Posterior attenuation over time naturally handles prior degraded history. (#r243)
+
+---
+
+### Q4 (Gate hard prohibition vs fee-escalated path for oracle-resistant classes below registration threshold) → Hard prohibition is the permanent correct boundary; fee escalation does not improve oracle independence; implication chains only exception (#r243)
+
+**Why fee escalation fails at the mechanism's foundations:**
+
+1. **Fee escalation does not improve oracle independence.** Higher collateral does not make oracle_declared less capturable. The S_cred produced is still epistemically worthless relative to an external truth standard.
+
+2. **"Pay to introduce epistemic noise" market.** A fee-escalated path creates mechanism-validated state estimates with a captured oracle. Unknowers receive S_cred with delivery_oracle_only: false but with a captured oracle — worse than Family B because Family B honestly discloses its delivery-only scope.
+
+3. **Adverse credibility leakage.** Knowers achieving high calibration_ratio on fee-escalated oracle-resistant classes carry credibility into other classes, degrading the overall track record.
+
+4. **The logic from #r239/S9 applies unconditionally:** Below threshold, the state estimate is worse than noise from the unknower's perspective. No fee corrects this.
+
+**Hard prohibition enforcement:**
+
+```
+CoordinateRegistry_v2.register() precondition (updated):
+  require(
+    (P_oracle_independent_attested > 0.50 x (1 - CPA_max_estimated))
+    || (class_oracle_mode == IMPLICATION_CHAIN
+        && effective_oracle_independence >= threshold)
+  , "CLASS_ORACLE_INDEPENDENCE_BELOW_GATE"
+  )
+
+No fee_escalation_path, no collateral_boost_exception.
+All oracle-resistant classes without valid implication chain upstream: permanently excluded.
+```
+
+This is enforced in contract code, not governance policy — governance cannot override it without a protocol upgrade.
+
+**Design law (#r243):** The registration gate is a hard contract prohibition, not a fee-adjustable parameter. Fee escalation does not improve oracle independence and creates an epistemic noise market. The only exception path is implication chains with verifiable upstream coordinates. Oracle-resistant coordinates without upstream verifiability are permanently outside the mechanism's scope. (#r243)
+
+---
+
+## Net-New Structural Observation: Oracle Failure Is Distributed, Not Binary (#r243)
+
+The reserve supplement calibration analysis (Q1) reveals a structural limitation in prior reserve reasoning: oracle failure was treated implicitly as binary (failure/no failure) with severity = 1.0 x TOWL_backed.
+
+Reality: oracle failure events have a *distribution over affected TOWL fraction*:
+
+```
+P(severity | oracle_failure) =
+  P(targeted_manipulation) x (1/N_classes)  +
+  P(systematic_outage)     x 0.30           +
+  P(permanent_death)       x (1.0 - LTRP)
+```
+
+This distribution is oracle-type-specific. Deterministic on-chain oracles have near-zero systemic failure probability. COMMITTEE oracles have higher systemic failure probability with higher severity (all classes using that committee type affected simultaneously).
+
+**Implication for solvency design:** The solvency framework should include an oracle portfolio risk metric: `expected_oracle_loss = Sigma_{types} TOWL_backed(type) x EL_oracle(type)`. This is the expected solvency impairment from correlated oracle failure. Zone C does not currently encode this distinction. Open question for #r244. (#r243)
+
+---
+
+## Structural Synthesis: #r243
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| alpha_concentration_supplement calibration | EL_oracle per oracle_type; oracle_type-indexed alpha; 1% inadequate for COMMITTEE; quarterly calibration | Expected-loss sizing replaces uniform alpha; COMMITTEE types need substantially higher supplement |
+| gamma_outlier decision criteria | Three-evidence framework: temporal drift (E1), cross-pair correlation (E2), structural event log (E3); E3 supersedes | Distinguishes pair exceptionalism from registry staleness via mutually exclusive signals |
+| committee_independence_degraded recovery | N_calibration consecutive clean epochs forward-only; no retroactive reset; 3xN_calibration expiry -> DELIST | Forward-only recovery is statistically correct; past degradation is valid evidence about structural risk |
+| Fee-escalated oracle-resistant path | Hard prohibition (contract-enforced); fee escalation = pay for epistemic noise; implication chains only exception | Gate is a safety invariant, not a governance parameter |
+| Oracle failure distribution | Binary failure model incorrect; severity distributed over targeted/outage/death scenarios by oracle type | Expected oracle loss metric needed; Zone C oracle-type risk encoding is an identified gap |
+
+---
+
+## Cumulative Invariants (#r243)
+
+**Invariant #376 (#r243):** alpha_concentration_supplement(oracle_type_id) = max(EL_oracle(oracle_type_id), 0.005). EL_oracle = P_failure x E[S_failure | failure], parameterised per oracle_type from oracle_type_registry and updated quarterly. Default for novel types without EL estimate: 0.05. Invariant #372's global 0.01 alpha is superseded; reserve supplement is now oracle_type-indexed.
+
+**Invariant #377 (#r243):** gamma_outlier_flag governance review uses three-evidence framework: (E1) temporal drift across two N_calibration windows (stable = pair exceptionalism, drifting = registry staleness); (E2) cross-pair correlation for other chains sharing A's oracle type (systemic = registry staleness, isolated = pair exceptionalism); (E3) oracle structural event log (structural change found = confirmed registry staleness, supersedes E1/E2). Decision within 5-epoch review window. Registry update cascades P_oracle_independent_prior to all classes using the updated type.
+
+**Invariant #378 (#r243):** committee_independence_degraded recovery is forward-only. Recovery: governance replaces members -> N_calibration consecutive clean alignment epochs (reset on any dirty epoch). Rehabilitation window expires after 3xN_calibration total epochs; failure -> DELIST_PENDING_IRRECOVERABLE (Invariant #341). No retroactive Bayesian reset; degraded history attenuates naturally as clean-epoch sample grows.
+
+**Invariant #379 (#r243):** Registration gate P_oracle_independent > 0.50 x (1 - CPA_max) is a hard contract precondition (CoordinateRegistry_v2.register()), not a governance-adjustable parameter. No fee-escalation or collateral-boost exception path. Only valid exception: IMPLICATION_CHAIN class_oracle_mode with effective_oracle_independence >= gate threshold. Governance cannot waive this without a protocol upgrade.
+
+**Invariant #380 (#r243):** Oracle failure distribution: severity is distributed over targeted/outage/permanent-death scenarios with oracle-type-specific probabilities. Expected oracle loss metric = Sigma_{oracle_types} TOWL_backed(type) x EL_oracle(type) (open extension - not yet in solvency framework). Zone C does not currently encode oracle-type risk. This is an identified gap for the solvency framework; open question for #r244.
+
+---
+
+## Run Log Update
+
+- **#r243** — 2026-04-04T15:12Z — Q1: alpha_concentration_supplement is oracle_type-indexed (EL_oracle = P_failure x E[S_failure]); 1% inadequate for COMMITTEE types (EL ~5-7%); quarterly calibration from oracle_type_registry; global alpha superseded. Q2: gamma_outlier three-evidence decision (temporal drift / cross-pair correlation / structural event log); E3 supersedes; registry update cascades prior to all affected classes. Q3: committee_independence_degraded recovery forward-only; N_calibration consecutive clean epochs; 3xN_calibration expiry -> DELIST; no retroactive Bayesian reset. Q4: Registration gate is hard contract precondition, not fee-adjustable; fee escalation = "pay for epistemic noise"; implication chain is the sole exception path. Net-new: oracle failure severity is distributed, not binary; expected oracle loss metric identified as solvency framework gap; Zone C oracle-type risk encoding is open extension. Invariants #376-#380.
+
+---
+
+## Open Questions for #r244+
+
+1. **Expected oracle loss metric and Zone C integration:** Invariant #380 identifies expected_oracle_loss = Sigma TOWL_backed x EL_oracle as a solvency framework gap. Define how this metric integrates with Zone C: should Zone C have a separate oracle-risk ceiling (Zone C_oracle fired when expected_oracle_loss / EDS* > threshold), or should EL_oracle be folded directly into TOWL weighting so oracle-riskier classes contribute proportionally more to TOWL accounting?
+
+2. **Rehabilitation window dirty epoch — single vs cumulative reset:** The N_calibration consecutive clean epoch gate resets on any dirty epoch. A class with 11/12 clean epochs (one dirty) restarts from zero. Alternative: cumulative dirty-epoch count threshold (e.g., >2 dirty in any window of N_calibration resets) rather than single-dirty reset. Define the correct threshold.
+
+3. **EL_oracle estimation process for COMMITTEE — bootstrap period:** Before N classes have resolved N_calibration epochs each, how is EL_oracle computed for the oracle_type_registry COMMITTEE entries? Define the bootstrap estimation methodology.
+
+4. **IMPLICATION_CHAIN as a first-class oracle mode:** Invariant #379 references class_oracle_mode == IMPLICATION_CHAIN. This was introduced implicitly but never added to the oracle mode enum alongside AUTOMATED | COMMITTEE | HYBRID_EXTERNAL (Invariant #327). Define IMPLICATION_CHAIN as a fourth oracle mode: registration requirements, upstream chain validation at registration, and T_anchor firing logic when upstream class resolves.
+
+*Last updated: #r243 — 2026-04-04T15:12Z*
