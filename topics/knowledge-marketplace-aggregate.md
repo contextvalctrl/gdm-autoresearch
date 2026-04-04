@@ -8408,4 +8408,202 @@ IMPLPending {
 
 4. **T_impl_pending_max governance interface.** Who sets T_impl_pending_max and when? Options: (a) declarant at declaration time; (b) governance at class registration; (c) derived from T_longtail of class B. Tradeoffs between flexibility and manipulation resistance.
 
-*Last updated: #r176 — 2026-04-04T03:02Z*
+*Last updated: #r177 — 2026-04-04T03:12Z*
+
+---
+
+## #r177 Contributions — 2026-04-04T03:12Z
+
+Addresses all four open questions from #r176 (Module 3: Implication Chains, continued).
+
+**Q1 (Parallel chain A→B→C: settlement order dependencies) → Lazy cascade; sequential IMPL_PENDING objects; no parallel instantiation (#r177):**
+
+When a chain declaration A→B→C is registered, three oracle events are awaited independently. The settlement order is always oracle-driven; the protocol does not control the resolution sequence.
+
+**Lazy cascade model:**
+
+```
+Stage 0 (declaration active):
+  A-coordinate claim: standard escrow locked (TOWL-counted)
+  B-coordinate claim: standard escrow locked (TOWL-counted)
+  C-coordinate claim: standard escrow locked (TOWL-counted)
+  Chain bonus escrow: implication_bonus_escrow_initial locked (protocol reserve)
+
+Stage 1 (A's oracle fires — A correct):
+  implication_bonus_direct_A released to declarant immediately
+    (compensates A-depth capital cost: alpha_cap_A component)
+  IMPL_PENDING_AB created: { residual_AB, T_impl_pending_max_AB, awaiting: B oracle }
+  No IMPL_PENDING_BC created yet — lazy
+
+Stage 2 (B's oracle fires — B correct):
+  IMPL_PENDING_AB closes; implication_bonus_B released
+    (B-depth bonus: gamma^1 component)
+  IMPL_PENDING_BC created: { residual_BC, T_impl_pending_max_BC, awaiting: C oracle }
+
+Stage 3 (C's oracle fires — C correct):
+  IMPL_PENDING_BC closes; implication_bonus_C released
+    (C-depth bonus: gamma^2 component)
+  Chain fully settled.
+```
+
+**If B resolves wrong:** IMPL_PENDING_AB closes; residual_AB slashed to B-class loser pool. IMPL_PENDING_BC is never created (chain broken). C-coordinate claim escrow continues as an independent standard claim awaiting its own oracle (the chain bonus for the B→C leg is forfeited; the base C-claim reward is not).
+
+**Why lazy (not eager):** An eager approach would create IMPL_PENDING_A_B and IMPL_PENDING_AB_C simultaneously at A's T_anchor. But IMPL_PENDING_AB_C would then hold capital contingent on B being correct — before B's oracle has fired. If B resolves wrong, IMPL_PENDING_AB_C must be unwound. The lazy cascade requires no unwind: each stage is created only after the prior stage confirms correct. Simpler, auditability-cleaner.
+
+**T_impl_pending_max per stage:** Each IMPL_PENDING object has its own T_impl_pending_max anchored to the awaited coordinate's T_longtail (see Q4). The combined chain lockup horizon is the sum of sequential T_impl_pending_max values, not a single pooled cap. This is bounded: depth-d chain has maximum lockup = d × T_longtail_max_per_class.
+
+**Design law (#r177):** Multi-step conditional settlement uses lazy sequential IMPL_PENDING cascade. Each stage is instantiated only when the prior stage confirms correct. No parallel IMPL_PENDING objects for a single chain. (#r177)
+
+---
+
+**Q2 (Circular implication detection — A→B and B→A) → No structural deadlock; simple path gate for single chain declarations; independent bilateral declarations are permitted (#r177):**
+
+**Key distinction between two cases:**
+
+**Case 1 — Two independent declarations (A→B) and (B→A):** Each is a separate declaration registered independently. A→B waits for A's oracle (creates IMPL_PENDING waiting for B when A resolves). B→A waits for B's oracle (creates IMPL_PENDING waiting for A when B resolves). Both IMPL_PENDING objects wait for **external oracle events** — not for each other. Oracle events are independent external triggers. No contract-level deadlock is possible. This is consistent with #r73 (cycles in the implication graph are harmless because no mechanical propagation exists). Permitted.
+
+**Case 2 — Single chain declaration A→B→A (a coordinate appears twice in one chain):** This is a degenerate registration: the chain bonus for A→B→A would require A's oracle to fire, then B's, then A's again — which is logically inconsistent for a single oracle event (A's oracle fires once and produces one value). The "second A" in the chain is the same oracle event as the first; the chain can never fully confirm because it waits for A to resolve *twice*.
+
+**Resolution:** Single-chain declarations must be simple paths (no repeated coordinate IDs). Gate enforced at CoordinateRegistry registration:
+
+```
+chain_registration_gate:
+  require all_unique(coordinate_ids_in_chain)
+  // Rejects A→B→A; permits A→B and B→A as independent declarations
+```
+
+**Rationale for allowing independent bilateral declarations:** A declares A→B (believes A tells us about B). Another agent may declare B→A (believes B tells us about A). These express different epistemic beliefs about causal structure. Both are honest, independently staked declarations. Both resolve against their respective oracles. The mechanism correctly rewards or slashes each independently. No cycle-breaking logic is needed.
+
+**Attack vector analysis:** Could a declarant register both A→B and B→A on the same coordinate pair to double-earn? Yes — and this is legitimate. Each declaration carries its own escrow and independent slash risk. If A resolves correct and B resolves correct: both earn their respective implication bonuses (with γ_corr discount for same-pair second declarer, per #r76). If A resolves correct but B wrong: A→B's bonus is slashed; B→A was a separately staked claim whose B-resolution also slashes it. The declarant loses on both. No exploitation path.
+
+**Design law (#r177):** Independent bilateral declarations on the same coordinate pair are permitted and treated as independent staked claims. Single-chain declarations must be simple paths. No cycle-detection logic beyond the simple-path gate is required. (#r177)
+
+---
+
+**Q3 (IMPL_PENDING_B and TOWL zone interaction) → IMPL_PENDING_B is protocol-side conditional reserve; separately tracked; does not add TOWL capacity, does not consume TOWL headroom (#r177):**
+
+**Decomposing what IMPL_PENDING_B holds:**
+
+At creation (A resolves correct):
+```
+IMPL_PENDING_AB.residual = implication_bonus_total - implication_bonus_direct_A
+  = (bonus_capital_comp_A_released) was already distributed
+  residual = remaining implication bonus contingent on B oracle
+```
+
+This residual is sourced from `implication_bonus_escrow_initial` (protocol reserve, per #r133/#r146). It is not the declarant's own claim escrow for the B-coordinate — that is separately held in ClaimEscrow as T3_escrow_standard/longtail and **is already TOWL-counted** through the normal path.
+
+**TOWL treatment of IMPL_PENDING_B:**
+
+```
+TOWL contribution at B-claim level:
+  T3_escrow_B (standard + longtail) → TOWL-counted (unchanged, normal path)
+
+IMPL_PENDING_AB.residual:
+  Source: implication_bonus_escrow_initial (protocol reserve = β_escrow + γ_escrow_excess)
+  β_escrow portion: already TOWL-counted at declaration time (per #r146)
+  γ_escrow_excess portion: not TOWL-counted (contingent pre-funding buffer, #r146)
+  Status in IMPL_PENDING_AB: TOWL-counted portion already credited; residual in IMPL_PENDING is
+    the remaining conditionally-held protocol liability, not new TOWL capacity
+```
+
+**Accounting rule:**
+
+The TOWL was credited for β_escrow at declaration time (when the full implication_bonus_escrow_initial was locked). The transition to IMPL_PENDING_AB does not create new TOWL or release TOWL — it is an internal state change within the same protocol reserve. From TOWL's perspective: the locked β_escrow contribution is constant throughout declaration → IMPL_PENDING_AB → settlement.
+
+**Separate tracking:** IMPL_PENDING_AB balances are reported in `implication_reserve_status.impl_pending_total` (introduced in #r176). Not in TOWL zone reports. Not in LTRP_status.
+
+**Zone C interaction:** IMPL_PENDING_AB releases (B-correct) or slashes (B-wrong) are class-local to B's class. Zone C on B's class defers release (per #r134/Q4 class-local gating principle). Zone C on A's class has no effect on IMPL_PENDING_AB (A already resolved; the pending liability is for B's outcome). This is consistent and requires no new rule.
+
+**Design law (#r177):** IMPL_PENDING escrow transitions are accounting reclassifications within the implication_bonus_escrow category. They do not create new TOWL events. TOWL is credited once at declaration and debited once at full settlement. Interim IMPL_PENDING states are internal to the protocol reserve layer. (#r177)
+
+---
+
+**Q4 (T_impl_pending_max governance interface) → Derived from T_longtail(class_B); governance sets k_impl factor; bounded doubling cap enforced (#r177):**
+
+**The three candidate interfaces:**
+
+(a) *Declarant-set at declaration time:* Flexible but manipulable — a declarant could set a very short T_impl_pending_max for a class with slow oracle to force early LTRP routing before legitimate resolution, gaming the residual settlement.
+
+(b) *Governance-set at class registration (per-class):* Predictable, but cross-class declarations span two class registrations with different T_impl_pending_max values. No natural reconciliation.
+
+(c) *Derived from T_longtail(class_B):* Principled — the awaited oracle is for B, so B's longtail horizon is the natural waiting time. Consistent with #r177/Q1 (each IMPL_PENDING stage anchors to its awaited coordinate's characteristic horizon). No new governance primitive required.
+
+**Resolution — derived formula:**
+
+```
+T_impl_pending_max(IMPL_PENDING_XY) = k_impl × T_longtail(class_Y)
+k_impl ∈ [0.5, 2.0]  (governance-settable, default 1.0)
+```
+
+Y = the awaited coordinate's class.
+
+**Doubling cap (consistent with #r135/Q2):** The combined toll-stacking ceiling applies. For a chain A→B→C, the sum of sequential T_impl_pending_max values is bounded:
+
+```
+Σ T_impl_pending_max(stages) ≤ 2 × max(T_longtail_A, T_longtail_B, T_longtail_C)
+```
+
+If k_impl × (T_longtail_B + T_longtail_C) exceeds the cap for a deep chain, the excess is trimmed proportionally per stage. This prevents chains from being used to lock capital indefinitely by traversing classes with very long T_longtail.
+
+**Anti-manipulation via short k_impl:** If governance sets k_impl = 0.5, T_impl_pending_max = 0.5 × T_longtail(B). For a slow oracle class with T_longtail = 200 epochs, this gives 100 epochs — still substantial. The minimum k_impl = 0.5 ensures T_impl_pending_max ≥ half the characteristic oracle waiting time; early LTRP routing cannot be forced below the oracle's expected resolution time.
+
+**Governance interface addition:**
+
+| Parameter | Hard contract bounds | Derived output |
+|---|---|---|
+| k_impl | [0.5, 2.0] | T_impl_pending_max = k_impl × T_longtail(class_Y) per IMPL_PENDING stage |
+
+**Design law (#r177):** All timeout parameters for conditional escrow objects are derived from the awaited event's characteristic horizon. No declarant-controlled timing primitives in the IMPL_PENDING family. Governance controls the multiplier (k_impl), not the base. Consistent with the all-parameters-derived principle (#r7). (#r177)
+
+---
+
+## Structural Synthesis: Module 3 — Implication Chains, Settlement Architecture Closed (#r177)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Parallel chain settlement (A→B→C) | Lazy cascade; sequential IMPL_PENDING; created only on prior-stage-correct | Multi-step conditional settlement = lazy sequential IMPL_PENDING |
+| Circular detection | Independent bilateral permitted; single-chain must be simple path; gate at registration | Cycles in graph are fine; degenerate repeated-coordinate chains are not |
+| IMPL_PENDING_B TOWL treatment | Internal accounting reclassification; TOWL credited once at declaration; no new TOWL events | IMPL_PENDING transitions are protocol-reserve-internal |
+| T_impl_pending_max interface | k_impl × T_longtail(class_Y); governance sets k_impl; doubling cap enforced | Timeout derived from awaited event's characteristic horizon |
+
+---
+
+## v2.2 Contract Spec Additions from #r177
+
+| Contract | Addition |
+|---|---|
+| **SettlementEngine** | Lazy cascade: IMPL_PENDING created on prior-stage-correct only; not at declaration time |
+| **CoordinateRegistry_v2** | simple_path gate at chain registration (reject repeated coordinate IDs in single chain) |
+| **SettlementEngine** | TOWL accounting rule: IMPL_PENDING transitions are not new TOWL events; TOWL credited once at declaration |
+| **SettlementEngine** | T_impl_pending_max = k_impl × T_longtail(class_B); k_impl governance parameter [0.5, 2.0]; doubling cap enforced |
+
+---
+
+## Cumulative Invariants (additions through #r177)
+
+**Invariant #105 (#r177):** Multi-step conditional settlement uses lazy sequential IMPL_PENDING cascade. Each stage is instantiated only when the prior stage confirms correct. No parallel instantiation for a single chain.
+
+**Invariant #106 (#r177):** Single-chain declarations must be simple paths (no repeated coordinate IDs). Independent bilateral declarations (A→B and B→A as separate registrations) are permitted. No deadlock is possible because IMPL_PENDING always awaits external oracle events.
+
+**Invariant #107 (#r177):** IMPL_PENDING escrow transitions are internal accounting reclassifications within the implication_bonus_escrow protocol reserve category. TOWL is credited once at declaration and debited once at full settlement. No new TOWL events occur at IMPL_PENDING creation or closure.
+
+**Invariant #108 (#r177):** T_impl_pending_max is derived as k_impl × T_longtail(class_Y) where Y is the awaited coordinate's class and k_impl ∈ [0.5, 2.0] is governance-set. Declarant-controlled timeout parameters in IMPL_PENDING are prohibited. Doubling cap applies to sum of sequential T_impl_pending_max across chain stages.
+
+---
+
+## Run Log Update
+
+- **#r177** — 2026-04-04T03:12Z — Module 3 implication chains: lazy cascade model for A→B→C, simple-path gate for circular detection, IMPL_PENDING TOWL accounting as protocol-reserve-internal, k_impl derived timeout governance interface. Invariants #105–#108. Four v2.2 contract additions.
+
+---
+
+## Open Questions for #r178+ (v2.2 Module 3: Implication Chains, edge cases)
+
+1. **Oracle fires out of order (B before A in A→B→C chain).** If B's oracle fires before A's, no IMPL_PENDING_AB exists yet. B's standard claim settles normally. When A fires later, IMPL_PENDING_AB is created but B has already resolved — should it immediately close (B's oracle result is already in EAT) or wait for a re-evaluation?
+
+2. **Chain declaration partial failure recovery.** If A→B→C has A correct and B wrong: B's escrow is slashed; IMPL_PENDING_BC is never created; C's base claim continues independently. Does C's declarant earn a reduced chain bonus for being in a partial chain, or does C simply earn the standard base claim reward only?
+
+3. **k_impl and LTRP pre-funding at class registration.** T_impl_pending_max = k_impl × T_longtail(B) affects LTRP exposure for the IMPL_PENDING tail. Should the LTRP_seed formula for cross-class implication chains include a k_impl-sensitive term?
+
+4. **IMPL_PENDING_B Zone C deferral interaction with T_impl_pending_max expiry.** Zone C defers IMPL_PENDING release. Does T_impl_pending_max expiry also toll during Zone C (analogous to T_longtail tolling during degraded mode), or does the clock advance regardless?
