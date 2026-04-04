@@ -15933,4 +15933,188 @@ This is the two-clock synchronization problem restated as a welfare optimisation
 
 4. **Welfare optimisation and oracle_type heterogeneity:** Different oracle_types have different convergence dynamics — COMMITTEE oracles may be slow (low Δ_epoch_S_cred until committee announces) while MULTI_SOURCE oracles may converge fast. Should θ_convergence be oracle_type-specific, or is per-class calibration of θ_convergence sufficient?
 
-*Last updated: #r211 — 2026-04-04T09:02Z*
+*Last updated: #r212 — 2026-04-04T09:12Z*
+
+---
+
+## #r212 Contributions — 2026-04-04T09:12Z
+
+Addresses all four open questions from #r211.
+
+**Q1 (θ_convergence manipulation resistance — deliberate convergence disruption) → Credibility-weighted Δ; W_max caps single-agent spike; T_anchor_max as hard adversary ceiling (#r212):**
+
+An adversary posts a large-stake noisy claim to spike Δ_epoch_S_cred above θ_convergence, delaying T_anchor. The attack is only viable if the claim materially moves S_cred.
+
+**Why the attack is structurally costly:**
+
+S_cred moves by credibility-weighted update: `w_a = C_a × log(1 + k_a_net)`. W_max caps per-agent influence (#r71). An adversary with low credibility_ratio contributes negligible w_a regardless of k_a — claim cannot spike S_cred. An adversary with high credibility_ratio who submits a wrong disruptive claim will be slashed at resolution — destroying both capital and the credibility_ratio they relied on for the attack. The W_max cap means even a high-credibility adversary cannot spike Δ_epoch_S_cred beyond `W_max / Σw` (the maximum fractional S_cred displacement achievable by any single agent).
+
+**Resolution — credibility-weighted Δ definition:**
+
+```
+Δ_epoch_S_cred(c, t) = credibility_weighted_distance(S_cred(c,t), S_cred(c,t-1))
+  = Σ_a w_a × d(d_a, S_cred(c, t-1)) / Σ_a w_a   [weighted mean distance from prior]
+```
+
+This makes Δ_epoch_S_cred insensitive to uncredentialed or low-stake submissions — they don't move S_cred enough to spike Δ. A sustained disruption campaign requires sustained high-credibility high-stake claims that the adversary expects to lose, paying both capital and credibility as the attack cost.
+
+**T_anchor_max as the hard ceiling:**
+
+No matter how the adversary behaves, T_anchor fires at T_anchor_max. The adversary can delay T_anchor from T_anchor_optimal to T_anchor_max — a bounded window, class-registered, governance-set. This converts the attack from "block settlement indefinitely" to "impose maximum delay of T_anchor_max − T_anchor_optimal epochs." At that delay cost, most attacks are uneconomic.
+
+**Governance-set θ_convergence floor:** Governance may set a conservative θ_convergence_floor such that very-low-Δ epochs (near-converged state) always trigger T_anchor without waiting for theoretical convergence. Default: θ_convergence_floor = 0.001 × range(c) per epoch. Below this, the mechanism is converged regardless of whether adversarial submissions are still trickling in.
+
+**Design law (#r212):** Endogenous T_anchor convergence criteria must be credibility-weighted, bounded by W_max, and backstopped by T_anchor_max. A governance-set θ_convergence_floor prevents attacks from exploiting the convergence delay beyond a governance-calibrated maximum window. (#r212)
+
+---
+
+**Q2 (T_anchor_max and Zone_C deferral — what happens if Zone_C persists past T_anchor_max) → T_anchor fires at T_anchor_max regardless; Zone_C defers challenge window post-T_anchor; settlement advances to T_finality after Zone_C exit (#r212):**
+
+T_anchor and Zone_C operate on different mechanism layers:
+- T_anchor is a settlement clock event: it freezes S_cred and opens the challenge window. Governed by oracle availability and (endogenously) convergence. Zone_C does not pause oracle availability.
+- Zone_C defers settlement-finality challenge windows (#r151/Q1). It does not defer T_anchor itself.
+
+**Resolution — T_anchor fires independently of Zone_C:**
+
+```
+T_anchor_max fires:
+  1. CoordinateRegistry.freezeForSettlement (atomic, #r160/Q2)
+     → S_cred snapshot committed; candidate_price written to SettlementEngine
+     → T_anchor EAT event emitted
+  2. Challenge window opens immediately after T_anchor.
+  3. If class is in Zone_C at challenge window open:
+     → challenge window enters Zone_C deferral immediately (#r151/Q1)
+     → expiry tolled during Zone_C
+  4. Zone_C exits → challenge window resumes → closes normally → T_finality.
+  5. Positions settle at T_finality.
+```
+
+**Key invariant:** T_anchor_max is not modified by Zone_C. The settlement clock fires on schedule. The solvency-deferred part is the challenge window (and thus T_finality) — not the information-freeze event. Position-holders may experience extended settlement latency during Zone_C, but the settlement price is frozen at T_anchor_max → no additional epistemic risk accumulates after T_anchor_max even during Zone_C.
+
+**Zone_C during T_anchor → T_finality:** Normal knower activity continues (S_cred advances, new claims admitted to CredibilityAggregator). These post-T_anchor S_cred updates are NOT reflected in the frozen candidate_price. They advance S_cred for the next clearing epoch. This is correct: the settlement epoch's price is frozen; the protocol's epistemic state continues.
+
+**EAT record:** T_anchor EAT event includes `zone_c_at_anchor: true/false`. If zone_c_at_anchor is true: `projected_challenge_window_start: post_zone_c_exit`. Participants can compute expected T_finality latency. (#r212)
+
+---
+
+**Q3 (Shadow-class τ_bonus for credibility_ratio_shadow) → τ_bonus applies at shadow T_anchor_shadow; inflation is contained by credibility_ratio_shadow's informational-only status (#r212):**
+
+**Case for applying τ_bonus to shadow epochs:**
+- The knower chose when to submit relative to shadow T_anchor_shadow. This timing is a free choice (#r211/Q4 design law: τ_bonus applies where submission timing is knower's free choice).
+- Shadow escrow slash is real (#r211/Q3). Credibility_ratio_shadow reflects real capital accountability. τ_bonus incentivises early high-conviction shadow claims — epistemically valuable for discovery classes where early information reduces S_cred_shadow uncertainty sooner.
+
+**Case against:**
+- credibility_ratio_shadow is informational only (Invariant #244) — it feeds portability carry-over and the epistemically_live gate, not live S_cred weighting. τ_bonus inflating credibility_ratio_shadow could produce overstated portability carry-over to clearing classes.
+
+**Resolution — τ_bonus applies to shadow epochs; carry-over is constrained by existing thin-evidence discount:**
+
+```
+credibility_ratio_shadow update at shadow epoch resolution:
+  log_score_delta × τ_bonus_shadow_multiplier
+  τ_bonus_shadow_multiplier = τ_bonus formula with T_anchor_shadow
+  applied to credibility_ratio_shadow (NOT credibility_ratio_live)
+```
+
+Portability carry-over to a clearing class uses the count-based thin-evidence discount (Invariant #20): `carry_over_fraction = min(1, n_shadow_resolutions / N_anchor)`. τ_bonus inflates credibility_ratio_shadow magnitude, but the count-based carry-over already limits total portability by resolution count, not magnitude. A single shadow epoch with τ_bonus=1.4 still carries over at `1/N_anchor` (e.g., 25%) of its score.
+
+**Combined effect:** τ_bonus in shadow epochs incentivises early information contribution (epistemically valuable) without enabling large portability exploits (carry-over count-gated). The inflation concern is absorbed by the existing thin-evidence design.
+
+**τ_bonus_shadow_multiplier range:** Same formula as clearing-mode τ_bonus (governance-set τ_max_bonus, τ_bonus_decay). Not separately calibrated. Shadow-class governance may register a different T_anchor_shadow_window if the shadow class has materially different information dynamics — this flows into τ_bonus_shadow_multiplier automatically.
+
+**Design law (#r212):** τ_bonus applies to any oracle-resolution credibility update where submission timing is a knower free choice, regardless of mode (CLEARING, DISCOVERY, shadow). The thin-evidence carry-over cap (Invariant #20) is the correct safeguard against portability inflation from shadow τ_bonus — not disabling τ_bonus in shadow mode. (#r212)
+
+---
+
+**Q4 (θ_convergence and oracle_type heterogeneity — oracle_type-specific convergence semantics) → oracle_type_convergence_profile: convergence_fn registered at oracle_type level; per-class θ_convergence is a threshold within the type's measurement function (#r212):**
+
+Different oracle_types have structurally different S_cred convergence dynamics:
+
+| oracle_type | S_cred convergence pattern | Epoch-by-epoch Δ |
+|---|---|---|
+| MULTI_SOURCE | Continuous; gradual convergence as sources aggregate | Decreasing Δ → θ_convergence applies naturally |
+| COMMITTEE | Flat for many epochs; large spike on announcement; flat again | Low Δ for periods → T_anchor would fire falsely; then spike → T_anchor delay |
+| SINGLE_ORACLE | Step function at oracle announcement | Very high Δ at announcement; zero before → T_anchor fires before useful info |
+| ON_CHAIN_EVENT | Binary flip at event occurrence | Δ = 0 until event, then large → unsuitable for smooth convergence trigger |
+
+For COMMITTEE and ON_CHAIN_EVENT types, epoch-by-epoch Δ_epoch_S_cred is not a reliable convergence signal. These oracle_types require a different convergence measurement.
+
+**Resolution — oracle_type_convergence_profile at oracle_type level:**
+
+```
+oracle_type_convergence_profile ∈ {
+  SMOOTH_DELTA:      standard Δ_epoch_S_cred ≤ θ_convergence  [MULTI_SOURCE default]
+  QUIESCENT_WINDOW:  no Δ > θ_min for N_quiescent consecutive epochs  [COMMITTEE]
+  BINARY_ANCHOR:     T_anchor_min only; θ_convergence unused  [ON_CHAIN_EVENT, SINGLE_ORACLE]
+}
+```
+
+**SMOOTH_DELTA (MULTI_SOURCE):** existing formula from #r211. θ_convergence is the Δ threshold. Standard.
+
+**QUIESCENT_WINDOW (COMMITTEE):** S_cred is considered converged if it has been quiet (Δ < θ_min) for N_quiescent consecutive epochs after a prior high-Δ period. This captures the post-announcement stabilization — not the pre-announcement quiet (which is spurious low-Δ).
+
+```
+converged_COMMITTEE(c, t) iff:
+  EXISTS epoch t* < t such that Δ(c, t*) > θ_announcement  [announcement detected]
+  AND Δ(c, τ) < θ_min for all τ in [t* + 1, t]            [post-announcement quiescence]
+  AND t - t* ≥ N_quiescent                                 [quiescence duration]
+```
+
+θ_announcement detects the committee announcement; θ_min + N_quiescent confirm post-announcement stabilization. Governance registers θ_announcement, θ_min, N_quiescent per class within the COMMITTEE profile.
+
+**BINARY_ANCHOR (ON_CHAIN_EVENT, SINGLE_ORACLE):** No convergence criterion applicable. T_anchor is governed solely by T_anchor_min (earliest possible) and T_anchor_max (latest). In practice, governance sets T_anchor_min = T_anchor_max = T_oracle_scheduled (degenerate scheduled anchor). Endogenous trigger disabled.
+
+**Profile registered at oracle_type level; θ values per-class:**
+
+```
+oracle_type_registry:
+  oracle_type_id → convergence_profile (SMOOTH_DELTA | QUIESCENT_WINDOW | BINARY_ANCHOR)
+
+class_registration:
+  oracle_type → inherits convergence_profile
+  θ_convergence (or {θ_announcement, θ_min, N_quiescent}) → per-class calibration within profile
+```
+
+Per-class calibration within a type allows adjustment for coordinate volatility (a high-volatility MULTI_SOURCE class uses higher θ_convergence than a low-volatility one) without changing the fundamental convergence measurement method.
+
+**Design law (#r212):** oracle_type determines the *structure* of the convergence measurement function (which mathematical quantity to compare against threshold). Per-class θ parameters determine the *calibration* of that function. Separating structure (oracle_type) from calibration (per-class) ensures convergence semantics are correct for each oracle mechanism while preserving per-class flexibility. (#r212)
+
+---
+
+## Structural Synthesis: Two-Clock Synchronization — Operational Closure (#r212)
+
+| Feature | Resolution | Law |
+|---|---|---|
+| θ_convergence manipulation | Credibility-weighted Δ; W_max caps spike; T_anchor_max hard ceiling; θ_convergence_floor | Endogenous T_anchor: W_max-bounded, adversarially hard-to-sustain |
+| Zone_C past T_anchor_max | T_anchor fires at T_anchor_max regardless; challenge window enters Zone_C deferral post-freeze | T_anchor is information freeze, not settlement finality; Zone_C defers only the latter |
+| Shadow-class τ_bonus | Applies at shadow T_anchor_shadow; inflation capped by count-based portability carry-over | τ_bonus applies where timing is knower's free choice; carry-over cap contains inflation |
+| oracle_type convergence heterogeneity | oracle_type_convergence_profile (SMOOTH_DELTA / QUIESCENT_WINDOW / BINARY_ANCHOR); θ per-class | Type governs convergence structure; class governs calibration |
+
+---
+
+## Cumulative Invariants (#r212)
+
+**Invariant #247 (#r212):** θ_convergence is evaluated on credibility-weighted Δ_epoch_S_cred, bounded by W_max. θ_convergence_floor (governance-set, default 0.001 × range(c)) prevents adversarial sustained delay past a governance-calibrated maximum window. T_anchor_max is the unconditional hard ceiling for any endogenous T_anchor trigger.
+
+**Invariant #248 (#r212):** T_anchor fires at T_anchor_max independently of Zone_C status. Zone_C defers settlement-finality challenge windows post-T_anchor, not T_anchor itself. Settlement price is frozen at T_anchor; epistemic state continues advancing until T_finality.
+
+**Invariant #249 (#r212):** τ_bonus applies to shadow epoch oracle-resolution credibility_ratio_shadow updates. Shadow τ_bonus portability inflation is bounded by the count-based carry-over cap (Invariant #20). τ_bonus is not disabled in shadow mode.
+
+**Invariant #250 (#r212):** oracle_type_convergence_profile defines the convergence measurement structure (SMOOTH_DELTA, QUIESCENT_WINDOW, BINARY_ANCHOR). Per-class θ parameters calibrate within the structure. oracle_type determines structure; class registration determines calibration.
+
+---
+
+## Run Log Update
+
+- **#r212** — 2026-04-04T09:12Z — Q1: θ_convergence manipulation: credibility-weighted Δ; W_max caps adversarial spike; θ_convergence_floor; T_anchor_max is unconditional hard ceiling. Q2: T_anchor fires at T_anchor_max regardless of Zone_C; Zone_C defers challenge window post-T_anchor (not T_anchor itself); zone_c_at_anchor EAT flag. Q3: τ_bonus applies to shadow epochs at shadow T_anchor_shadow; portability inflation capped by count-based carry-over (Invariant #20); not disabled in shadow mode. Q4: oracle_type_convergence_profile: SMOOTH_DELTA (MULTI_SOURCE), QUIESCENT_WINDOW (COMMITTEE), BINARY_ANCHOR (ON_CHAIN/SINGLE); type governs structure, per-class θ governs calibration. Invariants #247–#250.
+
+---
+
+## Open Questions for #r213+
+
+1. **θ_convergence_floor and QUIESCENT_WINDOW interaction:** In COMMITTEE oracle_type, the convergence criterion requires detecting a post-announcement quiescence window. θ_convergence_floor (from Q1, Invariant #247) is defined for SMOOTH_DELTA profiles. Does θ_convergence_floor have a meaningful interpretation in QUIESCENT_WINDOW mode — or should it be expressed as a maximum N_quiescent_max (e.g., if post-announcement quiescence hasn't been detected within N_quiescent_max epochs, T_anchor fires regardless)?
+
+2. **BINARY_ANCHOR and endogenous T_anchor co-registration:** For ON_CHAIN_EVENT classes, governance sets T_anchor_min = T_anchor_max (degenerate schedule). But the on-chain event may fire before T_anchor_min (early event). Should the mechanism detect on-chain oracle availability and allow T_anchor to fire at oracle_availability_onset even when T_anchor_min has not been reached? Or is T_anchor_min always a hard floor?
+
+3. **τ_bonus_shadow portability inflation ceiling — does it require explicit bounding beyond count-based carry-over?** The count-based carry-over cap (Invariant #20) limits magnitude by n_resolutions / N_anchor. If a shadow class has a very high τ_bonus (t_submit close to T_anchor_shadow, short window), credibility_ratio_shadow could be large. Carry-over is then credibility_ratio_shadow × carry_over_fraction — which could still be large even at 25% of an inflated credibility_ratio_shadow. Is an absolute magnitude cap on credibility_ratio_shadow warranted?
+
+4. **Zone_C impact on τ_bonus timing incentive:** τ_bonus rewards early submission relative to T_anchor_locked (the T_anchor known at submission). In Zone_C episodes, T_anchor_max may approach sooner than T_anchor_optimal (endogenous); knowers who submitted early expecting T_anchor_optimal to fire now have effectively lower τ_bonus (T_anchor_locked = T_anchor_max is farther from their submission time than T_anchor_optimal would have been). Is there a τ_bonus correction for Zone_C-forced T_anchor_max firing, or does τ_bonus accept this asymmetry as inherent governance cost?
