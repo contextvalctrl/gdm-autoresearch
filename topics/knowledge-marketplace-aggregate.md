@@ -20192,3 +20192,174 @@ In LMSR/orderbooks: capital moves price, which approximates truth only under Gro
 4. **Expedited onboarding for COMMITTEE mode critical density gap:** The expedited protocol was specified for T3 knowers. If a COMMITTEE class is in critical density gap, does the same expedited onboarding apply to committee members (lower identity bond + enhanced challenge escrow model)? Or does the COMMITTEE epistemic role — where committee members produce oracle_declared, not just S_cred input — require a different crisis response with stronger identity requirements?
 
 *Last updated: #r231 — 2026-04-04T13:02Z*
+
+---
+
+## #r232 Contributions — 2026-04-04T13:12Z
+
+Addresses all four open questions from #r231.
+
+---
+
+### Q1 (CommitteeStateEngine + CredibilityAggregator circular reference at v2.2 deployment) → ProtocolAddressRegistry pattern; no constructor dependency; both contracts resolve addresses at call time (#r232)
+
+**Why the naive approach fails:** Deploying A first requires B's address (not yet known); deploying B first requires A's address (not yet known). Constructor arguments that reference undeployed addresses require a mutable initialisation step — which introduces a time-window where each contract has an unset address slot.
+
+**Resolution — ProtocolAddressRegistry:**
+
+```
+Deploy order (v2.2 additive deployment):
+  1. Deploy ProtocolAddressRegistry (no dependencies; owns address slots for all v2.2 contracts)
+  2. Deploy CommitteeStateEngine_v2(registry=ProtocolAddressRegistry.address)
+  3. Deploy CredibilityAggregator_v2(registry=ProtocolAddressRegistry.address)
+  4. governance multisig calls:
+       registry.set("CommitteeStateEngine_v2", address(cse))
+       registry.set("CredibilityAggregator_v2", address(ca))
+  5. registry.finalize()  ← makes all slots immutable; no further writes possible
+
+At call time (not construction time):
+  CommitteeStateEngine.applyCPAPenalty:
+      address ca = registry.get("CredibilityAggregator_v2");
+      ICredibilityAggregator(ca).validateCPAInput(...);
+
+  CredibilityAggregator.routeCPAPenalty(COMMITTEE class):
+      address cse = registry.get("CommitteeStateEngine_v2");
+      ICommitteeStateEngine(cse).applyCPAPenalty(...);
+```
+
+**Properties:** Zero circular constructor dependency. Call-time address resolution. Post-`finalize()` immutability — no address can be swapped after finalization. The same pattern was implicitly used by CoordinateRegistry_v2 for SettlementEngine_v2 routing. Naming it explicitly creates a first-class protocol primitive.
+
+**Design law (#r232):** Circular address dependencies between protocol contracts are resolved at call time via an immutable ProtocolAddressRegistry deployed and finalized before any contract that uses it. Constructor dependencies are eliminated. Post-finalization registry slots are immutable. (#r232)
+
+---
+
+### Q2 (η_realized for COMMITTEE classes — denominator and CONSENSUS_LOCK interaction) → weighted_variance(votes, T_anchor) as denominator; CONSENSUS_LOCK high-variance epochs increase denominator correctly; full-abstention yields undefined η_realized (#r232)
+
+**COMMITTEE η_realized formula:**
+
+```
+η_realized_committee(c, t) =
+    1 − (S_cred_at_T_anchor(c, t) − oracle_declared(c, t))² / weighted_variance(votes_T_anchor(c, t))
+
+weighted_variance(votes_T_anchor) =
+    Σ_i w_i × (v_i − credibility_weighted_median)² / Σ_i w_i
+```
+
+**CONSENSUS_LOCK interaction:** When CONSENSUS_LOCK is active at T_anchor (high variance triggered hold), S_cred = S_cred_{t-1} (carried). Denominator = the actual high-variance reading. Result: large denominator correctly captures epistemic uncertainty. η_realized scores whether the carried prior value was accurate despite committee disagreement — a legitimate epistemic question.
+
+**Edge case — full abstention at T_anchor:** weighted_variance is undefined. η_realized_committee is undefined; epoch excluded from EMA. Governance alert: `full_abstention_at_T_anchor` (extreme dysfunction requiring immediate committee recruitment).
+
+**Design law (#r232):** η_realized for COMMITTEE classes uses committee vote weighted_variance at T_anchor as the epistemic uncertainty denominator — the committee analogue of σ_claim_spread² in T3 mode. CONSENSUS_LOCK produces correct large-denominator behaviour. Full-abstention yields undefined η_realized + governance alert. (#r232)
+
+---
+
+### Q3 (protocol_maintenance_reserve and bilateral_flow_recovery_reserve coexistence on HYBRID_EXTERNAL v2.2 classes) → Distinct pools; not merged; maintenance_bonus gated on bilateral-flow regime is the sole coupling (#r232)
+
+**Purpose distinction:**
+- `bilateral_flow_recovery_reserve`: acute regime intervention — subsidises EDS to cross the basin boundary. Episodic; draws in attestation-pool.
+- `protocol_maintenance_reserve`: chronic incentive supplement — fills Phase 2 maintenance gap. Ongoing; drains in bilateral-flow.
+
+These are orthogonal in trigger condition and function. Merging would destroy causal traceability of reserve depletion.
+
+**Cross-reserve interaction gate:**
+
+```
+maintenance_bonus_gate(class_i, epoch_t):
+  active iff: current_regime(class_i) == bilateral_flow
+           AND query_fee_revenue(class_i, epoch_t) < q_fee_floor_threshold
+```
+
+On regime_transition → attestation pool: maintenance_bonus automatically suspended by gate condition. Both reserves preserved. On recovery to bilateral flow: maintenance_bonus resumes; recovery_reserve stops draining.
+
+```
+Regime: bilateral_flow
+  maintenance_reserve: draining (if EQ demand thin)
+  recovery_reserve: not draining
+
+Regime: warranted_attestation_pool
+  maintenance_reserve: not draining (gate blocked)
+  recovery_reserve: draining (up to draw_3, Invariant #290)
+
+Regime: DELIST_PENDING_IRRECOVERABLE
+  maintenance_reserve: not draining
+  recovery_reserve: balance returned to governance treasury
+```
+
+**Design law (#r232):** Orthogonal functions → separate pools; bilateral-flow gate is sole coupling; no explicit coordination mechanism needed beyond the gate. (#r232)
+
+---
+
+### Q4 (Expedited knower onboarding for COMMITTEE mode critical density gap) → No bond reduction; oracle_carry_epoch + standard-bond accelerated recruitment; DELIST_PENDING if N_carry_max exceeded (#r232)
+
+**Why T3 expedited onboarding does not generalise to COMMITTEE:** T3 knowers contribute signals diluted by batch integration (W_max + credibility_ratio bounded). COMMITTEE members produce oracle_declared directly via credibility-weighted median. A reduced-bond neutral-credibility entrant in a k=3 committee occupies one of three oracle seats and shifts the median materially. The 1.5× challenge escrow compensation (T3 model) has no COMMITTEE analogue — committee members have no challenge escrow, only identity bond.
+
+**Resolution — oracle_carry_epoch extension:**
+
+```
+COMMITTEE class critical density gap response:
+
+Step 1: governance declares oracle_carry_epoch(class_i):
+  oracle_declared(class_i, T_anchor) = oracle_declared(class_i, T_anchor − 1)
+  Duration: up to N_carry_max = N_calibration / 2 consecutive carry epochs
+  EAT event: oracle_carry_epoch_initiated { class_id, start_epoch, carried_value, reason: density_gap }
+
+Step 2: Governance initiates standard-bond committee recruitment:
+  Full identity bond required (no reduction)
+  Accelerated governance vote: 2-epoch window (vs standard 4-epoch)
+  Recruit from CPA_IdentityRegistry addresses with resolved_exonerated status
+
+Step 3: Density recovered within N_carry_max:
+  Carry ends; normal operation resumes.
+  EAT event: oracle_carry_epoch_resolved { epochs_carried: N, new_committee }
+
+Step 4: Density not recovered within N_carry_max:
+  Class enters DELIST_PENDING_IRRECOVERABLE (Invariant #297 lifecycle applies)
+  EAT event: oracle_carry_irrecoverable { class_id }
+```
+
+oracle_carry is governance measure; positions settle from carried oracle. Challengers who dispute the carry file governance challenges (not epistemic challenges).
+
+**Design law (#r232):** COMMITTEE mode critical density gaps require oracle_carry_epoch + standard-bond accelerated recruitment. No expedited identity bond reduction. Crisis governance preserves oracle integrity at the cost of slower recruitment. DELIST_PENDING is the correct terminus if unresolvable within N_carry_max. (#r232)
+
+---
+
+## Structural Synthesis: #r232
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Circular contract reference | ProtocolAddressRegistry; finalize-then-use; call-time resolution; no constructor dependency | Finalized registry resolves all circular deps; constructor deps eliminated |
+| η_realized COMMITTEE | weighted_variance(votes, T_anchor) as denominator; CONSENSUS_LOCK → large denominator; undefined on full abstention | Vote uncertainty denominator = committee analogue of σ_claim_spread² |
+| Dual reserve coexistence | Distinct pools; maintenance drains only in bilateral-flow; recovery draws in attestation-pool; bilateral-flow gate is sole coupling | Orthogonal functions → separate pools; gate creates coupling without merger |
+| COMMITTEE expedited onboarding | No bond reduction; oracle_carry + standard-bond accelerated recruitment; DELIST_PENDING if N_carry_max exceeded | Oracle manufacturing surface disqualifies T3-style expedited entry |
+
+---
+
+## Cumulative Invariants (#r232)
+
+**Invariant #338 (#r232):** ProtocolAddressRegistry is deployed first in v2.2 additive deployment. CommitteeStateEngine_v2 and CredibilityAggregator_v2 take only the registry address at construction. registry.finalize() makes all slots immutable. Call-time address resolution via registry.get() eliminates circular constructor dependencies.
+
+**Invariant #339 (#r232):** η_realized for COMMITTEE classes: η_realized_committee = 1 − settlement_error² / weighted_variance(committee_votes, T_anchor_epoch). CONSENSUS_LOCK active at T_anchor → large denominator; η_realized correctly captures epistemic uncertainty. Full-abstention at T_anchor → η_realized undefined; epoch excluded from EMA; governance alert: `full_abstention_at_T_anchor`.
+
+**Invariant #340 (#r232):** protocol_maintenance_reserve and bilateral_flow_recovery_reserve are distinct pools. Sole coupling: maintenance_bonus gated on bilateral_flow regime (Invariant #329); automatic suspension on regime_transition to attestation-pool. No pool merger; causal traceability requires separation.
+
+**Invariant #341 (#r232):** COMMITTEE mode critical density gap: (1) oracle_carry_epoch declared (carries prior oracle_declared; max N_carry_max = N_calibration / 2 epochs); (2) standard-bond recruitment with accelerated 2-epoch approval; (3) density recovered → carry ends; (4) not recovered → DELIST_PENDING_IRRECOVERABLE. No expedited identity bond reduction for COMMITTEE mode.
+
+---
+
+## Run Log Update
+
+- **#r232** — 2026-04-04T13:12Z — Q1: ProtocolAddressRegistry; deploy-then-finalize; call-time resolution; eliminates circular constructor dependency. Q2: η_realized_committee uses weighted_variance(votes, T_anchor); CONSENSUS_LOCK → large denominator; full-abstention → undefined + governance alert. Q3: Distinct reserve pools; maintenance gated on bilateral-flow; recovery draws in attestation-pool; bilateral-flow gate is sole coupling. Q4: COMMITTEE critical gap → oracle_carry_epoch + standard-bond accelerated recruitment; no expedited bond reduction; DELIST_PENDING if N_carry_max exceeded. Invariants #338–#341.
+
+---
+
+## Open Questions for #r233+
+
+1. **ProtocolAddressRegistry partial-finalization:** If registry.finalize() must occur before class registration but v2.2 has uneven deployment (CommitteeStateEngine deployed; CredibilityAggregator_v2 not yet), can the registry be finalized with a partial address set? Define partial-finalization rules.
+
+2. **oracle_carry_epoch and T_anchor:** If T_anchor fires during oracle_carry_epoch, settlement uses the carried oracle_declared. Should η_realized use weighted_variance(votes, T_anchor) even when oracle_declared is a carry value (not a fresh committee vote)? Or is η_realized undefined for carry-epoch T_anchor resolutions?
+
+3. **COMMITTEE mode and τ_bonus analogue:** τ_bonus rewards T3 early-epoch claim submission. COMMITTEE mode produces per-epoch votes, not continuous claims. Does a τ_bonus analogue apply to committee members who vote in early epochs with a directional commitment before others?
+
+4. **ProtocolAddressRegistry and multi-chain deployment:** For eventual L2 expansion, the registry's own address must be known at construction for each new-chain deployment. How should the registry address be communicated without breaking single-source-of-truth?
+
+*Last updated: #r232 — 2026-04-04T13:12Z*
