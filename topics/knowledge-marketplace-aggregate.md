@@ -7281,3 +7281,184 @@ Applies to (current list): arweave_mirror_closed when settlement records present
 4. **Advisory-confirm pattern and emergency governance:** The gate blocks an action pending confirmation within N_confirm_window. Should the emergency multisig bypass (#r158/Q3) override the advisory-confirm gate entirely, or should the gate always be honoured even under emergency conditions?
 
 *Last updated: #r171 — 2026-04-04T02:12Z*
+
+---
+
+## #r172 Contributions — 2026-04-04T02:22Z
+
+**Phase: v2.2 Module 1 — DISCOVERY_MODE. Addresses all four open questions from #r171.**
+
+---
+
+**Q1 (Q25-calibrated tau_revision and sparse advisory epochs — minimum submission count) → N_advisory_min_submissions = max(5, 2 × N_active_knowers); fallback: τ_revision prohibited, τ_genesis carries forward with N_advisory_window extended by N_calibration (#r172):**
+
+Q25 from 3 submissions is statistically meaningless — worst case, Q25 is one of three data points, any of which could be an adversarial outlier or a noisy launch-epoch anomaly.
+
+**Resolution — minimum submission gate:**
+
+```
+tau_revision_eligible =
+  (total advisory_mode D_a submissions across all knowers >= N_advisory_min_submissions)
+  AND (advisory_mode has run for >= N_advisory_window epochs without termination)
+
+N_advisory_min_submissions = max(5, 2 × N_active_knowers_at_advisory_start)
+```
+
+**Fallback if count not met at end of advisory window:**
+
+```
+If tau_revision_eligible = false at advisory_window expiry:
+  tau_revision: prohibited for this advisory window
+  advisory_window extends by N_calibration epochs (one-time extension, automatic)
+  tau_genesis carries forward unchanged
+  EAT event: advisory_window_extended { reason: "insufficient_submissions", epoch }
+
+  If still false after extension:
+    advisory_mode terminates; tau_genesis carries forward permanently until self-calibration activates
+    EAT event: advisory_window_closed_without_revision { tau_genesis_retained, total_submissions }
+    Governance alert: tau_genesis_unrevised_low_participation
+```
+
+**Design law (#r172):** Quantile-based parameter calibration requires a minimum data density gate before the quantile is computed. When the gate is not met, the advisory window extends once; if still unmet, the genesis default carries forward and the governance alert redirects attention to the participation problem. (#r172)
+
+---
+
+**Q2 (MONOPOLY_MODE at genesis — bootstrapping contradiction with partial track record prerequisite) → Genesis MONOPOLY_MODE is track-record-free for first N_bootstrap_epochs; prerequisite activates after first oracle resolution (#r172):**
+
+At class genesis, no knower has resolved claims. The track record prerequisite (Invariant #78) cannot be met by anyone — a phase-ordering conflict.
+
+**Resolution — N_bootstrap_epochs track-record exemption:**
+
+```
+N_bootstrap_epochs = N_calibration
+
+During N_bootstrap_epochs:
+  MONOPOLY_MODE applies if only one unique knower present
+  mode-exit-eligible second knower: requires ONLY stake_a_net >= k_min (no track record gate)
+  N_monopoly_exit_window still applies (consecutive-epoch stability required)
+
+After N_bootstrap_epochs (or first oracle resolution, whichever comes first):
+  standard partial track record prerequisite activates:
+    resolved_claims_a >= floor(N_track_threshold / 2)
+```
+
+Flash-participation during bootstrap: claim withdrawal is prohibited (Invariant #47). k_min escrow lock serves as the credibility gate. Bootstrap substitutes stake lock for track record.
+
+**Design law (#r172):** Track-record prerequisites are inapplicable at class genesis. Bootstrap substitutes the minimum stake requirement for the track record gate during N_bootstrap_epochs. After the first oracle resolution, full prerequisites apply. (#r172)
+
+---
+
+**Q3 (N_rollover_max and long-horizon coordinates — safety valve economics for pre-paid query fees) → Mandatory disclosure at registration; N_rollover_max ceiling scaled to horizon; future query credit for pre-paid unknowers (#r172):**
+
+For T_discovery = 48 macro-epochs, a coordinated all-negative IVD streak cycling the safety valve materially reduces pre-paid unknower returns.
+
+**Resolution — three-part:**
+
+**Part 1 — Mandatory disclosure at class registration:**
+```
+discovery_params.safety_valve_disclosure:
+  N_rollover_max: declared value (governance-set, bounded [2, 6])
+  max_streaming_pool_drain_per_valve: 50% (protocol-fixed)
+  max_valve_cycles_per_epoch_window: floor(T_discovery / N_rollover_max)
+  EAT: committed at class registration; visible to unknowers before query fee payment
+```
+
+**Part 2 — N_rollover_max governance ceiling scaled to horizon:**
+```
+N_rollover_max_max = ceil(T_discovery / 8)
+  For T_discovery=48: N_rollover_max_max = 6
+  For T_discovery=4:  N_rollover_max_max = 1
+```
+
+**Part 3 — Future query credit (not refund) on safety valve fire:**
+```
+On safety_valve_fired:
+  unknower_a future_query_credit = (query_fee_total_paid - fees_already_returned) × 0.50
+  Stored in CoordinateRegistry; applicable to future query on same or sister class
+```
+
+**Design law (#r172):** Long-horizon mechanism coordinates disclose worst-case parametric risk at registration. Safety valves have governance-settable recurrence bounds scaled to horizon. Pre-paid participants receive future-use credit; refunds are not issued — the at-risk nature of the fee is a mechanism design feature. (#r172)
+
+---
+
+**Q4 (Advisory-confirm pattern and emergency multisig bypass — bifurcated treatment) → Known-degenerate-outcome gates: no bypass; operational-continuity gates: bypass permitted at elevated threshold (#r172):**
+
+**Bifurcated treatment:**
+
+```
+TYPE = known_degenerate_outcome (stale genesis prior at alpha ≤ 0.10; arweave_mirror_closed without ack):
+  Emergency multisig bypass: NOT PERMITTED
+  Degeneracy is invariant to urgency; correct exit = bypass the degenerate path, not the gate
+
+TYPE = operational_continuity (oracle deregistration; CredibilityAggregator upgrade):
+  Emergency multisig bypass: PERMITTED at elevated k-of-n threshold
+  Retroactive rationale within N_confirm_window = 2 macro-epochs required
+```
+
+**Categorization table:**
+
+| Advisory-confirm gate | Type | Emergency bypass |
+|---|---|---|
+| arweave_mirror_closed without ack | known_degenerate_outcome | NOT PERMITTED |
+| exportGenesisPrior at alpha ≤ 0.10 | known_degenerate_outcome | NOT PERMITTED |
+| Oracle deregistration | operational_continuity | PERMITTED (elevated k-of-n) |
+| HARD_GATE parameter change (#r158/Q3) | operational_continuity | PERMITTED (elevated k-of-n) |
+
+**Design law (#r172):** Known-degenerate-outcome advisory-confirm gates are absolute — emergency bypass is not permitted because the outcome's degeneracy is invariant to urgency. Operational-continuity gates admit bypass at elevated threshold with mandatory post-facto rationale. (#r172)
+
+---
+
+## Net-New Structural Insight: The Bootstrap-Substitute Pattern (#r172)
+
+Every mature mechanism prerequisite has a genesis-phase substitute that provides equivalent security at lower informational cost. This pattern recurs throughout the spec:
+
+| Mature prerequisite | Bootstrap substitute | Activation event |
+|---|---|---|
+| Partial track record (>= N_track_threshold/2) | Minimum stake k_min lock | First oracle resolution |
+| Self-calibrated tau | τ_genesis + advisory mode | N_sigma_window oracle epochs |
+| Mode mismatch discount | Mode mismatch prior (governance) | N_align_window alignment samples |
+| Oracle anomaly inner envelope | μ_genesis ± 3σ_genesis | N_sigma_window oracle epochs |
+| epistemically_live_discovery (2 knowers w/ track record) | 2 knowers, stake-only | N_bootstrap_epochs elapsed |
+
+Bootstrap substitutes are: (1) non-zero in cost; (2) achievable without class history; (3) replaced by mature prerequisite event-driven (not governance-triggered).
+
+**Design law (#r172):** Every mature mechanism prerequisite has a bootstrap substitute operational from genesis. Bootstrap substitutes are non-zero cost, achievable without class history, and replaced by the mature prerequisite when sufficient history exists. Activation is event-driven, not governance-triggered. (#r172)
+
+---
+
+## Structural Synthesis: DISCOVERY_MODE — Hardening Pass #2 Closed (#r172)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Sparse advisory epoch calibration | N_advisory_min_submissions gate; one-time extension; genesis-default-forward if sparse | Quantile calibration requires data density gate |
+| MONOPOLY_MODE genesis bootstrapping | N_bootstrap_epochs stake-only substitute for track record prerequisite | Bootstrap substitute is non-zero cost, history-free, event-activated to mature |
+| Safety valve economics (long-horizon) | Disclosure at registration; N_rollover_max ceiling; future query credit | Disclose worst-case at registration; scale N_rollover_max to horizon; credit not refund |
+| Emergency bypass vs advisory-confirm | Bifurcated: known-degenerate-outcome = no bypass; operational-continuity = permitted | Degeneracy is invariant to urgency |
+
+---
+
+## Cumulative Invariants (additions through #r172)
+
+**Invariant #82 (#r172):** Advisory-mode tau calibration requires N_advisory_min_submissions = max(5, 2 × N_active_knowers). If gate not met at window end, one N_calibration extension; after extension, genesis default carries forward permanently until self-calibration activates.
+
+**Invariant #83 (#r172):** During N_bootstrap_epochs (= N_calibration), MONOPOLY_MODE exit requires only stake k_min (no track record prerequisite). After N_bootstrap_epochs or first oracle resolution, Invariant #78 partial track record prerequisite activates fully.
+
+**Invariant #84 (#r172):** Long-horizon DISCOVERY_MODE classes must disclose worst-case safety valve exposure at registration. N_rollover_max is governance-settable with class-specific upper bound ceil(T_discovery/8). Pre-paid unknowers receive future_query_credit (not refund) when safety valves fire.
+
+**Invariant #85 (#r172):** Advisory-confirm gates are bifurcated: known-degenerate-outcome gates are absolute (no emergency bypass); operational-continuity gates admit emergency bypass at elevated k-of-n threshold with mandatory post-facto rationale within N_confirm_window.
+
+**Invariant #86 (#r172):** Every mature mechanism prerequisite has a bootstrap substitute operational from genesis. Bootstrap substitutes are non-zero cost, achievable without class history, and replaced by the mature prerequisite when sufficient history exists. Activation is event-driven, not governance-triggered.
+
+---
+
+## Open Questions for #r173+
+
+1. **future_query_credit transferability to sister class:** Invariant #84 allows credit transfer to a "governance-declared sister class." Define the sister-class declaration: what relationship justifies credit portability (same oracle, same underlying event, same governance sector), and should credit transfer be automatic or require unknower explicit election?
+
+2. **N_rollover_max and N_advisory_min_submissions interaction:** Both parameters scale to N_calibration. What is the correct governance interface — separate per-class fields, or derived from N_calibration with class-specific overrides? Risk of governance setting inconsistent values?
+
+3. **Bootstrap-substitute stake lock duration:** During N_bootstrap_epochs, second knower's k_min escrow is locked until oracle resolution (Invariant #47). For long T_discovery classes, this is a potentially multi-year lock. Is N_bootstrap_epochs bounded independently of T_discovery, or does long T_discovery create prohibitively expensive bootstrap-phase commitments?
+
+4. **DISCOVERY_MODE Module 1 completeness declaration:** With 86 invariants and two hardening passes through #r172, what remaining attack families and open questions constitute the minimum bar for declaring Module 1 specification-complete?
+
+*Last updated: #r172 — 2026-04-04T02:22Z*
