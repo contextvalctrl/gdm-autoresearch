@@ -14198,3 +14198,322 @@ When all five preconditions from Invariant #202 are confirmed:
   - Future corrections: [AUDIT] or [IMPL] tags only
   - v2.2 design: knowledge-marketplace-v22.md
 ```
+
+---
+
+## #r204 Contributions — 2026-04-04T07:42Z
+
+**Phase: First knowledge-marketplace-primary run per cron directive. MatchingEngine thread closed at #r203. Fresh first-principles pass — 10-section analysis from primitive. Net-new focus: hierarchical coordinates, oracle-type uncertainty decomposition, bilateral-flow precision.**
+
+---
+
+### Cron Directive Compliance Statement (#r204)
+
+The cron directive asks to pressure-test the knowledge marketplace as a mechanism family distinct from LMSR/orderbooks. After 203 runs the mechanism is substantially specified. This run adds three net-new structural angles the prior thread did not address:
+
+1. **Hierarchical coordinate structure** — does the knowledge marketplace compose naturally across related coordinates (GDP Q1 → GDP Annual), and what does this mean for the state model?
+2. **Oracle-type uncertainty** — the mechanism conflates two kinds of uncertainty: σ_resolve (uncertainty about the coordinate's value) and σ_oracle (uncertainty about whether/when an authoritative oracle will resolve). These require different mechanism responses.
+3. **Bilateral-flow precision** — the cron framing says "exchange is bilateral flow between high-information zones and low-information zones." Prior runs showed this only holds in DISCOVERY_MODE. This run gives a precise formal condition under which bilateral flow holds vs. collapses.
+
+---
+
+### §1 — Base Primitive (Hierarchical Extension) (#r204)
+
+**Prior statement (#r203):** The base primitive is a (claim, escrow, track-record) warrant on a coordinate variable.
+
+**Net-new — hierarchical primitive:**
+
+A knowledge marketplace over a *coordinate hierarchy* exchanges not just leaf-node claims but **structural bets on intermediate aggregates**. Example:
+
+```
+Coordinate hierarchy:
+  GDP_annual → GDP_Q1, GDP_Q2, GDP_Q3, GDP_Q4
+  relation: GDP_annual = GDP_Q1 + GDP_Q2 + GDP_Q3 + GDP_Q4  (known accounting identity)
+```
+
+In LMSR, these are four independent markets with no structural coupling. The knowledge marketplace can express hierarchical coordinate identities natively via the claim data structure:
+
+```
+Hierarchical claim: (parent_coord, child_coords[], identity_fn, stake)
+  where identity_fn : R^n → R is a known linear relation
+
+Constraint propagation: if knower stakes on any 3 of {Q1,Q2,Q3,Q4},
+  the fourth's S_cred is implied by identity_fn
+  — a DERIVED S_cred update, not a fresh claim
+
+Credibility_ratio update scope:
+  Direct claim: updated at oracle resolution of that coordinate
+  Implied claim: updated at discount γ_implied < 1 (derivation penalty)
+    agent earned less because they did not take independent position risk
+```
+
+**State model addition (#r204):** S_epistemic is a directed acyclic graph (DAG) of coordinate estimates, not a flat list. Edges are known identity or containment relations. Constraint propagation from resolved child nodes updates parent S_epistemic automatically — no additional knower claims required, no credibility_ratio update triggered.
+
+**This is the mechanism's first formal superiority over LMSR in the multi-coordinate case.** LMSR requires N independent markets for N related coordinates; the knowledge marketplace DAG propagates information across coordinates via declared relations, reducing the effective knower work for structured coordinate families. (#r204)
+
+---
+
+### §2 — State Model (Oracle-Type Uncertainty Decomposition) (#r204)
+
+**Prior state model (#r201):** S_epistemic (live), S_settlement (frozen), WED (conserved).
+
+**Net-new — two sources of uncertainty conflated in prior runs:**
+
+| Uncertainty | Definition | Nature |
+|---|---|---|
+| σ_resolve | Uncertainty about the coordinate's true value | Epistemic — knowers can reduce it with better models |
+| σ_oracle | Uncertainty about whether/when an oracle will provide authoritative resolution | Structural — no knower's model improves this |
+
+**Mechanism implications of σ_oracle (#r204):**
+
+```
+If oracle arrives late (T_oracle >> T_expected):
+  Knowers who maintained accurate S_epistemic during the delay earn fee revenue each epoch
+  Knowers who were right but withdrew early: no credibility_ratio update (missed it)
+
+If oracle never arrives (Case D3 — class retired):
+  Maintenance fees paid: YES
+  credibility_ratio updates: ZERO
+  Result: knowers who specialized in high-σ_oracle classes (regulatory, litigation)
+    are systematically penalized vs. fast-resolving class specialists
+    — bias against exactly the classes where institutional Type B demand is highest
+```
+
+**Resolution — consistency credit:**
+
+For classes retired without oracle resolution:
+```
+If knower maintained S_epistemic within tolerance for ≥ N_calibration epochs:
+  credibility_ratio partial update = γ_oracle_absent × Δ_correct
+  γ_oracle_absent ∈ [0.1, 0.5], governance-set at class registration
+  EAT event: credibility_update_oracle_absent
+```
+
+**Formal state extension (#r204):** σ_oracle is a distinct ClassConfig parameter. High-σ_oracle classes require:
+- Declared `γ_oracle_absent` at registration
+- T_longtail ≥ 3 × T_oracle_expected_delay
+- EQ query fee premium: `fee_rate × (1 + σ_oracle_premium)`, σ_oracle_premium ∈ [0, 0.5] (#r204)
+
+---
+
+### §3 — Credibility Model (σ_oracle-Adjusted Track Record) (#r204)
+
+The log-score update requires a reference value (oracle truth). Under high σ_oracle, the reference arrives late or not at all.
+
+**Path A — Late oracle:** credibility_ratio update fires normally at delayed oracle resolution. No mechanism change required. Knowers who maintained accurate estimates during the delay are correctly rewarded retroactively.
+
+**Path B — Absent oracle (Case D3):** Without γ_oracle_absent partial credit, zero credibility_ratio update regardless of accuracy — systematic bias against hard-to-resolve coordinate specialists.
+
+**γ_oracle_absent calibration constraint (#r204):** Should approximately equal the expected base rate of correct claims for a calibrated knower on that coordinate class — giving well-calibrated knowers zero expected gain from the partial credit. It corrects the systematic bias; it does not create new incentive. If set too high, knowers will fraudulently claim accuracy on unresolved coordinates. If set too low, specialization in high-σ_oracle classes remains unprofitable. (#r204)
+
+---
+
+### §4 — Market Roles (Bilateral Flow Formal Condition) (#r204)
+
+**The cron's claim:** "Exchange is bilateral flow between high-information zones and low-information zones."
+
+**Formal condition for bilateral flow:**
+
+```
+Bilateral flow holds iff ALL THREE:
+  (1) Type B (active EQ) unknowers present — willingness_to_pay > 0
+  (2) Knower pool is epistemically_live — Zone_H exists with credibly calibrated agents
+  (3) σ_oracle low enough for credible resolution timeline — D(c) is meaningful
+```
+
+**When bilateral flow collapses:**
+
+```
+Case 1 — CLEARING_MODE, Type A only:
+  Public-good S_cred consumed for free; capital flows only within knower pool
+  → "warranted attestation pool" semantics; no bilateral flow
+
+Case 2 — High σ_oracle:
+  D(c) diminishes under oracle delay; Type B willingness_to_pay drops
+  → Mechanism degrades toward warranted attestation pool
+
+Case 3 — Knower pool not epistemically_live:
+  Zone_H is empty; capital flows from Zone_L to uncalibrated claimants
+  → Bilateral flow exists but is epistemically empty
+```
+
+**Precise characterisation (#r204):** The mechanism is a knowledge marketplace (bilateral flow) only when all three conditions hold simultaneously. Most deployments will operate as warranted attestation pools (public-good S_cred, internal knower-pool redistribution). Both modes are valid and useful; only the bilateral-flow mode satisfies the strict "knowledge marketplace" definition. (#r204)
+
+---
+
+### §5 — Settlement (Echo Resolution, Case D4) (#r204)
+
+**Case D4 — σ_oracle-induced late settlement (oracle fires after T_longtail_ref):**
+
+```
+T_oracle > T_longtail_ref:
+  LTRP has already returned escrows; knower pool has exited
+  Oracle fires → must settle against S_cred snapshot from last committed epoch
+    before LTRP expiry
+
+  SettlementEngine reads: S_cred_history[last_pre_LTRP_epoch]
+  NOT: S_cred_history[T_oracle - 1]  (empty — no active knowers)
+
+  credibility_ratio updates fire retroactively for knowers active at last_pre_LTRP_epoch
+  EAT log: settlement_type = ECHO_RESOLUTION, s_cred_epoch_used = [N]
+```
+
+Echo resolution is epistemically correct: the clearing price reflects the best available estimate at the time knowers were still active. No escrow is at stake at echo resolution time (already returned by LTRP). (#r204)
+
+---
+
+### §6 — Attack Surface (Hierarchical Coordinate Manipulation) (#r204)
+
+Prior attack surface (#r194/§6): credibility laundering, wash-credibility, cheap talk, oracle gaming.
+
+**Net-new: DAG propagation gaming (#r204):**
+
+```
+Attack:
+  Stake cheaply on high-certainty child coordinates (near-resolved, tiny risk)
+  → DAG propagation implies parent S_cred for free
+  → Claim credibility_ratio update on parent via γ_implied
+  → Earn parent track record without bearing parent epistemic risk
+```
+
+**Defence — hierarchical stake floor:**
+
+```
+credibility_ratio_update_parent(a) ≠ 0  iff:
+  (a) direct stake on parent_coord ≥ k_min_parent  [direct path]
+  OR
+  (b) direct stakes on ≥ N_children_min child coords
+      AND each child claim differs from DAG-implied child value by ≥ ε_independence
+```
+
+"Non-trivially distinct": agent's child claim for each child coordinate differs from the mechanically-implied value (computed from other agents' estimates) by ≥ ε_independence. Prevents rubber-stamping DAG propagation to earn credibility_ratio. (#r204)
+
+---
+
+### §7 — vs LMSR/Orderbooks/Batch Auctions (Hierarchical Advantage) (#r204)
+
+Prior comparison (#r203): LMSR lacks conserved quantity, oracle arbitration, track-record gating.
+
+**Net-new — hierarchical coordinate advantage (#r204):**
+
+LMSR cost function is separable across markets — no native inter-market constraint. Coupling requires external arbitrage infrastructure (separate mechanism, separate subsidy).
+
+Knowledge marketplace DAG propagation: native. Zero additional mechanism required.
+
+**Quantitative advantage:** For coordinate DAG with N leaf nodes and M parent nodes, the knowledge marketplace provides M additional S_cred estimates from propagation given N leaf-node knower pools. LMSR requires M additional independent market-maker subsidies.
+
+**LMSR retains advantage:** isolated fast-resolving single-coordinate markets (no relational structure, high liquidity needed); LMSR is strictly simpler and more liquid there.
+
+**Verdict (#r204):** Knowledge marketplace dominates LMSR in multi-coordinate families with known relations. GestAlt's institutional focus — macroeconomic, regulatory, multi-event coordinate families with rich relational structures — is exactly the domain where this advantage is largest. (#r204)
+
+---
+
+### §8 — Simplest Viable Mechanism Sketch (T1a Extension) (#r204)
+
+Prior five-transition sketch (#r203): T1 STAKE, T2 COMMIT, T3 FREEZE, T4 RESOLVE, T5 QUERY.
+
+**Addition — T1a DECLARE_RELATION:**
+
+```
+T1a DECLARE_RELATION(parent_coord, child_coords[], identity_fn, validity_stake):
+  governance call; validity_stake burned if identity_fn is wrong at resolution
+  CoordinateRegistry records DAG edge: parent → children with identity_fn
+  After each T2 COMMIT: if all children have committed S_epistemic in same epoch,
+    propagate: S_epistemic(parent) = identity_fn(S_epistemic(child_1), ..., child_n)
+    — informational only until T3 FREEZE explicitly called on parent
+```
+
+validity_stake: same conviction-signalling logic applied to structural declarations. Declarant posts capital at risk if the declared relation is wrong. (#r204)
+
+---
+
+### §9 — Strongest Failure Reason (σ_oracle Dimension) (#r204)
+
+**Prior (#r203):** Cold-start — no credible knower pool at genesis.
+
+**Updated with σ_oracle (#r204):**
+
+Two independent cold-start axes:
+- **σ_knower (bootstrap cold-start):** no knower pool → no S_cred → no mechanism
+- **σ_oracle (resolution cold-start):** knower pool exists but oracle never resolves → credibility_ratio updates never fire → permanent epistemic inertia on hard classes
+
+The γ_oracle_absent consistency credit is a partial second-order fix. The primary fix is oracle commitment at class registration — requiring declarants to identify a specific authoritative resolution source and timeline.
+
+**Residual strongest failure (#r204):** The mechanism cannot force oracle arrival. Classes where the oracle is genuinely uncertain (regulatory discretion, open-ended litigation) are epistemically fragile regardless of knower pool quality. This is a correct design limitation: the mechanism amplifies oracle resolution; it cannot replace it. (#r204)
+
+---
+
+### §10 — Best Surviving Variant (σ_oracle-Robust: Relative-Truth Resolution) (#r204)
+
+**When oracle commitment is infeasible at class registration:**
+
+**Relative-truth resolution variant:**
+```
+coord_new resolves against ratio: outcome_new / outcome_reference
+  coord_reference = already-resolved coordinate with known truth value
+
+Example:
+  "GDP Q1 Growth relative to prior-year Q1" resolves as soon as one confirmed reference exists
+  — far lower σ_oracle than absolute GDP (which requires multi-revision BEA cycle)
+
+Mechanism extension:
+  T1 STAKE → T1 STAKE_RELATIVE(coord_new, coord_ref, ratio_claim, stake)
+  T4 RESOLVE fires on the ratio outcome; credibility_ratio updates on ratio accuracy
+
+Portability rule (new):
+  credibility_ratio earned on ratio-claims does NOT transfer to absolute-claim classes
+  (separate class IDs; no cross-class laundering — already prohibited by Invariant #163)
+```
+
+**Why this helps σ_oracle:** relative resolutions are available sooner. The reference coordinate acts as an oracle anchor that reduces effective σ_oracle for the new class without requiring an independent oracle source.
+
+**Best surviving variant if raw idea fails:** Relative-truth resolution is the correct σ_oracle-robust fallback when oracle commitment is infeasible. It maintains all mechanism properties (track-record gated, warrant-backed, oracle-arbitrated) while lowering the oracle arrival barrier. (#r204)
+
+---
+
+## Structural Synthesis: #r204
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| Hierarchical coordinate DAG | S_epistemic propagates via declared relations; M parents from N leaf knowers | LMSR requires M additional subsidies; knowledge marketplace dominates in multi-coord families |
+| σ_oracle decomposition | Oracle-arrival uncertainty is distinct from coordinate-value uncertainty | High-σ_oracle classes: consistency credit, extended LTRP, oracle_premium on EQ fees |
+| Bilateral flow formal conditions | Three simultaneous requirements; failure collapses to warranted attestation pool | Most deployments are warranted attestation pools; bilateral flow requires DISCOVERY_MODE EQ |
+| Echo resolution (Case D4) | Late oracle settles against last pre-LTRP S_cred snapshot | EAT ECHO_RESOLUTION tag; no escrow at stake; retroactive credibility_ratio update |
+| Hierarchical manipulation defence | Direct stake floor OR N_children_min independent claims with ε_independence | Prevents DAG-propagation rubber-stamping for credibility_ratio gaming |
+| Relative-truth resolution variant | Resolve against ratio to reference class; reduces effective σ_oracle | Best surviving variant when oracle commitment is infeasible |
+
+---
+
+## Cumulative Invariants (#r204)
+
+**Invariant #204 (#r204):** The global coordinate state is a DAG, not a flat list. Edges are declared identity or containment relations. S_epistemic propagates upward when all child nodes have committed estimates in the same epoch. Propagated parent estimates are informational only — not settlement inputs — until governance registers the parent as a first-class clearing class.
+
+**Invariant #205 (#r204):** σ_oracle (oracle-arrival uncertainty) is distinct from σ_resolve (coordinate-value uncertainty). High-σ_oracle classes require: declared γ_oracle_absent ∈ [0.1, 0.5] at registration; T_longtail ≥ 3 × T_oracle_expected_delay; EQ query fee premium (1 + σ_oracle_premium). Case D3 absence triggers consistency credit; Case D4 triggers echo resolution.
+
+**Invariant #206 (#r204):** Bilateral knowledge flow requires all three simultaneously: (1) Type B EQ unknowers present, (2) epistemically_live knower pool with sufficient oracle commitment, (3) calibrated min_q_bonus_ratio. When any fails, the mechanism operates as a warranted attestation pool. Both are valid deployments; only bilateral-flow mode is the strict "knowledge marketplace."
+
+**Invariant #207 (#r204):** Echo resolution (Case D4): oracle fires after LTRP longtail expiry; SettlementEngine settles against S_cred_history[last_pre_LTRP_epoch]. Logged as ECHO_RESOLUTION in EAT. credibility_ratio updates fire retroactively for knowers active at that epoch.
+
+**Invariant #208 (#r204):** Implied coordinate credibility_ratio update from DAG propagation requires: (a) direct stake on parent ≥ k_min_parent, OR (b) direct independent stakes on ≥ N_children_min child coordinates with each claim ≥ ε_independence distinct from the mechanically-implied value. Rubber-stamping DAG propagation does not earn credibility_ratio.
+
+**Invariant #209 (#r204):** Relative-truth resolution: claims expressed as ratios to a reference coordinate; credibility_ratio updates fire on ratio accuracy. STAKE_RELATIVE extends T1. credibility_ratio earned on ratio-claims does not transfer to absolute-claim classes (class ID isolation per Invariant #163).
+
+---
+
+## Run Log Update
+
+- **#r204** — 2026-04-04T07:42Z — First knowledge-marketplace-primary run. Net-new: hierarchical coordinate DAG (S_epistemic propagation via declared relations; T1a DECLARE_RELATION with validity_stake); σ_oracle decomposition (distinct from σ_resolve; consistency credit γ_oracle_absent; Case D4 echo resolution); bilateral flow formal conditions (three requirements; failure → warranted attestation pool); hierarchical manipulation defence (stake floor + ε_independence child claims); relative-truth resolution variant (σ_oracle-robust fallback). Invariants #204–#209.
+
+---
+
+## Open Questions for #r205+
+
+1. **DAG relation governance** — who declares coordinate relations? Governance-only (robust, slow) vs. knower-submitted with validity_stake (decentralized, faster, more attack surface)?
+
+2. **γ_oracle_absent calibration methodology** — governance must estimate base rate of correct claims for a class that hasn't resolved yet. How? Candidate: use analogous resolved class accuracy distribution as prior.
+
+3. **σ_oracle_premium staleness** — σ_oracle is declared at registration. If oracle repeatedly delays, the declared σ_oracle is stale. Needs an oracle-delay update mechanism that resists after-the-fact manipulation.
+
+4. **Relative-truth resolution credibility_ratio portability** — confirmed isolated by class ID (Invariant #163). But: what if the reference coordinate itself is also a ratio-resolved class? Transitive reference chains require a bounded resolution depth to prevent infinite regress.
+
+*Last updated: #r204 — 2026-04-04T07:42Z*
