@@ -6208,3 +6208,237 @@ Layer 2 alone: governance-reactive defences are too slow for capital-efficient a
 4. **v2.2 design scope declaration:** With v2.1 adversarial stress-test complete and 22 spec additions catalogued, the mechanism is ready for engineering handoff. Define the v2.2 mechanism design scope: DISCOVERY_MODE full spec, shadow-class lifecycle formalisation, implication chains, three-tier archive, cross-class LTRP backstop opt-in. Estimate run count for v2.2 scope completion.
 
 *Last updated: #r166 — 2026-04-04T01:22Z*
+
+---
+
+## #r167 Contributions — 2026-04-04T01:32Z
+
+**Phase: Closing the adversarial stress-test open questions; declaring v2.2 scope; net-new structural insight on the CLEARING/DISCOVERY game-theoretic split.**
+
+---
+
+**Q1 (Cluster W_max cap × TOWL Zone A headroom — governance transparency) → Epistemic Effective Capacity (EEC) metric; EEC/TOWL_ratio displayed alongside zone (#r167):**
+
+The asymmetry: a 10-member confirmed cluster posting 100K escrow each → TOWL sees 1M backing → Zone A headroom is abundant. S_cred effective weight = 1× W_max (single-entity cap). The mechanism appears financially healthy while epistemically thin.
+
+**Resolution — Epistemic Effective Capacity (EEC) metric:**
+
+```
+EEC(epoch, class_i) =
+  Σ_{a ∈ knowers(class_i)} min(C_a × w_a_net, W_max) × γ_corr(a) × cluster_cap(a)
+
+EEC_ratio(epoch, class_i) = EEC(epoch) / TOWL_capacity(epoch)
+```
+
+EEC_ratio interpretation:
+- ~1.0: financial and epistemic capacity are balanced
+- <0.5: TOWL-backed, epistemically thin (high concentration risk even in Zone A)
+- >1.0: impossible by construction (EEC cannot exceed TOWL_capacity because each contributor is bounded by W_max, which is scaled to a fraction of TOWL)
+
+**Governance dashboard fields (new EAT commit per epoch):**
+
+```
+{
+  towl_zone:        A | B | C,
+  eec_ratio:        [0, 1.0],
+  eec_concentration_flag: true if max_contributor_eec / total_eec > 0.5,
+  cluster_count_active: N  // number of active combined-W_max-capped clusters
+}
+```
+
+**Alert thresholds:**
+- `eec_ratio < 0.4`: epistemic_thinness_alert (governance signal only; not a throttle)
+- `eec_concentration_flag = true AND eec_ratio < 0.6`: compound_concentration_alert → governance review
+
+**Design law (#r167):** Financial solvency (TOWL zone) and epistemic quality (EEC_ratio) are independent governance-observable quantities. Both must be monitored and reported. A mechanism in Zone A with EEC_ratio < 0.4 is financially healthy but epistemically fragile — governance must be able to distinguish these states. (#r167)
+
+---
+
+**Q2 (Two-layer defence calibration — principled tradeoff formula) → L1_efficiency = C_attack(L1) / F_legit(L1); optimise at the L1 indifference curve (#r167):**
+
+**Formal tradeoff:**
+
+```
+L1_efficiency(θ) = C_attack(θ) / F_legit(θ)
+
+C_attack(θ) = minimum economic cost for adversary to mount a successful attack against Layer 1 threshold θ
+F_legit(θ)  = friction cost imposed on a legitimate participant per unit of genuine epistemic contribution
+
+Optimal θ* = argmax L1_efficiency(θ) subject to F_legit(θ) ≤ F_legit_max
+```
+
+**F_legit_max:** governance-declared acceptable friction (e.g., "a new legitimate knower may operate at 30% of full effective weight for their first N_calibration epochs").
+
+**Monotonicity analysis per L1 parameter:**
+
+| L1 parameter | C_attack vs θ | F_legit vs θ | L1_efficiency vs θ |
+|---|---|---|---|
+| Provisional γ_corr scaling | Increases steeply (each Sybil needs more legitimate history) | Increases slowly (new legit knowers earn less early) | Increasing; push threshold higher until F_legit_max is hit |
+| R_max (challenge rate limit) | Plateaus quickly (attacker spawns more accounts) | Increases slowly | Decreasing at high R_max; set at the rate that imposes 10× slash cost on the adversary relative to honest operation |
+| max_loser_pool_fraction (0.20) | Near-constant above 0.10 (attacker still profitable below cap) | Near-zero for honest challengers (rare to dominate 20%+ in normal operation) | High; current 0.20 default is likely near-optimal |
+| W_max | Increases quadratically (N² coordination needed) | Increases linearly (each legitimate knower earns less as W_max falls) | Increasing; optimum at W_max = 1/N_target_knowers × total_effective_capacity |
+
+**Practical governance calibration rule:**
+
+For each L1 parameter, governance should ask: "What is the minimum value that makes a coordinated attack cost at least 10× the friction imposed on a legitimate participant?" The 10× ratio is the pragmatic L1_efficiency target.
+
+This can be estimated per class from: (a) expected legitimate knower count (from class registration), (b) expected slash_rate (from ε_T3 registration field), and (c) minimum challenge cost (r_floor). No on-chain oracle required — registration-time inputs are sufficient.
+
+**Design law (#r167):** Layer 1 defence thresholds are calibrated to achieve C_attack(θ) ≥ 10× F_legit(θ) at each parameter. Governance verifies this ratio at class registration using registration-time inputs. Where the 10× threshold cannot be achieved without F_legit_max violation, Layer 2 SLA is tightened to compensate. (#r167)
+
+---
+
+**Q3 (Governance parameter sensitivity analysis — degenerate equilibrium map) → Four critical parameters; seven sensitive parameters; three safe parameters (#r167):**
+
+**Methodology:** For each parameter θ, evaluate whether a ±20% miscalibration produces a phase boundary crossing (participation rate → 0, solvency → negative headroom) or >50% change in equilibrium metric.
+
+**Critical (phase boundary crossing within ±20%):**
+
+| Parameter | Failure mode | Direction | Mechanism |
+|---|---|---|---|
+| γ_challenger (challenger reward fraction of slash) | No challengers | Too low: < 20% below current | Expected challenger income < gas cost; challengers exit |
+| LTRP_seed / WED_clearing ratio | Solvency collapse | Too low: < 20% of WED_clearing | LTRP cannot absorb first T_longtail cascade |
+| W_max as fraction of TOWL_capacity | No knower participation | Too low: < 5% of TOWL | Individual knower cannot earn meaningful fees |
+| T_longtail / macro_epoch ratio | Solvency collapse | Too high: >5× | Outstanding obligations exceed LTRP reserves at any reasonable LTRP_seed |
+
+**Sensitive (>50% equilibrium change within ±20%, no phase crossing):**
+
+| Parameter | Failure mode | Notes |
+|---|---|---|
+| κ (staleness decay exponent) | Knower churn | High κ → claims go stale rapidly → knowers must re-stake frequently → high-friction |
+| min_chain_weight_fraction | State vector quality | Too high → only top-credibility knowers qualify; information monoculture |
+| N_calibration | Governance stability | Longer N_calibration → slower self-calibration transitions |
+| r_floor (min challenge fee) | Challenger count | Too high → barrier to entry; thin challenger population |
+| α_prior_base | Discovery quality | Affects shadow-class prior weight; v2.2 impact greater than v2.1 |
+| mode_mismatch_discount_base | Discovery-clearing coupling | v2.2 primarily |
+| q_bonus_fraction | Query fee incentive | v2.2 primarily |
+
+**Safe (>50% change requires >50% miscalibration):**
+
+| Parameter | Notes |
+|---|---|
+| N_lock_epochs | Changing from 1 to 2 (100% increase) has minimal impact on normal operations |
+| N_compact_grace | Affects archive timing, not mechanism operation |
+| max_loser_pool_fraction_per_address | The 0.20 cap has low sensitivity to ±20% changes |
+
+**Pre-launch governance review priority order:**
+
+```
+Priority 1 (critical — must be verified analytically before launch):
+  γ_challenger, LTRP_seed, W_max, T_longtail
+
+Priority 2 (sensitive — verify against expected class volume):
+  κ, min_chain_weight_fraction, r_floor, N_calibration
+
+Priority 3 (safe — default acceptable):
+  N_lock_epochs, N_compact_grace, max_loser_pool_fraction
+```
+
+**Design law (#r167):** Pre-launch parameter governance review must be prioritised by sensitivity class, not by parameter familiarity. The four critical parameters must be verified against class-specific analytics before v2.1 launch. (#r167)
+
+---
+
+**Q4 (v2.2 design scope declaration and run estimate) (#r167):**
+
+**v2.2 Scope — five mechanism design modules:**
+
+```
+Module 1 — DISCOVERY_MODE full stack (LARGEST)
+  EQ (epistemic query) fee market: bilateral ask/bid flow
+  Multi-epoch calibration for query-fee-optimising knowers
+  Query fee distribution rule (pro-rata vs credibility-weighted)
+  Unknower partial-information problem: how much to reveal before bid confirmation
+  Mechanism design first principles: information revelation game, not coordination game
+  Estimated: 25–30 runs
+
+Module 2 — Shadow-class lifecycle adversarial stress-test
+  Wind-down, bootstrap prior, T_wind_down_max: specified (#r155, #r157)
+  Remaining: discovery-mode specific attack surfaces
+  Estimated: 8–10 additional runs
+
+Module 3 — Implication chains full settlement routing
+  Declaration structure and bifurcated alpha_cap: specified (#r145)
+  Missing: settlement routing for implication-chain resolution
+  Estimated: 10–12 runs
+
+Module 4 — Three-tier archive integration
+  CID chain, Arweave/IPFS, retry SLA: mostly specified (#r156–#r158)
+  Remaining: integration with lazy compaction eligibility
+  Estimated: 3–5 additional runs
+
+Module 5 — Cross-class LTRP backstop adversarial stress-test
+  Bilateral opt-in, Zone C gating: specified (#r158/Q4)
+  Remaining: backstop gaming attack vectors
+  Estimated: 3–5 additional runs
+```
+
+**Total v2.2 estimate: 50–62 runs to mechanism-spec-complete.**
+
+**Recommended v2.2 run ordering:** Module 1 first (changes most fundamental assumptions) → Module 2 → Module 3 in parallel → Modules 4–5 last.
+
+---
+
+## Net-New Structural Insight: CLEARING_MODE vs DISCOVERY_MODE as Distinct Game-Theoretic Regimes (#r167)
+
+Through 167 runs, CLEARING_MODE and DISCOVERY_MODE have been differentiated operationally. A deeper distinction now emerges: **they are fundamentally different economic games layered on the same primitive.**
+
+**CLEARING_MODE — coordination game:**
+- Knowers and position-holders are *aligned*: both benefit from accurate settlement.
+- Information revelation is complete-to-complete: knowers want to convey their full information.
+- Mechanism design tradition: coordination game, public-goods revelation.
+
+**DISCOVERY_MODE — bilateral information revelation game:**
+- Unknowers want to extract maximum information at minimum fee.
+- Knowers want to reveal minimum information necessary to earn the fee, preserving their edge.
+- A knower who fully reveals eliminates their future earning potential.
+- Epistemic and financial incentives are *adversarial*: the mechanism design problem is revelation, not coordination.
+- This is closer to a Myerson optimal mechanism / Cremer-McLean full-extraction design.
+
+**Key unresolved question for v2.2/Module 1:** Does the credibility_ratio scoring rule (log-score of realised accuracy) induce full information revelation in DISCOVERY_MODE, or only partial revelation? If partial, what supplemental incentive design closes the gap?
+
+**Most promising v2.2 Module 1 approach:** A **multi-epoch revelation contract** where the unknower commits to a sequence of queries and the knower commits to consistent, calibrated sequential updates. Consistency across epochs is scored — a knower who contradicts their prior reveal is penalised, creating an incentive for honest incremental revelation rather than strategic withholding.
+
+**Design law (#r167):** DISCOVERY_MODE mechanism design begins from the Myerson revelation framework, not from the CLEARING_MODE coordination analysis. Reusing CLEARING primitives for DISCOVERY without a first-principles re-analysis is a v2.2 design anti-pattern. (#r167)
+
+---
+
+## Structural Synthesis: v2.1 Final Closure and v2.2 Scope (#r167)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| EEC transparency | EEC_ratio metric; compound_concentration_alert; per-epoch EAT commit | Financial zone ≠ epistemic quality; both monitored |
+| L1 calibration formula | L1_efficiency = C_attack / F_legit; 10× ratio target | 10× attack cost vs legitimate friction is the calibration standard |
+| Parameter sensitivity | 4 critical, 7 sensitive, 3 safe; Priority 1 verified before launch | Sensitivity class governs governance review priority |
+| v2.2 scope | 5 modules, ~50–62 runs; DISCOVERY_MODE dominant (25–30 runs) | Coordination game ≠ revelation game; Module 1 first |
+
+---
+
+## Cumulative Invariants (additions through #r167)
+
+**Invariant #61 (#r167):** EEC_ratio (Epistemic Effective Capacity / TOWL capacity) must be monitored and reported per epoch alongside TOWL zone. Zone A with EEC_ratio < 0.4 is financially healthy but epistemically fragile.
+
+**Invariant #62 (#r167):** Layer 1 defence thresholds target C_attack(θ) ≥ 10× F_legit(θ). Where this ratio cannot be achieved without exceeding F_legit_max, Layer 2 SLA is tightened.
+
+**Invariant #63 (#r167):** Pre-launch governance review prioritises: (1) γ_challenger, LTRP_seed, W_max, T_longtail (critical); (2) κ, min_chain_weight_fraction, r_floor, N_calibration (sensitive); (3) all others (safe).
+
+**Invariant #64 (#r167):** DISCOVERY_MODE mechanism design begins from the Myerson revelation framework. Cross-applying CLEARING primitives to DISCOVERY without re-analysis is a design anti-pattern.
+
+---
+
+## v2.1 Mechanism Specification — Complete and Closed
+
+GestAlt v2.1 mechanism specification is **complete** as of #r167.
+
+- **64 invariants** with full provenance
+- **12 attack families** (A1–A12) evaluated and hardened
+- **22 v2.1 contract spec additions** catalogued (#r163–#r166)
+- **7-gate production readiness checklist** including adversarial hardening gate
+- **4-parameter sensitivity priority map** for pre-launch governance review
+- **3 Demo Day narrative variants** (Polymarket, Kalshi, Betfair)
+- **5-contract architecture** with primary/secondary audit scope defined
+
+**Next autoresearch focus:** v2.2 Module 1 — DISCOVERY_MODE full stack, beginning from the bilateral information revelation game framework.
+
+---
+
+*Last updated: #r167 — 2026-04-04T01:32Z*
