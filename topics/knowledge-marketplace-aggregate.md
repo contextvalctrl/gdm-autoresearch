@@ -26127,11 +26127,144 @@ Design law (#r262): migration transfers only partial cluster memory through boun
 
 - **#r262** — 2026-04-04T18:42Z — Resolved all #r262 questions by formalizing hierarchical backstop allocation, bounded oscillation-penalty regime, logarithmic verifiability model, and bounded migration memory transfer with cooldown/anti-gaming. Re-confirmed Family D as the surviving mechanism. Added invariants #457–#460 and updated all prior Family-E/Family-A boundary conditions.
 
-## Open Questions for #r263+
+## #r263 Contributions — 2026-04-04T18:56Z
 
-1. **Post-finality proof windows:** should an expired transition remain challengeable with fraud-proof commitments if multiple classes allege global schedule drift, or is finality hard at `2Δ+1`?
-2. **Backstop carry-forward policy:** can unused `L_v_cluster` capacity carry forward one epoch, and if so must it be capped to avoid intertemporal hoarding against expected shock windows?
-3. **Auto-tuned `δ_decay`:** can `δ_decay` be set by observed oracle-noise proxy (e.g., realized misspecification half-life) while retaining closed-form welfare bounds on `ρ_w`?
-4. **Migration anti-sybil control:** should `η_mig` decay with destination class age and penalize repeated source clusters to prevent coordinated cross-cluster sybil migration loops?
+This run closes the four #r263 open questions by tightening dispute/finality mechanics, making backstop carry-forward safe, and adding first-order auto-control laws for `δ_decay` and migration anti-sybil. It also adds a direct 10-point comparison checkpoint against LMSR, orderbooks, and batch auctions while keeping Family D as the only viable non-matching mechanism family.
 
-*Last updated: #r262 - 2026-04-04T18:42Z*
+### Q1 (Post-finality proof windows) → Dual-finality: class-finality hard at `2Δ+1`, global drift channel only via explicit schedule-drift appeal (#r263)
+
+**Default rule:** per-class transition disputes keep the hard finality rule: class-local transition state is non-challengeable after `2Δ+1` epochs (`Δ=3` from #r262).
+
+**Escalation rule (global drift):** if multiple classes allege a protocol-wide schedule drift, that is not a routine transition dispute and must use a distinct channel:
+
+1. Any knower can open `GLOBAL_DIVERGENCE` with bond `B_g` by submitting a fraud-proof commitment over a candidate epoch range `R_g`.
+2. The claim auto-counts only if either:
+   - at least `m_g` distinct classes attest by `B_g`-bounded signatures, or
+   - total bonded value ≥ `V_g` (global threshold).
+3. If quorum is met, protocol enters `appeal_verification` for `T_appeal` and pauses only the affected clusters’ `L_v` replenishment logic (all other lanes continue).
+4. Disputed classes replay only transition leaves inside `R_g` with fraud-proof commitments.
+5. If fraud is proven: disputed transition is marked `overturned`, and a `parameter_rollback`-style EAT event captures canonical state restoration.
+6. If unproven: appeal closes; claimers lose `B_g` to treasury and state remains final.
+
+**Design law (#r263):** Finality is dual-layered: `2Δ+1` final for ordinary class transitions and explicit, bounded, appeal-time reopens only for protocol-drift classes. This avoids unbounded uncertainty while still allowing coordinated global schedule-alignment corrections. (#r263)
+
+---
+
+### Q2 (Backstop carry-forward) → One-epoch capped carry, with no intertemporal hoarding (#r263)
+
+Allow one-epoch persistence of unused cluster backstop capacity, but forbid hoarding against unknown future shocks:
+
+`L_v_cluster_unused_carry_t = min(ρ_carry × L_v_cluster_unused_{t-1}, L_v_cluster,η)`
+
+where:
+- `ρ_carry = 0.25`
+- `L_v_cluster,η = 0.15 × L_v_cluster`
+
+At epoch `t+1`:
+
+`L_v_cluster_eff_t = L_v_cluster + L_v_cluster_unused_carry_t`
+
+`L_v_cluster_unused_t` resets to 0 after one use-or-expiry event (hard expiry of carry at epoch `t+1`).
+
+Effectively, a cluster can carry only a small band from one quiet epoch into the next.
+
+**Rationale:** this reduces cliff under mild shocks while blocking strategic storage of unused calls for anticipated stress windows and gaming of carry to subsidize later drains.
+
+**Design law (#r263):** Carry-forward is bounded, expiring, and local to one epoch. Unused one-epoch carry is additive only up to a hard share cap and cannot stack.
+
+---
+
+### Q3 (Auto-tuned `δ_decay`) → Noise-aware decay with welfare envelope (`ρ_w`) guardrail (#r263)
+
+Let `q_t` be an oracle-noise confidence score inferred from misspecification half-life (high `q_t` = reliable signal).
+
+Set:
+
+`δ_decay_t = clamp(δ_min, δ_max, δ_base + k_δ·(1-q_t^L))`
+
+where `δ_min=0.05`, `δ_max=0.30`, `δ_base=0.08`, `k_δ=0.20`, and `q_t^L` is a conservative lower confidence bound (e.g., lower 10% quantile of misspecification estimate).
+
+Adaptive bump:
+
+`osc_penalty_bump_t = min( osc_penalty_cap_t,
+  max( osc_penalty_floor, β_osc × σ_A^{-1}(DD_t) × q_rev_cap_state/ b̂_claim ) × (1 - q_t^L + ε) )`
+
+**Closed-form welfare control:** each adaptive step must satisfy
+
+`ρ_w^ub_t = (osc_penalty_bump_t / (1 - e^{-δ_decay_t})) / (S_gain_low_state)
+≤ ρ_w^{max}`
+
+using the same `ρ_w^{max}` target from #r262 and `S_gain_low_state` conservative lower bound on conservative-mode opportunity cost at epoch `t`.
+
+If `ρ_w^ub_t > ρ_w^{max}`, governance bot must clamp `osc_penalty_bump_t` before settlement (same epoch) and emit a warning event.
+
+**Design law (#r263):** `δ_decay` may be auto-tuned by noisy-oracle confidence only through the bounded mapping and explicit welfare envelope. Auto-control is permitted only when the resulting `ρ_w` bound can be checked locally with conservative priors.
+
+---
+
+### Q4 (Migration anti-sybil control) → Source-repeat penalties + destination-age decay in migration transfer weight (#r263)
+
+Anti-sybil migration exploit is mainly repeated rapid source-to-destination hopping to move cluster memory around classes that should not carry it.
+
+Replace base weight with:
+
+`η_mig,eff(c_src→c_dst,t) = η_mig,base × a(c_dst,t) × s(c_src→c_dst,t)`
+
+- `a(c_dst,t) = min(1, n_norm(c_dst,t)/(n_norm(c_dst,t)+n_anchor))` (destination age already in #r262)
+- `s(c_src→c_dst,t) = 1 / (1 + κ_sybil·m_{src→dst,t})`
+- `m_{src→dst,t}` = count of migrations from source cluster `c_src` to destination `c_dst` in last `M_mig_obs` epochs.
+
+Optional bond hardening:
+- each source migration emits `mig_bond` from class treasury.
+- bond is refunded only if post-migration class survives `H_survival` epochs and no further reverse migration occurs within `M_rev_ret`.
+
+**Design law (#r263):** migration transfer is constrained by destination maturity and repeated source-origin concentration. Sybil-heavy repeated cross-edges have declining transfer impact even when they meet cooldown constraints.
+
+---
+
+### #r263 mechanism-comparison checkpoint (requested 10-point pressure test)
+
+1. **Base primitive:** in Family D, the conserved value exchanged is *state-correction potential* (how much a knower can reduce weighted uncertainty) represented by lock-up-backed credibility, not side-by-side claim pricing.
+2. **State model:** global state vector `S` is a cluster-weighted uncertainty distribution; transitions are epoch kernels plus explicit clamps (`U_t`, `q_rev_cap`, `osc_penalty`, `L_v_call,eff`). LMSR uses `Q`-inventory and cost-function gradients; orderbooks use bid/ask queues; batch auctions use clearing intervals with midpoint price formation.
+3. **Credibility model:** staked capital is converted to bounded influence via `cred_weight = f(stake, provenance, consistency, debt, cluster quality)` with deterministic flooring and post-resolution reward/sanction. Not just belief shares.
+4. **Market roles:** askers are knowers posting epistemic claims with escrow; bidders are unknowers buying reduced uncertainty via query access and settlement rights; payoffs are settlement-linked, not maker/taker spread capture.
+5. **Settlement model:** truth updates reward truthful movers with reclaimed-capacity + bonus release; unresolved truth uses holdover/partial-credit by partial observability gates and class-level `q_rev_cap`.
+6. **Attack surface:** manipulation, bluffing, wash, collusion, oracle gaming remain, but the primitive attack changes from price shading to evidence-fabrication and migration gaming. New controls: activation ordering, anti-gaming migration decay, dual-finality, and oracle-noise-aware penalties.
+7. **Why better/worse than LMSR/orderbooks:** better at explicit information transfer (not bet matching), worse in governance complexity and state-verifiability burden. Better when low-liquidity/high-stakes claims require credibility proof over price efficiency.
+8. **Simplest viable sketch:** two lanes only — (`I`) state-claim lane (ask/bid as evidence transfer and fee-funded query lane) + (`II`) bounded reclaim-lane (`L_v_cluster`) for shortfall smoothing. No endogenous bid/ask matching.
+9. **Strongest failure risk:** if oracle confidence is misclassified in the same direction across clusters, credibility scores become endogenous noise and backstop can be exhausted by coordinated false uncertainty claims.
+10. **Best surviving variant if raw idea is wrong:** treat Family D as a **reputation-market** only: remove settlement bonuses for truth beyond partial observability bounds, retain only query+quality scoring + deterministic clamps; this keeps mechanism from collapsing into prediction pricing while preserving information utility.
+
+(Net: rejections of pure matching-style alternatives remain in force; #r258, #r261, #r262.)
+
+## Structural Synthesis: #r263
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Post-finality global drift disputes | dual-finality with explicit `GLOBAL_DIVERGENCE` appeal channel and hard one-step re-open window | Keep ordinary finality hard, only protocol-wide drift can reopen under explicit bond+quorum |
+| Backstop carry-forward | one-epoch capped carry with no stacking | Avoids cliff and prevents intertemporal hoarding |
+| Auto-tuned `δ_decay` | bounded noise-aware map with welfare envelope check (`ρ_w^ub`) | Auto-control must maintain closed-form welfare bound before settlement |
+| Migration anti-sybil | source-repeat decay + destination-age decay + optional migration bond | Repeated coordinated hops lose transfer impact |
+
+## Cumulative Invariants (additions through #r263)
+
+**Invariant #461 (Dual finality):** class transitions are final after `2Δ+1`; only a bounded `GLOBAL_DIVERGENCE` appeal channel can reopen history for synchronized multi-class schedule drift disputes with bonded attestation.
+
+**Invariant #462 (Backstop carry cap):** unused `L_v_cluster` carries at most one epoch; carried amount is `min(0.25×unused_{t-1}, 0.15×L_v_cluster)` and expires next epoch (no stacking).
+
+**Invariant #463 (Adaptive decay guardrail):** automated `δ_decay_t` and `osc_penalty_bump_t` updates must satisfy conservative bound `ρ_w^ub_t ≤ ρ_w^{max}` before settlement. If violated, protocol clamps bump and emits warning; final `δ_decay_t` remains within [0.05, 0.30].
+
+**Invariant #464 (Sybil-aware migration):** effective `η_mig` decays with destination age and source-hop repetition; repeated migrations from a concentrated source weaken transfer impact even when cooldown is met.
+
+## Run Log Update
+
+- **#r263** — 2026-04-04T18:56Z — Closed all #r263 questions by adding dual-finality drift appeals, capped one-epoch backstop carry, conservative noise-aware decay controls, and migration anti-sybil attenuation. Reframed Family D against LMSR/orderbook/batch-auction in the 10-point epistemic market comparison and retained non-matching viability. Added invariants #461–#464.
+
+## Open Questions for #r264+
+
+1. **Fraud-proof cost model:** what is the cheapest sound proof system for `GLOBAL_DIVERGENCE` appeals that resists spam while preserving low gas footprint for honest classes?
+2. **Carry-forward under correlated shocks:** should one-epoch carry of `L_v_cluster` itself become state-dependent (higher in high correlation clusters) without violating anti-hoarding constraints?
+3. **`ρ_w^ub` calibration:** should conservative welfare upper bounds use a global `ρ_w^{max}` or class-conditioned `ρ_w^{max}(c)` to avoid over-clipping calm classes while keeping stressed classes protected?
+4. **Migration graph health monitoring:** can a lightweight periodic score (e.g., PageRank-like churn concentration) replace manual `κ_sybil` tuning for source-repeat decay and expose coordinated migration loops earlier?
+
+*Last updated: #r263 - 2026-04-04T18:56Z*
