@@ -15662,3 +15662,275 @@ T4 RESOLVE(oracle_truth, T_finality):
 3. **Shadow epoch EAT record structure:** Shadow epochs generate oracle resolutions without live escrow. Does the shadow epoch EAT record include a `synthetic_oracle_resolution` tag, and is credibility_ratio_update_shadow separate from the live-epoch update in storage?
 
 4. **τ_bonus interaction with EQ (DISCOVERY_MODE):** In DISCOVERY_MODE, EQ unknowers pay q_fee + q_bonus for a targeted S_cred query. Should τ_bonus also apply to the credibility_ratio updates earned by knowers responding to EQ queries? Or is τ_bonus scoped to CLEARING_MODE direct claims only?
+
+---
+
+## #r211 Contributions — 2026-04-04T09:02Z
+
+Addresses all four open questions from #r210. Net-new first-principles angle: the Epistemic Clock vs the Settlement Clock — optimal synchronization as a v2.2+ upgrade path.
+
+---
+
+### Q1 (ZONE_C_WATCH + Zone_C simultaneous entry — orthogonal state machines, timer tolling only) (#r211)
+
+**Are the two state machines coupled?** ZONE_C_WATCH is a governance remediation timer: class must reduce WED_ceiling or inject treasury capital within 2×N_calibration epochs. Zone_C is a real-time TOWL solvency condition triggered by aggregate TOWL utilisation crossing the Zone_C threshold.
+
+**Resolution — orthogonal; one interaction (timer tolling):**
+
+The ZONE_C_WATCH remediation window is epoch-indexed (#r137 design law: epoch-indexed deadlines auto-freeze in degraded mode; they do not freeze in Zone_C). However, Zone_C episodes reduce governance bandwidth and may prevent timely remediation action that requires active governance attention.
+
+**Policy: ZONE_C_WATCH timer tolls during Zone_C episodes:**
+
+```
+ZONE_C_WATCH_remaining_epochs(class_i, t):
+  = 2 × N_calibration
+    minus normal-mode epochs elapsed
+    minus non-Zone_C epochs elapsed (normal Zone_A/B operation)
+  Zone_C epochs do NOT advance the remediation clock
+  (Zone_C is not degraded mode but imposes real governance bandwidth constraints)
+```
+
+This is the only interaction. Zone_C challenge gate (#r139/Q3), deferral rules, and epistemic enforcement operate normally for a ZONE_C_WATCH class during Zone_C. The remediation timer pauses; settlement operations continue.
+
+**Governance action during Zone_C_WATCH + Zone_C overlap:** Governance may still act during Zone_C — treasury injection or WED_ceiling reduction do not require epistemically complex governance votes. They are parameter update transactions. If governance successfully completes remediation during Zone_C, ZONE_C_WATCH is cleared immediately (remediation epoch recorded in EAT).
+
+**Maximum extension:** ZONE_C_WATCH cannot be extended indefinitely by persistent Zone_C. If Zone_C persists for N_max_suspension (#r153/Q3, 5 macro-epochs), the Zone_C crisis auto-clear fires. After crisis auto-clear, any remaining ZONE_C_WATCH epochs resume normal countdown. If Zone_C re-enters after crisis auto-clear within the same remediation window, the Zone_C tolling applies again. There is no cap on total tolled time — the 2×N_calibration remediation window always represents 2×N_calibration non-Zone_C epochs.
+
+**Design law (#r211):** ZONE_C_WATCH remediation timer tolls during Zone_C episodes (governance bandwidth is impaired). Remediation timer does NOT pause during degraded mode (DA outage) — degraded mode tolls epoch-indexed deadlines; Zone_C is not degraded mode but shares the tolling treatment by policy. (#r211)
+
+---
+
+### Q2 (oracle_type immutability vs oracle source re-designation) → oracle_type immutable; source re-designable; mixed-type succession requires class migration (#r211)
+
+**The oracle has two distinct attributes:**
+
+1. **oracle_type**: the structural category of how truth is determined (MULTI_SOURCE, COMMITTEE, SINGLE_ENTITY, etc.). This governs τ_scale_max and is an epistemic commitment made at class registration.
+
+2. **oracle_source**: the specific entity, address, or feed that executes the oracle (e.g., "BEA Q3 GDP release" or "0xABC chainlink feed"). This can change if a source ceases operation.
+
+**Why oracle_type must be immutable:**
+
+oracle_type determines τ_scale_max for all claims already submitted with T_anchor_at_submission recorded. Retroactively changing oracle_type would change the credibility_ratio update magnitude for claims already in escrow — violating the static-commitment design law (#r137). A submitted claim's τ_bonus was priced under the oracle_type known at submission.
+
+**Oracle source re-designation protocol:**
+
+```
+Phase 1 (N_oracle_transition_window = N_calibration epochs before source ceases):
+  Governance submits oracle_source_redesignation_proposal:
+    { new_oracle_source, oracle_type_of_new_source, continuity_assessment }
+  If oracle_type_of_new_source == existing oracle_type:
+    SAME_TYPE_REDESIGNATION → straightforward
+  If oracle_type_of_new_source != existing oracle_type:
+    TYPE_MISMATCH → class migration required (see below)
+
+Phase 2 (SAME_TYPE_REDESIGNATION):
+  At transition epoch:
+    oracle_source updated to new address; oracle_type unchanged
+    EAT event: oracle_source_redesignation { old_source, new_source, oracle_type, epoch }
+    All pending claims retain T_anchor_at_submission and τ_bonus denominator unchanged
+    Any claims submitted after redesignation use new oracle_source for resolution
+
+TYPE_MISMATCH → class migration:
+  New coordinate class registered with new oracle_type and new oracle_source
+  Existing class enters WINDING_DOWN (shadow-class wind-down protocol, #r155/Q3)
+  No forced migration of knowers; fresh registration on new class
+  Cross-class credibility carry-over via attenuated formula (#r71)
+```
+
+**Why TYPE_MISMATCH requires class migration:** A class that was SINGLE_ENTITY (τ_scale_max=0.10) replacing its oracle with MULTI_SOURCE is epistemically a different class. Knowers who were incentivised by SINGLE_ENTITY's lower τ_bonus may have calibrated differently than a MULTI_SOURCE market would require. The incentive structure changes; class identity changes. This is principled class separation, not administrative friction.
+
+**Design law (#r211):** oracle_type is immutable at class registration. oracle_source is redesignable within the same oracle_type via SAME_TYPE_REDESIGNATION protocol. oracle_type changes require class migration with wind-down of the old class. (#r211)
+
+---
+
+### Q3 (Shadow epoch EAT record structure — synthetic tag and separate credibility storage) (#r211)
+
+**EAT record for shadow epoch oracle resolution:**
+
+```
+shadow_oracle_resolution EAT event: {
+  type:                "oracle_resolution",
+  synthetic:           true,
+  class_id:            shadow_class_id,
+  coordinate_c:        c,
+  oracle_confirmed:    v_oracle,
+  epoch:               T_resolve,
+  settlement_executed: false,    // no escrow; no slash; no position settlement
+  credibility_updates: [
+    { knower_a, log_score_delta, weight_multiplier: τ_bonus_a, update_type: "shadow" }
+  ]
+}
+```
+
+**Separate credibility storage:**
+
+```
+CredibilityAggregator storage per knower per class:
+  credibility_ratio_live[class_id]   // from live-epoch resolutions; used in S_cred weighting
+  credibility_ratio_shadow[class_id] // from shadow-epoch resolutions; used for 0.5× epistemically_live credit only
+```
+
+Shadow credibility_ratio_shadow is NOT used in S_cred weighting for any purpose — only for the epistemically_live gate calculation. Live S_cred computation uses only credibility_ratio_live. This clean separation prevents shadow calibration from inflating S_cred influence.
+
+**On shadow-class ARCHIVED transition:** The final credibility_ratio_shadow is emitted in the ARCHIVED EAT event alongside credibility_ratio_live (both fields present). For portability (carry-over to new classes): the carry-over formula uses only credibility_ratio_live. credibility_ratio_shadow is informational-only in the portability context — it informs governance about calibration quality but does not directly weight carry-over.
+
+**No slash events in shadow epochs:** shadow epoch oracle_resolution EAT events have no ClaimEscrow interaction. If a knower posts a claim in a shadow round (shadow classes may have escrow, but shadow oracle resolution does not trigger slash against escrow — the shadow is a calibration run, not a financial settlement). Wait: does the shadow class have real escrow? Yes — shadow classes have real capital at stake (#r153/Q2: shadow-class carries real escrow to maintain calibration honesty). Resolution: slash IS executed against shadow-class escrow at oracle resolution. The `synthetic: true` tag marks the oracle resolution as synthetic (no position holder settlement) — NOT the escrow action.
+
+**Corrected EAT event structure:**
+
+```
+shadow_oracle_resolution EAT event: {
+  type:                "oracle_resolution",
+  synthetic_settlement: true,     // no position settlement; no SFP
+  class_id:            shadow_class_id,
+  oracle_confirmed:    v_oracle,
+  escrow_settled:      true,      // slash/release against shadow-class escrow DOES occur
+  credibility_update_type: "shadow"
+}
+```
+
+**Design law (#r211):** Shadow oracle resolution: escrow slash/release IS executed (capital honesty maintained); position settlement is NOT executed (no position holders). credibility_ratio_shadow is stored separately from credibility_ratio_live. Only credibility_ratio_live feeds S_cred weighting. Shadow credibility is informational for portability and epistemically_live gate. (#r211)
+
+---
+
+### Q4 (τ_bonus scoping — CLEARING_MODE only; NOT applied to EQ query credibility in DISCOVERY_MODE) (#r211)
+
+**Why τ_bonus should NOT apply to EQ query-driven credibility updates:**
+
+τ_bonus rewards knowers for early submission of claims relative to T_anchor — a choice the knower makes. In DISCOVERY_MODE EQ, the timing dimension is unknower-driven: an EQ query arrives at epoch T_q when the unknower decides to pay. The knower submitted their underlying claim at t_submit; the EQ query arriving at T_q is independent of that submission.
+
+Applying τ_bonus to EQ-earned credibility updates (where "early" is measured from T_q relative to some T_anchor) would create a perverse incentive: knowers would calibrate their claim submissions to maximize the probability of attracting early-arriving EQ queries — optimizing for EQ timing rather than epistemic quality. The τ_bonus would reward being found early by unknowers, not having submitted early yourself.
+
+**Resolution — τ_bonus is scoped to CLEARING_MODE direct claim resolution only:**
+
+```
+credibility_ratio_update_source ∈ {
+  CLEARING_DIRECT:    direct claim resolution; τ_bonus applies (t_submit vs T_anchor_locked)
+  DISCOVERY_LRESOL:  DISCOVERY_MODE direct oracle resolution; τ_bonus applies (same logic)
+  EQ_QUERY:          EQ query-triggered update; τ_bonus does NOT apply; weight = 1.0
+  SHADOW_RESOLUTION: shadow epoch resolution; τ_bonus applies to shadow credibility_ratio_shadow only
+}
+```
+
+DISCOVERY_MODE direct claim resolution (knower submits a direct claim and oracle resolves it) does receive τ_bonus — the knower's submission timing relative to T_anchor is their choice and reflects conviction. EQ-mediated credibility updates are the exception because the "timing" is not the knower's choice.
+
+**EQ credibility_ratio_update mechanics in DISCOVERY_MODE:** When an unknower pays q_fee + q_bonus, the contributing knowers earn a query fee. This fee is a cash flow, not a credibility_ratio update. Credibility_ratio in DISCOVERY_MODE is updated only via oracle resolution — same as CLEARING_MODE. EQ does not create a separate credibility pathway. The question was based on a misconception: EQ affects earnings (query fee share), not credibility_ratio directly. Credibility_ratio remains oracle-resolution-only in all modes.
+
+**Design law (#r211):** τ_bonus applies to oracle-resolution-driven credibility_ratio updates where the knower's submission timing is a free choice (direct claims in any mode). τ_bonus does NOT apply to EQ query-driven query-fee distributions (these are earnings, not credibility updates). EQ does not create a direct credibility_ratio update pathway — it distributes query fees to contributors based on existing S_cred contribution weights. (#r211)
+
+---
+
+### Net-New First-Principles: The Epistemic Clock vs the Settlement Clock — Optimal Synchronization (#r211)
+
+**The structural tension:** GestAlt runs two coupled clocks:
+
+1. **Epistemic clock:** governs how quickly S_cred converges toward truth. Rate determined by: knower submission density, τ_bonus incentive for early revelation, calibration track records, diversity of evidence lineages.
+
+2. **Settlement clock:** governs when T_anchor fires and positions settle. Determined by: oracle availability, Zone_C deferral, governance scheduling.
+
+**The divergence problem:**
+
+- If T_anchor fires before S_cred has converged, the settlement price is a noisy posterior — worse epistemic quality than waiting. Settlement finality is achieved, but at the cost of accuracy.
+- If T_anchor is delayed after S_cred has already converged, knowers bear prolonged capital lockup with no additional epistemic contribution. τ_bonus is reduced for late submissions. The mechanism punishes the knower population for governance delays.
+
+**Current mechanism:** T_anchor is governance-scheduled or oracle-driven. It is exogenous to the epistemic clock. There is no feedback between S_cred convergence rate and T_anchor timing.
+
+**Optimal synchronization criterion:**
+
+```
+Let Δ_epoch_S_cred(c, t) = |S_cred(c, t) − S_cred(c, t-1)| / range(c)
+  = normalised S_cred change rate per epoch
+
+T_anchor_optimal fires when:
+  Δ_epoch_S_cred(c, t) ≤ θ_convergence  [S_cred change rate below threshold]
+  AND oracle_availability(c) = true       [oracle can resolve]
+  AND TOWL(c) ≥ Zone_A_threshold         [solvency adequate]
+```
+
+`θ_convergence` is the epistemic convergence threshold: the minimum S_cred change per epoch below which additional knower input provides marginal epistemic value insufficient to justify continued capital lockup.
+
+**Why this is superior to fixed-schedule T_anchor:**
+
+1. T_anchor fires as soon as S_cred has converged — knower capital lockup is minimised without sacrificing accuracy.
+2. If new information arrives (sharp S_cred movement after a quiet period), T_anchor is delayed — the mechanism waits for the new signal to be absorbed.
+3. Adversarial S_cred manipulation to trigger early T_anchor is detectable: a sudden artificial Δ that would push below θ_convergence must be a large-stake credible claim (costly attack).
+
+**Formal T_anchor trigger (endogenous, v2.2+ design):**
+
+```
+T_anchor_fires(c, t) iff:
+  Δ_epoch_S_cred(c, t) ≤ θ_convergence   [convergence]
+  AND t ≥ T_anchor_min                    [minimum window, prevents premature trigger]
+  AND t ≤ T_anchor_max                    [deadline, prevents indefinite delay]
+  AND oracle_available(c, t)
+  AND NOT Zone_C(c, t)
+```
+
+T_anchor_min and T_anchor_max are class-registered parameters. This is fully compatible with current governance-scheduled T_anchor (governance just sets T_anchor_min = T_anchor_max = T_scheduled — a degenerate endogenous trigger).
+
+**Two-clock synchronization as the correct framing for all T_anchor interactions:**
+
+Many open questions from prior runs resolve cleanly under this framing:
+- Zone_C deferral of settlement-finality challenges (#r151/Q1): Zone_C defers the settlement clock without pausing the epistemic clock — knowers keep submitting; S_cred keeps converging; T_anchor waits.
+- τ_bonus under T_anchor extension (#r210/Q4): T_anchor_locked at submission captures the epistemic clock state known to the knower. Post-extension claims use the extended T_anchor because they operated under the extended settlement clock.
+- ZONE_C_WATCH timer tolling (this run, Q1): governance remediation window (governance clock) pauses in Zone_C; epistemic and settlement clocks continue.
+
+**Interaction with W(t) welfare function (#r209/Q4):**
+
+```
+optimal_T_anchor minimises:
+  E[settlement_error²] + knower_lockup_cost
+    subject to oracle_availability and solvency constraints
+```
+
+This is the two-clock synchronization problem restated as a welfare optimisation. The endogenous T_anchor criterion (θ_convergence) is the mechanism-design solution: trigger when the epistemic benefit of waiting (ΔI) falls below the capital cost of waiting (Δ transaction_cost). Under optimal synchronization: ΔI/Δt = transaction_cost rate → first-order condition.
+
+**v2.1 vs v2.2 scope:** Endogenous T_anchor is a v2.2+ feature. For v2.1, the degenerate governance-scheduled T_anchor is used (T_anchor_min = T_anchor_max). The mathematical framework for optimal synchronization is complete here (#r211) and can be implemented in v2.2 as `θ_convergence` added to class registration parameters.
+
+**Conserved quantity impact:** The two-clock framing does not alter WED, S_cred mechanics, or credibility_ratio. It is a scheduling optimisation layer above the core mechanism. All existing invariants hold.
+
+---
+
+## Structural Synthesis: #r211
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| ZONE_C_WATCH timer tolls in Zone_C | Remediation window pauses in Zone_C; all other settlement/epistemic operations continue | Zone_C is governance-bandwidth-impaired but not degraded mode; requires explicit tolling policy |
+| oracle_type immutable; source re-designable | Same-type redesignation allowed; type-change requires class migration + wind-down | Static-commitment design law extends to oracle_type; migration is principled, not administrative |
+| Shadow epoch EAT: synthetic_settlement: true; escrow slash still executes | Shadow oracle resolution executes real escrow; does NOT execute position settlement | Capital honesty in shadow class maintained; credibility_ratio_shadow stored separately |
+| τ_bonus scoped to CLEARING_MODE + DISCOVERY_MODE direct claims; NOT EQ | EQ distributes query fees, not credibility updates; τ_bonus irrelevant to EQ | EQ is an earnings channel; credibility is an oracle-resolution channel; they are orthogonal |
+| Epistemic clock vs settlement clock — θ_convergence endogenous T_anchor | Optimal T_anchor fires at ΔS_cred/Δt ≤ θ_convergence; v2.2+ feature | Two-clock synchronization unifies prior open questions; welfare optimisation first-order condition |
+
+---
+
+## Cumulative Invariants (#r211)
+
+**Invariant #242 (#r211):** ZONE_C_WATCH remediation timer tolls during Zone_C episodes (governance bandwidth is impaired). Zone_C is not degraded mode but shares the timer-tolling treatment by explicit policy. No cap on total tolled time; 2×N_calibration window always represents 2×N_calibration non-Zone_C epochs.
+
+**Invariant #243 (#r211):** oracle_type is immutable at class registration. oracle_source re-designation within the same oracle_type is permitted via the SAME_TYPE_REDESIGNATION protocol. oracle_type reclassification requires class migration (old class WINDING_DOWN; new class registration). Claims submitted before redesignation retain T_anchor_at_submission and oracle_type-at-submission for τ_bonus purposes.
+
+**Invariant #244 (#r211):** Shadow epoch oracle resolution: escrow slash/release executes (capital honesty maintained); position settlement does not execute (synthetic_settlement: true). credibility_ratio_shadow stored separately from credibility_ratio_live. Only credibility_ratio_live feeds S_cred weighting. Shadow credibility is informational only for portability and epistemically_live gate calculations.
+
+**Invariant #245 (#r211):** τ_bonus applies to oracle-resolution-driven credibility_ratio updates where the knower's submission timing is their free choice (direct claims, any mode). EQ in DISCOVERY_MODE distributes query fees to contributors — not credibility_ratio updates. EQ creates no direct credibility pathway; credibility is oracle-resolution-only. τ_bonus does not apply to EQ earnings.
+
+**Invariant #246 (#r211):** The mechanism runs two coupled clocks: the epistemic clock (S_cred convergence rate) and the settlement clock (T_anchor). Optimal synchronization: T_anchor_optimal fires when Δ_epoch_S_cred(c,t) ≤ θ_convergence AND oracle_available AND solvency adequate. Endogenous T_anchor is a v2.2+ feature. v2.1 uses degenerate governance-scheduled T_anchor (T_anchor_min = T_anchor_max). The welfare optimisation first-order condition: ΔI/Δt = capital lockup cost rate at T_anchor.
+
+---
+
+## Run Log Update
+
+- **#r211** — 2026-04-04T09:02Z — Q1: ZONE_C_WATCH timer tolls in Zone_C; orthogonal to Zone_C settlement operations; no cap on total tolled time. Q2: oracle_type immutable; oracle_source re-designable within same type; type-change = class migration + wind-down; T_anchor_at_submission and τ_bonus unaffected by same-type redesignation. Q3: shadow epoch EAT: synthetic_settlement=true; escrow slash still executes; credibility_ratio_shadow separate from live; shadow credibility informational only for portability and epistemically_live gate. Q4: τ_bonus scoped to direct oracle-resolution credibility updates (CLEARING+DISCOVERY); EQ distributes query fees not credibility; EQ creates no direct credibility pathway; credibility oracle-resolution-only. Net-new: two-clock synchronization (epistemic vs settlement); θ_convergence endogenous T_anchor (v2.2+); welfare optimisation first-order condition; two-clock framing unifies Zone_C deferral, τ_bonus T_anchor extension, ZONE_C_WATCH tolling. Invariants #242–#246.
+
+---
+
+## Open Questions for #r212+
+
+1. **θ_convergence manipulation resistance:** If governance sets θ_convergence, an adversary with a large stake could submit a noisy claim to spike Δ_epoch_S_cred above θ_convergence — delaying T_anchor indefinitely. How does endogenous T_anchor defend against deliberate convergence disruption?
+
+2. **Dual-clock welfare: does T_anchor_max cap change with Zone_C deferral?** T_anchor_max is the settlement clock's hard deadline. Zone_C defers settlement-finality challenge windows but does not move T_anchor itself. If Zone_C persists past T_anchor_max, what is the settlement outcome?
+
+3. **Shadow-class credibility_ratio_shadow and τ_bonus:** Shadow epochs execute real escrow slash. Do they also apply τ_bonus to credibility_ratio_shadow updates (τ_bonus denominator is shadow-class T_anchor_shadow)? Or is τ_bonus disabled for shadow epochs to avoid inflating shadow calibration scores?
+
+4. **Welfare optimisation and oracle_type heterogeneity:** Different oracle_types have different convergence dynamics — COMMITTEE oracles may be slow (low Δ_epoch_S_cred until committee announces) while MULTI_SOURCE oracles may converge fast. Should θ_convergence be oracle_type-specific, or is per-class calibration of θ_convergence sufficient?
+
+*Last updated: #r211 — 2026-04-04T09:02Z*
