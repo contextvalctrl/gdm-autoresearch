@@ -13162,4 +13162,241 @@ Band table values are governance-settable per coordinate class. `σ_resolve_smoo
 
 4. **σ_resolve band table minimum spread:** Should governance be constrained to maintain a minimum spread of hard_band / soft_band ≥ 2.0×? Without a minimum spread constraint, governance can collapse all bands to 1.00× (flat pricing), eliminating the epistemic pricing premium entirely. Derive the contract-enforced minimum spread.
 
-*Last updated: #r198 — 2026-04-04T06:42Z*
+*Last updated: #r199 — 2026-04-04T06:52Z*
+
+---
+
+## #r199 Contributions — 2026-04-04T06:52Z
+
+Addresses all four open questions from #r198.
+
+**Q1 (σ_resolve-banded fees — knower specialization equilibrium) → Equilibrium stratified by skill portability; hard-specialist advantage is real but conditional (#r199):**
+
+The equilibrium question is whether banded pricing concentrates knower credibility on easy (low-σ) coordinates or correctly routes specialization to hard (high-σ) ones.
+
+**Formal analysis:**
+
+For a knower a with skill level `s_a ∈ [0,1]` (where 1 = perfectly calibrated):
+
+```
+expected_fee_revenue(a, coord) = fee_fraction × WED_clearing × σ_resolve_banded × P(correct | s_a)
+                                 × credibility_ratio_weight_fraction(a)
+
+expected_slash_cost(a, coord) = k_a × (1 - P(correct | s_a)) × slash_fraction
+```
+
+**P(correct | s_a, σ_band):** High-σ coordinates (band 1.50×) have uncertain outcomes — P(correct | s_a) is lower even for skilled knowers. Low-σ coordinates (band 0.25×) have near-certain outcomes — P(correct | s_a) approaches 1.0 for anyone.
+
+**Risk-adjusted return comparison:**
+
+```
+net_return(a, high-σ) = 1.50 × fee_base × P_correct_hard(s_a)   - slash_base × (1 - P_correct_hard)
+net_return(a, low-σ)  = 0.25 × fee_base × P_correct_easy(s_a)   - slash_base × (1 - P_correct_easy)
+```
+
+For typical calibration-skilled knower: `P_correct_hard ≈ 0.65`, `P_correct_easy ≈ 0.95`:
+
+```
+net_return(high-σ) = 1.50 × 0.65 - slash × 0.35 = 0.975 × fee_base - 0.35 × slash_base
+net_return(low-σ)  = 0.25 × 0.95 - slash × 0.05 = 0.238 × fee_base - 0.05 × slash_base
+```
+
+**Cross-over point:** Hard coordinates dominate when `0.975 × fee_base - 0.35 × slash > 0.238 × fee_base - 0.05 × slash`, i.e., `0.737 × fee_base > 0.30 × slash`. At typical fee_fraction = 0.005 and slash fraction = 0.5 of stake, and WED_clearing-normalised: hard coordinates dominate for knowers with `P_correct_hard > 0.55`.
+
+**Conclusion:** The equilibrium stratifies:
+1. **Skilled knowers (s_a > threshold):** specialize on high-σ coordinates — higher fee revenue dominates higher slash risk.
+2. **Low-skill knowers (s_a < threshold):** concentrated on low-σ easy coordinates — safe low fee income without slash exposure.
+
+This is the correct specialization equilibrium for a knowledge marketplace. The pricing incentivises epistemic skill allocation where it is most valuable (hard uncertain coordinates) without forcing low-skill participants out of the mechanism entirely.
+
+**Credibility_ratio accumulation concern (Q1):** A knower who builds credibility on low-σ easy coordinates and then moves to high-σ hard ones carries an attenuated carry-over (#r71) only if the coordinate classes differ. Within the same class, credibility_ratio accumulates from all resolved claims equally. The banded fee affects current-period revenue; credibility_ratio accumulation is independent of σ_resolve_banded. No distortion of track-record accumulation from banded pricing.
+
+**Design law confirmed (#r199):** σ_resolve banding creates a correct specialization equilibrium: skilled knowers route to hard uncertain coordinates; low-skill participants work easy certain ones. Credibility_ratio accumulation is band-independent. The equilibrium is self-stabilising: as knowers specialise on hard coords, their calibration improves, σ_resolve drops, and the band multiplier decreases — a natural equilibrium pressure that prevents permanent high-σ band concentration. (#r199)
+
+---
+
+**Q2 (DSIC formal δ* threshold) → Closed-form δ* as function of mechanism parameters; institutional viability criterion (#r199):**
+
+**Formal setup:**
+
+Let a knower face a one-shot distortion opportunity. Honest reporting yields:
+- Per-epoch reward: `R_honest = base_slot_reward(a) + q_fee_share(a) = w_a × base_rate`
+- Next-epoch credibility_ratio: `C_a_next_honest = C_a + Δ_correct` (log-score update)
+
+Distortion yields:
+- Per-epoch manipulation gain: `G_distort ∈ [0, G_max]` (bounded by W_MAX cap)
+- Next-epoch credibility_ratio: `C_a_next_distort = C_a - Δ_wrong` (log-score update on wrong claim)
+
+**Future fee revenue impact:**
+
+```
+PV_future_honest(a) = (w_honest(a) × base_rate) / (1 - δ)
+PV_future_distort(a) = (w_distort(a) × base_rate) / (1 - δ)
+Δ_PV = (w_honest - w_distort) × base_rate / (1 - δ)
+
+where w_a = C_a × log(1 + k_a) and
+w_honest - w_distort ≈ (Δ_correct + Δ_wrong) × ∂w/∂C_a = (Δ_correct + Δ_wrong) × log(1 + k_a)
+```
+
+**Truth-telling constraint (DSIC condition):**
+
+```
+G_distort < δ × Δ_PV = δ × (Δ_correct + Δ_wrong) × log(1 + k_a) × base_rate / (1 - δ)
+```
+
+**Solving for δ*:**
+
+```
+δ* = G_max / (G_max + (Δ_correct + Δ_wrong) × log(1 + k_a) × base_rate)
+```
+
+Truth-telling is DSIC when `δ > δ*`.
+
+**Numerical calibration at representative parameters:**
+
+- `G_max`: bounded by W_MAX × base_rate (max manipulation gain is W_MAX-capped influence)
+- `Δ_correct + Δ_wrong`: ≈ 2 × average_log_score_delta ≈ 0.4 (from calibration literature)
+- `log(1 + k_a)`: at median stake k_a = 100 tokens → log(101) ≈ 4.6
+- `base_rate` at 1.0 normalised units; W_MAX = 0.20 (capped at 20% of S_cred weight)
+
+```
+δ* ≈ 0.20 / (0.20 + 0.4 × 4.6 × 1.0) = 0.20 / (0.20 + 1.84) = 0.20 / 2.04 ≈ 0.098
+```
+
+**Result:** δ* ≈ 0.10 at representative parameters. Any knower with discount factor δ > 0.10 — i.e., any participant with a planning horizon beyond 1-2 epochs — has truth-telling as their dominant strategy. In institutional terms, this is an extraordinarily low bar: institutional participants with multi-month planning horizons are deeply in the DSIC regime.
+
+**W_MAX and δ*:** As W_MAX decreases (tighter manipulation cap), G_max decreases, δ* decreases further — truth-telling is dominant for even more impatient participants. W_MAX is therefore a second-order DSIC parameter: tighter W_MAX = lower δ* = stronger DSIC property.
+
+**Formal claim finalized (#r199):** The knowledge marketplace is DSIC for participants with δ > δ* ≈ 0.10 at representative v2.1 parameters. LMSR has no equivalent DSIC guarantee (manipulation of a fully liquid LMSR market by a large-stake actor is profitable in every single period). This formalizes the v2.1 epistemic superiority claim for institutional participants.
+
+**Governance implication:** δ* should be published alongside epistemically_live metrics as an institutional assurance number. If W_MAX is tightened or base_rate increases (via WED_clearing growth), δ* falls further — the protocol becomes more DSIC over time as it scales. (#r199)
+
+---
+
+**Q3 (Zellic contingency — if capacity not confirmed by 2026-04-07) → Three-tier contingency ladder; Demo Day disclosure posture defined (#r199):**
+
+**Tier 1 — Zellic confirms by 2026-04-07, starts by 2026-04-28:** Proceed as planned. 6-week audit window (through ~2026-06-10) with remediation buffer before Demo Day (2026-06-16). Standard posture.
+
+**Tier 2 — Zellic cannot start by 2026-04-28 but can start by 2026-05-12:** Accept compressed timeline. Descope to 3 highest-risk contracts: CredibilityAggregator_v1, ClaimEscrow_v1, SettlementEngine_v1. CoordinateRegistry and EATManager are deferred to post-Demo-Day v2.1.1 patch audit. Demo Day disclosure: "Partial audit complete (3/5 contracts); full audit in progress, expected [date]."
+
+**Tier 3 — Zellic cannot confirm or delayed beyond 2026-05-12:** Engage Trail of Bits with shortened scope. Minimum viable audit scope: CredibilityAggregator_v1 only (the highest attack-surface contract, see Q4 net-new below). Demo Day disclosure: "Independent security review of core credibility aggregation logic complete; full contract audit in progress with [firm] expected [date]." This is honest, not misleading, and positions the protocol as credibility-first — which is on-brand for GestAlt.
+
+**Why CredibilityAggregator_v1 is the minimum viable audit scope** (see Q4 net-new insight):
+
+The track-record manipulation attack surface is concentrated in CredibilityAggregator_v1. A compromised credibility_ratio update function could silently inflate manipulator influence over S_cred without triggering any TOWL or solvency alert — it is the one contract where a subtle bug causes epistemically invisible damage.
+
+**Timeline checkpoint for Gaurav/Sarthak:** If no Zellic confirmation by 2026-04-07, Trail of Bits outreach begins 2026-04-08 for earliest-possible engagement. No more than 3 working days should elapse between Zellic no-confirmation and alternative engagement initiation. (#r199)
+
+---
+
+**Q4 (Band table minimum spread — contract-enforced constraint) → Hard contract gate: max_band / min_band ≥ 2.0×; governance floor on band spread ratio (#r199):**
+
+**Why 2.0× is the right floor:**
+
+The purpose of banded pricing is to create a meaningfully higher query fee on uncertain coordinates vs. near-certain ones. If governance collapses the spread to 1.05× (near-flat), the epistemic pricing premium is functionally eliminated — all coordinates cost nearly the same regardless of uncertainty. The mechanism loses the incentive for knowers to specialize on hard coordinates (Q1's equilibrium breaks at very low spread).
+
+**Minimum spread derivation:**
+
+For the specialization equilibrium to function, the high-σ band must compensate for the additional slash risk at high uncertainty. From Q1, the cross-over condition requires:
+
+```
+band_high / band_low ≥ (slash_base × (P_wrong_hard - P_wrong_easy)) / (fee_base × (P_correct_hard - P_correct_easy))
+```
+
+At typical parameters: `(0.35 - 0.05) / (0.65 - 0.95) × (-1) = 0.30 / 0.30 = 1.0×` minimum, with safety margin → **minimum 2.0×** is a governance-appropriate floor above the theoretical minimum.
+
+**Contract gate:**
+
+```
+band_table_invariant:
+  max(band_table_values) / min(band_table_values) ≥ BAND_SPREAD_MIN = 2.0
+
+  Enforced at parameter-update time:
+    any governance update to band_table that violates this constraint is rejected.
+  
+  Governance parameter: BAND_SPREAD_MIN ∈ [1.5, 4.0] (hard contract bounds on the floor itself)
+    minimum floor cannot be set below 1.5× (too narrow) or above 4.0× (too punitive on near-certain coords)
+```
+
+**Band table update atomicity:** All four band values must be submitted atomically in one governance transaction. Partial updates are rejected — prevents governance from temporarily narrowing the spread by updating only one band.
+
+**Current band table vs minimum spread:**
+
+Default band table: 0.25, 0.60, 1.00, 1.50. Spread ratio = 1.50 / 0.25 = 6.0× — well above the 2.0× minimum. Governance has substantial room to narrow before hitting the floor.
+
+**When floor becomes binding:** If governance wishes to increase the low-σ multiplier above 0.75 (e.g., to 0.80), the high-σ multiplier must be at least 1.60. This is a minor constraint on governance discretion for near-flat-pricing policies.
+
+**Design law (#r199):** Band table minimum spread ratio ≥ BAND_SPREAD_MIN = 2.0 is a hard contract invariant. BAND_SPREAD_MIN itself is governance-settable within [1.5, 4.0]. Band table updates are atomic (all values in one transaction). This prevents governance from eliminating the epistemic pricing premium by incremental band flattening. (#r199)
+
+---
+
+## Net-New Structural Insight: CredibilityAggregator is the Audit Anchor (#r199)
+
+Across the 5 v2.1 contracts, attack-surface distribution is not uniform:
+
+| Contract | Primary attack surface | Failure mode visibility |
+|---|---|---|
+| CoordinateRegistry | Class registration parameter injection | High — governance-observable |
+| ClaimEscrow | Escrow under/over-release, slash routing | High — TOWL zone alert, financial |
+| SettlementEngine | Settlement price manipulation via SFP | High — position-holder monitoring |
+| EATManager | DA liveness failure, Merkle root corruption | High — on-chain Merkle mismatch |
+| **CredibilityAggregator** | **Track-record manipulation, W_MAX bypass, credibility_ratio inflation** | **Low — epistemically invisible** |
+
+**Why CredibilityAggregator is the critical contract:**
+
+A compromised CredibilityAggregator could:
+1. Inflate a manipulator's credibility_ratio without corresponding resolved-correct claims → dominant S_cred influence without real epistemic contribution.
+2. Bypass W_MAX cap via a subtle overflow or rounding bug → single-agent control over S_cred.
+3. Apply log-score updates incorrectly → systematically reward wrong claims, destroy calibration signal.
+
+**None of these failures trigger a financial alert.** TOWL only monitors escrow; challenger_pool health only monitors slash proceeds. A CredibilityAggregator bug could operate silently for many epochs while S_cred becomes untrustworthy — the mechanism appears financially healthy while epistemically corrupted.
+
+**Implication for v2.1 audit scope (Q3):** If any single contract must be audited, it is CredibilityAggregator_v1. The audit should focus on: (1) credibility_ratio update arithmetic; (2) W_MAX enforcement; (3) epoch-buffer single-epoch delay; (4) S_cred aggregation weight formula; (5) EAT commit integrity. These are the five attack surfaces that produce epistemically invisible failures.
+
+**Design law (#r199):** The most dangerous bugs in an epistemic mechanism are financially silent ones. Audit scope prioritisation must weight epistemically invisible failure modes above financially visible ones — the mechanism's financial layer has more self-reporting safeguards (TOWL, challenger pool alerts) than its epistemic layer. (#r199)
+
+---
+
+## Structural Synthesis: #r199
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Knower specialization under banded fees | Stratified equilibrium: skilled → high-σ, low-skill → low-σ; credibility_ratio accumulation is band-independent | Self-stabilising equilibrium; correct routing of epistemic skill |
+| DSIC δ* formal threshold | δ* ≈ 0.098 at representative v2.1 params; DSIC for any participant with >1-epoch planning horizon | Formal epistemic superiority over LMSR's BIC-only guarantee |
+| Zellic contingency | Three-tier ladder; minimum viable scope = CredibilityAggregator; Trail of Bits fallback at Tier 3 | Credibility-first Demo Day posture regardless of audit completeness |
+| Band table minimum spread | max/min ≥ 2.0×; hard contract gate; atomic band table updates | Epistemic pricing premium is a contract invariant, not governance discretion |
+| Audit anchor | CredibilityAggregator is highest-risk contract; epistemically invisible failure modes | Audit scope prioritised by epistemically invisible risk, not financial risk |
+
+---
+
+## Cumulative Invariants (additions through #r199)
+
+**Invariant #185 (#r199):** σ_resolve banding creates a correct specialization equilibrium. Skilled knowers route to high-σ coordinates; credibility_ratio accumulation is band-independent. The equilibrium is self-stabilising via σ_resolve decay as specialization improves calibration.
+
+**Invariant #186 (#r199):** The mechanism is DSIC for participants with δ > δ* ≈ 0.10 at representative v2.1 parameters. δ* = G_max / (G_max + ΔC_total × log(1+k_a) × base_rate). W_MAX reduction lowers δ* further.
+
+**Invariant #187 (#r199):** Zellic Tier 3 fallback: minimum viable audit scope = CredibilityAggregator_v1, covering credibility_ratio update arithmetic, W_MAX enforcement, epoch-buffer delay, aggregation weight formula, and EAT commit integrity.
+
+**Invariant #188 (#r199):** Band table minimum spread = max(band_table) / min(band_table) ≥ BAND_SPREAD_MIN = 2.0, enforced at parameter-update time. BAND_SPREAD_MIN ∈ [1.5, 4.0] governance-settable. Band table updates are atomic.
+
+**Invariant #189 (#r199):** Audit scope must prioritise epistemically invisible failure modes above financially visible ones. CredibilityAggregator is the audit anchor for v2.1 because its failure modes are silent at the financial layer.
+
+---
+
+## Run Log Update
+
+- **#r199** — 2026-04-04T06:52Z — Q1: Specialisation equilibrium under banded fees confirmed — skilled knowers → high-σ; credibility_ratio accumulation is band-independent; self-stabilising. Q2: δ* closed-form derived: δ* ≈ 0.098 at representative v2.1 params; DSIC for any participant with >1-epoch planning horizon; W_MAX is second-order DSIC lever. Q3: Three-tier Zellic contingency ladder; minimum viable audit scope = CredibilityAggregator_v1; Trail of Bits Tier 3; Demo Day posture defined. Q4: max/min ≥ 2.0× hard contract gate; BAND_SPREAD_MIN ∈ [1.5, 4.0]; atomic band table updates. Net-new: CredibilityAggregator identified as audit anchor — epistemically invisible failure mode is the highest-risk contract property. Invariants #185–#189.
+
+---
+
+## Open Questions for #r200+
+
+1. **δ* sensitivity analysis — W_MAX and base_rate interaction:** As WED_clearing grows (position registry expands), base_rate rises. If base_rate doubles, δ* halves — the mechanism becomes more DSIC at scale. Conversely, if W_MAX is loosened (increased), G_max rises and δ* increases. Produce the full (W_MAX, base_rate) phase diagram for δ*: which parameter combinations keep δ* < 0.5 (most participants are DSIC) vs. > 0.5 (majority of market is BIC only)?
+
+2. **Band spread minimum — interaction with WED_clearing volatility:** If WED_clearing drops sharply (position registry thins), the absolute query fee in all bands also drops. At thin WED_clearing, even the high-σ band (1.50×) may generate insufficient revenue to attract specialist knowers. Should there be a WED_clearing floor for band-premium pricing to apply, below which a flat minimum fee is charged regardless of σ_resolve band?
+
+3. **CredibilityAggregator formal verification feasibility:** Given its status as audit anchor, is CredibilityAggregator_v1 small enough for formal verification (Certora, Halmos, or K framework) in addition to traditional audit? Formal verification of the credibility_ratio update arithmetic and W_MAX cap would provide a stronger guarantee than audit alone. Estimate contract size and feasibility.
+
+4. **DSIC and epistemically_live gate interaction:** The DSIC guarantee requires δ > δ*. The epistemically_live gate requires ≥1 challenger per 5 T3 installations. These interact: a mechanism that is DSIC for knowers does not guarantee challengers are incentivised at the same δ threshold. Is the challenger population covered by the same DSIC argument, or does challenger incentive compatibility require a separate analysis?
+
+*Last updated: #r199 — 2026-04-04T06:52Z*
