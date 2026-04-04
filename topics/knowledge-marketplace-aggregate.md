@@ -12589,3 +12589,176 @@ All four new invariants from #r194 require specific Zellic verification actions.
 4. **v2.1 contract deployment sequence — safe ordering:** With five contracts (CoordinateRegistry, ClaimEscrow, CredibilityAggregator, SettlementEngine, EATManager), what is the safe deployment order given circular initialisation dependencies? CredibilityAggregator needs CoordinateRegistry address; SettlementEngine needs CredibilityAggregator and CoordinateRegistry addresses; EATManager needs all four. Define the initialisation sequence and any two-phase initialisation pattern required.
 
 *Last updated: #r195 — 2026-04-04T06:12Z*
+
+---
+
+## #r196 Contributions — 2026-04-04T06:22Z
+
+**Phase: Addresses open questions Q1–Q4 from #r195. Net-new first-principles pass on the knowledge marketplace mechanism per cron directive.**
+
+---
+
+### Q1 (Deprecated `getS_cred` legacy alias — sunset timeline) → Usage-gate sunset; LegacyInterfaceCall event; v1.1 upgrade gate on zero-call evidence (#r196)
+
+The deprecated alias `getS_cred()` is retained in v2.1 for external integration compatibility only. Removed at v1.1. Deprecation event emitted on every legacy call:
+
+```solidity
+event LegacyInterfaceCall(bytes32 indexed classId, bytes4 indexed selector, address indexed caller, uint256 epoch);
+
+function getS_cred(bytes32 classId) external view returns (uint256) {
+    emit LegacyInterfaceCall(classId, 0xABCD1234, msg.sender, currentEpoch());
+    return getCommittedS_cred(classId, latestCommittedEpoch(classId)).s_settlement;
+}
+```
+
+EATManager aggregates per-epoch call counts to the audit trail. v1.1 upgrade gate: `require(legacy_call_count_last_4_epochs == 0)`. Removal is usage-evidence-gated (N_legacy_monitor = 4 consecutive zero-call epochs), not time-gated.
+
+**Design law (#r196):** Deprecated interface functions emit events on every call, maintain per-epoch EAT call counts, and are gated from removal until N_legacy_monitor = 4 consecutive zero-call epochs confirm no active dependents. (#r196)
+
+---
+
+### Q2 (min_q_bonus_ratio_clearing interaction with mode transition — pending EQ queries) → Carry through maturity; no retroactive re-evaluation (#r196)
+
+Three candidate rules: (A) retroactive re-evaluation, (B) carry through maturity, (C) cancel-and-return.
+
+Option A creates perverse incentive (unknowers front-run mode transition to lock DISCOVERY-mode floor). Option C punishes good-faith early submitters.
+
+**Resolution — carry through maturity (Option B):** `min_q_bonus_ratio_at_submission` is an immutable per-query field set at submission. Mode transitions do not retroactively re-price outstanding queries. New queries after transition use `min_q_bonus_ratio_clearing` (default 0.10).
+
+**Design law (#r196):** EQ query `min_q_bonus_ratio_at_submission` is immutable per-query. Mode transitions are not retroactive for outstanding queries. (#r196)
+
+---
+
+### Q3 (ZA-5 EATManager getLiveS_epistemic logging scope — freeze-aware restriction) → Pre-freeze: unconditional; post-freeze: tagged monitoring supplemental only; never used for settlement (#r196)
+
+**Resolution — freeze-aware branch in EATManager.recordEpochDiagnostics():**
+
+- Pre-freeze: call `getLiveS_epistemic`; emit `EpochDiagnostic(..., DiagnosticType.LIVE_S_EPISTEMIC)`.
+- Post-freeze: call `getCommittedS_cred` as canonical settlement reference; emit `FROZEN_S_SETTLEMENT`.
+- Optional post-freeze monitoring supplement: call `getLiveS_epistemic`; emit `POST_FREEZE_LIVE_NOT_FOR_SETTLEMENT`.
+
+ZA-5 refined: post-freeze `getLiveS_epistemic` calls are permitted in EATManager ONLY IF tagged `POST_FREEZE_LIVE_NOT_FOR_SETTLEMENT`. Zellic must confirm no code path uses a post-freeze live value in any settlement computation.
+
+**Design law (#r196):** EATManager diagnostics are freeze-aware. Post-freeze settlement diagnostic uses `getCommittedS_cred`. Post-freeze live value is an optional tagged monitoring supplement only. (#r196)
+
+---
+
+### Q4 (v2.1 contract deployment sequence — circular initialisation) → Two-phase DAG; no cycles; immutable cross-contract addresses; ZA-6 audit item (#r196)
+
+**Dependency DAG (confirmed acyclic):**
+
+```
+GovernanceParams          → (no deps)
+EATManager                → (no deps; role-grantees set post-deploy)
+CoordinateRegistry_v1     → GovernanceParams
+GestAltVault_v1           → CoordinateRegistry, GovernanceParams
+CredibilityAggregator_v1  → CoordinateRegistry, GovernanceParams
+OracleManager_v1          → CredibilityAggregator, CoordinateRegistry, EATManager
+SettlementEngine_v1       → CredibilityAggregator, GestAltVault, OracleManager, CoordinateRegistry, EATManager
+```
+
+**Two-phase deployment script:**
+
+```
+PHASE_1:
+  A_GOV   = deploy GovernanceParams
+  A_EAT   = deploy EATManager
+  A_REG   = deploy CoordinateRegistry_v1(A_GOV)
+  A_VAULT = deploy GestAltVault_v1(A_REG, A_GOV)
+  A_CRED  = deploy CredibilityAggregator_v1(A_REG, A_GOV)
+
+PHASE_2:
+  A_ORACLE  = deploy OracleManager_v1(A_CRED, A_REG, A_EAT)
+  A_SETTLE  = deploy SettlementEngine_v1(A_CRED, A_VAULT, A_ORACLE, A_REG, A_EAT)
+
+ROLE_GRANTS:
+  grantRole(A_EAT, SETTLEMENT_ENGINE_ROLE, A_SETTLE)
+  grantRole(A_EAT, ORACLE_MANAGER_ROLE, A_ORACLE)
+  grantRole(A_EAT, COORD_REGISTRY_ROLE, A_REG)
+  grantRole(A_CRED, SETTLEMENT_ENGINE_ROLE, A_SETTLE)
+  grantRole(A_CRED, ORACLE_MANAGER_ROLE, A_ORACLE)
+  grantRole(A_REG, SETTLEMENT_ENGINE_ROLE, A_SETTLE)
+```
+
+Cross-contract addresses stored as `immutable` in constructors — no post-deploy setters. EATManager is the only contract with post-deploy linkage (role grants only).
+
+**Audit item ZA-6:** Verify no v2.1 contract has a post-constructor setter for any cross-contract address. Check for `delegatecall` paths writing to cross-contract address storage slots.
+
+**Design law (#r196):** v2.1 deployment is a two-phase DAG (no circular dependencies). Cross-contract addresses are immutable post-deploy. No `setXxx(address)` setter functions permitted. (#r196)
+
+---
+
+### Net-New First-Principles Pass: What the Mechanism Gets Wrong About "Information Transfer" (#r196)
+
+The cron directive says capital is a credibility transfer mechanism and exchange is bilateral flow between high-information and low-information zones. After 196 runs, this framing deserves a pointed challenge.
+
+**The three-step chain that must hold:**
+
+1. Capital transfer → proves willingness to accept loss if wrong
+2. Willingness → proves conviction
+3. Conviction → proves high-information-zone membership
+
+**Where the chain breaks:** Capital can transfer without conviction (portfolio hedge). Conviction can exist without information (confidently wrong). High-information membership can exist without capital (expert with no escrow budget).
+
+**The mechanism's epistemic content lives entirely in the track record — not the capital.** Capital is only the anti-Sybil participation gate. New participants with high capital and zero track record are treated as noise traders (credibility_ratio at floor). This is correct and necessary. But it means capital does NOT prove information zone membership; it only enables track record accumulation to begin.
+
+**Revised canonical description of S_cred (#r196):**
+
+> S_cred(coord, epoch) = credibility-weighted centroid of claims by agents who have survived oracle resolutions on related coordinate classes, weighted by the accuracy of those resolutions.
+
+"Survived resolutions" replaces "has high conviction." The mechanism is a **track record revelation mechanism with a spam filter** — not a conviction-signalling mechanism.
+
+---
+
+### Net-New Structural Insight: Bilateral Flow Claim Holds Only in DISCOVERY_MODE (#r196)
+
+**Where bilateral flow holds (DISCOVERY_MODE, v2.2):** Type B unknowers pay EQ fees; knowers produce warranted estimates; capital flows from low-information zone to high-information zone. Genuinely bilateral.
+
+**Where bilateral flow fails (CLEARING_MODE, v2.1):**
+
+- Type A unknowers consume S_cred as a public good — zero payment.
+- Knowers earn fee_fraction from the LOSING position pool (slashed escrow of wrong knowers), not from unknowers.
+- Capital flows only within the knower pool (losing escrow → winning knower fees). No payment from information consumers to information producers.
+
+CLEARING_MODE is a **warranted-attestation pool** producing a public-good clearing price as byproduct. The bilateral-flow knowledge marketplace is the DISCOVERY_MODE product.
+
+**Implications:**
+- Do not use "bilateral knowledge marketplace" language for v2.1 in external materials.
+- Demo Day: "credibility-weighted clearing engine" for v2.1; "knowledge marketplace" is v2.2 roadmap.
+- Invariant #137 (#r187) tightened: v2.1 is warranted-attestation pool; bilateral flow holds only in DISCOVERY_MODE.
+
+---
+
+## Cumulative Invariants (additions through #r196)
+
+**Invariant #170 (#r196):** Deprecated interface functions emit a `LegacyInterfaceCall` event on every invocation. Per-epoch EAT call counts are recorded. Removal is usage-evidence-gated on N_legacy_monitor = 4 consecutive zero-call epochs. No time-gate.
+
+**Invariant #171 (#r196):** EQ query `min_q_bonus_ratio_at_submission` is immutable per-query. Mode transitions do not retroactively re-evaluate outstanding queries. Queries carry their submission-time mode ratio through maturity.
+
+**Invariant #172 (#r196):** EATManager epoch diagnostics are freeze-aware. Post-freeze `getLiveS_epistemic` calls are tagged `POST_FREEZE_LIVE_NOT_FOR_SETTLEMENT` and are monitoring-only. Settlement diagnostics post-freeze use `getCommittedS_cred` exclusively. ZA-5 updated.
+
+**Invariant #173 (#r196):** v2.1 deployment is a two-phase DAG with no circular dependencies. All cross-contract addresses are immutable post-deploy. No post-constructor address setter functions permitted in any v2.1 contract. ZA-6 is the Zellic audit item.
+
+**Invariant #174 (#r196):** S_cred measures track record (resolution survival and accuracy), not conviction. Capital is the anti-Sybil participation gate, not the epistemic signal. "Resolution survival weighted by accuracy" is the correct framing.
+
+**Invariant #175 (#r196):** GestAlt v2.1 (CLEARING_MODE) is a warranted-attestation pool with public-good clearing price output. Capital flows within the knower pool only (losing escrow → winning). Bilateral-flow knowledge marketplace semantics apply exclusively to DISCOVERY_MODE (v2.2). Invariant #137 tightened.
+
+---
+
+## Run Log Update
+
+- **#r196** — 2026-04-04T06:22Z — Q1: `getS_cred` deprecated alias usage-gate sunset (N_legacy_monitor=4), LegacyInterfaceCall event, v1.1 upgrade gate. Q2: pending EQ queries carry submission-time mode ratio through maturity; no retroactive re-evaluation. Q3: EATManager freeze-aware logging — post-freeze live value tagged POST_FREEZE_LIVE_NOT_FOR_SETTLEMENT; ZA-5 refined. Q4: v2.1 two-phase deployment DAG fully specified; no circular dependencies; immutable cross-contract addresses; ZA-6 audit item added. Net-new mechanism critique: capital is spam filter only; S_cred measures track record not conviction; CLEARING_MODE is warranted-attestation pool (public-good output); bilateral flow holds only in DISCOVERY_MODE. Invariants #170–#175.
+
+---
+
+## Open Questions for #r197+
+
+1. **Zellic brief final version:** Incorporate ZA-6 (immutable cross-contract addresses) and refined ZA-5 (freeze-aware EATManager logging). Produce final 1-page brief as deliverable by 2026-04-07.
+
+2. **Demo Day narrative revision:** Replace "capital proves conviction" with "track record determines weight" in all external materials. Draft revised competitor comparison sentences using the corrected framing (#r196 critique).
+
+3. **CLEARING_MODE fee sustainability:** Fee revenue comes from fee_fraction on warranted claims only (public-good S_cred, no unknower payment). Derive the minimum fee_fraction × WED_clearing product needed for self-sustaining operation without governance seed subsidies.
+
+4. **DISCOVERY_MODE bilateral flow pressure test (v2.2 thread #r2):** Does EQ escrow-conditioned query actually produce bilateral flow, or does the warranted-attestation-pool failure mode recur in DISCOVERY_MODE? First pressure test for knowledge-marketplace-v22.md #r2.
+
+*Last updated: #r196 — 2026-04-04T06:22Z*
