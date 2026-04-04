@@ -19927,3 +19927,268 @@ A class that becomes critically under-density after CPA blocks had hidden knower
 4. **Expedited knower onboarding in critical density response — identity bond reduction:** In the critical EDS* gap response, governance may facilitate "expedited new-knower onboarding below minimum identity bond" (#r230/Q4). What is the minimum expedited identity bond, and does this create an opportunity for adversarial actors who were previously excluded by the identity bond to enter the knower pool under crisis conditions?
 
 *Last updated: #r230 — 2026-04-04T12:52Z*
+
+
+---
+
+## #r231 Contributions — 2026-04-04T13:02Z
+
+Addresses all four open questions from #r230. Net-new first-principles synthesis: definitive answers to the cron's original four conserved-quantity questions, now answerable after 230 runs of mechanism development.
+
+---
+
+### Q1 (protocol_maintenance_reserve seeding formula — sixth reserve category) → Seed = (WED_clearing_forecast − q_fee_revenue_forecast) × α_maintenance × T_class_expected_life; lower-bounded by WED_clearing_forecast × 0.03 (#r231)
+
+**The reserve exists to sustain T3 participation in HYBRID_EXTERNAL classes where oracle independence severs the native settlement-benefit incentive.** The expected cost over the class lifetime is the maintenance bonus payout, which is bounded by:
+
+```
+maintenance_cost_expected =
+    max(0, WED_clearing_forecast(c) − q_fee_revenue_forecast(c)) × α_maintenance × T_class_expected_life_epochs
+
+where:
+  WED_clearing_forecast(c)   = governance estimate of weekly epistemic demand at class launch
+  q_fee_revenue_forecast(c)  = governance estimate of query fee revenue per epoch
+  α_maintenance              = maintenance bonus rate (Invariant #329 default range [0.001, 0.02])
+  T_class_expected_life_epochs = governance estimate of class active-service epochs
+```
+
+**Reserve seed formula:**
+
+```
+protocol_maintenance_reserve_seed(c) =
+    max(
+        maintenance_cost_expected,
+        WED_clearing_forecast(c) × 0.03     [3% floor; ensures non-trivial reserve even on low WED]
+    )
+```
+
+The 3% floor: even when q_fee_revenue_forecast ≈ WED_clearing_forecast (self-funding class), the reserve provides a buffer against forecast error — consistent with conservative governance calibration patterns from #r152/Q3.
+
+Governance accountability: at N_calibration resolutions, empirical q_fee_revenue is compared to forecast. If empirical < forecast × 0.50 for N_calibration consecutive epochs, reserve replenishment is added to the governance alert queue. Max depletion without replenishment: maintenance_cost_per_epoch × T_class_expected_life. Replenishment SLA: N_calibration epochs from alert.
+
+**Sixth reserve category summary:**
+
+| Reserve | Class-level | TOWL-counted | Zone C gated | Source |
+|---|---|---|---|---|
+| LTRP | Yes | No | No | Per-position epoch accrual |
+| challenger_pool | Yes | No | No | EQ fee share + governance |
+| debt_retirement_reserve | Protocol | No | No | Governance seeding |
+| bilateral_flow_recovery_reserve | Yes | No | No | Governance seeding |
+| settlement_reserve | Yes | Yes | No | Per-position collateral |
+| **protocol_maintenance_reserve** | **Yes** | **No** | **No** | **Governance seeding at registration** |
+
+Not TOWL-counted (maintenance bonus is incentive payment, not warranty obligation). Not Zone C gated (cutting it during solvency stress would accelerate the EDS* collapse it is meant to prevent).
+
+**Design law (#r231):** protocol_maintenance_reserve seed = max(expected maintenance cost over lifecycle, WED_clearing × 0.03). Not TOWL-counted; not Zone C gated. Chronic-shortfall alert after N_calibration epochs. (#r231)
+
+---
+
+### Q2 (CommitteeStateEngine deployment and interface) → Standalone contract; minimal interface to SettlementEngine_v2; EAT write role exclusive per class; upgradeable independently (#r231)
+
+**Standalone vs module decision:** A module within CredibilityAggregator_v2 would couple upgrade paths — a COMMITTEE bug forcing a re-audit would block AUTOMATED class operations. Standalone isolation allows independent upgrade cycles.
+
+**CommitteeStateEngine_v2 minimal interface:**
+
+```solidity
+interface ICommitteeStateEngine {
+    // Called by CoordinateRegistry_v2 at each epoch boundary for COMMITTEE classes
+    function computeEpochState(
+        bytes32 classId, uint256 epoch,
+        CommitteeVote[] calldata votes,
+        ConvergenceProfileFlags calldata flags
+    ) external returns (uint256 S_cred_new, bool updated);
+
+    // Called by SettlementEngine_v2 at T_anchor for COMMITTEE classes
+    function getS_credAtAnchor(bytes32 classId, uint256 anchorEpoch)
+        external view returns (uint256 S_cred_snapshot, uint256 n_votes, uint256 weighted_variance);
+
+    // Called by CredibilityAggregator_v2 to write CPA detection results (COMMITTEE classes)
+    function applyCPAPenalty(bytes32 classId, address[] calldata affected, uint256 rho_prior_shrunk)
+        external;
+
+    function getConvergenceProfileStatus(bytes32 classId, uint256 epoch)
+        external view returns (CommitteeEpochStatus memory);
+}
+```
+
+SettlementEngine_v2 discriminates state provider by class_oracle_mode at call site:
+
+```solidity
+address stateProvider = class_oracle_mode[classId] == COMMITTEE
+    ? address(committeeStateEngine)
+    : address(credibilityAggregator);
+(uint256 s_cred, , ) = IStateProvider(stateProvider).getS_credAtAnchor(classId, anchorEpoch);
+```
+
+EAT write roles are mode-exclusive — COMMITTEE classes: CommitteeStateEngine writes S_cred_epoch_commit; AUTOMATED/HYBRID_EXTERNAL: CredibilityAggregator writes. No overlapping writes possible.
+
+**Design law (#r231):** CommitteeStateEngine_v2 is standalone. SettlementEngine_v2 discriminates by class_oracle_mode. EAT write roles are exclusive per class. Independent upgrade cycles. (#r231)
+
+---
+
+### Q3 (COMMITTEE_CONSENSUS_LOCK during SEE — suspend or hold active) → Suspend CONSENSUS_LOCK; EPOCH_CARRY active; SUPERMAJORITY_ANCHOR conditionally suspended by SEE evidence relevance (#r231)
+
+**The competing pressures:** CONSENSUS_LOCK exists to prevent noisy contested-vote S_cred writes in stable conditions. During SEE, high committee variance IS the valid epistemic signal — the coordinate value is genuinely uncertain. Holding CONSENSUS_LOCK means S_cred holds at the stale pre-shock value, presenting false certainty exactly when uncertainty is highest. EPOCH_CARRY prevents thin-participation updates; this remains valid during SEE (abstaining committees are still suspect).
+
+**Resolution — profile-specific SEE suspension:**
+
+```
+During SEE (epoch_type = SYSTEMIC_EVENT_EPOCH for class_i):
+
+  COMMITTEE_CONSENSUS_LOCK:       suspended (high variance = informative shock signal)
+  COMMITTEE_EPOCH_CARRY:          active (thin participation still suspect during SEE)
+  COMMITTEE_SUPERMAJORITY_ANCHOR: conditionally suspended
+    if SEE_evidence_type is directly relevant to this coordinate: suspended
+    else: active
+    SEE_evidence_type_relevance: governance-declared per-class at SEE initiation
+```
+
+CommitteeStateEngine emits: `SEE_profile_suspension { class_id, epoch, CONSENSUS_LOCK_suspended, SUPERMAJORITY_ANCHOR_suspended, EPOCH_CARRY_active, SEE_ref }`.
+
+Post-SEE: all suspensions lift immediately on SEE resolution (no N_calibration delay).
+
+**Design law (#r231):** SEE suspension is profile-specific and purpose-driven. CONSENSUS_LOCK (stable-state noise guard) is suspended during shocks. EPOCH_CARRY (thin-participation guard) remains active. SUPERMAJORITY_ANCHOR is conditionally suspended by governance-declared SEE relevance. (#r231)
+
+---
+
+### Q4 (Expedited knower onboarding below minimum identity bond — adversarial entry risk) → 0.25× standard bond with 1.5× challenge escrow compensation; N_recovery_window time limit; CPA screening unchanged (#r231)
+
+**Attack surface analysis:** With T3 installations throttled to 0 during critical density gap, an adversary entering expedited onboarding cannot immediately create warranty positions, earn q_bonus, or immediately manipulate S_cred. Medium-term positioning is the attainable attack — defended by enhanced escrow, not identity bond alone.
+
+**Expedited onboarding parameters:**
+
+```
+Conditions: critical density gap state active (EDS* × 0.5 threshold, #r230/Q4)
+
+expedited_identity_bond = max(0.25 × standard_identity_bond, identity_bond_minimum_absolute)
+
+Enhanced challenge escrow requirement:
+  T3_challenge_escrow_expedited = standard_T3_challenge_escrow × 1.5
+  (for T3 claims submitted within N_calibration epochs of expedited entry)
+  Reverts to standard after N_calibration track record epochs
+
+Duration gate:
+  Expedited window = max N_recovery_window (= N_calibration) epochs from critical_gap_declared
+  Standard identity bond required for all new knowers after window closes
+
+CPA_IdentityRegistry check:
+  Unchanged — active CPA cluster membership denies registration regardless of expedited status
+```
+
+1.5× challenge escrow compensates for 0.25× identity bond: per-claim skin-in-the-game is maintained even at lower entry cost. A knower paying 1.5× escrow on each T3 claim stakes more per-claim than a standard knower.
+
+Why 0.25× floor: below 25% of standard bond, absolute capital at stake may be insufficient for sybil resistance on small-denomination classes.
+
+**Design law (#r231):** Expedited bond = 0.25× + 1.5× escrow compensation maintains per-claim skin-in-the-game. Time-limited to N_recovery_window. CPA screening unchanged. Standard bond restored at window expiry. (#r231)
+
+---
+
+### Net-New First-Principles Synthesis: The Cron's Four Founding Questions — Definitive Answers After 231 Runs (#r231)
+
+---
+
+**"What is the conserved quantity?"**
+
+In LMSR: the market maker's capital reserve (cost function integral). In GestAlt: **epistemic debt** — the aggregate outstanding obligation to service warranted attestations.
+
+```
+ED(c, t) = Σ_a [escrow_a(c) + expected_bonus_a(c, t)] for all active T3 claims
+```
+
+ED is created at T3 installation (escrow committed) and destroyed at oracle resolution (slash or release). TOWL is the real-time observable proxy.
+
+The deeper conservation: **credibility allocation** over the active knower population is approximately conserved within N_calibration windows. Log-score updating is a zero-sum credibility redistribution over each resolution cohort. A correct claim gains credibility at the expense of the reference prior; a wrong claim loses credibility proportional to epistemic overconfidence.
+
+The conserved quantity is not price — it is the credibility allocation over the active knower population. (#r231)
+
+---
+
+**"What is the update rule?"**
+
+```
+S_cred(c, t) = S_cred(c, t−1) × (1 − λ_decay)
+             + Σ_a [effective_weight_a × d_a(t)] × λ_new_claim
+
+effective_weight_a = W_a × credibility_ratio_a × (1 − CPA_penalty_a)
+λ_new_claim ∝ D(c, t)  [EQ demand signal scales update magnitude]
+```
+
+A credibility-weighted exponential moving average with demand scaling. The bilateral-flow innovation: in LMSR, capital moves price regardless of demand quality. In GestAlt, S_cred update magnitude is amplified by EQ demand — stronger unknower demand pulls more weight from high-credibility knowers.
+
+In COMMITTEE mode: credibility-weighted median with convergence profile gate (CommitteeStateEngine, Invariant #331). Structurally different — discontinuous at consensus thresholds rather than smooth EMA. (#r231)
+
+---
+
+**"What is the source of truth?"**
+
+**oracle_declared at T_anchor** — exogenous to the mechanism in all three modes:
+
+- AUTOMATED: independent event oracle (not the mechanism itself)
+- HYBRID_EXTERNAL: independent price feed / on-chain event reporter
+- COMMITTEE: credibility-weighted expert deliberation with S_cred blinding (Invariant #303)
+
+The mechanism's epistemic value is *anticipatory convergence*: S_cred converges toward oracle_declared before oracle fires. If S_cred == oracle_declared at T_anchor, the mechanism achieved perfect anticipatory accuracy — knowers revealed truth before truth was externally verifiable. η_realized (Invariant #295) is the performance metric.
+
+**What distinguishes this from LMSR:** LMSR's clearing price IS the mechanism's output — truth-proxy is endogenous, circular. GestAlt's oracle_declared is exogenous — the mechanism cannot affect what the oracle reports. Epistemic correctness is externally verifiable. (#r231)
+
+---
+
+**"Why does capital improve epistemics rather than just reallocate PnL?"**
+
+In LMSR/orderbooks: capital moves price, which approximates truth only under Grossman-Stiglitz assumptions. When those fail (CPA, oracle gaming), capital reallocates PnL without improving epistemics.
+
+**In GestAlt, capital improves epistemics through three distinct mechanisms:**
+
+1. **Forfeiture incentive (escrow):** Capital at risk is forfeited on wrong claims. Epistemic dishonesty and carelessness become financially costly. Dominance of honesty and accuracy over [0, T_anchor] is the result — not a price signal, a direct stake alignment.
+
+2. **Credibility compounding (log-score leverage):** Correct knowers increase credibility_ratio → higher effective_weight → larger S_cred influence per unit of new capital committed. Each correct claim makes future capital more epistemically productive. In LMSR, a lucky large trader and a consistently accurate small trader have identical price-moving power per unit capital — no such compounding exists.
+
+3. **EQ demand signal (q_bonus):** Unknowers posting q_bonus commitments signal which coordinate classes are decision-relevant. q_bonus creates a resource allocation signal: capital flows from low-epistemic-value classes (no q_bonus) to high-value classes (large q_bonus pool). This is capital as *epistemic priority signal*, not PnL.
+
+**The proof:** When all three are active (bilateral flow, Invariant #285), η_Phase2 > 0. When only 1+2 are active (attestation pool), η_Phase2 = 0 — equivalent to LMSR. Bilateral flow adds mechanism 3, which separates GestAlt from a well-designed prediction market with individual escrow. (#r231)
+
+---
+
+## Structural Synthesis: #r231
+
+| Topic | Contribution | Invariant |
+|---|---|---|
+| protocol_maintenance_reserve seed | max((WED − q_fee_forecast) × α_maint × T_life, WED × 0.03); sixth reserve; not TOWL | #333 |
+| CommitteeStateEngine_v2 | Standalone; SettlementEngine routes by mode; EAT write exclusive; independent upgrade | #334 |
+| CONSENSUS_LOCK during SEE | Suspended; EPOCH_CARRY active; SUPERMAJORITY_ANCHOR conditionally by SEE relevance | #335 |
+| Expedited onboarding | 0.25× bond + 1.5× escrow; N_recovery_window limit; CPA screening unchanged | #336 |
+| Four founding questions | Conserved qty = epistemic debt + credibility allocation; update rule = credibility-weighted EMA + demand scaling; truth = exogenous oracle; capital improves epistemics via 3 mechanisms | #337 |
+
+---
+
+## Cumulative Invariants (#r231)
+
+**Invariant #333 (#r231):** protocol_maintenance_reserve_seed = max((WED_clearing_forecast − q_fee_forecast) × α_maintenance × T_life_epochs, WED_clearing_forecast × 0.03). Sixth reserve category: class-level, not TOWL-counted, not Zone C gated, governance-seeded at registration. Chronic-shortfall replenishment alert after N_calibration epochs (empirical q_fee < 50% of forecast for N_calibration consecutive epochs).
+
+**Invariant #334 (#r231):** CommitteeStateEngine_v2 is a standalone contract. Interface: computeEpochState, getS_credAtAnchor, applyCPAPenalty, getConvergenceProfileStatus. SettlementEngine_v2 routes by class_oracle_mode: COMMITTEE → CommitteeStateEngine; AUTOMATED/HYBRID_EXTERNAL → CredibilityAggregator. EAT write role for S_cred_epoch_commit is exclusive per class. CommitteeStateEngine upgradeable independently of CredibilityAggregator_v2.
+
+**Invariant #335 (#r231):** During SEE: COMMITTEE_CONSENSUS_LOCK suspended (high variance is informative during shocks). COMMITTEE_EPOCH_CARRY remains active (thin participation suspect). COMMITTEE_SUPERMAJORITY_ANCHOR conditionally suspended based on SEE_evidence_type_relevance (governance-declared per class at SEE initiation). All suspensions lift immediately on SEE resolution.
+
+**Invariant #336 (#r231):** Expedited knower identity bond = max(0.25 × standard_bond, absolute_minimum). Compensating requirement: 1.5× T3 challenge escrow for claims submitted within N_calibration epochs of expedited entry. Duration: max N_recovery_window (= N_calibration) epochs from critical_gap_declared. CPA_IdentityRegistry screening unchanged. Standard bond restored at window expiry.
+
+**Invariant #337 (#r231):** Definitive answers to the founding four conserved-quantity questions: (1) Conserved quantity = epistemic debt (outstanding T3 escrow + expected bonus obligations) + credibility allocation (zero-sum log-score redistribution per cohort). (2) Update rule = credibility-weighted EMA with demand scaling (S_cred updated by effective_weight_a × D(c)). (3) Source of truth = exogenous oracle_declared at T_anchor (not endogenous). (4) Capital improves epistemics via three mechanisms: forfeiture incentive (escrow stake), credibility compounding (log-score → influence leverage), EQ demand signal (q_bonus as epistemic priority allocation). All three active in bilateral-flow only; η_Phase2 > 0 iff bilateral flow; LMSR has η_Phase2 = 0.
+
+---
+
+## Run Log Update
+
+- **#r231** — 2026-04-04T13:02Z — Q1: protocol_maintenance_reserve seed formula; sixth reserve category; not TOWL; not Zone C gated; chronic-shortfall alert SLA. Q2: CommitteeStateEngine_v2 standalone; SettlementEngine_v2 routes by class_oracle_mode; EAT write role exclusive; independent upgrade cycle. Q3: CONSENSUS_LOCK suspended during SEE; EPOCH_CARRY active; SUPERMAJORITY_ANCHOR conditionally suspended by SEE evidence relevance; suspensions lift at SEE resolution. Q4: Expedited bond = 0.25× standard + 1.5× challenge escrow; N_recovery_window limit; CPA screening unchanged. Net-new: Definitive answers to cron's four founding questions after 231 runs — epistemic debt + credibility allocation as conserved quantities; credibility-weighted EMA + demand scaling as update rule; exogenous oracle as source of truth; three capital-epistemic mechanisms proven active in bilateral-flow only. Invariants #333–#337.
+
+---
+
+## Open Questions for #r232+
+
+1. **CommitteeStateEngine_v2 and CredibilityAggregator_v2 circular reference resolution at v2.2 deployment:** CredibilityAggregator_v2 needs CommitteeStateEngine_v2's address (to route CPA penalty calls for COMMITTEE classes); CommitteeStateEngine_v2 needs CredibilityAggregator_v2's address (to validate CPA detection inputs). Which deploys first, and how is the circular reference broken without a mutable initialisation pattern?
+
+2. **η_realized computation for COMMITTEE classes:** η_realized_simple (Invariant #295) uses σ_claim_spread² from T3 claim distributions. COMMITTEE classes produce no T3 distributions — the prior variance is the weighted_variance of committee votes. Should η_realized for COMMITTEE classes use weighted_variance(votes, T_anchor) as denominator, and if so, how does COMMITTEE_CONSENSUS_LOCK (which suppresses high-variance epochs and holds S_cred constant) interact with the η_realized denominator at T_anchor?
+
+3. **protocol_maintenance_reserve and bilateral_flow_recovery_reserve coexistence on HYBRID_EXTERNAL v2.2 classes:** A HYBRID_EXTERNAL class with T3 knowers in bilateral-flow mode potentially has both reserves active simultaneously. Are these distinct pools or should they merge for HYBRID_EXTERNAL classes?
+
+4. **Expedited onboarding for COMMITTEE mode critical density gap:** The expedited protocol was specified for T3 knowers. If a COMMITTEE class is in critical density gap, does the same expedited onboarding apply to committee members (lower identity bond + enhanced challenge escrow model)? Or does the COMMITTEE epistemic role — where committee members produce oracle_declared, not just S_cred input — require a different crisis response with stronger identity requirements?
+
+*Last updated: #r231 — 2026-04-04T13:02Z*
