@@ -13554,3 +13554,206 @@ Challenger IC is structurally more robust than knower DSIC. The enforcement laye
 4. **Mechanism thread termination criterion:** 200 runs, 193 invariants, 5-contract v2.1 spec, FV plan, challenger IC closure. Is there a natural termination for this thread (e.g., v2.1 contract implementation handoff), or does it continue as a living document through v2.2+?
 
 *Last updated: #r200 — 2026-04-04T07:02Z*
+
+---
+
+## #r201 Contributions — 2026-04-04T07:12Z
+
+**Phase: Thread closure questions Q1–Q4 from #r200; net-new first-principles pass on the mechanism's conserved-quantity structure.**
+
+---
+
+### Q1 (W_MAX_schedule simplified v2.1 config — two-phase static advisory) → Two static phases; W_MAX_genesis = 0.05; W_MAX_steady = 0.15; transition gated on WED_clearing_smooth ≥ 20% of reference AND N_calibration resolved epochs; governance-triggered not automatic (#r201)
+
+**Why static not dynamic for v2.1:** Dynamic W_MAX coupling to WED_clearing_smooth is v2.2 scope. v2.1 needs a deterministic advisory that gives governance a clear decision rule without per-epoch recomputation.
+
+**Two-phase spec:**
+
+```
+Phase 1 (Genesis): W_MAX_genesis = 0.05
+  Active from class registration until transition condition met.
+  Rationale: thin-market DSIC boundary (#r200/Q1) is at W_MAX ≈ 0.062 for very thin markets.
+  Conservative 0.05 provides margin.
+
+Phase 2 (Steady): W_MAX_steady = 0.15
+  Activated by governance call after transition condition is confirmed.
+  Rationale: DSIC_majority at W_MAX=0.15 down to base_rate ≈ 0.006 (#r200/Q1).
+
+Transition condition (both must hold):
+  (a) WED_clearing_smooth(class_i) ≥ WED_clearing_ref(class_i) × 0.20
+        (same threshold as MVF activation; aligns the two advisory boundaries)
+  (b) N_resolved_epochs(class_i) ≥ N_calibration
+        (credibility_ratio accumulation is meaningful)
+
+Transition mechanics:
+  Governance submits: setW_MAX(class_i, W_MAX_steady)
+  CoordinateRegistry verifies transition_condition(class_i) on-chain
+  Reverts if condition not met — prevents premature relaxation
+  EAT event: W_MAX_phase_transition {class_id, from: 0.05, to: 0.15, epoch: t}
+```
+
+**Why governance-triggered (not automatic):** Automatic transition would require on-chain WED_clearing_smooth computation at every epoch boundary — expensive. Governance evaluates off-chain; on-chain contract only enforces the condition gate at the moment of the governance call. Same pattern as the epistemically_live gate: governance certifies readiness, contract enforces the criterion.
+
+**GovernanceParams addition:** `w_max_genesis` and `w_max_steady` as class-scoped parameters, both governance-settable within hard bounds `[0.03, 0.10]` and `[0.10, 0.25]` respectively. The bounds enforce phase separation: genesis is always below steady, contract-guaranteed.
+
+**Design law (#r201):** v2.1 W_MAX policy is two static phases: genesis (0.05) and steady (0.15). Transition is governance-triggered, conditioned on WED_clearing_smooth ≥ 20% of reference AND N_calibration resolved epochs. Phase separation enforced via disjoint governance parameter bounds. Dynamic WED_clearing coupling is v2.2. (#r201)
+
+---
+
+### Q2 (MVF treasury subsidy cap — zombie class protection) → Cumulative subsidy cap with DELIST_PENDING state; cap = WED_clearing_ref × 0.05 × N_subsidy_window; governance re-affirmation required to continue (#r201)
+
+**The drain scenario:** A class achieves epistemically_live status but never attracts sufficient organic WED_clearing. MVF activates indefinitely, consuming treasury at MVF_base × max_band_multiplier per query, per epoch, permanently. This is a structural drain from low-value classes subsidised by high-WED classes.
+
+**Resolution — cumulative cap with DELIST_PENDING:**
+
+```
+MVF_subsidy_cumulative(class_i, window_t) = Σ_{e in [t-N_subsidy_window, t]} MVF_overage_paid(class_i, e)
+
+MVF_subsidy_cap(class_i) = WED_clearing_ref(class_i) × 0.05 × N_subsidy_window
+  N_subsidy_window = N_calibration  (default; governance-settable [N_calibration/2, 2×N_calibration])
+  WED_clearing_ref anchored at class registration (immutable)
+
+When MVF_subsidy_cumulative ≥ MVF_subsidy_cap:
+  class_i enters DELIST_PENDING state
+  EAT event: class_mvf_cap_hit {class_id, total_subsidy, epoch}
+  Governance has T_delist_window = N_calibration epochs to:
+    (a) Increase WED_clearing_ref (re-registers class scale — governance discretion)
+    (b) Top up treasury explicitly (logged to governance_subsidy ledger)
+    (c) Take no action → class retired at T_delist_window expiry
+  During DELIST_PENDING: class operates normally (no disruption to knowers/unknowers)
+```
+
+**Zombie class targeting:** A class with zero queries contributes zero MVF drain (no fee_effective computations → no MVF activation). The cap correctly targets demand-but-thin-clearing zombie classes, not fully dormant ones.
+
+**Design law (#r201):** Cumulative MVF subsidy capped at WED_clearing_ref × 0.05 × N_subsidy_window per rolling window. Cap exhaustion triggers DELIST_PENDING; governance must re-affirm within N_calibration epochs or class is retired. Fully dormant classes accrue no drain. (#r201)
+
+---
+
+### Q3 (Bounded P5 for Demo Day — acceptable or must full proof be in scope?) → Bounded P5 acceptable when paired with ZA-5 traditional audit; full cross-contract P5 is named v2.1.1 deliverable (#r201)
+
+**What bounded P5 proves:** Under the assumption that EATManager correctly calls `commitBatch(epoch, S_cred_snapshot)` with the snapshot produced by `CredibilityAggregator_v1.commitEpochBuffer(epoch)`, P5 proves the Merkle root committed on-chain is the same value used by SettlementEngine. The assumption is verified behaviourally (EATManager call stack trace) rather than formally.
+
+**What full P5 proves:** Cross-contract: EATManager's `commitBatch` parameters provably equal CredibilityAggregator output at every epoch boundary, regardless of EATManager internal logic. No behavioural assumptions required.
+
+**Audit disclosure framing for Demo Day (#r201):**
+
+> "Formal verification of credibility aggregation arithmetic (P1–P4: log-score sign, W_MAX cap, epoch-buffer delay, weight non-negativity) complete via symbolic execution. EAT commit atomicity (P5) verified under EATManager behavioural assumptions — full cross-contract P5 is post-launch scope, expected [date]. Traditional audit by [Zellic/Trail of Bits] complete [or in progress, report expected date]."
+
+**Why this is not a material gap:** Traditional audit ZA-5 (#r195/Q4) also covers EAT commit integrity via manual call-stack review. Bounded P5 + ZA-5 = defence-in-depth adequate for Demo Day.
+
+**Design law (#r201):** Bounded P5 is acceptable for Demo Day when paired with traditional audit coverage of the same invariant (ZA-5). Full cross-contract P5 is a named v2.1.1 deliverable with committed post-launch timeline. FV completeness is a spectrum; partial FV with explicit open items is rigorous when gaps are named. (#r201)
+
+---
+
+### Q4 (Thread termination criterion) → Thread becomes READ-ONLY at CredibilityAggregator_v1 P1–P4 FV completion; final closing entry #r-CLOSE written at that event (#r201)
+
+**Natural termination:** The thread's purpose is to produce a complete, sound v2.1 spec that can be implemented, audited, and formally verified. When the FV of the core epistemic contract (P1–P4) is complete, the spec is confirmed correct at the arithmetic level. That is the terminal event.
+
+**Thread lifecycle post-#r201:**
+
+| Event | Document action |
+|---|---|
+| Code freeze (2026-04-21) | Implementation freeze notice added to run log |
+| P1–P4 FV complete (~2026-05-12) | Final closing entry #r-CLOSE; thread transitions to READ-ONLY |
+| Audit findings (2026-06-02) | `[AUDIT]` tags in run log; invariant text updated if finding overturns a design claim |
+| v2.2 design | Continues in knowledge-marketplace-v22.md; cross-references this doc by invariant number |
+
+**Final entry format:**
+```
+## #r-CLOSE — Mechanism Design Thread Closure
+Date: [FV completion date]
+Status: READ-ONLY
+Invariant count at close: [N]
+Active design scope closed: v2.1 GestAlt
+Forward design: knowledge-marketplace-v22.md
+Post-close updates: [AUDIT] tags only
+```
+
+**Design law (#r201):** A mechanism design thread terminates when the core epistemic contract is formally verified. Termination is a specific event (FV completion), not a line count. Post-close: audit corrections only, tagged `[POST-CLOSE]`. (#r201)
+
+---
+
+### Net-New First-Principles Pass: The Mechanism Has Exactly Three Quantities; Only One Is Conserved (#r201)
+
+Prior runs have tracked three quantities without explicitly naming the taxonomy:
+
+1. **WED** — total outstanding warranty liability
+2. **epistemic capital (Σ credibility_ratio)** — aggregate track record weight
+3. **S_cred** — current best estimate of coordinate value
+
+**Formal classification:**
+
+| Quantity | Type | Update trigger | Conserved? |
+|---|---|---|---|
+| WED | Conserved between oracle resolutions | Claim submission / oracle resolution | **YES** |
+| Σ credibility_ratio | Monotone-trending under honest play | Oracle resolution only | NO |
+| S_cred | Derived | Epoch boundary (commitEpochBuffer) | NO — derived from {claims, credibility_ratios} |
+
+**Why exactly three:** The mechanism needs a quantity to bound liability (WED), a quantity to route epistemic weight (Σ credibility_ratio), and a quantity to output as clearing price (S_cred). Each serves a distinct function; none is redundant. A fourth would require a genuinely new mechanism function to be non-redundant.
+
+**Comparison with LMSR:** LMSR has exactly one conserved quantity: the cost function C(q). LMSR's position size is the analog of credibility_ratio — but it is freely adjustable at any time at cost, not earned through resolution history. LMSR has no S_cred analog; price is position-only, track-record-free. The knowledge marketplace has three quantities to LMSR's one. This additional state-space richness is where the epistemic superiority originates — and also where the additional attack surfaces arise.
+
+**Three failure modes, one per quantity (#r201):**
+
+| Quantity | Failure mode | Primary defense |
+|---|---|---|
+| WED breaks (exceeds solvency bound) | Solvency failure | TOWL zone architecture; GestAltVault silo obligations |
+| Σ credibility_ratio breaks (manipulated/inflated) | Epistemic quality failure | CredibilityAggregator FV; epistemically_live gate; W_MAX |
+| S_cred breaks (price manipulation) | Settlement manipulation | Settlement Freeze Protocol; challenger pool; Zone C deferral |
+
+**Three failure modes are orthogonal.** A WED solvency failure does not necessarily produce S_cred manipulation (solvency can break through honest wrong-claim concentration). S_cred manipulation does not necessarily break WED (manipulator with correct eventual outcome may not be slashed). This orthogonality means defense layers are non-redundant — each defends a distinct failure mode.
+
+**Corollary: LMSR's single conserved quantity means all failure modes collapse together.** Manipulation of the LMSR cost function simultaneously compromises price output, financial solvency, and the calibration signal (LMSR has no independent credibility tracking). The knowledge marketplace's three-quantity structure is therefore not just epistemic superiority — it is structural defense superiority.
+
+**WED as the sole solvency primitive (#r201):** Since WED is the only conserved quantity, all solvency reasoning derives from WED alone. Position counts and escrow balances are WED derivatives, not independent solvency objects. The TOWL architecture is correct in making WED the central solvency primitive.
+
+**New naming convention:** For audit documents and external materials:
+- **WED** — the conserved solvency quantity (retain existing name)
+- **epistemic capital** — Σ credibility_ratio (replaces "aggregate credibility weight"; emphasises it is a resource earned, not just a score)
+- **S_cred** — the derived clearing price estimate (retain; now formally defined as derived, not primitive)
+
+---
+
+## Structural Synthesis: Thread Maturity (#r201)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| W_MAX v2.1 advisory | Two static phases: genesis=0.05, steady=0.15; governance-gated transition at 0.20 × WED_clearing_ref AND N_calibration epochs | W_MAX advisory boundary aligns with MVF threshold |
+| MVF subsidy cap | WED_clearing_ref × 0.05 × N_subsidy_window; DELIST_PENDING on exhaustion; governance re-affirmation gate | Cap targets demand-but-thin zombie classes; dormant classes accrue no drain |
+| Bounded P5 for Demo Day | Acceptable with ZA-5 pairing; full P5 named v2.1.1 deliverable | Bounded FV + manual audit = defence-in-depth for Demo Day |
+| Thread termination | READ-ONLY at P1–P4 FV completion; #r-CLOSE format defined; [AUDIT] tags only post-close | Termination = FV completion event, not line count |
+| Three-quantity taxonomy | WED (conserved), epistemic capital (monotone), S_cred (derived); three orthogonal failure modes; structural defense superiority over LMSR | Single conserved quantity governs all solvency reasoning |
+
+---
+
+## Cumulative Invariants (additions through #r201)
+
+**Invariant #194 (#r201):** v2.1 W_MAX policy: W_MAX_genesis = 0.05; W_MAX_steady = 0.15. Transition is governance-triggered, conditioned on WED_clearing_smooth ≥ 0.20 × WED_clearing_ref AND N_calibration resolved epochs. CoordinateRegistry verifies transition_condition on-chain at governance call time. Dynamic coupling deferred to v2.2.
+
+**Invariant #195 (#r201):** MVF cumulative subsidy cap = WED_clearing_ref × 0.05 × N_subsidy_window per rolling window. Cap exhaustion triggers DELIST_PENDING; governance re-affirms within N_calibration epochs or class is retired. Fully dormant classes (zero queries) accrue no drain.
+
+**Invariant #196 (#r201):** Bounded P5 (EAT commit atomicity under EATManager behavioural assumptions) is acceptable for Demo Day when paired with traditional audit coverage (ZA-5). Full cross-contract P5 via Certora is a named v2.1.1 deliverable with committed post-launch timeline.
+
+**Invariant #197 (#r201):** The mechanism has exactly three state quantities: WED (conserved, solvency), epistemic capital / Σ credibility_ratio (monotone-trending, track record), and S_cred (derived, clearing price). Three failure modes are orthogonal: solvency (WED), epistemic quality (epistemic capital), and settlement manipulation (S_cred). Each failure mode has a distinct defense layer; no layer is redundant.
+
+**Invariant #198 (#r201):** All solvency reasoning derives from WED alone. WED is the sole conserved quantity; position counts and escrow balances are WED derivatives. The TOWL architecture correctly makes WED the central solvency primitive.
+
+---
+
+## Run Log Update
+
+- **#r201** — 2026-04-04T07:12Z — Q1: W_MAX two-phase static advisory (genesis=0.05, steady=0.15); governance-gated transition at WED_clearing_smooth ≥ 0.20 × ref AND N_calibration epochs; phase-separation enforced by disjoint GovernanceParams bounds. Q2: MVF cumulative subsidy cap (WED_clearing_ref × 0.05 × N_subsidy_window); DELIST_PENDING on exhaustion; governance re-affirmation gate; dormant classes immune. Q3: bounded P5 acceptable for Demo Day with ZA-5 pairing; full P5 named v2.1.1 deliverable. Q4: thread termination at P1–P4 FV completion; #r-CLOSE format defined; READ-ONLY post-close with [AUDIT] tags. Net-new: three-quantity taxonomy (WED conserved, epistemic capital monotone, S_cred derived); three orthogonal failure modes; structural defense superiority over LMSR formalised. Invariants #194–#198.
+
+---
+
+## Open Questions for #r202+
+
+1. **[THREAD MILESTONE]** Engineering handoff readiness check: which invariants are not yet reflected in the contract scaffold? FV toolchain confirmation (Halmos vs Foundry symbolic; Certora scope). Zellic engagement status — confirmed or Tier 2/3 contingency triggered?
+
+2. **W_MAX_genesis as governance default vs required input:** 0.05 is derived from the thin-market DSIC boundary. Should it be a hard default with governance override, or a required input at class registration (forcing deliberation)?
+
+3. **DELIST_PENDING interaction with Settlement Freeze Protocol:** If a class enters DELIST_PENDING during an active SFP window, settlement must complete before delist takes effect. Define the precedence rule explicitly.
+
+4. **Invariant completeness audit (pre-#r-CLOSE):** Before closing, run one pass checking that all 198 invariants have a corresponding contract enforcement mechanism or are explicitly tagged governance-convention. Any invariant without enforcement is a spec gap.
+
+*Last updated: #r201 — 2026-04-04T07:12Z*
