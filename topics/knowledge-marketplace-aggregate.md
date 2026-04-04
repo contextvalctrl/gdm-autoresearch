@@ -14688,3 +14688,193 @@ Both Q1 (DAG governance) and Q4 (reference chain depth) converge on the same str
 4. **Governance veto window T_veto_window interaction with degraded mode:** If a Tier 2 DAG edge enters PENDING during a DA outage, T_veto_window epoch count pauses (epoch-indexed, implicit freeze per Invariant #137). Should the PENDING period during degraded mode be bounded analogously to T_wind_down_max?
 
 *Last updated: #r205 — 2026-04-04T07:52Z*
+
+---
+
+## #r206 Contributions — 2026-04-04T08:07Z
+
+Addresses all four open questions from #r205. Net-new first-principles angle: information leakage through DAG structure (when does a declared relation reveal private information?).
+
+---
+
+**Q1 (Tier 2 validity_stake sizing — static commitment vs. auto-ratchet) → Static declaration-time commitment; separately, a floor on minimum total-child-stake for DAG edge activation (#r206):**
+
+Auto-ratcheting validity_stake creates a continuous open-ended obligation for declarants — a knower who correctly identifies a structural relation is penalised as the market grows. That deters beneficial Tier 2 declarations.
+
+**Resolution — two-part static model:**
+
+```
+Part A: Declaration stake (static):
+  validity_stake at declaration time = max(k_min_parent, ε_independence × Σ child_stakes_at_declaration)
+  Fixed at declaration; does not ratchet. Declarant assumes child-stake state as-of submission.
+
+Part B: Activation floor (enforced at edge activation, T_veto_window expiry):
+  edge activates iff Σ child_stakes_current ≥ activation_floor
+  activation_floor = child_stakes_at_declaration × 0.50  (governance-settable [0.25, 1.0])
+
+  If child stakes have dropped >50% since declaration:
+    edge deferred into PENDING_ACTIVATION until floor re-met
+    validity_stake held; not slashed
+```
+
+Part B catches the case where children dissipate before the edge activates. The edge does not activate against a nearly-dead child pool. Once active, no further condition: the declarant committed the static stake and the edge has earned its ontological credibility.
+
+**Design law (#r206):** DAG edge validity_stake is static at declaration. A separate activation floor ensures the edge does not inherit stale child-pool credibility at activation time. Two-stage commitment matches the two-stage risk: declaration risk (identity_fn is wrong) vs. activation risk (child pool is dormant). (#r206)
+
+---
+
+**Q2 (σ_oracle ratchet → T_longtail link — programmatic or manual) → Programmatic with governance override cap; T_longtail_effective = T_longtail_base × (1 + σ_oracle_scalar × σ_oracle) (#r206):**
+
+Manual T_longtail updates under growing σ_oracle create governance lag precisely when the mechanism most needs the buffer. The failure mode: oracle delay → σ_oracle ratchets up → knowers exit at T_longtail_base → echo resolution happens on thin stale pool (#r204/Case D4). Programmatic linkage prevents the window from closing when oracle uncertainty rises.
+
+**Resolution — programmatic T_longtail_effective:**
+
+```
+T_longtail_effective(class_i, t) =
+    T_longtail_base(class_i) × (1 + σ_oracle_scalar × σ_oracle(class_i, t))
+
+σ_oracle_scalar = 1.5  (governance-settable, bounded [0.5, 3.0])
+
+At σ_oracle = 0:     T_longtail_effective = T_longtail_base       (no delay)
+At σ_oracle = 0.5:   T_longtail_effective = 1.75 × T_longtail_base
+At σ_oracle = 1.0:   T_longtail_effective = 2.5 × T_longtail_base
+
+Hard ceiling: T_longtail_effective ≤ T_longtail_max_abs
+  T_longtail_max_abs: governance-set at class registration; immutable (same rationale as k_a_max_single_stake)
+```
+
+**Governance override:** governance may call `override_T_longtail(class_i, value)` but only upward (value ≥ T_longtail_effective_current). Downward overrides would expose knowers who budgeted escrow lockup against T_longtail_effective — downward changes are a retroactive liquidity attack.
+
+**Re-evaluation period:** T_longtail_effective is computed at every epoch boundary using current σ_oracle. Knowers see the current value in EAT before each claim submission; they can choose not to submit at unacceptably long lockup. This is voluntary opt-in to updated lockup terms, not retroactive.
+
+**Design law (#r206):** T_longtail_effective is programmatically linked to σ_oracle via a linear scale factor. Governance may extend but not shorten relative to the formula output. Knowers opt in per-claim; no retroactive lockup extension on already-staked escrow. (#r206)
+
+---
+
+**Q3 (Propagated-only S_epistemic and epistemically_live threshold) → Propagated-only S_epistemic is INFORMATIONAL; ineligible for settlement without ≥1 direct knower and ≥1 direct challenger in same epoch (#r206):**
+
+S_epistemic derived purely from DAG propagation has no direct credibility_ratio backing for the parent coordinate. No knower staked capital specifically on the parent's value; no challenger is positioned to challenge the parent claim. The settlement guarantees collapse: if the identity_fn was incorrectly declared (validator_stake at risk), but there is no direct parent knower whose escrow would be slashed if wrong.
+
+**Resolution — propagated-only exclusion from settlement:**
+
+```
+S_epistemic(coord, epoch).settlement_eligible = false  iff:
+  N_direct_knowers(coord, epoch) == 0
+    ("direct": stake posted specifically on this coord_id, not inferred from children)
+
+epistemically_live(coord) gate (existing, #r160/Q4) already requires ≥2 resolved epochs.
+New extension: live_with_direct_stake(coord) = epistemically_live(coord)
+                                               AND N_direct_knowers_current_epoch ≥ 1
+                                               AND N_direct_challengers_current_epoch ≥ 1
+
+SettlementEngine.freezeForSettlement(coord, epoch):
+  require(CoordinateRegistry.live_with_direct_stake(coord), "propagated-only ineligible for settlement")
+```
+
+**Information value preserved:** Propagated S_epistemic is still valuable as an informational signal. Type A unknowers may read it for free. Type B EQ queries may trigger it. The exclusion is settlement-eligibility only; the DAG propagation continues to serve its informational function.
+
+**Governance exception path:** For specific known structural identities (e.g., GDP_annual = Σ GDP_Qx where all four quarters are direct-claim settlement-eligible), governance may explicitly declare `parent_propagation_settlement_eligible = true` with governance attestation. This is a Tier 1 governance-declared exception — not an automatic path.
+
+**Design law (#r206):** Settlement eligibility requires direct capital commitment on the coordinate being settled. Epistemic propagation is an informational service; it does not substitute for direct warranty exposure. Governance may declare specific propagation paths settlement-eligible with explicit attestation. (#r206)
+
+---
+
+**Q4 (T_veto_window during degraded mode — interaction with DA outage) → T_veto_window is epoch-indexed; pauses on degraded mode; bounded at T_veto_max_abs = 3 × N_calibration epochs to prevent indefinite PENDING (#r206):**
+
+**Resolution — bounded epoch-indexed pause:**
+
+```
+T_veto_window_remaining(edge_j, t):
+  if DA_degraded_mode(t): no decrement (epoch not counted)
+  else:                   T_veto_window_remaining -= 1
+
+  if T_veto_window_remaining == 0 AND NOT vetoed: edge activates
+  if epoch_age(edge_j) ≥ T_veto_max_abs: governance must explicitly extend or edge is auto-rejected
+    — auto-rejection is NOT a veto; validity_stake returned minus governance_review_fee
+
+T_veto_max_abs = 3 × N_calibration  (hard bound; prevents indefinite PENDING under chronic degradation)
+```
+
+**Why auto-reject rather than auto-activate at T_veto_max_abs:** An unreviewed edge should not activate by default — silence is not endorsement. Auto-rejection preserves governance quality standard; declarant may re-submit with a fresh validity_stake once DA is healthy.
+
+**Design law (#r206):** Time-sensitive governance windows are epoch-indexed and pause during degraded mode. Total age bounds (T_veto_max_abs) prevent chronic-degradation PENDING accumulation. Silence is auto-rejection at T_veto_max_abs, not auto-activation. (#r206)
+
+---
+
+### Net-New First-Principles Insight: Information Leakage Through DAG Structure (#r206)
+
+**The unconsidered problem:** When a knower declares a DAG relation (T1a DECLARE_RELATION), they reveal structural information before staking on it. An adversary watching the mempool can:
+
+1. Observe a Tier 2 DAG declaration for parent_coord with child_coords
+2. Infer the declarant believes a structural relation exists (probably with informational basis)
+3. Front-run: stake heavily on the child coordinates before the edge activates
+
+**Why this matters for credibility_ratio, not just price:** In LMSR/orderbook front-running, profit is financial. Here the adversary extracts track-record weight — the declarant's structural insight earns the front-runner credibility_ratio on child coordinates.
+
+**Formal attack flow:**
+```
+t=0: Knower K declares edge(parent, [child1, child2, child3], identity_fn)
+     validity_stake posted; edge enters PENDING
+t=1: Adversary A sees the declaration in EAT
+     A stakes on child1, child2, child3 with large stake
+t=2..4: T_veto_window elapses; edge activates
+t=5: Oracle resolves; children correct
+     K earns credibility_ratio on parent (derived, γ_implied discount)
+     A earns credibility_ratio on children (direct, large stake)
+     A's credibility_ratio gain > K's; structural insight was worth more to A
+```
+
+**Defence options:**
+- **Option A — Commit-reveal:** H(edge_data, nonce) posted first; reveal at activation. Front-runner cannot act before reveal.
+- **Option B — Front-run discount:** Stakes on child_coords within T_front_run_window of a PENDING parent declaration earn 50% credibility_ratio discount.
+- **Option C — Accept:** Declarant retains parent credit; adversary earns only through correct child claims. Track-record competition, not value extraction.
+
+**Resolution (#r206):** Option C for v2.1 (DAG is v2.2; competition is acceptable). Option A recommended for v2.2 high-value parent declarations where structural insight is proprietary.
+
+**Design law (#r206):** DAG declaration front-running is a track-record competition. Declarant retains the parent propagation credit. v2.1: no additional defence needed. v2.2 recommendation: commit-reveal for high-value parent declarations to protect structural insights as a knowledge asset. (#r206)
+
+---
+
+## Structural Synthesis: #r206
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| Validity_stake two-part model | Static declaration stake + activation floor (50% of declaration-time child stakes) | Deters over-stale activation; does not penalise growing markets |
+| σ_oracle → T_longtail programmatic link | T_longtail_effective = base × (1 + 1.5 × σ_oracle); governance extend-only | Prevents echo resolution on thin pool during oracle delay |
+| Propagated-only settlement exclusion | live_with_direct_stake gate for settlement eligibility | Settlement guarantee requires direct warranty exposure |
+| T_veto_window DA pause + T_veto_max_abs | Epoch-indexed pause; auto-reject at T_veto_max_abs = 3×N_calibration | Silence is rejection; chronic degradation cannot accumulate unbounded PENDING |
+| DAG declaration front-running | Track-record competition, not value extraction; commit-reveal for v2.2 | Declarant's parent credit intact; v2.1 no defence needed |
+
+---
+
+## Cumulative Invariants (#r206)
+
+**Invariant #215 (#r206):** Tier 2 DAG edge validity_stake is static at declaration time. A separate activation floor (50% of declaration-time child stakes, governance-adjustable [0.25×, 1.0×]) must be met at T_veto_window expiry. If floor not met, edge enters PENDING_ACTIVATION; validity_stake held, not slashed.
+
+**Invariant #216 (#r206):** T_longtail_effective = T_longtail_base × (1 + σ_oracle_scalar × σ_oracle), σ_oracle_scalar = 1.5, bounded [0.5, 3.0]. Governance may extend but not shorten T_longtail_effective. Hard ceiling T_longtail_max_abs set immutably at class registration. No retroactive escrow lockup extension on already-staked claims.
+
+**Invariant #217 (#r206):** Settlement eligibility requires live_with_direct_stake: epistemically_live AND ≥1 direct knower AND ≥1 direct challenger in current epoch. Propagated-only S_epistemic is informational; not settlement-eligible without explicit governance Tier 1 exception.
+
+**Invariant #218 (#r206):** T_veto_window is epoch-indexed; pauses during DA degraded mode. T_veto_max_abs = 3 × N_calibration epochs; at expiry without veto, edge is auto-rejected (not auto-activated). validity_stake returned minus governance_review_fee. Declarant may re-submit post-degradation.
+
+**Invariant #219 (#r206):** DAG declaration front-running is a track-record competition. Declarant retains parent propagation credit. v2.1: no additional defence. v2.2 recommendation: commit-reveal for high-value parent declarations to protect structural insight as a knowledge asset.
+
+---
+
+## Run Log Update
+
+- **#r206** — 2026-04-04T08:07Z — Q1: validity_stake two-part (static declaration + activation floor). Q2: T_longtail_effective programmatically linked to σ_oracle (1.5× scalar); governance extend-only; T_longtail_max_abs immutable at registration. Q3: propagated-only S_epistemic excluded from settlement; live_with_direct_stake gate. Q4: T_veto_window epoch-indexed pause; T_veto_max_abs = 3×N_calibration; silence = auto-rejection. Net-new: DAG declaration front-running analysis — track-record competition; commit-reveal Option A for v2.2. Invariants #215–#219.
+
+---
+
+## Open Questions for #r207+
+
+1. **PENDING_ACTIVATION state machine interaction with DELIST_PENDING:** If a class has edges in PENDING_ACTIVATION while simultaneously entering DELIST_PENDING, the activation floor may never be met. Should edges in PENDING_ACTIVATION auto-reject when their parent class enters DELIST_PENDING, or should they inherit the governance window?
+
+2. **σ_oracle_scalar upper bound [0.5, 3.0] — knower liquidity-preference derivation:** At σ_oracle_scalar = 3.0 and σ_oracle = 0.9, T_longtail_effective = 3.7 × T_longtail_base. Derive the upper bound from knower liquidity-preference constraints rather than engineering intuition.
+
+3. **Commit-reveal gas economics for DAG declarations:** Two transactions per edge. For high-volume DISCOVERY_MODE with many child coordinates, this doubles declaration costs. Batch commit-reveal pattern?
+
+4. **live_with_direct_stake and echo resolution interaction:** Case D4 echo resolution uses last-pre-LTRP epoch. If that epoch had direct knowers but current epoch does not (LTRP expiry cleared the pool), live_with_direct_stake fails on current epoch check. Explicit precedence rule: echo resolution uses epoch-at-time check, not current-epoch check.
+
+*Last updated: #r206 — 2026-04-04T08:07Z*
