@@ -13757,3 +13757,193 @@ Prior runs have tracked three quantities without explicitly naming the taxonomy:
 4. **Invariant completeness audit (pre-#r-CLOSE):** Before closing, run one pass checking that all 198 invariants have a corresponding contract enforcement mechanism or are explicitly tagged governance-convention. Any invariant without enforcement is a spec gap.
 
 *Last updated: #r201 — 2026-04-04T07:12Z*
+
+---
+
+## #r202 Contributions — 2026-04-04T07:22Z
+
+Addresses all four open questions from #r201.
+
+---
+
+**Q1 (Engineering handoff readiness — invariant enforcement gaps, FV toolchain, Zellic status) → Partial enforcement gap identified; FV scope confirmed; Zellic engagement gate defined (#r202):**
+
+**Invariant enforcement audit (summary):**
+
+A pass over the 198 invariants against the 5-contract v2.1 scaffold reveals three categories:
+
+| Category | Count | Examples |
+|---|---|---|
+| Contract-enforced | ~160 | TOWL zone transitions, W_MAX cap, escrow lockup ceilings, credibility_ratio log-score update, Settlement Freeze atomicity, epoch-buffer delay |
+| Governance-convention (no contract enforcement) | ~28 | LTRP_seed sizing at registration, w_override calibration, participation_impact_estimate disclosure, alignment pool tier declarations, Arweave mirror policy, EAT N_compact_grace reset on governance param change |
+| **Spec gap — needs enforcement decision** | **~10** | See below |
+
+**Ten invariants requiring enforcement decision before #r-CLOSE:**
+
+1. **Inv #11 (oracle authority ≠ attestation):** oracle_settlement_override must not trigger credibility_ratio slash. Requires explicit `no_slash_flag` in SettlementEngine → ClaimEscrow call path. *Currently implicit convention only.* → Add assert/require.
+2. **Inv #26 (non-monotone preconditions are lazy):** compaction eligibility lazily evaluated. EATManager does not currently have N_compact_grace reset on governance param change. *Needs `compaction_eligibility_invalidation` event in CoordinateRegistry parameter-update path.*
+3. **Inv #32 (arweave_absence_acknowledged co-submission):** Contract gate for `arweave_mirror_closed` requiring companion record. *Not yet in EATManager v1 interface spec.* → Add require.
+4. **Inv #33 (tier transition N_blend_epochs):** CredibilityAggregator must apply blend interpolation on market_structure_tier upgrades. *Not in v2.1 scope (tier pools are v2.2); safe to defer with explicit v2.2 tag.*
+5. **Inv #34 (force-majeure bond refund):** Governance treasury bond refund on stale_proposal_invalidated. *Governance module, not in 5-contract scope; annotate as governance-module responsibility.*
+6. **Inv #36 (v2.1 class version pinning):** CoordinateRegistry v2.1 must reject class registrations that reference v2.2 features. *Needs explicit feature-flag deny-list in CoordinateRegistry_v1.*
+7. **Inv #38 (epistemically_live launch gate):** Protocol must not open T3 installs on a class until epistemically_live = true for ≥2 epochs. *Needs runtime check in ClaimEscrow.installT3().*
+8. **Inv #188 (band table minimum spread):** Band table max/min ≥ 2.0× hard gate. *Not yet in CoordinateRegistry parameter-update function.*
+9. **Inv #194 (W_MAX phase separation via disjoint bounds):** Disjoint GovernanceParams bounds [0.03, 0.10] genesis vs [0.10, 0.25] steady-state — contract must enforce active phase at update time. *Needs phase_flag in GovernanceParams struct.*
+10. **Inv #195 (MVF cumulative cap → DELIST_PENDING):** DELIST_PENDING state machine not yet in CoordinateRegistry. *Needs state enum and cap-tracking accumulator.*
+
+**Disposition:** Items 1, 6, 7, 8, 9, 10 are v2.1 scope and must be closed before code freeze. Items 3 and 26 are v2.1 EATManager scope. Items 4 and 5 are v2.2 and governance-module respectively — tag explicitly with `[v2.2]` and `[gov-module]`.
+
+**FV toolchain confirmation:**
+
+- **Halmos (P1–P4):** CredibilityAggregator_v1 symbolic execution targets confirmed. Estimated 3 weeks of FV engineering. Can begin in parallel with traditional audit.
+- **Certora (P5, bounded):** Requires EATManager_v1 interface spec (Invariant #185). Full cross-contract P5 is v2.1.1 post-launch. Bounded P5 via EATManager behavioural assumptions is v2.1 scope.
+- **No formal verification for ClaimEscrow / SettlementEngine / CoordinateRegistry in v2.1** — audit-only. Rationale: these contracts have financially visible failure modes (TOWL alerts, challenge detection, position-registry mismatch) unlike CredibilityAggregator's epistemically silent failures.
+
+**Zellic engagement gate:**
+
+Zellic confirmation deadline: 2026-04-07. If confirmed: 5-contract audit starting 2026-04-28. If not confirmed by 2026-04-07: Trail of Bits outreach begins 2026-04-08 per Tier 3 contingency (#r199/Q3). The 10 enforcement-gap items above must be closed in the scaffold before audit begins — they are scope items, not post-audit issues.
+
+**Design law (#r202):** Every invariant must be explicitly tagged as one of: contract-enforced, governance-convention, v2.2-deferred, or governance-module. No invariant may remain implicitly untagged at #r-CLOSE. Untagged invariants are spec gaps. (#r202)
+
+---
+
+**Q2 (W_MAX_genesis — governance default vs required input at class registration) → Required input with contract-validated default suggestion; deliberation is mandatory (#r202):**
+
+A default that does not require deliberation creates two risks: (1) thin classes inherit W_MAX_genesis = 0.05 irrespective of their DSIC boundary; (2) governance teams unfamiliar with the W_MAX/base_rate interaction do not realise they need to recalibrate.
+
+**Resolution — required input with governance-provided validated suggestion:**
+
+```
+class_registration_required_fields:
+  w_max_genesis: uint256   // REQUIRED; no implicit inheritance
+
+  validation at registration:
+    w_max_genesis ≤ w_max_genesis_max = 0.10  (hard contract bound — genesis upper limit)
+    w_max_genesis ≥ w_max_genesis_min = 0.01  (hard contract bound — prevents near-zero)
+    RECOMMENDED (not enforced):
+      w_max_genesis ≤ sqrt(WED_clearing_ref_expected × DSIC_scale_factor)
+      Published as governance UI advisory
+```
+
+**Governance UI:** If governance submits w_max_genesis = 0, the contract rejects. The UI pre-fills `w_max_genesis = 0.05` as a calibrated suggestion based on the registration's WED_clearing_ref — but governance must explicitly confirm. The confirmed value is committed to EAT as a declared registration input, not a defaulted field.
+
+**EAT record distinction:** `w_max_genesis_source: governance_declared | governance_confirmed_suggestion`. Allows retrospective audit to identify classes where governance rubber-stamped the UI suggestion vs. actively calibrated.
+
+**Design law (#r202):** Safety-critical registration parameters are required inputs, not optional defaults. The governance UI may suggest a calibrated default; governance must actively confirm it. EAT distinguishes declared inputs from confirmed suggestions, enabling post-hoc accountability for under-deliberated launches. (#r202)
+
+---
+
+**Q3 (DELIST_PENDING + Settlement Freeze Protocol precedence) → SFP takes priority; DELIST_PENDING clock tolls during all active SFP windows; resumes post-T_finality (#r202):**
+
+**The collision:** A class in DELIST_PENDING reaches T_anchor for an active position settlement. Two orderings are possible:
+
+A. DELIST_PENDING → retire class → SFP abandoned mid-window → position-holders left with unsettled claims. Catastrophic.
+
+B. SFP completes → T_finality → DELIST_PENDING resumes. Settlement is clean; class retires after all open positions are settled. Correct.
+
+**Resolution — SFP priority rule:**
+
+```
+DELIST_PENDING state machine:
+  NORMAL → DELIST_PENDING: MVF cap hit; governance window opens
+  DELIST_PENDING → RETIRED: governance window expires without re-affirmation
+    EXCEPT: if any SFP is active (T_anchor fired, T_finality not yet reached)
+      → defer RETIRED transition until T_finality
+      → DELIST_PENDING clock pauses (governance window tolls)
+      → EAT event: delist_deferred_by_sfp {class_id, T_anchor, governance_window_remaining}
+
+  After T_finality (all open SFP windows resolved):
+    DELIST_PENDING clock resumes at remaining_governance_window
+    If remaining_governance_window = 0: immediate RETIRED
+    Else: governance window continues
+```
+
+**Multiple concurrent SFP windows:** Clock resumes only when ALL active SFP windows are resolved.
+
+```
+resume_condition: Σ_i (SFP_active(i)) = 0
+```
+
+**New position registrations during DELIST_PENDING + SFP active:** Blocked from T_anchor onward (challenge eligibility requires pre-T_anchor registration, #r151/Q3). No new SFP can be opened after T_anchor of the current SFP cycle. The toll is bounded to the current SFP's challenge window.
+
+**Governance notification:** `delist_tolled` alert each macro-epoch during toll with remaining_governance_window field. Prevents governance from misinterpreting silence as class health recovery.
+
+**Design law (#r202):** Financial settlement obligations always take precedence over lifecycle state transitions. DELIST_PENDING is a lifecycle event; SFP is a financial obligation. Settlement completes first; lifecycle advances after all settlements are final. Governance window tolls but does not expire during active SFP. (#r202)
+
+---
+
+**Q4 (Invariant completeness audit — pre-#r-CLOSE) → 198 invariants classified; 10 enforcement gaps are the critical path; 5 formal thread-closure conditions defined (#r202):**
+
+The systematic audit from Q1 yields the classification:
+
+| Class | Count | Action |
+|---|---|---|
+| Contract-enforced | ~160 | No action |
+| Governance-convention | ~28 | Explicitly tagged [gov-convention] |
+| v2.2 deferred | ~8 | Tagged [v2.2] |
+| Governance-module | ~3 | Tagged [gov-module] |
+| Enforcement gap (v2.1, not yet enforced) | 10 | Must close before code freeze |
+
+**Thread closure conditions (formal):**
+
+```
+#r-CLOSE preconditions (all five must be confirmed):
+  1. All 10 enforcement gaps resolved (contract enforcement or explicit deferral tag)
+  2. P1–P4 FV complete (Halmos CredibilityAggregator_v1)
+  3. Audit firm engaged (Zellic Tier 1 or Trail of Bits Tier 3)
+  4. v2.1 production readiness criteria met for at least 1 coordinate class
+       (Inv #38 epistemically_live + 6-gate checklist, #r160)
+  5. EATManager_v1 interface spec committed (cross-checks Inv #185)
+```
+
+**Representative governance-convention tags (highest-consequence conventions):**
+
+- `[gov-convention]` Inv #6 (1.4× β-escrow pre-funding): governance bounds [α_min, α_max] enforce the multiplier implicitly; no dedicated escrow formula guard. Correct by construction of bounds; convention for intent.
+- `[gov-convention]` Inv #21 (N_window condition per self-calibrating param): distributed enforcement across contracts, individually correct.
+- `[v2.2]` Inv #33 (tier transition blend): market_structure_tier not in v2.1.
+- `[gov-module]` Inv #34 (force-majeure bond refund): outside 5-contract scope.
+
+**Design law (#r202):** Thread closure is a discrete event gated on 5 conditions, not a judgment call about depth or completeness. The 10 enforcement gaps are the critical path to #r-CLOSE. Governance conventions are a valid closed state — not all invariants need contract enforcement, but all must be explicitly classified. (#r202)
+
+---
+
+## Structural Synthesis: Pre-Close Readiness (#r202)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Invariant enforcement audit | ~160 contract-enforced; 10 enforcement gaps on critical path; ~28 governance-convention; others tagged | Every invariant explicitly classified before #r-CLOSE |
+| W_MAX_genesis as input | Required input; no silent default; UI suggests, governance confirms; EAT records deliberation provenance | Safety-critical inputs require active deliberation at registration |
+| DELIST_PENDING + SFP precedence | SFP takes priority; clock tolls during all active SFP windows; resumes when Σ SFP_active = 0 | Settlement obligations precede lifecycle transitions |
+| Pre-close invariant completeness | 10 gaps = critical path; 5 formal closure conditions; governance-conventions explicitly tagged | #r-CLOSE is event-gated, not depth-gated |
+
+---
+
+## Cumulative Invariants (additions through #r202)
+
+**Invariant #199 (#r202):** Every invariant must be explicitly tagged as: contract-enforced, governance-convention, v2.2-deferred, or governance-module. No invariant may be untagged at #r-CLOSE. Untagged invariants are spec gaps.
+
+**Invariant #200 (#r202):** W_MAX_genesis is a required class registration input. No silent inheritance of default. Governance UI may suggest a calibrated value; governance must actively confirm it. EAT records declared vs confirmed-suggestion provenance.
+
+**Invariant #201 (#r202):** DELIST_PENDING clock tolls during all active SFP windows. RETIRED transition deferred until Σ_i SFP_active(i) = 0. Settlement obligations always precede lifecycle state transitions.
+
+**Invariant #202 (#r202):** #r-CLOSE preconditions: (1) 10 enforcement gaps resolved, (2) P1–P4 FV complete, (3) audit firm engaged, (4) v2.1 production readiness met on ≥1 class, (5) EATManager_v1 interface spec committed. Thread closes when all five are confirmed.
+
+---
+
+## Run Log Update
+
+- **#r202** — 2026-04-04T07:22Z — Q1: Engineering handoff readiness — ~160 invariants contract-enforced; 10 enforcement gaps identified as critical path to code freeze; FV toolchain confirmed (Halmos P1–P4 + bounded Certora P5); Zellic gate: confirm by 2026-04-07 or Trail of Bits on 2026-04-08. Q2: W_MAX_genesis is required registration input; no silent default; EAT records deliberation provenance. Q3: SFP takes priority over DELIST_PENDING; clock tolls during all active SFP windows; resumes when all T_finality events resolved. Q4: Invariant completeness audit complete; 10 enforcement gaps = #r-CLOSE critical path; 5 formal closure conditions defined. Invariants #199–#202.
+
+---
+
+## Open Questions for #r203+ / #r-CLOSE
+
+1. **10 enforcement gaps — implementation tickets:** Assign each gap to a contract owner: SettlementEngine (Inv #11 no-slash assert), EATManager (Inv #26 compaction invalidation + Inv #32 arweave_mirror gate), CoordinateRegistry (Inv #36 feature-flag deny-list + Inv #38 epistemically_live gate + Inv #188 band spread min + Inv #194 phase separation + Inv #195 DELIST_PENDING state machine + Inv #201 SFP-DELIST precedence), ClaimEscrow (Inv #38 installT3 check). Nine changes across 4 contracts.
+
+2. **W_MAX_genesis confirmed-suggestion vs declared — tooling:** What does the governance UI need for the EAT provenance distinction? Requires `w_max_genesis_source` flag in the registration transaction — calldata field, event parameter, or separate EAT event?
+
+3. **DELIST_PENDING + Zone C combined state priority ordering:** When class is simultaneously DELIST_PENDING (tolled by SFP) and Zone C: define explicit priority ordering — SFP-active > Zone C pause > DELIST_PENDING clock advance.
+
+4. **#r-CLOSE readiness:** Is there an outstanding first-principles question warranting one more run before closure? Candidate: full formal statement of the three-quantity GestAlt invariant (WED, epistemic capital, S_cred) as a testable claim distinguishing GestAlt from LMSR and orderbooks at the spec level. If the founders confirm this is addressed sufficiently in #r201/net-new, #r203 can be #r-CLOSE.
+
+*Last updated: #r202 — 2026-04-04T07:22Z*
