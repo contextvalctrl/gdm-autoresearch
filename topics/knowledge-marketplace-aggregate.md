@@ -7461,4 +7461,219 @@ Bootstrap substitutes are: (1) non-zero in cost; (2) achievable without class hi
 
 4. **DISCOVERY_MODE Module 1 completeness declaration:** With 86 invariants and two hardening passes through #r172, what remaining attack families and open questions constitute the minimum bar for declaring Module 1 specification-complete?
 
-*Last updated: #r172 — 2026-04-04T02:22Z*
+*Last updated: #r173 — 2026-04-04T02:32Z*
+
+---
+
+## #r173 Contributions — 2026-04-04T02:32Z
+
+**Phase: v2.2 Module 1 — DISCOVERY_MODE. Addresses all four open questions from #r172. Completeness declaration for Module 1.**
+
+---
+
+**Q1 (future_query_credit transferability to sister class — definition and election model) → Oracle-lineage declaration at registration; explicit unknower election required; credit non-expiring but non-fungible (#r173):**
+
+The safety valve fires and 50% of the streaming pool migrates to challenger_pool. Pre-paid unknowers receive future_query_credit usable on the same or a sister class (Invariant #84). Sister class must be defined to prevent governance manufacturing arbitrary credit sinks.
+
+**Sister-class declaration criteria (governance, at registration of either class):**
+
+```
+sister_class(A, B) = true iff ANY of:
+  (a) oracle_lineage: same oracle_address registered for both A and B (same underlying data source)
+  (b) same_event: governance declares both classes reference the same underlying real-world event
+      (requires EAT event: sister_declaration { class_A, class_B, basis: "oracle_lineage" | "same_event", rationale })
+  (c) clearing_shadow_pair: A and B are registered as shadow↔clearing pair (Invariant #76)
+
+NOT eligible:
+  - governance declares sister relationship without one of the above three bases
+  - same governance sector alone is insufficient (too broad; credit leakage risk)
+```
+
+**Unknower election (not automatic):**
+
+Credit is held in CoordinateRegistry against unknower_address. Transfer requires explicit call:
+
+```
+applyQueryCredit(from_class_id, to_class_id, credit_amount):
+  requires sister_class(from_class_id, to_class_id) = true
+  requires msg.sender = unknower with active credit on from_class_id
+  EAT event: query_credit_applied { from_class_id, to_class_id, amount, unknower_address }
+```
+
+Automatic credit routing without election risks undermining the unknower's decision to participate in a different class. Explicit election ensures the unknower has evaluated the sister class independently.
+
+**Credit properties:** Non-expiring (no staleness decay — credit is a refund liability, not an epistemic signal); non-fungible (cannot be transferred between arbitrary addresses; tied to the unknower_address that paid the original query fee); applicable only at query submission time (cannot be converted to escrow or TOWL credit).
+
+**Design law (#r173):** Credit portability requires declared kinship (oracle lineage, same event, or shadow-clearing pair). Portability is unknower-elected, not automatic. Credit is non-expiring and non-fungible. (#r173)
+
+---
+
+**Q2 (N_rollover_max and N_advisory_min_submissions interaction — governance interface) → Unified governance parameter table; both derived from N_calibration with override bounds; consistency check at registration (#r173):**
+
+Both N_rollover_max and N_advisory_min_submissions scale naturally from N_calibration. Setting them independently invites inconsistency — e.g., N_advisory_min_submissions = 10 with N_calibration = 2 (advisory window only 2 epochs; nearly impossible to collect 10 submissions in 2 epochs).
+
+**Resolution — unified governance parameter table with cross-validation:**
+
+```
+Derived defaults (no governance action required):
+  N_advisory_min_submissions_default = max(5, 2 × N_active_knowers_at_advisory_start)
+  N_rollover_max_default             = max(2, ceil(T_discovery / 8))
+
+Per-class overrides (governance may set at registration):
+  N_advisory_min_submissions_override ∈ [3, N_calibration × max_knower_count × 2]
+  N_rollover_max_override             ∈ [2, ceil(T_discovery / 8)]
+
+Consistency gate (CoordinateRegistry validation at registration):
+  N_advisory_min_submissions ≤ N_advisory_window_epochs × expected_submissions_per_epoch
+    where expected_submissions_per_epoch = N_active_knowers_at_advisory_start × advisory_submission_rate_estimate
+    advisory_submission_rate_estimate = 0.5  (governance-estimated; default conservative)
+  If gate fails: registration rejected with diagnostic error; governance must revise parameters
+```
+
+**Cross-parameter consistency check (two more):**
+
+```
+N_rollover_max ≤ T_discovery / 2        (safety valve cannot cycle more than twice per discovery phase)
+N_advisory_window_epochs ≥ N_calibration / 2  (advisory window cannot be shorter than half N_calibration)
+```
+
+Both are registration-time hard rejects, not advisory warnings. They prevent parameter configurations that are formally self-defeating.
+
+**Design law (#r173):** Governance parameter tables include cross-parameter consistency checks as hard registration gates. Derived-default formulas are always provided; overrides are bounded to the range within which the consistency property holds. (#r173)
+
+---
+
+**Q3 (Bootstrap-substitute stake lock duration for long T_discovery — is N_bootstrap_epochs bounded independently?) → N_bootstrap_epochs hard-bounded at 4 macro-epochs regardless of T_discovery; long-class bootstrap uses time-bounded stake lock, not T_discovery-scaled lock (#r173):**
+
+The bootstrap issue: for T_discovery = 48 macro-epochs, N_bootstrap_epochs = N_calibration = 4 — manageable. But if N_calibration were ever set to 12 (a governance-allowed range), bootstrap-phase escrow lockup would be 12 macro-epochs of unknown duration (macro-epoch length varies). And N_bootstrap_epochs ≤ N_calibration means a long N_calibration directly extends the bootstrap commitment window for the second knower.
+
+**The deeper issue:** Bootstrap stake lock is bounded by oracle resolution (Invariant #47: escrow released at oracle resolution). For a T_discovery = 48-epoch coordinate, oracle resolution is ~48 macro-epochs away. The bootstrap k_min lock is effectively a ~48-epoch commitment for the second knower during bootstrap — potentially years for real-world event coordinates.
+
+**Resolution — N_bootstrap_epochs hard cap independent of N_calibration and T_discovery:**
+
+```
+N_bootstrap_epochs = min(N_calibration, 4)  [hard cap at 4 macro-epochs]
+
+After N_bootstrap_epochs, partial track record prerequisite activates (Invariant #78):
+  resolved_claims_a >= floor(N_track_threshold / 2)
+
+Problem: resolved_claims may still be zero at N_bootstrap_epochs for a long-horizon class
+  (no oracle resolution yet)
+
+Resolution — bootstrap credit count as track record substitute in this specific case:
+  If N_bootstrap_epochs has elapsed AND oracle has not yet resolved:
+    bootstrap_claim_count(a) = number of D_a submissions since class genesis (not resolution-conditional)
+    track_record_substitute(a) = bootstrap_claim_count(a) >= floor(N_track_threshold / 2)
+    This substitute is WEAKER than resolved_claims but provides Sybil cost (escrow locked per submission)
+```
+
+**The stake lock duration for long-horizon bootstrap:**
+
+k_min stake is not locked for T_discovery. It is locked until oracle resolution OR until the claim ages out via T_longtail_expiry (LTRP routing, Invariant from #r5). T_longtail_expiry provides the natural out for long-horizon commitments.
+
+For long T_discovery classes, governance must set T_longtail generously (or route to LTRP with standard seed). This is already in the existing escrow taxonomy — no new mechanism needed. The bootstrap lock is not a new duration concern; it is bounded by existing escrow lifecycle parameters.
+
+**Net: N_bootstrap_epochs ≤ min(N_calibration, 4). Bootstrap ends at 4 macro-epochs maximum regardless of T_discovery. Long-horizon second-knower commitments are bounded by T_longtail, which is already a governance parameter at class registration.** (#r173)
+
+**Design law (#r173):** Bootstrap phase duration is hard-capped at min(N_calibration, 4) macro-epochs, independent of T_discovery. For long-horizon classes where oracle resolution does not occur within bootstrap, bootstrap_claim_count substitutes for resolved_claims in the track-record prerequisite. (#r173)
+
+---
+
+**Q4 (DISCOVERY_MODE Module 1 completeness declaration) → Module 1 is specification-complete after #r173; 10-point framework answered in full for DISCOVERY_MODE; estimated 7–10 additional runs for adversarial pass (#r173):**
+
+**Completeness checklist for DISCOVERY_MODE Module 1:**
+
+| Criterion | Status | Source |
+|---|---|---|
+| Base primitive | ✅ IVD (epistemic value transferred); bilateral revelation game, not coordination game | #r168 |
+| Conserved quantity | ✅ Cumulative KL(S(T) \|\| π_0) monotonically increasing | #r168/D1 |
+| State model | ✅ Full distribution S(t); parametric default + N_buckets=16 on-chain | #r168/D6, #r170/Q2 |
+| Update rule | ✅ W_a(t) = base × consistency × IVD; N_buckets=16 on-chain; ~3,200 gas/knower/epoch | #r168/D3, #r169/Q2 |
+| Fee structure | ✅ Two-pool: streaming + accuracy bonus; f_min = 1/(1+T_discovery) | #r168/D4, #r169/Q3 |
+| Degenerate equilibria | ✅ Withholding, IVD sniping, dump-all, noise injection — all addressed | #r168/D2, #r169/Q3 |
+| Parameter calibration | ✅ τ_genesis + advisory mode + Q25 + N_advisory_min_submissions | #r169/Q1, #r171/Q1, #r172/Q1 |
+| Monopoly handling | ✅ MONOPOLY_MODE; N_monopoly_exit_window; bootstrap substitute | #r170/Q3, #r171/Q2, #r172/Q2 |
+| Degenerate epoch response | ✅ All-negative IVD rollover; N_rollover_max; safety valve; future_query_credit | #r171/Q4, #r172/Q3, #r173/Q1 |
+| Genesis prior export | ✅ exportGenesisPrior interface; alpha advisory-confirm gate | #r170/Q4, #r171/Q3 |
+| Governance interfaces | ✅ Unified parameter table; cross-parameter consistency checks | #r173/Q2 |
+| Bootstrap phase | ✅ N_bootstrap_epochs ≤ min(N_calibration, 4); bootstrap_claim_count substitute | #r173/Q3 |
+
+**10-point framework for DISCOVERY_MODE (condensed):**
+
+1. **Base primitive:** IVD (information value delivered per epoch per knower) — not capital warranty.
+2. **State model:** Full probability distribution S(t) = credibility-weighted mixture of D_a(t); N_buckets=16 on-chain; parametric output to unknowers.
+3. **Credibility model:** W_a(t) = base_share × consistency_factor × IVD_weight; credibility_ratio from CLEARING v2.1 used as base_share; IVD_weight adds revelation-quality component.
+4. **Market roles:** Knowers (information sellers) submit D_a(t) for streaming fees; Unknowers (information buyers) pay query_fee_total per query; Challengers enforce state quality; Governance manages parameters and attester set.
+5. **Settlement model:** Two-pool: streaming distributed per-epoch; accuracy_bonus at T_finality. Degenerate epochs roll over; N_rollover_max safety valve routes to challenger_pool.
+6. **Attack surface:** Credibility laundering, dump-all, IVD sniping, noise injection, flash-participation, oracle timing, all-negative IVD coordinated attack — all addressed by Invariants #65–#86.
+7. **vs LMSR/orderbooks:** Rewards revelation process, not just terminal accuracy. Track record stratification. Full distribution output vs scalar. Naturally deters dump-all via pool depletion. Weakness: τ_genesis calibration governance problem for novel domains.
+8. **Simplest viable mechanism:** 5 new v2.2 contracts (DiscoveryCoordinateRegistry, DiscoveryClaimEscrow, DiscoveryCredibilityAggregator, DiscoverySettlementEngine, ShadowClearingPairRegistry).
+9. **Strongest failure reason:** info_arrival_tolerance self-calibration fails for genuinely unprecedented coordinate types with no oracle history and no analogous classes. Bootstrap default τ_mid = 0.15 may be systematically wrong; advisory mode extends the problem without solving it.
+10. **Best surviving variant if Module 1 fails:** Degrade to CLEARING_MODE with enhanced temporal scoring — reward knowers proportional to earliest-epoch accuracy (not just terminal). Cheaper to implement, partially incentivises early revelation, does not require IVD on-chain computation.
+
+**Remaining work before Module 1 is engineering-handoff-ready:**
+
+1. Adversarial stress-test of DISCOVERY_MODE specifically (A10-equivalent pass for new attack surfaces unique to IVD and two-pool structure): estimated 7–10 runs
+2. Cross-mode attack surface (CLEARING_MODE actor gaming DISCOVERY_MODE state to influence settlement): estimated 3–4 runs
+3. v2.2 contract spec additions summary (analogous to #r163–#r166 summary for v2.1): 1 run
+
+**Module 1 mechanism design is specification-complete. Adversarial pass starts with #r174.** (#r173)
+
+---
+
+## Net-New Structural Insight: The Revelation Game Failure Mode is Irreducibly Governance-Bounded (#r173)
+
+After 6 runs of DISCOVERY_MODE design (#r168–#r173), the fundamental limitation emerges with clarity: **the mechanism's epistemic quality is bounded above by governance's ability to estimate one parameter — τ_genesis for novel domains.**
+
+This is not a mechanism design flaw. It is a structural property of the revelation game itself. Information arrival rate is a property of the underlying domain, not of the mechanism. No mechanism can discover τ from within itself without sufficient history — that is the definition of novelty.
+
+**Implication for deployment strategy:**
+
+DISCOVERY_MODE should be deployed on coordinate classes that have analogous historical classes already in the system. The first DISCOVERY_MODE deployment is necessarily highest-risk for τ calibration; subsequent deployments cite the first as analogy and inherit its calibrated τ.
+
+**The right way to frame this for Demo Day:**
+
+> GestAlt's DISCOVERY_MODE gets better the more classes it has. Every resolved class produces an oracle-velocity signal that calibrates future similar classes. The mechanism has a cold-start problem on genuinely novel domains — but it has a warm-start advantage on every subsequent class in the same domain. This creates a natural moat: the mechanism becomes harder to replicate as history accumulates.
+
+**Design law (#r173):** DISCOVERY_MODE deployment should be sequenced by domain similarity to previously resolved classes. τ_genesis calibration quality compounds with domain history. Novel-domain deployments should be small in initial TOWL capacity to bound the τ miscalibration risk. (#r173)
+
+---
+
+## Structural Synthesis: DISCOVERY_MODE Module 1 — Specification Complete (#r173)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Sister-class credit portability | Oracle lineage / same event / shadow-clearing pair; unknower-elected; non-expiring non-fungible | Credit portability requires declared kinship; explicit election |
+| Parameter consistency governance | Unified table; derived defaults; cross-param hard gates at registration | Cross-parameter consistency checks are hard gates, not warnings |
+| Long-horizon bootstrap lock | N_bootstrap_epochs ≤ min(N_calibration, 4); bootstrap_claim_count substitute when oracle unresolved | Bootstrap hard-capped; long-horizon handled by existing T_longtail escrow lifecycle |
+| Module 1 completeness | 10-point framework answered; 12-item checklist satisfied; adversarial pass is remaining work | Mechanism spec complete; adversarial pass (#r174+) next |
+
+---
+
+## Cumulative Invariants (additions through #r173)
+
+**Invariant #87 (#r173):** future_query_credit is portable only to governance-declared sister classes (oracle lineage, same event, or shadow-clearing pair). Transfer requires unknower explicit election. Credit is non-expiring, non-fungible, and applicable only at query submission.
+
+**Invariant #88 (#r173):** Governance parameter tables include cross-parameter consistency checks as hard registration gates. Derived-default formulas are always available; overrides are bounded to the range within which consistency holds.
+
+**Invariant #89 (#r173):** N_bootstrap_epochs ≤ min(N_calibration, 4) macro-epochs, hard cap independent of T_discovery. When oracle has not resolved at N_bootstrap_epochs, bootstrap_claim_count >= floor(N_track_threshold/2) substitutes for resolved_claims in the track-record prerequisite.
+
+**Invariant #90 (#r173):** DISCOVERY_MODE deployment should be sequenced by domain similarity to previously resolved classes. Novel-domain first deployments must set initial TOWL capacity conservatively to bound τ_genesis miscalibration risk.
+
+---
+
+## Run Log Update
+
+- **#r173** — 2026-04-04T02:32Z — DISCOVERY_MODE Module 1 Q1–Q4 (#r172 open questions): sister-class credit portability; governance parameter consistency gates; bootstrap lock cap; Module 1 completeness declaration. 10-point DISCOVERY_MODE framework answered. Four new invariants (#87–#90). Adversarial pass begins #r174.
+
+---
+
+## Open Questions for #r174+ (DISCOVERY_MODE Adversarial Pass)
+
+1. **IVD inflation via adversarial state poisoning and recovery cycle:** Adversary injects noise (reducing S(t) quality) then immediately corrects it — manufacturing positive IVD_weight in the correction epoch. Cost: consistency penalty on the injection epoch. Gain: IVD_weight credit on recovery epoch. Net profitable if recovery IVD > injection penalty. Formal attack model needed.
+
+2. **Streaming fee front-running via on-chain W_a(t) preview:** W_a(t) is computable by any party from the publicly observable D_a(t) submissions. A large-stake actor could observe near-end-of-epoch W_a(t) distribution, submit a D_a(t) with precisely targeted IVD_weight to maximize personal share, and earn disproportionate streaming fees with minimal genuine revelation. Is this possible within the epoch-boundary commit timing?
+
+3. **Cross-mode state injection: CLEARING_MODE actor gaming DISCOVERY_MODE state vector to influence linked clearing settlement:** A participant with large CLEARING_MODE positions on a clearing class linked to a DISCOVERY_MODE shadow class could submit low-quality D_a updates to degrade the genesis prior quality for the clearing class, advantaging their clearing position. Does mode_mismatch_discount fully close this channel?
+
+4. **accuracy_bonus_pool drainage via early oracle gaming:** An adversary who can influence the oracle output (oracle registration attack A6 variant) specifically in DISCOVERY_MODE could game the accuracy_bonus_pool by aligning terminal D_a to the manipulated oracle value. Is the accuracy_bonus_pool adversarial surface identical to CLEARING_MODE oracle attacks, or does the multi-epoch credibility_ratio history create an additional exposure?
