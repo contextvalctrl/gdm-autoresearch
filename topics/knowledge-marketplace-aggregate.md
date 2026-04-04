@@ -7089,3 +7089,195 @@ advisory_mode(class_i, parameter_P):
 3. **ShadowClearingPairRegistry.exportGenesisPrior — prior age staleness:** The export is governance-triggered and may be delayed. If the shadow-class has not updated S(t) for many epochs (e.g., low-activity phase), the exported snapshot may be stale relative to the shadow-class's own staleness_window. Should the export be blocked if age_at_export > staleness_window_shadow?
 
 4. **DISCOVERY_MODE on-chain KL computation — negative IVD handling:** IVD_weight(a,t) = max(0, IVD_a(t)) / Σ max(0, IVD_j(t)). If ALL knowers simultaneously produce negative IVD_a (all updates reduce state quality), the denominator is zero and fee distribution is undefined. What is the fallback distribution when Σ max(0, IVD_j(t)) = 0?
+
+---
+
+## #r171 Contributions — 2026-04-04T02:12Z
+
+**Phase: v2.2 Module 1 — DISCOVERY_MODE. Addresses all four open questions from #r170.**
+
+---
+
+**Q1 (Advisory mode adversarial consistency simulation — free probe attack) → Lower-quartile τ_revision calibration renders adversarial upper-tail inflation counterproductive; stake cost preserved (#r171):**
+
+Advisory-mode submissions are not free. The claim_submission_fee and escrow lockup still apply (Invariant #47: escrow is non-withdrawable post-submission). An adversary submitting extreme D_a distributions during advisory mode:
+- Pays claim_submission_fee
+- Locks escrow that is scored at oracle resolution
+- Incurs credibility_ratio penalty at resolution (extreme noisy distributions resolve poorly)
+
+The residual concern is calibration gaming: an adversary who submits D_a far outside the plausible range inflates the observed JS distribution toward high values. If governance uses the maximum or mean observed JS to set τ_revision, the adversary could cause τ_genesis to be revised too loosely.
+
+**Resolution — lower-quartile calibration commitment at registration:**
+
+```
+tau_revision_calibration_rule = Q25  (25th percentile of observed JS distribution from advisory_mode epochs)
+  committed at class registration, immutable for that class's advisory window
+```
+
+The adversary's extreme submissions inflate Q75 and above — they have zero effect on Q25. Governance sets τ_revision = f_info(Q25(observed_JS)) where f_info is the same self-calibration function from #r169/Q1.
+
+An adversary who wants to inflate Q25 must submit many moderate-JS distributions across the advisory window, which requires substantial escrow and results in degraded credibility_ratio at resolution. The attack becomes expensive for minimal calibration benefit.
+
+**Advisory-mode EAT record:** Commits the full observed JS distribution summary (Q10, Q25, Q50, Q75, Q90) per epoch — auditable; governance sees the percentile distribution before committing τ_revision. If Q25 ≪ Q50, the distribution is right-skewed (likely adversarial inflation in the upper tail); governance is informed.
+
+**Design law (#r171):** Advisory-mode calibration uses the lower quartile (Q25) of observed parameter distributions, not the mean or maximum. Upper-tail inflation by adversarial extreme submissions cannot affect Q25. The calibration commitment (Q25-based) is declared at class registration and immutable for the advisory window. (#r171)
+
+---
+
+**Q2 (MONOPOLY_MODE → normal DISCOVERY_MODE transition — flash-participation attack) → N_monopoly_exit_window stability requirement + partial track record prerequisite (#r171):**
+
+The flash-participation attack: adversary briefly registers as second knower → MONOPOLY_MODE exits immediately → adversary withdraws → dump-all in now-normal DISCOVERY_MODE.
+
+Two reinforcing defences needed:
+
+**Defence A — Track record prerequisite for mode-exit contribution:**
+
+```
+second_knower_mode_exit_eligible(a) = true iff:
+  resolved_claims_a >= floor(N_track_threshold / 2)
+  AND stake_a_net >= k_min (standard minimum claim stake for the class)
+```
+
+An address with zero resolved claims cannot trigger MONOPOLY_MODE exit regardless of stake.
+
+**Defence B — N_monopoly_exit_window stability window:**
+
+```
+N_monopoly_exit_window = max(2, ceil(N_calibration / 2))  [default: 2 epochs for N_calibration=4]
+
+MONOPOLY_MODE exits only when:
+  epistemically_live_discovery = true (>= 2 eligible knowers)
+  AND condition has been continuously true for N_monopoly_exit_window consecutive normal-mode epochs
+  AND governance has not flagged the second knower as cluster member with the first (Invariant #50)
+
+Re-entry: if epistemically_live_discovery falls back to false at any point during N_monopoly_exit_window:
+  window resets to zero
+```
+
+**MONOPOLY_MODE re-entry (hysteresis):** Once MONOPOLY_MODE has exited, it re-enters only if epistemically_live_discovery remains false for >= 2 consecutive epochs — prevents oscillation.
+
+**Flash-participation residual:** An adversary with a partial track record (>= N_track_threshold/2 resolved claims on easy coordinates) could still attempt this attack at lower cost. The cluster detection mechanism (#r165/Q1) handles this: if the second and first knower are governance-confirmed as a cluster, they do not count as two independent knowers for epistemically_live_discovery.
+
+**Design law (#r171):** Participation-threshold mode transitions require stability windows and track-record prerequisites on contributing parties. Immediate mode transitions on single-epoch participation are prohibited for modes that carry weaker adversarial protections. (#r171)
+
+---
+
+**Q3 (exportGenesisPrior — prior age staleness: block or advisory confirm?) → No hard block; advisory-confirm gate at alpha <= 0.10; governance confirmation with rationale required (#r171):**
+
+Hard blocking is counterproductive: governance may have legitimate reasons to export even a stale prior (coordinated multi-class deployment, shadow-class quiescent but still valid). The alpha_prior_effective formula already handles staleness gracefully — age_at_export >= staleness_window_shadow yields alpha = 0 (pure uniform prior, no discovery benefit).
+
+Silent acceptance of alpha = 0 is the error. Governance may not realise the export is stale.
+
+**Resolution — advisory-confirm gate at alpha = 0:**
+
+```
+ShadowClearingPairRegistry.exportGenesisPrior precondition:
+  If alpha_prior_effective <= alpha_prior_effective_threshold (default 0.10):
+    emit genesis_prior_stale_warning { shadow_class_id, clearing_class_id, age_at_export, alpha_prior_effective }
+    Export BLOCKED pending governance confirmation:
+      governance must call exportGenesisPriorConfirmed(shadow_class_id, clearing_class_id, rationale: string)
+      within N_confirm_window = 2 macro-epochs
+      Rationale is required (non-empty string), EAT-committed
+    If N_confirm_window passes without confirmation: export attempt expires; governance must resubmit
+```
+
+This pattern reuses the arweave_absence_acknowledged model (#r159/Q1): governance is not blocked permanently but must commit an explicit acknowledgment before proceeding with a known-low-value action.
+
+**alpha_prior_effective_threshold governance parameter:** bounded [0.05, 0.25]; default 0.10. Normal-case exports (alpha > 0.10) proceed immediately with no gate.
+
+**Design law (#r171):** When a protocol action would produce a near-zero-value outcome due to a parameter condition, the mechanism does not block the action but requires explicit governance acknowledgment with a rationale commitment. Advisory-confirm gate makes known-low-value actions transparent and auditable. (#r171)
+
+---
+
+**Q4 (All-negative IVD epoch — fallback fee distribution when denominator = 0) → Rollover with N_rollover_max = 3 epochs; challenger_pool safety valve after cap (#r171):**
+
+All-negative IVD (Σ max(0, IVD_j(t)) = 0) means every knower's update degraded shared state quality in epoch t. Three requirements for the fallback: (1) no reward for degradation; (2) no permanent fee stagnation; (3) recovery incentive.
+
+**Resolution — rollover with safety valve:**
+
+```
+On all-negative IVD epoch (Σ max(0, IVD_j(t)) = 0):
+  streaming_fee_distribution(t) = 0 for all knowers
+  fee_streaming_pool carry-forward: fees roll over to epoch t+1
+  rollover_epoch_count increments
+
+  If rollover_epoch_count < N_rollover_max: silent rollover
+  If rollover_epoch_count == N_rollover_max (default 3):
+    safety_valve fires:
+      50% of fee_streaming_pool -> challenger_pool
+      50% remains in fee_streaming_pool (preserves recovery incentive)
+      rollover_epoch_count resets to 0
+      EAT event: streaming_pool_safety_valve_fired { epoch, pool_balance_before, challenger_pool_share }
+    Governance alert: all_negative_ivd_extended
+```
+
+**Recovery incentive mechanics:** Knowers observing an accumulated fee_streaming_pool from rollover compete to produce the first positive-IVD update. The rolled-over pool creates a concentrated reward for genuine state improvement. This is the primary mechanism restoring epistemic health after a degenerate streak.
+
+**Why challenger_pool as safety valve:** Challenger_pool distribution incentivises challengers to identify and remove the noisy-knowers causing the all-negative IVD streak. Governance treasury would not create this targeted enforcement incentive.
+
+**Design law (#r171):** Degenerate equilibrium epochs (all-negative IVD) trigger fee rollover, not redistribution to degrading contributors. Rollover creates accumulated recovery incentive; N_rollover_max safety valve prevents indefinite stagnation; challenger_pool is the safety valve destination because it targets enforcement of the state-degradation attack. (#r171)
+
+---
+
+## Net-New Structural Insight: The Advisory-Confirm Pattern as a Reusable Mechanism Primitive (#r171)
+
+Three separate runs now apply the same governance-confirmation pattern:
+- #r159/Q1: arweave_mirror_closed requires arweave_absence_acknowledged
+- #r171/Q3: exportGenesisPrior at alpha <= 0.10 requires exportGenesisPriorConfirmed with rationale
+
+The pattern: **when a governance action would produce a known-degenerate outcome, do not block it — gate it on explicit acknowledgment with a rationale that is immutably committed to the EAT.**
+
+**Generalized advisory-confirm primitive:**
+
+```
+advisory_confirm_gate(condition, action, confirmation_call, N_confirm_window):
+  When condition is true at action invocation:
+    emit advisory_action_warning { condition, action_type, expected_outcome }
+    Block action
+    Governance must call confirmation_call(rationale: string) within N_confirm_window
+    If confirmed: action proceeds; EAT records { confirmed_by, rationale, condition_at_confirmation }
+    If expired: action attempt expires; governance must resubmit
+```
+
+Applies to (current list): arweave_mirror_closed when settlement records present; exportGenesisPrior when alpha <= 0.10; oracle deregistration; any parameter_change triggering >N_alert_refunds bond refund events in one window.
+
+**Design law (#r171):** The advisory-confirm gate is the canonical mechanism response when a governance action's outcome is computable as degenerate at invocation time. Block + explicit rationale + EAT audit is preferable to either silent execution or hard prohibition. (#r171)
+
+---
+
+## Structural Synthesis: DISCOVERY_MODE — Hardening Pass #1 Closed (#r171)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Advisory mode probing | Q25-based tau_revision; adversarial upper-tail inflation irrelevant | Lower-quartile calibration; adversarial probe is self-defeating |
+| Flash-participation MONOPOLY exit | N_monopoly_exit_window + partial track record prerequisite | Participation-threshold transitions require stability windows |
+| Stale genesis prior export | Advisory-confirm gate at alpha <= 0.10; rationale EAT-committed | Known-degenerate outcomes require explicit acknowledgment |
+| All-negative IVD epoch | Rollover to N_rollover_max = 3; 50% -> challenger_pool safety valve | Degenerate epochs trigger rollover + targeted enforcement incentive |
+
+---
+
+## Cumulative Invariants (additions through #r171)
+
+**Invariant #77 (#r171):** Advisory-mode calibration commits to Q25 (25th percentile) of observed parameter distributions at class registration. Upper-tail inflation by adversarial submissions has zero effect on Q25-based tau_revision.
+
+**Invariant #78 (#r171):** MONOPOLY_MODE exits only after N_monopoly_exit_window consecutive normal-mode epochs of epistemically_live_discovery = true, with second knower meeting partial track record prerequisite (>= N_track_threshold/2 resolved claims). Re-entry requires >= 2 consecutive false epochs (hysteresis).
+
+**Invariant #79 (#r171):** ShadowClearingPairRegistry.exportGenesisPrior at alpha_prior_effective <= 0.10 requires advisory-confirm gate: governance must call exportGenesisPriorConfirmed with non-empty rationale within N_confirm_window = 2 macro-epochs. Absent confirmation, export attempt expires.
+
+**Invariant #80 (#r171):** All-negative IVD epoch triggers streaming fee rollover. After N_rollover_max = 3 consecutive rollover epochs, safety valve fires: 50% of fee_streaming_pool routes to challenger_pool; rollover_epoch_count resets to 0.
+
+**Invariant #81 (#r171):** The advisory-confirm gate is the canonical mechanism response when a governance action's outcome is computable as degenerate at invocation time. Format: automatic detector -> block + emit warning -> governance confirmation with non-empty rationale within N_confirm_window -> EAT-committed confirmation.
+
+---
+
+## Open Questions for #r172+
+
+1. **Q25-calibrated tau_revision and sparse advisory epochs:** If few knowers participate during advisory mode (e.g., 3 total submissions), Q25 may be a noisy outlier from too-small a sample. Is there a minimum submission count before tau_revision is allowed, and what is the fallback if count is not met at end of advisory window?
+
+2. **MONOPOLY_MODE partial track record prerequisite and bootstrapping contradiction:** N_track_threshold/2 resolved claims requires prior oracle resolutions. For a brand-new class, neither incumbent nor second knower has any resolved claims. Does MONOPOLY_MODE apply from genesis of a single-knower class, and is N_monopoly_exit_window then irrelevant until the first oracle resolution?
+
+3. **N_rollover_max and long-horizon DISCOVERY_MODE coordinates:** For T_discovery = 48 macro-epochs, a coordinated all-negative IVD attack lasting 4 epochs would cycle the safety valve, drain 50% of streaming pool to challenger_pool, and reset. Is the safety valve cycle economically harmful to legitimate unknowers who pre-paid query fees expecting streaming returns?
+
+4. **Advisory-confirm pattern and emergency governance:** The gate blocks an action pending confirmation within N_confirm_window. Should the emergency multisig bypass (#r158/Q3) override the advisory-confirm gate entirely, or should the gate always be honoured even under emergency conditions?
+
+*Last updated: #r171 — 2026-04-04T02:12Z*
