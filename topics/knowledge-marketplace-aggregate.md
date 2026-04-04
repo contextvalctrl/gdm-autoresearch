@@ -24558,3 +24558,185 @@ These advance together in steady-state (one oracle event per epoch on fast class
 4. **Cross-class calibration regime divergence in implication declarations:** An A→B declaration spans two classes potentially at different calibration states (one in normal calibration, one reverted to level-correlation after deadline). Should the implication bonus use the weaker calibration of the two, or are coordinates scored independently against their own calibration state?
 
 *Last updated: #r252 — 2026-04-04T16:52Z*
+
+---
+
+## #r253 Contributions — 2026-04-04T17:02Z
+
+Addresses all four open questions from #r252. Net-new structural insight: calibration regime divergence across implication chain legs is a latent attack surface requiring an epistemic service floor on the implication bonus.
+
+---
+
+**Q1 (Anti-snipe delay and micro-epoch universality — batch-only epoch classes) → Block-count canonical: anti_snipe_delay expressed as EVM block count; micro-epoch expression is derived (#r253):**
+
+`anti_snipe_delay = 1 micro-epoch` is undefined for batch-only epoch classes (macro-epoch only; no intra-epoch micro-epoch clock).
+
+**Resolution — universal block-count expression:**
+
+```
+anti_snipe_delay_blocks:
+  if class.micro_epoch_defined:
+    anti_snipe_delay_blocks = micro_epoch_length / avg_block_time
+  else:
+    anti_snipe_delay_blocks = anti_snipe_blocks_governance_default
+
+anti_snipe_blocks_governance_default = 100 EVM blocks  [governance-settable, bounded [50, 500]]
+```
+
+**100 EVM blocks rationale:** At ~12s per block (Ethereum mainnet), 100 blocks ≈ 20 minutes. Exceeds typical transaction finality latency; short enough that knowers are not locked for hours. The observation window (not capital lockup) is the mechanism purpose.
+
+**Block-count is canonical; micro-epoch is derived:** All anti_snipe_delay computation uses block counts internally. For classes with micro-epoch structure, `micro_epoch_length / avg_block_time` converts at registration. This eliminates unit ambiguity across class types.
+
+**Class registration field:** `anti_snipe_delay_blocks` committed to EAT at registration. Changes via ADVISORY parameter_update (not HARD_GATE — block count changes do not trigger compaction eligibility invalidation per Invariant #27).
+
+**Design law (#r253):** Anti-snipe delay is canonical in EVM block counts. Micro-epoch expressions are a derived convenience. Batch-only classes use the governance-default block count directly. Universal applicability requires universal units. (#r253)
+
+---
+
+**Q2 (PCA during MEDIUM_CONSENSUS fallback — synthetic vs real claims) → Real claims only; synthetic block-bootstrap data excluded from PCA; `pca_eligible` flag gates execution (#r253):**
+
+**The contamination risk:** MEDIUM_CONSENSUS fallback (Invariant #408) populates block-bootstrap with synthetic claim data from level-correlation and macro-factor models. Including synthetic claims in the PCA correlation matrix is circular — PCA would recover the generator model's assumed structure, not the empirical latent factor.
+
+**Resolution — real-claims-only gate:**
+
+```
+pca_eligible(class_j, epoch_t) = true iff:
+  n_real_claims_j(epoch_t) >= 3
+  AND current_oracle_resolution_mode(class_j) != MEDIUM_CONSENSUS_FALLBACK
+
+if pca_eligible = false:
+  f_latent_j(t) = f_latent_governance_default (0.30)
+  EAT: pca_source = governance_default or medium_consensus_excluded
+
+if pca_eligible = true:
+  PCA runs on real claims only; synthetic block-bootstrap claims excluded
+  EAT: pca_source = real_only
+```
+
+**Dual-condition gate extension (Invariant #415):** MEDIUM_CONSENSUS_FALLBACK epochs are non-qualifying for the dual-condition transition counter. Epochs where MEDIUM_CONSENSUS was active reset the epoch count — consistent with Invariant #8 (exceptional-mode epochs do not advance calibration windows).
+
+**EAT record amendment:** `latent_exposure_estimate` adds field `pca_source: real_only | governance_default | medium_consensus_excluded`.
+
+**Design law (#r253):** PCA-derived parameters must be computed from empirically observed data only. Synthetic model outputs may not serve as PCA inputs. The dual-condition transition gate extends to require oracle_resolution_mode = NORMAL for each qualifying epoch. (#r253)
+
+---
+
+**Q3 (COMMITTEE credibility-weight quorum at genesis — near-zero differentiation) → Gradual activation: MEMBER_COUNT_ONLY until N_calibration epochs; HYBRID_DUAL_THRESHOLD activates on calibration clock (#r253):**
+
+At genesis all committee members start at near-identical credibility_ratio. The credibility-weight threshold is near-meaningless — small noise in genesis scores could cause spurious results against an uninformative signal.
+
+**Resolution — calibration-clock-gated quorum mode:**
+
+```
+committee_quorum_mode(class_j, epoch_t):
+  if normal_mode_epoch_count_since_class_live < N_calibration:
+    quorum_mode: MEMBER_COUNT_ONLY
+    T_anchor fires when: member_count_voted >= ceiling(k × quorum_fraction_count)
+
+  else:
+    quorum_mode: HYBRID_DUAL_THRESHOLD (Invariant #416)
+    T_anchor fires when: member_count AND credibility_weight thresholds both met
+```
+
+**Activation on calibration clock:** After N_calibration normal-mode epochs, committee members have meaningful credibility differentiation from resolved claims. The credibility-weight threshold becomes informative at exactly the epoch the calibration clock deems mechanism-mature.
+
+**Continuity at activation:** Pending T_anchor vote accumulations re-evaluated against HYBRID_DUAL_THRESHOLD at the next epoch boundary after activation. Governance notified via `committee_quorum_mode_activated` EAT event.
+
+**Genesis credibility audit trail:** `credibility_weight_voted` is recorded in EAT per epoch during MEMBER_COUNT_ONLY mode — not used for quorum but available for retroactive validation when HYBRID_DUAL_THRESHOLD activates.
+
+**Design law (#r253):** Credibility-based mechanism features activate on the calibration clock (N_calibration normal-mode epochs). Genesis-phase operation uses the structurally simpler precursor. Consistent with α_cap, β_effective, and mode_mismatch_discount dual-condition activation (Invariant #21). (#r253)
+
+---
+
+**Q4 (Cross-class calibration regime divergence in implication declarations — weakest-link vs independent scoring) → Independent per-coordinate scoring; natural self-correction via effective_weight; no weakest-link penalty (#r253):**
+
+An A→B declaration where class A is in normal calibration and class B has reverted to level-correlation fallback.
+
+**The correct rule — independent scoring:**
+
+The implication bonus components already operate per-coordinate independently (established in #r141/Q3):
+
+```
+bonus_epistemic_service_A: Σ_epochs eff_weight(A, e) / Σ_epochs base_weight(A)
+  Uses class A's normal calibration -> full effective_weight
+
+bonus_epistemic_service_B: Σ_epochs eff_weight(B, e) / Σ_epochs base_weight(B)
+  Uses class B's level-correlation fallback -> reduced S_cred signal -> lower effective_weight
+```
+
+**No weakest-link unification.** The degraded calibration on B naturally produces a lower epistemic service ratio on the B leg — the mechanism is self-correcting without requiring a special penalty.
+
+**Attack path closed — but new one identified (see Net-New below):** Independent scoring is epistemically correct and manipulation-resistant. A knower cannot game B's level-correlation by over-claiming on A — the β multiplier still requires both coordinates to resolve correctly (Invariant #133).
+
+**Design law (#r253):** Implication chain legs scored independently against their own calibration state. Weakest-link penalty not applied: (1) mechanism already self-corrects via lower effective_weight; (2) penalising A for B-side conditions the A-knower cannot control is epistemically unjust. (#r253)
+
+---
+
+## Net-New Structural Insight: Selective Chain Declaration Exploit via Level-Correlation Passivism (#r253)
+
+Independent scoring closes the weakest-link concern but reveals a subtler attack:
+
+**The exploit:** A knower who knows class B is near calibration deadline (Invariant #414):
+1. Declares A→B.
+2. Contributes accurate S_cred to A (earning base slot reward on A).
+3. Lets B pass calibration deadline → reverts to level-correlation.
+4. Level-correlation tracks the true level passively — B oracle may still resolve correctly without knower's private signal contributing.
+5. If B resolves correctly: knower earns the full β implication multiplier despite near-zero epistemic contribution on B.
+
+**The exploit works because:** β conditions on correct resolution, not on genuine epistemic contribution on the weaker leg. A knower can ride B's correct resolution passively while earning the implication multiplier.
+
+**Mitigation — epistemic service floor for implication bonus eligibility:**
+
+```
+implication_bonus_eligible(A→B) iff:
+  service_ratio_A = cumulative_eff_weight_A / (base_weight_A × n_active_epochs_A) >= eps_service_floor_impl
+  AND
+  service_ratio_B = cumulative_eff_weight_B / (base_weight_B × n_active_epochs_B) >= eps_service_floor_impl
+
+eps_service_floor_impl = 0.10  (governance-settable, bounded [0.05, 0.30])
+```
+
+If either leg's service ratio is below floor at oracle resolution: β multiplier forfeited. Base slot rewards and stake returns on both legs proceed normally.
+
+**Why 0.10:** Level-correlation fallback produces effective_weight near-zero for classes with fast staleness decay. A ratio below 10% signals the knower's claims contributed minimal genuine epistemic direction — the level-correlation model carried the load.
+
+**EAT record:** `implication_bonus_settlement` adds `epistemic_service_A_ratio`, `epistemic_service_B_ratio`, `service_floor_passed: bool`. (#r253)
+
+---
+
+## Structural Synthesis: #r253
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Anti-snipe delay universality | Block-count canonical (100 EVM blocks default); micro-epoch is derived | Universal units for universal applicability |
+| PCA during MEDIUM_CONSENSUS | Real claims only; synthetic excluded; MEDIUM_CONSENSUS epochs non-qualifying for dual-condition | PCA inputs must be empirical; model outputs are circular |
+| COMMITTEE quorum at genesis | MEMBER_COUNT_ONLY until N_calibration epochs; HYBRID_DUAL_THRESHOLD activates on calibration clock | Credibility features activate on calibration clock; genesis uses simpler precursor |
+| Cross-class calibration divergence | Independent per-coordinate scoring; natural self-correction via lower effective_weight | Independent scoring is correct and manipulation-resistant; weakest-link is unjust |
+
+---
+
+## Cumulative Invariants (#r253)
+
+**Invariant #419 (#r253):** Anti-snipe delay is expressed in EVM block counts (`anti_snipe_delay_blocks`). For classes with micro-epoch structure: blocks = micro_epoch_length / avg_block_time. For batch-only classes: governance default 100 EVM blocks [50, 500]. Committed to EAT at registration. Changes via ADVISORY parameter_update.
+
+**Invariant #420 (#r253):** PCA for within_class_latent_exposure_fraction runs on real claims only. Synthetic block-bootstrap data excluded. MEDIUM_CONSENSUS_FALLBACK epochs are non-qualifying for the Invariant #415 dual-condition transition counter. EAT field `pca_source: real_only | governance_default | medium_consensus_excluded`.
+
+**Invariant #421 (#r253):** COMMITTEE T_anchor quorum uses MEMBER_COUNT_ONLY for first N_calibration normal-mode epochs post-class-live. HYBRID_DUAL_THRESHOLD (Invariant #416) activates on calibration clock. Mode switch = `committee_quorum_mode_activated` EAT event. Credibility-weight history recorded during MEMBER_COUNT_ONLY period for audit trail.
+
+**Invariant #422 (#r253):** Implication chain legs scored independently against each coordinate's own calibration state. No weakest-link penalty. Degraded calibration naturally reduces effective_weight and bonus_epistemic_service on that leg.
+
+**Invariant #423 (#r253):** Implication bonus (β multiplier) eligibility requires both legs to satisfy epistemic service floor: `service_ratio_leg = cumulative_eff_weight_leg / (base_weight_leg × n_active_epochs_leg) >= eps_service_floor_impl` (default 0.10, bounded [0.05, 0.30]). Floor not met on either leg: β multiplier forfeited; base slot rewards and stake returns unaffected. Prevents selective-chain exploit via level-correlation passivism. EAT: `implication_bonus_settlement.service_floor_passed`.
+
+---
+
+## Open Questions for #r254+
+
+1. **eps_service_floor_impl and level-correlation mid-life recovery:** If class B reverts to level-correlation then recovers to normal calibration mid-claim-lifetime, the cumulative effective_weight is a mix of near-zero and normal contributions. Should the service floor check use the full-lifetime cumulative, or only the post-recovery window?
+
+2. **MEMBER_COUNT_ONLY quorum at N_calibration boundary — mid-vote-accumulation mode switch:** If the N_calibration-th qualifying epoch fires simultaneously with a pending T_anchor vote accumulation, the mode switches mid-vote. Is the last-epoch vote evaluated under the new HYBRID_DUAL_THRESHOLD or the old MEMBER_COUNT_ONLY mode?
+
+3. **oracle_portfolio_expected_loss as a Zone C trigger input:** The #r243 net-new observation proposed `expected_oracle_loss = Σ TOWL_backed(type) × EL_oracle(type)` as an oracle concentration risk metric. Should this supplement or replace existing TOWL zone signals for Zone C entry?
+
+4. **anti_snipe_blocks per-class override:** Should individual coordinate classes be permitted to override the protocol-wide governance default anti_snipe_delay_blocks (e.g., fast-resolution classes need shorter; slow deliberative COMMITTEE classes need longer), or is the bounded [50, 500] governance range sufficient for all cases?
+
+*Last updated: #r253 — 2026-04-04T17:02Z*
