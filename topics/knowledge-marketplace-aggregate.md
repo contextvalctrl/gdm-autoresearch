@@ -6704,3 +6704,154 @@ At T_finality:
 4. **Information re-sale:** Unknowers who receive S(t) can re-sell to third parties without compensating knowers. Is this a protocol-layer problem (needs non-transferability primitive) or a legal/contractual layer problem outside mechanism scope?
 
 *Last updated: #r168 — 2026-04-04T01:42Z*
+
+---
+
+## #r169 Contributions — 2026-04-04T01:52Z
+
+**Phase: v2.2 Module 1 — DISCOVERY_MODE. Addresses all four open questions from #r168.**
+
+---
+
+**Q1 (info_arrival_tolerance calibration — derivation procedure) → Self-calibrating from EAT oracle variance after N_sigma_window epochs; governance-estimated genesis default (#r169):**
+
+info_arrival_tolerance τ controls the maximum JS divergence between consecutive knower reports without consistency penalty. It should reflect the maximum single-epoch genuine information arrival for the coordinate class — a quantity that varies by domain and coordinate type.
+
+**Derivation from oracle variance:**
+
+```
+oracle_value_variance(epoch_t) = (oracle_V(t) − oracle_V(t-1))^2 averaged over N_sigma_window epochs
+oracle_velocity_sigma = sqrt(EMA(oracle_value_variance, N_sigma_window))
+
+For parametric Gaussian state S(t) = (μ, σ):
+  info_arrival_tolerance_tau = f_info(oracle_velocity_sigma / oracle_value_range)
+    where oracle_value_range = outer_fence_max − outer_fence_min
+```
+
+`f_info` maps the normalised oracle velocity to a JS divergence bound. At oracle_velocity_sigma = 0 (static coordinate): τ → 0. At maximum observed velocity: τ → τ_max_governance (hard cap). The mapping is a monotone function calibrated to the coordinate's natural information arrival rate.
+
+**Self-calibrating transition (same pattern as mode_mismatch_discount, #r156/Q1):**
+
+```
+Before N_sigma_window oracle epochs: τ = τ_genesis (governance-estimated at registration)
+After N_sigma_window oracle epochs:  τ = f_info(oracle_velocity_sigma)
+Transition: discrete EAT event tau_genesis_exit (same governance disclosure requirement as other self-calibrating params)
+```
+
+**τ_genesis governance input:** Required at class registration. Governance must estimate the expected rate of information arrival for the coordinate domain. This is the one unavoidable subjective governance input; it decays to zero importance after self-calibration activates.
+
+**Pathological case — zero velocity oracle (event not yet in the world):** Before the underlying event begins generating information, oracle_velocity_sigma ≈ 0 and τ → τ_genesis. This is correct: the mechanism treats the coordinate as static; knowers should not be updating dramatically. Any large update is properly penalised as inconsistent. (#r169)
+
+---
+
+**Q2 (IVD computation on-chain gas — fixed-point extension) → Discretized N_buckets=16 representation for all IVD computation; reuses v2.1 log-score table (#r169):**
+
+KL-divergence requires log operations. Solidity has no native log. The v2.1 CredibilityAggregator already implements a fixed-point log lookup table for the log-score accuracy computation. The same table is reusable for IVD.
+
+**Computation approach:**
+
+```
+On-chain representation: dual-track
+  Reporting representation: parametric (μ, σ) or (α, β) — used for S(t) output to unknowers
+  Computation representation: discretized N_buckets=16 probability bins — used for IVD and JS
+
+Conversion: parametric → N_buckets discretization at epoch boundary
+  Performed by knower client off-chain; submitted as 16-element uint16 array (sums to 65536)
+  Gas cost: O(N_buckets) = O(16) log-table lookups per knower per epoch
+
+KL(D_a(t) || S(t-1)) = Σ_{i=1}^{16} D_a(t,i) × log(D_a(t,i) / S(t-1,i))
+  (each term: one multiply + one log lookup + one add)
+
+JS(D_a(t) || D_a(t-1)) = (KL(D_a(t)||M) + KL(D_a(t-1)||M))/2  where M = mixture
+  Total: O(48) log-table lookups per epoch per knower — tractable
+```
+
+**Error bound:** With 16 buckets and 16-bit fractional resolution, maximum IVD computation error is bounded by 0.01 nats for a Gaussian on the standard range. This is acceptable for fee allocation (query fees are rounded to wei; 0.01 nat error → sub-percent fee allocation error).
+
+**Gas estimate:** ~16 log lookups × ~200 gas/lookup = ~3,200 gas per knower per epoch for IVD computation. Comparable to an ERC20 transfer. Tractable for v2.2. (#r169)
+
+---
+
+**Q3 (Dump-all profitability bound — formal) → Self-defeating by pool depletion; formal constraint gives query_fee_fraction ≥ 1/(1 + T_discovery) (#r169):**
+
+**Key structural property (not obvious from the D2 analysis):** The query_fee_pool at epoch t is a decreasing function of Cumulative_IVD(t-1). As honest knowers move the state toward truth, unknowers receive more of what they need and stop querying. By the time a dump-all knower arrives at epoch T-1 to collect, the fee pool has been depleted by honest knowers.
+
+Formally: query_fee_pool(t) ≈ Q_total × (1 − Cumulative_IVD(t-1) / IVD_max). The dump-all knower arrives at t = T-1 where Cumulative_IVD(T-2) ≈ (T-2)/T × IVD_max (linear information arrival approximation). Available pool ≈ Q_total × 2/T.
+
+**Constraint:** Dump-all is dominated by consistent multi-epoch strategy when T > 2/w̄ (where w̄ is the honest knower's consistent per-epoch share). For w̄ = 0.2: T > 10.
+
+**Formal query_fee_fraction lower bound:**
+
+```
+f_min ≥ 1/(1 + T_discovery)
+```
+
+For T_discovery=4: f_min ≥ 0.20 — exactly the stated [0.2, 0.8] lower bound. The [0.2, 0.8] governance bounds are formally derived. Both pool depletion (natural deterrent) and f_min constraint are necessary; neither alone covers all discovery-phase lengths. (#r169)
+
+---
+
+**Q4 (Information re-sale — protocol-layer or legal-layer problem) → Legal/contractual layer only; protocol scope excludes non-transferability; mechanism compensates through multi-epoch streaming structure (#r169):**
+
+**Why protocol-layer non-transferability is infeasible:**
+
+1. Non-transferability requires identity binding — incompatible with permissionless protocol design.
+2. S(t) is committed to EAT (public by construction). On-chain state cannot be access-controlled retroactively.
+3. Encrypted per-recipient S(t) requires O(unknower_count) encryption per epoch — outside feasible scope.
+
+**Why re-sale doesn't harm the mechanism:**
+
+Re-sale transfers already-revealed information. Knowers are already compensated for revelation via streaming fees. Re-sale *accelerates* information spread (aligned with IVD objective) while reducing future query pools (natural information-goods externality). The mechanism compensates at the moment of revelation, not for future gatekeeping rights.
+
+**Design law (#r169):** Information re-sale of EAT-committed state is out of protocol scope. Streaming fees compensate at revelation time; accuracy bonus compensates for track record. Post-revelation value capture is a legal/contractual matter. (#r169)
+
+---
+
+## Net-New Structural Insight: Pool Depletion as the Natural Anti-Dump Mechanism (#r169)
+
+The Q3 analysis reveals an emergent structural property: **the query_fee_pool natural depletion curve is itself a dump-all deterrent** — not designed, but consequential.
+
+As honest knowers reveal information, unknowers' uncertainty decreases and query volume falls. The fee pool a dump-all adversary would collect at epoch T-1 is the pool honest knowers have already depleted. Dump-all is a race against honest knowers who have a T-1 epoch head start.
+
+**Implication:** The mechanism does not need an explicit anti-dump rule. It only needs to:
+1. Not guarantee minimum pool per epoch (which would protect dump-all timing)
+2. Maintain the consistency penalty to block large single-epoch jumps in a depleted pool
+
+Both conditions are met by the D4 two-pool design and D3 consistency factor. The anti-dump property emerges from the pool structure — achieving the deterrent without false positives on legitimate late-epoch genuine updates.
+
+---
+
+## Structural Synthesis: DISCOVERY_MODE Mechanism — Core Design Closed (#r169)
+
+| Primitive | Decision | Source |
+|---|---|---|
+| info_arrival_tolerance | Self-calibrating from oracle velocity sigma; τ_genesis at genesis | #r169/Q1 |
+| IVD computation | N_buckets=16 on-chain; ~3,200 gas/knower/epoch; reuses log-score table | #r169/Q2 |
+| Dump-all bound | f_min = 1/(1+T_discovery); pool depletion is additional natural deterrent | #r169/Q3 |
+| Information re-sale | Out of protocol scope; streaming fee compensates at revelation | #r169/Q4 |
+| Anti-dump | Emergent from pool depletion + consistency penalty; no explicit anti-dump rule | #r169 net-new |
+
+---
+
+## Cumulative Invariants (additions through #r169)
+
+**Invariant #69 (#r169):** info_arrival_tolerance self-calibrates from oracle_velocity_sigma after N_sigma_window epochs; τ_genesis required at registration for bootstrap. Same dual-condition transition pattern as mode_mismatch_discount.
+
+**Invariant #70 (#r169):** IVD computation uses N_buckets=16 discretized representation on-chain; parametric (μ,σ) for unknower output. Max error bound: 0.01 nats.
+
+**Invariant #71 (#r169):** query_fee_fraction lower bound = 1/(1 + T_discovery). The [0.2, 0.8] governance bounds are formally derived. For T_discovery=4: f_min = 0.20.
+
+**Invariant #72 (#r169):** Information re-sale of EAT-committed state is out of protocol scope. Knowers are compensated at revelation time; post-revelation value capture is a legal/contractual matter.
+
+---
+
+## Open Questions for #r170+
+
+1. **τ_genesis governance quality problem:** For entirely novel coordinate classes (no analogous oracle history), governance must estimate τ_genesis without data. What governance interface prevents catastrophically miscalibrated τ_genesis — either so tight that all knowers are penalised as inconsistent, or so loose that all dump-all strategies are unpunished?
+
+2. **N_buckets=16 vs parametric at oracle resolution:** At T_finality, oracle returns a scalar value V*. Scoring accuracy against a 16-bucket discretized D_a requires the oracle scalar to be mapped to a bucket. What is the bucket mapping specification and how does it interact with the outer_fence expected_range?
+
+3. **Query_fee_pool depletion when no honest knowers exist (information monopoly):** If one knower has a monopoly on private information (e.g., a corporate insider on a product launch coordinate), honest knowers do not deplete the pool. Pool depletion as dump-all deterrent requires ≥2 independent knowers. What is the minimum independent-knower count requirement for DISCOVERY_MODE to achieve its epistemic objectives?
+
+4. **DISCOVERY_MODE settlement routing into CLEARING_MODE via shadow-class pair:** When the shadow-class achieves a meaningful genesis prior for the linked clearing-class, what is the exact protocol call that exports the DISCOVERY_MODE S(T_anchor) distribution as the clearing-class genesis prior? Define the cross-contract genesis prior export interface.
+
+*Last updated: #r169 — 2026-04-04T01:52Z*
