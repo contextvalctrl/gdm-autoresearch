@@ -11123,3 +11123,237 @@ These are epistemically distinct claims. Grandfathering conflates statistical co
 4. **Thread status:** After 189 runs covering mechanism design, engineering spec, adversarial audit, and handoff — should this thread close and split into (a) implementation audit, (b) Demo Day materials, (c) v2.2 design threads? Or continue in this aggregate document?
 
 *Last updated: #r189 — 2026-04-04T05:12Z*
+
+---
+
+## #r190 Contributions — 2026-04-04T05:22Z
+
+**Phase: CorrelationBonusManager attack surface, v2.2 roadmap priority, Demo Day materials, and thread status.**
+
+---
+
+### Q1 (CorrelationBonusManager attack surface — top-3 vectors) (#r190)
+
+**Attack A — Seed pool exhaustion griefing:**
+
+An adversary registers many correlated declarations (X, Y) at minimum escrow. Each declaration claims a tiny CorrelationBonus. The declarations are designed to never resolve: oracle windows are slow, or the adversary picks coordinate classes with high T_longtail. The seed pool is not drawn down until oracle resolution fires — but declaration count accumulates, and governance governance-UI shows high utilisation, potentially triggering early refill that benefits the griefer.
+
+**Defence (#r190):**
+```
+declaration_slot_fee = max(r_floor_per_class × slot_fee_fraction, min_slot_fee)
+slot_fee_fraction = 0.05  (governance-settable [0.02, 0.15])
+```
+Slot fee collected at declaration time, non-refundable regardless of oracle resolution. Caps the number of economically rational declarations per epoch at a cost proportional to r_floor. Seed draw (the CorrelationBonus payout) only fires on oracle resolution; slot fee filters declarations before they can exhaust resolution-triggered payouts.
+
+**Residual risk:** Adversary with deep capital can afford slot fees. The seed pool is bounded by governance sizing — depletion causes natural sunset, not catastrophic loss. CorrelationBonus is a supplemental incentive; its depletion does not break the core mechanism.
+
+---
+
+**Attack B — SEE manipulation to force competitor 50% forfeiture:**
+
+Adversary triggers a false SEE (Systemic Event Epoch) on market X. Competitor has a single-leg-SEE scenario (X SEE-tagged, Y resolves normally). Per #r189/Q3: competitor's declaration suspended and, if X does not resolve within T_longtail, 50% bonus forfeiture applies.
+
+**Defence (#r190):**
+The SEE trigger already requires oracle-confirmed external shock OR governance council evidence bond + sortition appeal (#r73/Q3, four-layer SEE defence). False SEE triggering costs the adversary their evidence bond + council stake. The 50% forfeiture in a single-leg-SEE is a mechanism consequence of oracle unavailability, not a governance discretion action — so even a successfully triggered false SEE results in forfeiture only if X genuinely does not resolve within T_longtail. An adversary who triggers a false SEE on X gains a temporary disruption; they cannot extend X's oracle silence indefinitely.
+
+**Residual risk:** If the adversary has access to the oracle itself (oracle capture), SEE manipulation and T_longtail extension are both possible. This is an oracle governance problem, not a CorrelationBonusManager problem. Defence: multi-source oracle with k/n quorum (#r71); oracle registry governance.
+
+---
+
+**Attack C — Dual-flag co-firing exploitation (trigger oracle divergence to suppress competitor bonuses):**
+
+Adversary intentionally creates oracle divergence (large wrong claim in the same epoch, driving Δ_smooth above threshold) to trigger the dual-flag suspension (#r189/Q1), preventing competitor correlated declarations from paying out.
+
+**Defence (#r190):**
+```
+dual_flag_suspension is class-scoped: only class_i is suspended when Δ_smooth(class_i) fires.
+```
+The adversary must produce oracle divergence on the exact coordinate class of the competitor's declaration. Creating oracle divergence on a specific class requires posting and having a large wrong claim resolved on that class — the adversary's own escrow is slashed in the process. The cost of triggering Δ_smooth > Δ_alert_threshold is proportional to the position that diverges from the oracle (a wrong T3 claim with high stake, which is slashed at resolution).
+
+The adversary's economics: cost = slash of large wrong claim ≫ benefit = deferred competitor CorrelationBonus (which is bounded by seed pool fraction). Attack is economically dominated.
+
+**Residual risk:** In a thin market with few active claimants, even a moderately-sized wrong claim can shift Δ_smooth above threshold. The 2-sigma Δ_alert_threshold (self-calibrating from resolved-epoch history, #r188/Q2) naturally adapts: if the market regularly has high Δ variance, the threshold rises. In thin markets, the absolute floor staleness window prevents rapid Δ_smooth manipulation from a single epoch.
+
+**Design law (#r190):** CorrelationBonusManager's three primary attack surfaces — seed griefing, SEE manipulation, dual-flag exploitation — are all economically dominated (slot fees, oracle capture cost, wrong-claim slash cost) under the existing mechanism. CorrelationBonusManager does not introduce new attack categories; it inherits the mechanism's existing defence architecture. No new defence mechanisms are required. (#r190)
+
+---
+
+### Q2 (v2.2 roadmap priority — which unaddressed question is highest leverage?) (#r190)
+
+**Three candidates from #r188:**
+
+(a) **Multi-oracle quorum for qualified collective override** — required for DISCOVERY_MODE oracle silence handling. No production deployment depends on it until DISCOVERY_MODE is live. v2.2 dependency only.
+
+(b) **calibration_warmup_oracle genesis implementation** — a proposal from earlier runs to bootstrap credibility_ratio for classes with zero resolved history. This was partially addressed by the Phase-1 bootstrap protocol (#r76). The remaining gap is specifically for classes where oracle resolution is very slow (decades+). Niche; does not block any near-term deployment.
+
+(c) **DISCOVERY_MODE → CLEARING_MODE migration path** — covered by the additive deployment + shadow-class genesis prior specification (#r154, #r160). The mechanism is specified. The open question is the contract-level migration interface (registry adapter, #r161/Q1). This IS required for v2.2 and is partially designed.
+
+**Priority analysis (#r190):**
+
+The highest-leverage unaddressed v2.2 question is neither of these three. It is: **the PositionRegistryAdapter interface specification** (registry adapter from #r161/Q1). 
+
+Reason: every v2.2 feature that involves a shadow-class or cross-version position data reference (shadow→clearing migration, discovery→clearing mode transition, cross-version S_cred reading) depends on the adapter. If the adapter interface is underspecified, all downstream v2.2 features are blocked. The adapter is a v2.2 ground-zero dependency.
+
+**Minimal adapter spec (#r190):**
+
+```solidity
+interface IPositionRegistryAdapter {
+    // Returns WED_clearing for a coordinate class at a given epoch
+    function getWEDClearing(bytes32 classId, uint256 epoch) 
+        external view returns (uint256 wedClearing);
+    
+    // Returns max_loss for all positions on class at current epoch
+    function getPositionMaxLoss(bytes32 classId) 
+        external view returns (uint256 maxLoss);
+    
+    // Returns whether a position was registered before a given anchor timestamp
+    function isPositionRegisteredBefore(
+        bytes32 classId, address positionHolder, uint256 anchorEpoch
+    ) external view returns (bool);
+    
+    // Returns the adapter's source contract version (for audit)
+    function sourceVersion() external view returns (string memory);
+}
+```
+
+This is a four-method interface. Every v2.2 feature needing cross-version or cross-class position data uses exactly these methods. No other cross-contract coupling is needed.
+
+**Roadmap priority order (#r190):**
+1. **IPositionRegistryAdapter spec** (above) — v2.2 ground-zero dependency. Implement before other v2.2 features.
+2. **Shadow-class genesis prior parameter finalisation** (#r154–#r155) — depends on adapter; high leverage for one-shot clearing markets.
+3. **Multi-oracle quorum for collective override** — needed before DISCOVERY_MODE goes live; can trail v2.2 alpha.
+
+**Design law (#r190):** v2.2 roadmap sequencing is governed by dependency order, not by conceptual interest. Ground-zero dependencies (adapters, interfaces) precede dependent features. Highest conceptual complexity (multi-oracle quorum, DISCOVERY_MODE) trails ground-zero infrastructure. (#r190)
+
+---
+
+### Q3 (Demo Day minimal materials set — YC X26, 2026-06-16) (#r190)
+
+**What investors need from this research thread for Demo Day:**
+
+The knowledge marketplace mechanism is the epistemic architecture underlying GestAlt v2.1. Investors do not need the mechanism spec — they need the business case: why GestAlt wins where Polymarket, Kalshi, and Betfair lose.
+
+**Minimal materials set:**
+
+**1. One-paragraph positioning (already produced, #r160/Q3):**
+Use as-is for the core narrative. No modification needed.
+
+**2. One-slide competitive differentiation table:**
+
+| | Polymarket | Kalshi | Betfair | GestAlt v2.1 |
+|---|---|---|---|---|
+| Who sets the price? | Capital volume | Capital volume | Matched bets | Credibility-weighted knowers |
+| Manipulation resistance | Low (money = influence) | Moderate (US-regulated) | Moderate (exchange rules) | High (track record gates influence) |
+| Institutional grade? | No | Partial (CFTC-regulated) | No | Yes (solvency-bounded clearing) |
+| Settlement transparency | Oracle-dependent | CFTC-regulated oracle | Exchange rules | Attestation + oracle authority duality |
+| Capital efficiency | Inefficient (contra-bets tie up capital) | Inefficient | Low margin | TOWL-bounded collateral |
+
+**3. One sentence per invariant category for founders to recite:**
+- **Solvency first:** "Every position is backed by TOWL-bounded collateral; no bad debt can propagate."
+- **Anti-manipulation:** "Influence scales with calibration track record, not wallet size."
+- **Settlement integrity:** "The Settlement Freeze Protocol separates our provisional price from the oracle's final word — challengers trigger the audit, oracle wins."
+- **Capital efficiency:** "We escrow the minimum needed to warrant each position's accuracy, not a fixed percentage of notional."
+
+**4. One-paragraph risk disclosure for sophisticated investors:**
+> GestAlt v2.1 depends on an active population of credible knowers and challengers. Before go-live, each coordinate class must demonstrate epistemically live status (minimum 3 active challengers, 2 consecutive qualifying epochs). The mechanism is CLEARING_MODE only in v2.1 — price discovery is a v2.2 roadmap feature. Demo Day demonstrates mechanism correctness; production deployment follows an independent security audit of the five core contracts.
+
+**5. What NOT to include for Demo Day:**
+- Invariant numbers, run references, mechanism jargon (TOWL, WED, S_cred) — internal only.
+- Implication chains, EQ escrow-conditioned queries, shadow-classes — v2.2, not Demo Day scope.
+- 189-run research history — this aggregate doc is internal; Demo Day uses distilled outputs only.
+
+**Design law (#r190):** Demo Day materials are customer-value propositions and competitive differentiation, not mechanism specification. The five-item minimal materials set above is necessary and sufficient for YC X26 Demo Day. Full mechanism documentation (this aggregate) supports investor technical diligence post-Demo Day, not the pitch itself. (#r190)
+
+---
+
+### Q4 (Thread status — close and split, or continue in aggregate?) (#r190)
+
+**Assessment after 190 runs:**
+
+The document now covers:
+- Full 10-point framework (answered definitively in #r148)
+- Complete v2.1 minimal viable mechanism (5 contracts, 20 invariants, #r159)
+- v2.1 production readiness criteria (#r160)
+- 147 cumulative invariants
+- Three-family mechanism taxonomy (#r187)
+- Complete clearing/discovery/shadow-class architecture (#r149–#r160)
+- Adversarial audit of all major features (#r161–#r189)
+- Demo Day materials (#r190/Q3)
+
+**What remains genuinely unresolved:**
+- IPositionRegistryAdapter formal spec (v2.2 ground-zero, #r190/Q2)
+- CorrelationBonusManager detailed implementation spec
+- Multi-oracle quorum design for collective override
+- v2.2 DISCOVERY_MODE shadow-class full lifecycle contracts
+
+**Recommendation — partial split:**
+
+```
+THIS DOCUMENT: close to new founding-design entries after #r190.
+  → Archive as: knowledge-marketplace-aggregate.md (v2.1 complete)
+  → Continue using for: v2.1 implementation audit cross-references
+
+NEW DOCUMENT: /topics/knowledge-marketplace-v22.md
+  → Open for: IPositionRegistryAdapter, DISCOVERY_MODE contracts,
+               multi-oracle quorum, shadow-class lifecycle implementation
+
+NEW DOCUMENT: /topics/gestalt-demo-day-2026.md  
+  → Open for: Demo Day narrative, competitive positioning, investor materials
+               (sources from this document, not duplicates of mechanism spec)
+```
+
+**Why not full close:** The v2.1 audit and implementation phases will generate findings that reference specific sections of this document. Keeping it open for audit cross-reference entries (flagged as `[AUDIT]` in the run log) allows implementation findings to link back to original specs without polluting the founding design with implementation noise.
+
+**Why not continue in single document:** At 11,000+ lines, the document is approaching operational friction. v2.2 design questions have different scope, audience (implementation engineers vs mechanism designers), and iteration cadence than v2.1 spec work.
+
+**Action items from #r190:**
+1. Create `/topics/knowledge-marketplace-v22.md` at next v2.2 design session.
+2. Create `/topics/gestalt-demo-day-2026.md` for Demo Day materials.
+3. This document: `[OPEN for AUDIT cross-references, v2.1 implementation findings]`.
+4. Future runs in this document: numbered from #r191, scoped to v2.1 audit/implementation only.
+
+**Design law (#r190):** Long-lived research documents should split when: (a) scope diverges (design vs implementation vs communications), (b) audience diverges (mechanism designers vs engineers vs investors), (c) iteration cadence diverges (founding design is slow; implementation audit is fast; Demo Day materials have hard deadline). Split on scope, audience, and cadence — not on line count alone. (#r190)
+
+---
+
+## Structural Synthesis: Thread Closure and Forward Plan (#r190)
+
+| Domain | Status after #r190 | Forward path |
+|---|---|---|
+| v2.1 mechanism design | COMPLETE | This document (open for audit cross-refs) |
+| v2.1 attack surface | COMPLETE (CorrelationBonusManager, core contracts) | Audit phase |
+| Demo Day materials | SPEC COMPLETE (#r190/Q3) | New doc: gestalt-demo-day-2026.md |
+| v2.2 roadmap | PRIORITY SET: IPositionRegistryAdapter first | New doc: knowledge-marketplace-v22.md |
+| Invariant set | #1–#147 fully specified | No further additions to v2.1 set |
+
+---
+
+## Cumulative Invariants (additions through #r190)
+
+**Invariant #148 (#r190):** CorrelationBonusManager's three primary attack surfaces (seed griefing, SEE manipulation, dual-flag exploitation) are all economically dominated by existing mechanism defences. No new defence mechanisms required; no new attack categories introduced.
+
+**Invariant #149 (#r190):** v2.2 roadmap sequencing is governed by dependency order. IPositionRegistryAdapter is the ground-zero v2.2 dependency; all other v2.2 features sequence behind it.
+
+**Invariant #150 (#r190):** Demo Day materials use customer-value propositions and competitive differentiation only. Full mechanism documentation supports post-Demo-Day technical diligence; it does not appear in investor-facing pitch materials.
+
+**Invariant #151 (#r190):** Research documents split when scope, audience, and iteration cadence diverge. Split criterion is not line count.
+
+---
+
+## Run Log Update
+
+- **#r190** — 2026-04-04T05:22Z — Thread milestone. CorrelationBonusManager top-3 attack surface: all economically dominated; slot fee defence added. v2.2 roadmap priority: IPositionRegistryAdapter (four-method interface spec); dependency-first sequencing. Demo Day minimal materials: 5-item set; mechanism jargon excluded. Thread status: partial split recommended; this doc stays open for v2.1 audit cross-refs; new docs for v2.2 design and Demo Day. Invariants #148–#151.
+
+---
+
+## Open Questions for #r191+
+
+1. **IPositionRegistryAdapter implementation spec:** Concrete Solidity interface with storage layout requirements for v2.1 SettlementEngine adapter. Define how v2.2 CredibilityAggregator_v2 calls `getWEDClearing()` without holding a storage reference to v2.1 SettlementEngine_v1.
+
+2. **CorrelationBonusManager slot fee governance:** How does `slot_fee_fraction` interact with `challenge_submission_fee` (#r141/Q1)? Both are r_floor-scaled friction mechanisms. Should they share a single `r_floor_friction_factor` governance parameter to prevent independent miscalibration?
+
+3. **v2.1 security audit scope confirmation:** Which of the five v2.1 contracts requires external audit vs internal review? Proposed: SettlementEngine + ClaimEscrow + CredibilityAggregator → external audit; CoordinateRegistry + EATManager → internal review with external spot-check. Confirm or revise.
+
+4. **Demo Day date-sensitive preparation:** YC X26 Demo Day is 2026-06-16. What is the latest date to finalise mechanism audit (enabling accurate Demo Day risk disclosure) given typical audit durations? Working backward: if audit takes 6 weeks, latest audit-start date is 2026-05-05.
+
+*Last updated: #r190 — 2026-04-04T05:22Z*
