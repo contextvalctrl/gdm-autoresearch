@@ -4957,4 +4957,171 @@ GestAlt v2.1 is production-ready on a coordinate class when ALL of the following
 
 4. **Five-contract audit scope for v2.1 launch:** SettlementEngine + ClaimEscrow are identified as audit-required. Should CredibilityAggregator also be in audit scope (it contains the credibility_ratio update logic, which is the most attack-surface-rich component for track-record manipulation)?
 
-*Last updated: #r160 — 2026-04-04T00:22Z*
+*Last updated: #r161 — 2026-04-04T00:32Z*
+
+---
+
+## #r161 Contributions — 2026-04-04T00:32Z
+
+Addresses all four open questions from #r160. Adds one net-new structural insight: CredibilityAggregator is the highest attack-surface contract in v2.1 and should anchor the audit scope.
+
+---
+
+**Q1 (Cross-version S_cred reference — v2.2 shadow-class reading v2.1 clearing-class position registry) → Governance-registered registry adapter; no direct v2.2→v2.1 contract dependency (#r161):**
+
+A direct EVM call from v2.2 code to a v2.1 contract address creates a versioned dependency: v2.2 contracts must know v2.1 storage layouts. If v2.1 is ever deprecated or upgraded, v2.2 breaks. This is an unacceptable coupling for a long-lived additive architecture.
+
+**Resolution — registry adapter pattern:**
+
+```
+PositionRegistryAdapter (governance-deployed, version-agnostic):
+  interface IPositionRegistry {
+    function getWEDClearing(bytes32 class_id, uint epoch) external view returns (uint256);
+    function getPositionMaxLoss(bytes32 class_id) external view returns (uint256);
+  }
+
+At governance registration of a shadow-class pair:
+  governance registers adapter_address for clearing_class_id
+  v2.2 CredibilityAggregator reads WED_clearing from adapter_address (IPositionRegistry)
+  adapter_address is governance-upgradeable (stored in CoordinateRegistry_v2.2 as a reference,
+  not hardcoded in v2.2 bytecode)
+```
+
+**Adapter as governance-deployed proxy:** The adapter is a thin translation contract:
+- For v2.1 clearing classes: adapter calls `SettlementEngine_v1.getPositionExposure(class_id)` using v2.1 storage layout.
+- For future v2.3+ clearing classes: adapter is redeployed with v2.3 storage translation.
+
+**Security property:** v2.2 contracts have no dependency on v2.1 contract addresses. They depend only on the adapter address registered by governance — governance-upgradeable but governance-audited. The blast radius of a v2.1 SettlementEngine bug does not propagate to v2.2 code.
+
+**Governance action at pair registration:** Emit `position_registry_adapter_registered` EAT event: `{ shadow_class_id, clearing_class_id, adapter_address, clearing_contract_version: v2.1 }`.
+
+**Design law (#r161):** Cross-version contract references must be mediated by governance-registered adapters with version-agnostic interfaces. Direct versioned dependencies between contract sets are prohibited. Governance bears the responsibility of maintaining adapter correctness; the core contracts remain version-isolated. (#r161)
+
+---
+
+**Q2 (epistemically_live 50% throttle + Zone C simultaneous — combined suppression) → More restrictive floor; not multiplicative (#r161):**
+
+The two suppression mechanisms are conceptually orthogonal:
+- Zone C: solvency-driven. TOWL is under stress; new installations risk pushing TOWL further into deficit.
+- epistemically_live = false: quality-driven. New installations cannot be epistemically enforced; challenger population is too thin.
+
+**Why multiplicative (50% × Zone-C-rate) is wrong:**
+
+Multiplicative produces rates like 50% × 30% = 15% of normal installation capacity. The Zone C rate is already a governance-calibrated solvency safety margin. Applying epistemically_live throttle on top assumes the two conditions are independent and that their combined effect should be the product. But the throttle is a binary quality gate, not a continuous rate — "50% of normal capacity" is already a solvency-style throttle applied for a quality reason, which creates semantic confusion.
+
+**Resolution — more restrictive floor:**
+
+```
+effective_installation_throttle(class_i, epoch_t) = min(
+  zone_c_throttle_rate(class_i, t),      // from TOWL Zone C logic
+  epistemic_throttle_rate(class_i, t)    // 1.0 if live; 0.5 if not epistemically_live
+)
+```
+
+The more restrictive condition governs. If Zone C allows 30% and epistemically_live = false allows 50%, the effective rate is 30%. If Zone C is not active (100%) and epistemically_live = false, the effective rate is 50%.
+
+**Governance reporting:** Each epoch, EAT commits `installation_throttle_active: { zone_c_rate, epistemic_rate, effective_rate, governing_condition: "zone_c" | "epistemic_liveness" | "neither" }`. This makes the governing constraint transparent for post-hoc accountability.
+
+**Design law (#r161):** When multiple independent suppression conditions target the same variable (installation rate), apply the more restrictive floor. Multiplicative suppression implies independence and continuity assumptions that do not hold for binary quality gates. (#r161)
+
+---
+
+**Q3 (Demo Day narrative variants — Kalshi and Betfair) → Two additional paragraphs; Sarthak to select per audience (#r161):**
+
+**Variant A — vs Kalshi (regulatory-grade event contracts):**
+
+> Kalshi's edge is regulatory legitimacy: it is CFTC-regulated and can offer contracts that others cannot. GestAlt's edge is epistemic legitimacy: it is not enough to be legally allowed to settle a contract — the settlement price itself must be credibly accurate, traceable, and manipulation-resistant. Kalshi's settlement is oracle-dependent and challengeable only through legal process. GestAlt's settlement is credibility-weighted by the track records of participants who stake real capital on their assessments, and challengeable on-chain within a defined window. For institutional counterparties whose clearing price determines margin calls, collateral transfers, or structured product payoffs, the question is not "was this contract legal?" but "was this settlement price right?" — GestAlt answers the second question.
+
+**Variant B — vs Betfair (exchange-style, liquidity-depth):**
+
+> Betfair is a deep, efficient exchange: it matches buyers and sellers at prices that reflect aggregate willingness-to-bet. The problem is that willingness-to-bet and epistemic accuracy are not the same thing. A large position from a well-capitalised bettor moves the market as much as one from a domain expert — capital is the only signal Betfair's mechanism sees. GestAlt builds a different market: one where the settlement price reflects not just capital weight but calibration weight — how often has this participant been right in the past, on similar events, with real money at stake? For institutional clearing where accuracy matters more than liquidity depth, GestAlt's credibility-weighted price is structurally harder to move without actually being right.
+
+**Usage note for Sarthak:** Use the Polymarket variant (#r160/Q3) when the audience is DeFi-native and cares about manipulation resistance. Use the Kalshi variant when the audience is institutional or regulatory and cares about accuracy of settlement. Use the Betfair variant when the audience has exchange/trading backgrounds and cares about price formation quality. All three can be held in reserve and selected per room. (#r161)
+
+---
+
+**Q4 (Five-contract audit scope for v2.1 launch — CredibilityAggregator) → Three-contract minimum audit scope: CredibilityAggregator + ClaimEscrow + SettlementEngine; two-contract secondary scope: CoordinateRegistry + EATManager (#r161):**
+
+**Attack surface analysis by contract:**
+
+| Contract | Primary attack surface | Audit priority |
+|---|---|---|
+| CredibilityAggregator | credibility_ratio manipulation (track-record gaming); single-agent dominance bypass (W_max); epoch-buffer timing games | **CRITICAL** |
+| ClaimEscrow | slash routing bugs; longtail escrow accounting; LTRP seed drain | **CRITICAL** |
+| SettlementEngine | SFP T_anchor race conditions; oracle_settlement_override authorization; Zone C deferral bypass | **CRITICAL** |
+| CoordinateRegistry | staleness parameter manipulation at registration; version-pinning bypass | **HIGH** |
+| EATManager | Merkle root manipulation; degraded-mode trigger gaming | **HIGH** |
+
+**Why CredibilityAggregator must be in audit scope:**
+
+The credibility_ratio update is the mechanism's most attack-surface-rich computation:
+1. **Log-score manipulation:** A sophisticated participant could structure claims to maximise log-score gain while minimising loss exposure — requires careful review of edge cases (zero-probability claims, extreme stake sizes, rounding).
+2. **W_max bypass:** The single-agent dominance cap (`W_max`) is enforced in CredibilityAggregator. If bypassed, a single agent can dominate S_cred — the mechanism's core epistemic integrity fails.
+3. **Epoch-buffer timing:** The one-epoch clearing feed buffer (new claims do not affect settlement until the next epoch) must be atomic with the T_anchor StateFreeze. A race condition here allows a last-second credibility_ratio update to influence the candidate settlement price.
+4. **S_cred aggregation overflow/underflow:** credibility-weighted aggregation involves floating-point-style arithmetic on-chain. Precision loss or overflow in extreme cases must be verified.
+
+**Recommended audit scope:**
+
+- **Primary (pre-launch required):** CredibilityAggregator, ClaimEscrow, SettlementEngine — all three in scope for a single coordinated security audit. Rationale: these three contracts interact atomically at T_anchor (StateFreeze transaction, #r160/Q2); an auditor must review them together, not independently.
+- **Secondary (pre-v2.2 required, can follow launch by one quarter):** CoordinateRegistry, EATManager — lower direct financial stakes but required for full system integrity.
+
+**Audit deliverable specification:** The audit scope must include the T_anchor atomic transaction call-ordering (#r160/Q2), the credibility_ratio log-score edge cases, the W_max cap enforcement, and the Zone C deferral state machine in SettlementEngine. These are the four highest-probability defect locations.
+
+**Design law (#r161):** Audit scope is determined by attack surface, not contract count. Contracts that interact atomically at settlement-critical transactions must be audited together as a unit. The three-contract primary audit scope is the minimum; piecemeal auditing of these three is insufficient. (#r161)
+
+---
+
+## Net-New Structural Insight: CredibilityAggregator as the Mechanism's Trust Root (#r161)
+
+The full 161-run design converges on a key architectural observation: the CredibilityAggregator is the mechanism's **trust root** — the component whose correctness all other epistemic guarantees depend on.
+
+**Why CredibilityAggregator is the trust root:**
+
+- S_cred correctness depends on credibility_ratio correctness. If credibility_ratio is manipulable, S_cred is manipulable, which means settlement prices can be gamed by track-record manipulation — the mechanism's core differentiation from LMSR fails.
+- The oracle-authority/attestor duality (#r151) requires attestation quality to be meaningful. Attestation quality derives from credibility_ratio. If credibility_ratio is noise, oracle overrides become the only reliable settlement signal — degrading the mechanism to oracle-only pricing.
+- Epistemic liveness (#r160/Q4) is measured by challenger pool activity, which is only profitable if credibility_ratio updates are honest. Corrupted credibility_ratio = challengers cannot identify wrong installations efficiently = epistemically_live collapses.
+
+**The trust root implication for GestAlt v2.1:**
+
+GestAlt can tolerate bugs in secondary contracts (EATManager bugs = audit gaps; CoordinateRegistry bugs = parameter miscalibration) and recover through governance. A CredibilityAggregator bug that allows credibility_ratio manipulation may be undetectable until significant settlement damage has occurred — and may be irreversible (credibility history once committed propagates forward through all subsequent S_cred computations).
+
+**Operational consequence:** The CredibilityAggregator update logic must be the most conservatively designed, most thoroughly audited, and least mutable component of GestAlt v2.1. Any upgrade to CredibilityAggregator (even v2.1 patches) must trigger a re-audit of the credibility_ratio update path and a re-evaluation of epistemically_live status for all active coordinate classes.
+
+**Invariant addendum (#r161):** CredibilityAggregator upgrades require re-audit and epistemically_live re-evaluation. No patch to the credibility_ratio update logic is deployable without auditor sign-off. This constraint is independent of governance multisig approval — it is a mechanism safety invariant. (#r161)
+
+---
+
+## Structural Synthesis: v2.1 Audit and Deployment Architecture — Closed (#r161)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Cross-version S_cred reference | Governance-registered adapter (IPositionRegistry); no direct versioned dependency | Cross-version coupling prohibited; adapters mediate |
+| Dual suppression floor | More restrictive floor (not multiplicative); governing condition logged per epoch | Binary quality gates use floor, not product |
+| Demo Day narrative variants | Three paragraphs: vs Polymarket (#r160), vs Kalshi, vs Betfair; select per audience | Sarthak selects per room |
+| Audit scope | Three-contract primary (CredibilityAggregator + ClaimEscrow + SettlementEngine); audited together | Atomic-interaction contracts audited as unit; CredibilityAggregator is trust root |
+
+---
+
+## Cumulative Invariants (additions through #r161)
+
+**Invariant #39 (#r161):** Cross-version contract references are mediated by governance-registered adapters with version-agnostic interfaces. No direct versioned EVM dependencies between contract sets.
+
+**Invariant #40 (#r161):** When multiple independent suppression conditions target the same installation rate, apply the more restrictive floor — never multiplicative.
+
+**Invariant #41 (#r161):** CredibilityAggregator is the mechanism's trust root. Upgrades require re-audit of the credibility_ratio update path and re-evaluation of epistemically_live status for all active classes. No patch deployable without auditor sign-off.
+
+**Invariant #42 (#r161):** The three-contract primary audit scope (CredibilityAggregator, ClaimEscrow, SettlementEngine) must be audited together as a unit before v2.1 launch. Piecemeal auditing of these three is insufficient.
+
+---
+
+## Open Questions for #r162+
+
+1. **CredibilityAggregator upgrade governance gate:** Define the precise governance multi-step required to deploy a CredibilityAggregator upgrade: (a) audit submitted; (b) governance vote; (c) epistemically_live re-evaluation window; (d) deploy. What is the minimum time between each step? Should there be a time-lock even for emergency fixes?
+
+2. **IPositionRegistry adapter trust model:** The adapter is governance-upgradeable. A malicious governance action could replace the adapter with one that returns fabricated WED_clearing data, causing v2.2 shadow-classes to route knower incentives incorrectly. What immutability constraint prevents this — is the adapter address stored immutably in shadow-class registration, or should it be governance-alterable only with a time-lock?
+
+3. **More-restrictive-floor throttle and knower planning horizon:** When the effective_installation_throttle drops below 1.0 for multiple consecutive epochs (sustained Zone C or sustained epistemically_live failure), knowers with pending declarations cannot install. What is the maximum queue depth before queued declarations begin to expire, and how should governance prioritize queue drain on throttle recovery?
+
+4. **Mechanism completeness declaration:** With 42 invariants, 5-contract v2.1 scope, full audit scope defined, and three Demo Day narratives ready, is the knowledge-marketplace mechanism design complete enough to hand off to the smart contract engineering team? What is the minimum readable engineering spec format — invariants + 10-point framework (#r148) + 5-contract launch checklist (#r160) — that constitutes a handoff-ready document?
+
+*Last updated: #r161 — 2026-04-04T00:32Z*
