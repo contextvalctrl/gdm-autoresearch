@@ -17226,3 +17226,207 @@ The dashboard makes the three basin-stability conditions observable together. A 
 3. **r_watch_scale and EAT compaction eligibility:** An increased challenge rate under ZONE_C_WATCH means more challenges per epoch, more EAT events, more resolved epoch records. Does ZONE_C_WATCH status affect compaction eligibility timelines — specifically, does the N_compact_grace countdown pause during ZONE_C_WATCH (heightened vigilance period) or proceed normally?
 
 4. **Grossman-Stiglitz resolution in multi-class correlated portfolios:** The two-phase GS analysis treats each class independently. In a correlated multi-class portfolio (e.g., macro interest rate class + bond default class), knowers who have private information about both can arbitrage Phase 1 across classes. Does the Grossman-Stiglitz resolution condition for correlated classes require adjustment to account for cross-class information spillover?
+
+---
+
+## #r218 Contributions — 2026-04-04T10:12Z
+
+Addresses all four open questions from #r217.
+
+**Q1 (EDS* empirical calibration for v2.2 genesis — C_info and credibility_ratio_avg unobservable) → Governance-declared genesis estimates with revealed-preference transition; dual-condition maturation analogous to α_cap (#r218):**
+
+EDS* = C_info × (1−ρ_discount) / (credibility_ratio_avg × q_fee_base_share) requires two genesis-unknown quantities. Neither C_info nor credibility_ratio_avg is directly observable before the class has active knowers and resolved claims.
+
+**C_info genesis estimate:**
+
+C_info (information acquisition cost per epoch) can be bounded from observable proxies at registration:
+```
+C_info_estimate_genesis = r_floor_per_class × stake_complexity_multiplier
+
+stake_complexity_multiplier ∈ [1.0, 5.0]  (governance-declared at registration)
+  1.0 = simple public-data coordinate (financial price, on-chain event)
+  2.5 = moderate expertise required (regulatory state, model-dependent forecast)
+  5.0 = high information cost (proprietary intelligence, expert judgment)
+```
+
+Governance commits `stake_complexity_multiplier` and a rationale string to EAT at registration. Analogous to oracle_resolution_p50_latency in LTRP seed sizing (#r131/Q1): governance bears accountability for miscalibration.
+
+**credibility_ratio_avg genesis default:**
+
+At genesis, all knowers are new entrants with credibility_ratio initialised at θ_T1_floor (#r72/Q4). Therefore:
+```
+credibility_ratio_avg_genesis = θ_T1_floor  (conservative lower bound)
+```
+
+This produces a conservative (high) EDS* at genesis — the bootstrap subsidy must be sized for worst-case demand to enter the upper basin. As credibility_ratio_avg rises with resolved claims, EDS* falls and the system becomes easier to sustain.
+
+**Empirical transition (dual-condition, analogous to α_cap, #r143/Q3):**
+
+Once BOTH conditions hold:
+1. ≥ N_calibration normal-mode resolved claim epochs exist for the class.
+2. Governance has completed at least one post-launch calibration review (optional governance action).
+
+Replace genesis estimates with revealed-preference empirical values:
+```
+C_info_revealed(epoch_t) = EMA(observed_avg_claim_stake × r_floor_scaling, N_ρ)
+credibility_ratio_avg_revealed(epoch_t) = EMA(mean_credibility_ratio_active_knowers, N_calibration)
+```
+
+When EDS*_empirical first activates:
+- If EDS*_empirical < EDS*_genesis (typical): bootstrap subsidy rate reduces; excess governance seed may be recalled.
+- If EDS*_empirical > EDS*_genesis (rare): governance alert `EDS_underestimated`; subsidy increases; failure to respond within 2 macro-epochs triggers epistemically_live downgrade.
+
+**Design law (#r218):** EDS* calibration follows the same dual-condition maturation pattern as all protocol-derived parameters. Genesis estimates use governance-bounded conservative defaults; empirical values replace them after N_calibration resolved epochs. (#r218)
+
+---
+
+**Q2 (θ_eligible_floor governance clamp for thin knower pools) → max(min_eligible_absolute, floor(θ_eligible_floor × N_knowers_active)); min_eligible_absolute = 2 (#r218):**
+
+Applying θ_eligible_floor = 0.70 as a pure fraction to a pool of 3 active knowers requires ceil(2.1) = 3 — all 3 must be active, leaving zero tolerance for inactivity.
+
+**Resolution:**
+```
+N_eligible_required(class_i, epoch_t) =
+    max(min_eligible_absolute, floor(θ_eligible_floor × N_knowers_active(class_i, t)))
+
+min_eligible_absolute = 2   (governance-settable, bounds [1, 5])
+```
+
+For 3 active knowers: max(2, floor(0.70 × 3)) = max(2, 2) = 2. Allows one inactive knower without triggering eligibility_erosion_alert.
+For 100 active knowers: max(2, floor(70)) = 70. Identical to pure fraction.
+
+**floor() vs ceil():** floor() is used because eligibility fraction is a rate-of-system-health signal, not a binary gate. Rounding down avoids over-constraining thin pools.
+
+**Interaction with epistemically_live threshold:** These are separate conditions. epistemically_live governs new T3 installation admission. eligibility_erosion_alert governs EQ fee redistribution and upper_basin_confidence index. A class may be epistemically_live = true with eligibility_erosion_alert = true if the active knower pool is participating but a sub-floor fraction is eligible.
+
+**Design law (#r218):** Fraction-based eligibility floors must be combined with absolute minimums via max(). Pure fractions on thin pools can be over-constraining. min_eligible_absolute = 2 provides redundancy protection while fractions protect large pools from free-rider erosion. (#r218)
+
+---
+
+**Q3 (r_watch_scale and EAT compaction eligibility — does ZONE_C_WATCH pause N_compact_grace?) → ZONE_C_WATCH does NOT pause N_compact_grace; elevated challenges delay compaction via open challenge windows, not countdown resets (#r218):**
+
+**Classification check:** Per Invariant #27 and #r157/Q4, N_compact_grace resets only on governance parameter changes affecting claim status (min_chain_weight_fraction, staleness_window, κ). ZONE_C_WATCH is a dynamic protocol state driven by TOWL utilisation — not a governance parameter change. Invariant #27 does not trigger.
+
+**What actually happens under ZONE_C_WATCH:**
+
+1. r_watch_scale = 0.70: effective_δ_threshold is lower → neutral challenger triggers on more installations → more challenges per epoch.
+2. Each challenge opens a challenge window on the targeted installation's epoch.
+3. Compaction eligibility requires all challenge windows closed (Invariant #23). More open windows → recent epochs compaction-blocked until challenges resolve.
+
+The delay is real but correctly scoped. Once each challenge resolves, its window closes and the epoch advances toward compaction eligibility. N_compact_grace countdown proceeds normally in normal-mode epochs.
+
+**Practical consequence:**
+```
+Expected compaction lag_ZONE_C_WATCH =
+    N_compact_grace + E[challenge_resolution_time | ZONE_C_WATCH]
+  > N_compact_grace + E[challenge_resolution_time | normal_mode]
+```
+
+Peak backlog occurs at ZONE_C_WATCH onset; clears as challenges resolve.
+
+**Design law (#r218):** ZONE_C_WATCH is a protocol state, not a governance parameter change. It does not reset N_compact_grace. Elevated challenge rates delay compaction through open challenge windows. Compaction eligibility is a lazy predicate (Invariant #26); open challenge windows are the operative delay mechanism. (#r218)
+
+---
+
+**Q4 (Grossman-Stiglitz resolution in multi-class correlated portfolios — information spillover) → Cross-class information spillover reduces effective Phase 2 income on correlated classes; implication chain declarations are the correct compensation mechanism (#r218):**
+
+**The spillover problem formalised:**
+
+Let A and B be two coordinate classes with oracle correlation ρ_AB ∈ [0, 1]. A knower's A-side Phase 1 claim submission reveals partial information about s_B:
+```
+ΔI_B = ρ_AB² × I_B_total  (fraction of B-private-information made public by A-claim)
+
+I_B_remaining = (1 − ρ_AB²) × I_B_total
+
+Effective multi-class GS income:
+  Total_GS_income = Phase1_A + Phase1_B + Phase2_A + Phase2_B × (1 − ρ_AB²)
+```
+
+**Failure mode at high correlation:** For ρ_AB → 1, Phase2_B → 0. Rational knowers avoid A-side Phase 1 submission to preserve B-side advantage. Both classes suffer under-provision of warranted attestation.
+
+**Implication chain as information-bundling compensation:**
+
+The implication chain declaration (A→B, #r72–#r73) compensates for this spillover externality. Required β for equilibrium compensation:
+```
+β_required(ρ_AB) ≈ C_info_B × ρ_AB² / (Phase1_B + ε)
+  (compensation to make bundled disclosure individually rational)
+```
+
+For ρ_AB = 0.5: β_required is moderate, within the β_effective range [1.3, 2.0].
+For ρ_AB = 0.9: β_required is large — highly correlated classes should be candidates for merge.
+
+**Mechanism recommendation by correlation tier:**
+
+1. ρ_AB ≥ 0.7 AND C_info_shared ≥ 0.5 × min(C_info_A, C_info_B): **class merge candidate** — single class captures both variables, eliminates spillover entirely.
+
+2. ρ_AB ∈ [0.4, 0.7): **implication chain with β_floor_correlated** — governance registers `cross_class_correlation_declaration: (A, B, ρ_AB_estimate)` at registration. Contract gate enforces β_effective ≥ β_floor_correlated at class registration.
+
+3. ρ_AB < 0.4: standard independent class GS analysis sufficient. No adjustment needed.
+
+**Governance interface addition:**
+```
+β_floor_correlated(A, B) = max(β_effective_uncorrelated, β_required(ρ_AB_estimate))
+
+alignment pool extension (#r157/Q3): correlated pairs (ρ_AB ≥ 0.4) same oracle + tier qualify for shared alignment pool
+EDS*_portfolio < Σ EDS*_i  (correlated classes partially substitute for each other's information)
+```
+
+**Why v2.1 is unaffected:** v2.1 is CLEARING_MODE only. D(c) comes from position max_loss (Invariant #13), not GS revelation. Correlated CLEARING_MODE classes have a TOWL solvency interaction (correlated slashing), not a GS revelation concern. GS spillover and implication chain compensation are v2.2 DISCOVERY_MODE scope. (#r218)
+
+---
+
+## Net-New Structural Insight: ρ_AB-Weighted Class Registration as a v2.2 Launch Gate (#r218)
+
+High cross-class correlations without governance declarations cause systematic errors in three places:
+1. EDS* over-estimated (per-class independence assumption; combined subsidy over-sized).
+2. β_effective under-calibrated (no β_floor_correlated applied; knowers under-compensated for spillover).
+3. implication chain depth incentives mis-aligned (γ^(depth-1) discount not adjusted for correlated bonus).
+
+**v2.2 registration invariant:**
+
+For any class pair with ρ_AB_estimate ≥ 0.4: governance must submit cross_class_correlation_declaration at registration. Contract gate: β_effective ≥ β_floor_correlated. ρ_AB ≥ 0.7 with low C_info_shared differentiation is a class merge candidate.
+
+**Design law (#r218):** For v2.2 DISCOVERY_MODE class portfolios, cross-class correlation declarations are required for ρ_AB ≥ 0.4. Undeclared correlations cause systematic calibration errors in EDS*, β_floor, and bootstrap subsidy sizing. The implication chain mechanism is the correct compensation tool for declared correlated pairs. (#r218)
+
+---
+
+## Structural Synthesis (#r218)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| EDS* genesis calibration | stake_complexity_multiplier × r_floor; θ_T1_floor as credibility_avg; dual-condition empirical transition | Genesis = conservative default; revealed-preference replaces after N_calibration |
+| θ_eligible_floor thin pools | max(min_eligible_absolute=2, floor(θ × N_active)) | Fraction + absolute minimum; floor not ceil |
+| ZONE_C_WATCH and compaction | N_compact_grace proceeds; delays via open windows only | ZONE_C_WATCH is protocol state not parameter change; lazy predicate governs |
+| GS correlated portfolios | ρ_AB² spillover → Phase2_B reduced; implication chain β compensates; ρ ≥ 0.4 declarations required | Information spillover solved by implication chain bundling; v2.2 only |
+
+---
+
+## Cumulative Invariants (#r218)
+
+**Invariant #277 (#r218):** EDS* calibration follows dual-condition maturation. Genesis default uses governance-declared stake_complexity_multiplier and credibility_ratio_avg = θ_T1_floor. Empirical values replace defaults after N_calibration resolved epochs. EDS*_underestimated alert fires if empirical EDS* > genesis EDS*.
+
+**Invariant #278 (#r218):** Eligible knower threshold = max(min_eligible_absolute=2, floor(θ_eligible_floor × N_knowers_active)). floor(), not ceil(). min_eligible_absolute ∈ [1, 5] governance-settable.
+
+**Invariant #279 (#r218):** ZONE_C_WATCH does not reset N_compact_grace. Elevated neutral challenge rate delays compaction of challenged epochs through open challenge windows. Compaction eligibility is a lazy predicate; ZONE_C_WATCH is a protocol state, not a parameter change.
+
+**Invariant #280 (#r218):** For v2.2 DISCOVERY_MODE class portfolios with ρ_AB ≥ 0.4: cross_class_correlation_declaration is required at registration. β_effective must satisfy β_floor_correlated. Highly correlated pairs (ρ_AB ≥ 0.7) are candidates for class merge. GS spillover analysis and implication chain compensation are v2.2 scope only.
+
+---
+
+## Run Log Update
+
+- **#r218** — 2026-04-04T10:12Z — Q1: EDS* genesis via stake_complexity_multiplier × r_floor; credibility_ratio_avg_genesis = θ_T1_floor; dual-condition empirical transition; EDS*_underestimated alert on miscalibration. Q2: θ_eligible_floor = max(2, floor(0.70 × N_active)); floor not ceil; min_eligible_absolute = 2. Q3: ZONE_C_WATCH does not pause N_compact_grace; elevated challenges delay compaction via open windows only. Q4: GS cross-class spillover → Phase2_B reduced by ρ_AB²; implication chain β compensates; ρ_AB ≥ 0.4 correlation declarations required for v2.2; ρ_AB ≥ 0.7 suggests class merge; v2.1 unaffected. Net-new: ρ_AB-weighted class registration as a v2.2 launch gate; β_floor_correlated contract gate. Invariants #277–#280.
+
+---
+
+## Open Questions for #r219+
+
+1. **EDS* and C_info_shared estimation for class merge candidates:** At what combined (ρ_AB, C_info_shared/C_info_total) threshold is class merge epistemically superior to an implication chain? A quantitative decision boundary would make this governance-actionable rather than advisory.
+
+2. **cross_class_correlation_declaration update mechanics:** Once ρ_AB_estimate is committed to EAT at registration, how is it updated if empirical data revises the estimate? Does revision trigger N_compact_grace reset (Invariant #27) for affected epochs, since β_floor_correlated computation changes?
+
+3. **Combined EDS*_portfolio formula:** When classes are correlated, EDS*_portfolio < Σ EDS*_i. What is the formal portfolio EDS* formula — minimum of correlated pairs, harmonic mean, or full portfolio covariance adjustment?
+
+4. **v2.2 correlation-aware registry adapter:** The #r161 registry adapter mediates v2.2 → v2.1 position registry reads. If a v2.2 shadow-class is correlated with a v2.1 clearing class, how does the adapter expose the correlation-aware EDS* computation to the v2.2 CredibilityAggregator without depending on v2.2-only data structures?
+
+*Last updated: #r218 — 2026-04-04T10:12Z*
