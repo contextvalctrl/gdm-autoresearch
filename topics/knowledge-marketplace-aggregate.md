@@ -17903,3 +17903,243 @@ This exception is clean: DISCOVERY_MODE classes have no settlement-price obligat
 3. **regime_transition hysteresis and LTRP seeding:** When a class transitions bilateral_flow → warranted_attestation_pool, the `bilateral_flow_recovery_reserve` becomes immediately relevant. But if EDS is in the hysteresis band (EDS* − ε < EDS < EDS*), the class has not officially exited bilateral flow yet — the recovery reserve should not be drawn. Should the reserve activation gate use `EDS < EDS* − ε_hysteresis` (the hysteresis boundary) rather than `EDS < EDS_floor_hard` alone?
 
 4. **class_merge_declaration and implication chain validity:** If a WINDING_DOWN source class was the `A` coordinate in an active A→B implication declaration, the declaration's epistemic basis is degrading (no new A-claims from T_merge_declared onward). Should the implication declaration remain active until natural expiry, or should there be an accelerated implication bonus settlement at T_merge_declared?
+
+---
+
+## #r221 Contributions — 2026-04-04T10:52Z
+
+Addresses all four open questions from #r220. Net-new first-principles angle: the mechanism's information-theoretic efficiency ceiling — what is the maximum epistemic value extractable by this protocol design, and does the bilateral-flow regime approach it?
+
+---
+
+### Q1 (Maximum recovery draw attempts before irrecoverability declared) → max_recovery_attempts = 3; exponential backoff on draw intervals; irrecoverability declared if EDS < EDS* after third draw; supermajority required to extend (#r221)
+
+**The structural problem:** The bilateral_flow_recovery_reserve exists to cross the EDS* basin boundary. If EDS remains below EDS* even after a full subsidy draw, one of two things is true:
+1. EDS* was underestimated (C_info or credibility_ratio_avg miscalibrated at genesis); the subsidy was correctly sized but the target was wrong.
+2. The demand-side failure is structural — the unknower population for this class has contracted permanently (e.g., the regulatory event class is no longer relevant).
+
+In both cases, refilling and re-attempting indefinitely wastes treasury capital. The mechanism must declare irrecoverability at some bounded point.
+
+**Resolution — three-attempt protocol with exponential backoff:**
+
+```
+recovery_attempt_log(class_i):
+  draw_1: at regime_transition (bilateral_flow → attestation pool)
+    amount: min(recovery_reserve_balance, EDS*_current × 1.5)
+    wait: N_calibration epochs to observe EDS response
+
+  draw_2: if EDS still < EDS* after draw_1 + N_calibration
+    amount: min(remaining_reserve + governance_treasury_top_up, EDS*_current × 2.0)
+    wait: 2 × N_calibration epochs  [exponential backoff]
+    governance decision: vote to proceed OR declare irrecoverability
+
+  draw_3: if EDS still < EDS* after draw_2 + 2 × N_calibration
+    amount: governance_discretionary (up to 3 × EDS*_current)
+    wait: 2 × N_calibration epochs
+    post-draw: if EDS < EDS* → IRRECOVERABILITY_DECLARED
+
+max_recovery_attempts = 3  [governance-settable [2, 5]; supermajority vote required to extend]
+```
+
+**Irrecoverability declaration:**
+```
+IRRECOVERABILITY_DECLARED iff:
+  recovery_attempt_count >= max_recovery_attempts AND EDS < EDS* post-final-draw
+
+Effect:
+  - Class enters DELIST_PENDING_IRRECOVERABLE
+  - Remaining bilateral_flow_recovery_reserve returned to governance treasury
+  - Existing positions settle at next scheduled T_anchor; no further T3 installations accepted
+  - EAT: irrecoverability_declared { class_id, epoch, attempts_count, final_EDS, EDS_star }
+```
+
+**Why 3 attempts:** Draw 1 tests whether a pulse subsidy crosses the boundary. Draw 2 (with governance vote) tests whether sustained subsidy overcomes structural demand-side weakness. Draw 3 tests whether the protocol is willing to invest at 3×. Beyond 3, continued failure despite capitalised attempts is strong evidence of structural class failure. Extending beyond 3 requires explicit supermajority — prevents political drift on indefinite recovery attempts. (#r221)
+
+---
+
+### Q2 (λ_max uncertainty band lower approximation) → Rayleigh quotient with uniform test vector: λ_max_lower = 1 + (N−1) × average_pairwise_ρ; O(N²); completes uncertainty band (#r221)
+
+**Resolution — Rayleigh quotient lower bound with uniform test vector v = (1,1,...,1)/√N:**
+
+For a correlation matrix Σ with diagonal 1 and off-diagonal ρ_ij ∈ [0,1):
+
+```
+λ_max ≥ v^T Σ v / v^T v = (N + 2 × Σ_{i<j} ρ_{ij}) / N
+       = 1 + (2/N) × Σ_{i<j} ρ_{ij}
+       = 1 + (N−1) × average_pairwise_ρ
+
+where average_pairwise_ρ = (2/(N×(N-1))) × Σ_{i<j} ρ_{ij}
+```
+
+This is always a valid lower bound (Rayleigh quotient property for PSD matrices). Computable in O(N²) — same cost as the row-sum upper bound.
+
+**Numerical verification (matrix from #r220/Q2):**
+```
+Off-diagonal pairs: 0.7+0.3+0.1+0.4+0.2+0.6 = 2.3
+average_pairwise_ρ = 2.3/6 ≈ 0.383
+λ_max_lower = 1 + 3 × 0.383 = 2.149
+
+True λ_max ≈ 2.15; row-sum upper = 2.3
+uncertainty_band = (2.3 − 2.149) / 2.3 = 6.6%  ≤ 10% → Gershgorin valid ✓
+```
+
+**Complete uncertainty band formula:**
+```
+λ_max_lower = 1 + (N−1) × average_pairwise_ρ          [Rayleigh; uniform vector]
+λ_max_upper = 1 + max_row_offdiag_sum                  [Gershgorin row-sum; Invariant #287]
+uncertainty_band = (λ_max_upper − λ_max_lower) / λ_max_upper
+trigger full eigenvalue iff uncertainty_band > 0.10
+```
+
+**Design law (#r221):** λ_max lower bound = 1 + (N−1) × average_pairwise_ρ (Rayleigh quotient; uniform test vector; O(N²)). Uncertainty band = (row-sum − Rayleigh)/row-sum. Full eigenvalue triggered when > 10%. Completes Invariant #287. (#r221)
+
+---
+
+### Q3 (Recovery reserve activation gate — hysteresis interaction) → Draw triggered by regime_transition at EDS*−ε; EDS_floor_hard is severity gate only; no draws in hysteresis band (#r221)
+
+**Three EDS threshold levels:**
+```
+EDS* + ε_hysteresis     bilateral flow entry gate
+EDS*                    GS resolution minimum viable EDS
+EDS* − ε_hysteresis     bilateral flow exit gate (regime_transition fires here)
+EDS_floor_hard = 0.30 × EDS*_genesis   irrecoverability severity threshold
+```
+
+**Resolution:**
+
+Recovery reserve draw_1 is triggered by the `regime_transition` EAT event (bilateral_flow → warranted_attestation_pool), which fires when EDS crosses EDS* − ε_hysteresis downward. EDS_floor_hard is evaluated *at* the regime_transition event to classify severity:
+- EDS > EDS_floor_hard at exit: standard 3-draw recovery protocol
+- EDS ≤ EDS_floor_hard at exit: `recovery_required = true` alert from draw_1 initiation (irrecoverability risk flagged; 3 draws still permitted)
+
+**While EDS is in the hysteresis band [EDS* − ε, EDS* + ε]:** No regime_transition event; no draw permitted. Three-tier ladder continues monitoring. This is the "weakened bilateral flow" state — governance-advisory only.
+
+**Clean separation of thresholds:**
+- Hysteresis exit boundary = draw trigger = regime health gate
+- EDS_floor_hard = severity classifier = irrecoverability risk indicator
+- These are distinct; conflating them would miscalibrate both draw timing and severity assessment
+
+**Design law (#r221):** Recovery reserve draw is triggered by regime_transition (at EDS*−ε_hysteresis). EDS_floor_hard classifies the exit severity but does not replace the hysteresis threshold as the activation gate. No draws inside the hysteresis band. (#r221)
+
+---
+
+### Q4 (class_merge_declaration and implication chain validity) → DEGRADED_SOURCE state; β_effective exponential decay at halflife N_calibration; natural expiry maintained; no accelerated settlement; merged class C has fresh registry (#r221)
+
+**Why accelerated settlement fails:** Future implication bonuses are conditional on continued A-activity. Paying them in a lump sum would over-reward the declarant for activity that will not occur, violating the equivalence principle between implication chains and direct claims. Static-commitment (#r137) extends to chain lifecycle.
+
+**Resolution — DEGRADED_SOURCE state:**
+
+```
+At T_merge_declared for source class A (WINDING_DOWN):
+  All active A→B implication declarations enter DEGRADED_SOURCE
+
+DEGRADED_SOURCE mechanics:
+  β_effective_decay(t) = β_effective × exp(−λ_decay × (t − T_merge_declared))
+  λ_decay = ln(2) / N_calibration  [halflife = N_calibration epochs; governance-settable per class]
+
+  Per-epoch implication bonus earned:
+    implication_bonus(t) = β_effective_decay(t) × residual_log_score_A_to_B(t)
+    [no new A-claims from T_merge_declared; residual = staleness-weighted existing A-claims]
+
+  Declaration expires naturally at original expiry epoch or when β_effective_decay < β_floor_min
+```
+
+**B-class unaffected:** B's S_cred incorporates A's accumulated contribution up to T_merge_declared. Post-merge, B updates from direct B-knowers. No disruption to B's epistemic state.
+
+**Merged class C inheritance:** C is a new class; it does not inherit A→B implication declarations. If a knower wants to register an A+B→C chain, they do so as a fresh declaration with C as the new coordinate.
+
+**Design law (#r221):** DEGRADED_SOURCE state for implication chains from WINDING_DOWN source classes. β_effective decays exponentially (halflife = N_calibration). Natural expiry maintained; no accelerated bonus settlement. Merged class C starts with empty implication registry. Static-commitment extends to implication chain lifecycle. (#r221)
+
+---
+
+### Net-New First-Principles Pass: Information-Theoretic Efficiency Ceiling (#r221)
+
+**The question:** What is the maximum epistemic efficiency η = I_revealed / I_total this mechanism can achieve, and does bilateral flow approach it?
+
+**LMSR efficiency ceiling — self-defeating:**
+In LMSR, the revelation incentive falls as the market becomes more informative (Grossman-Stiglitz). At equilibrium, η_LMSR settles at whatever fraction equates marginal trading gain to C_info. Full efficiency (η→1) requires zero incentive, which is self-contradicting.
+
+**GestAlt two-phase efficiency:**
+```
+η_GestAlt = η_Phase1 + η_Phase2
+
+η_Phase1: early-conviction τ_bonus drives revelation while S_cred is far from oracle
+          (active in both regimes; analogous to LMSR Phase 1 revelation incentive)
+
+η_Phase2: post-convergence EQ fee maintenance premium
+          η_Phase2 > 0 iff EDS > EDS*  ↔  bilateral-flow condition (Invariant #272)
+```
+
+The bilateral-flow regime adds η_Phase2 on top of η_Phase1. The attestation-pool regime has η_Phase1 only — equivalent to LMSR's information revelation.
+
+**Theoretical ceiling:**
+```
+η_max = 1 − H_irreducible / I_total
+
+H_irreducible: information that agents will not reveal regardless of incentive
+  (autonomy constraint; regulatory constraints; competitive moats)
+```
+
+For institutional prediction-market coordinates, H_irreducible is small; η_max ≈ 1 for well-designed classes.
+
+**Why bilateral flow approaches the ceiling:**
+The efficiency gap in bilateral flow is:
+```
+1 − η_GestAlt = η_voluntary_revelation_gap
+  (information held by agents who rationally decline to participate even with both phases active)
+```
+
+This is the irreducible floor. No additional mechanism design closes it — it is an autonomy constraint, not a mechanism failure.
+
+**Observable proxy for η (deferred to v2.3):**
+```
+η_realized(c, epoch_t) = 1 − (S_cred_at_T_anchor − oracle_truth)² / σ_oracle_prior²(c, t)
+```
+Where σ_oracle_prior² is the variance of submitted claims as of claim_deadline. Rolling EMA of η_realized provides a class-level efficiency KPI. When η_realized < η_bilateral_floor (e.g., 0.70) in bilateral-flow mode, governance should review claim quality, τ_scale calibration, and EDS sustainability. Adding this to the Ω dashboard is v2.3 scope.
+
+**Implication for regime comparison:** The correct comparative metric is not LMSR vs GestAlt in Phase 1 (they are equivalent). It is LMSR vs GestAlt in Phase 2 (sustaining accuracy post-convergence). LMSR has η_Phase2 = 0. GestAlt has η_Phase2 > 0 for any class in bilateral-flow. This is the empirically testable performance claim of the knowledge marketplace mechanism.
+
+---
+
+## Structural Synthesis: #r221
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| max_recovery_attempts = 3; exponential backoff; supermajority to extend | Bounded recovery prevents treasury drain; structured escalation | 3 draws at 1.5×/2.0×/3.0×EDS*; wait N_cal/2×N_cal; irrecoverability declared at failure of draw_3 |
+| λ_max_lower = 1+(N−1)×avg_pairwise_ρ | Rayleigh quotient with uniform vector; valid PSD lower bound; O(N²) | Closes uncertainty band formula; completes Invariant #287 |
+| Recovery draw at EDS*−ε_hysteresis; EDS_floor_hard is severity gate | Hysteresis boundary governs draw trigger; EDS_floor_hard classifies risk | No draws in hysteresis band; severity classification from draw initiation |
+| DEGRADED_SOURCE with exponential β_effective decay | Static-commitment extends to implication chain lifecycle; no accelerated settlement | Merged class C has fresh registry; B unaffected; decay halflife = N_calibration |
+| η = η_Phase1 + η_Phase2; bilateral flow adds maintenance premium; η_max bounded by voluntary revelation gap | The efficiency claim of GestAlt is Phase 2 maintenance, not Phase 1 revelation | η_realized monitoring via settlement error deferred to v2.3; LMSR equivalent only in Phase 1 |
+
+---
+
+## Cumulative Invariants (#r221)
+
+**Invariant #290 (#r221):** Bilateral-flow recovery protocol: max 3 draw attempts (governance-settable [2,5]; supermajority required to extend). Draw amounts: 1.5× EDS* (draw_1), 2.0× EDS* (draw_2, + governance vote), governance-discretionary up to 3× EDS* (draw_3). Wait intervals: N_calibration, then 2×N_calibration. Irrecoverability declared if EDS < EDS* after draw_3 + 2×N_calibration. Remaining recovery reserve returned to treasury on irrecoverability declaration.
+
+**Invariant #291 (#r221, completing #r220):** Portfolio EDS* λ_max bounds: upper (Gershgorin row-sum) = 1 + max_row_offdiag_sum; lower (Rayleigh uniform) = 1 + (N−1) × average_pairwise_ρ. Uncertainty band = (upper − lower)/upper. Full eigenvalue required when band > 0.10. Both O(N²). Applies for all N; the N>4 trigger from Invariant #287 is superseded by the uncertainty-band criterion.
+
+**Invariant #292 (#r221):** Recovery reserve draw_1 is activated by the `regime_transition` EAT event (bilateral_flow → warranted_attestation_pool), which fires when EDS crosses EDS* − ε_hysteresis downward. EDS_floor_hard classifies the exit as at-risk (immediately flagged) but is not the activation threshold. No draws permitted while EDS ∈ [EDS* − ε, EDS* + ε] (hysteresis band).
+
+**Invariant #293 (#r221):** Implication chain declarations for WINDING_DOWN source classes enter DEGRADED_SOURCE at T_merge_declared. β_effective_decay(t) = β_effective × exp(−λ_decay × (t − T_merge_declared)); halflife λ_decay = ln(2)/N_calibration (governance-settable). No accelerated bonus settlement; natural expiry timeline maintained. Merged class C does not inherit source class implication declarations; fresh registration required.
+
+**Invariant #294 (#r221):** GestAlt information-theoretic efficiency: η = η_Phase1 + η_Phase2 in bilateral-flow; η = η_Phase1 only in attestation-pool (LMSR-equivalent). η_Phase2 > 0 iff EDS > EDS* (bilateral-flow condition, Invariant #272). η_max = 1 − voluntary_revelation_gap. Observable proxy η_realized = 1 − settlement_error²/σ_oracle_prior²; rolling EMA monitoring deferred to v2.3. The empirically testable performance claim of GestAlt over LMSR is η_Phase2 > 0 in bilateral-flow mode.
+
+---
+
+## Run Log Update
+
+- **#r221** — 2026-04-04T10:52Z — Q1: max_recovery_attempts=3; exponential backoff (N_cal, 2×N_cal waits); draw amounts 1.5×/2.0×/3.0×EDS*; governance vote at draw_2; irrecoverability at draw_3 failure; supermajority to extend. Q2: λ_max_lower = 1+(N−1)×avg_pairwise_ρ (Rayleigh quotient; uniform test vector; O(N²)); uncertainty band (row-sum−Rayleigh)/row-sum > 0.10 triggers full eigenvalue; supersedes N>4 cutoff from Invariant #287. Q3: Recovery draw triggered by regime_transition (EDS*−ε_hysteresis exit); EDS_floor_hard is severity classifier not draw trigger; no draws in hysteresis band. Q4: DEGRADED_SOURCE state at T_merge_declared; β_effective × exp(−ln(2)/N_cal × Δt); natural expiry; no accelerated settlement; merged class C has fresh declaration registry. Net-new: Information-theoretic efficiency ceiling η = η_Phase1+η_Phase2 in bilateral flow vs η_Phase1 only in attestation pool; η_max bounded by voluntary revelation gap; η_realized monitoring deferred to v2.3; GestAlt over LMSR claim is Phase 2 maintenance premium. Invariants #290–#294.
+
+---
+
+## Open Questions for #r222+
+
+1. **η_realized as governance health signal — simplified v2.1 scope version:** η_realized = 1 − settlement_error²/σ_oracle_prior² is deferred to v2.3 as full monitoring primitive. But governance could compute a simplified version immediately post-resolution using S_cred at T_anchor vs oracle truth. Should this simplified η_realized be added to the Ω(t) oracle health dashboard (Invariant #270) as an optional v2.1 governance-advisory signal?
+
+2. **DEGRADED_SOURCE β_effective_decay and minimum chain activity:** If the source class's S_cred has not been updated since T_merge_declared, the residual_log_score_A_to_B(t) decays to near-zero by staleness weighting. Does DEGRADED_SOURCE need a floor on residual activity (minimum one prior resolved epoch) to avoid paying near-zero implication bonuses that clutter state without epistemic contribution?
+
+3. **Irrecoverability declaration and outstanding T3 escrow claims:** When irrecoverability is declared, existing T3 claims have active escrow. If T_anchor has not yet fired (class is in the DELIST_PENDING_IRRECOVERABLE state before T_anchor), those claims must still settle at scheduled T_anchor. Is there any interaction between the irrecoverability declaration and T3 claim slash/release logic at T_anchor, or is settlement proceeding exactly as if the class had simply paused new T3 admissions?
+
+4. **Maximum portfolio N for tractable governance-managed correlation registry:** Portfolio EDS* is O(N²) for the bounds and O(N²×k) for full eigenvalue. At what N_max does per-class portfolio computation become governance-infeasible, and is there a cluster-based tiered strategy (subgraph of correlated classes computed independently) that extends tractable range beyond N_max?
+
+*Last updated: #r221 — 2026-04-04T10:52Z*
