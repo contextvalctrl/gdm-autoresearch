@@ -21624,3 +21624,299 @@ GestAlt surfaces this as k_max_joint. Any incentive architecture with competing 
 4. **Dimension weight update after class goes live:** Can governance update dimension weights after epistemically_live = true? If yes, existing claims were installed under prior weights — define the boundary between old-weight and new-weight claim resolution.
 
 *Last updated: #r238 — 2026-04-04T14:14Z*
+
+---
+
+## #r239 Contributions — 2026-04-04T14:24Z
+
+**Thread pivot: pausing MatchingEngine line. Opening dedicated knowledge-marketplace mechanism thread.**
+
+This run constitutes the founding first-principles analysis of the knowledge marketplace mechanism family — explicitly NOT LMSR, NOT orderbook matching. Prior GestAlt work (which arrived at this architecture via mechanism invention) is now cross-referenced against this vocabulary. Net-new: explicit mechanism family taxonomy, competitive comparison, and the oracle-dependency failure analysis.
+
+---
+
+### 1. Base Primitive — Refined in Knowledge-Marketplace Vocabulary (#r239)
+
+Prior statement (Section 1, #r1): *"a credible information claim about a hidden variable, backed by forfeitable capital."*
+
+**Sharpening via knowledge-marketplace framing:**
+
+The exchange is not between two parties betting on the same variable. It is between:
+- **Knowers (Asks):** agents who hold private signals about a hidden state and want to monetise their epistemic advantage
+- **Unknowers (Bids):** agents who need a credible state update to make a decision and want to pay for it
+
+What is actually exchanged: **access to a credibility-attested state estimate**. Not a probability share. Not a position. A certified summary of dispersed private knowledge, with capital as the certification bond.
+
+The capital is not wagered against other participants. It is staked against the external oracle — proof that the knower's claim is credible enough to bet on. This makes capital a **credibility bond**, not a speculative instrument.
+
+**Conserved quantity (updated):** In prior runs we established: epistemic debt (TOWL) + credibility allocation (log-score redistribution). The knowledge-marketplace framing adds the explicit statement: *credibility is what transfers from high-information zones to low-information zones.* Capital is the proxy that makes this transfer verifiable and economically incentivised. (#r239)
+
+---
+
+### 2. State Model — Bilateral Flow as the Knowledge-Marketplace Update Rule (#r239)
+
+The cron frames this as: "exchange is bilateral flow between high-information zones and low-information zones."
+
+In GestAlt's formal language:
+
+```
+High-information zone: knowers with private signals (T3 claims, high credibility_ratio)
+Low-information zone: unknowers (EQ demand, q_bonus commitments)
+Flow: S_cred update — dispersed private knowledge → public state estimate
+Capital role: forces high-information zone to credibly reveal signals (escrow commitment)
+```
+
+The bilateral-flow mechanism (eta_Phase2 > 0 iff bilateral flow; Invariant #337) is the formal statement that the knowledge-marketplace exchange is only epistemically productive when both sides have skin in the game: knowers via escrow, unknowers via q_bonus commitments.
+
+**Net-new from this run:** The bilateral-flow condition is equivalent to the knowledge-marketplace requirement that "capital is proof-of-conviction on both sides." A unilateral flow (knowers attesting without unknower demand, or unknowers demanding without knower commitment) degenerates to either an unvalidated signal pool or a futile demand market. The bilateral condition is both necessary and sufficient for the knowledge-marketplace exchange to function. (#r239)
+
+---
+
+### 3. Mechanism Family Taxonomy — Three Families, Two Eliminated (#r239)
+
+**Family A: Attested-Signal Exchange (GestAlt)**
+
+- Knowers post credibility-staked claims about a shared state vector
+- Unknowers post demand via q_bonus commitments
+- Capital = escrow commitment against calibration; credibility = track-record score
+- Truth anchor = external oracle (exogenous)
+- Settlement = log-score redistribution at oracle resolution
+
+**Family B: Direct Knowledge Transfer Market**
+
+- Knowers sell specific information packages to specific buyers (bilateral, private)
+- Buyers bid for targeted answers to decision-specific questions
+- Capital = performance bond; knower discloses; buyer verifies ex-post
+
+**Family C: Peer-Scoring Knowledge Network**
+
+- Agents score each other's claims; capital required to issue scores
+- Truth emerges from cross-validation consensus; no external oracle
+
+---
+
+**Kill Family C:** Without an external oracle, the mechanism has no exogenous truth anchor. Truth becomes social consensus. Rich actors who coordinate dominate epistemic scoring. The conserved quantity is not credibility — it is influence, which is capital-purchaseable. Epistemic circularity is fatal: if the scoring of knowledge claims is itself a knowledge claim subject to scoring, the mechanism has no fixed point. Family C is eliminated.
+
+**Kill Family B:** The "Green Lumber" problem: verifying that disclosed knowledge is valuable is extremely hard before oracle resolution. Buyers can claim the information was already known; knowers can claim the buyer misapplied it. Bilateral enforcement requires costly arbitration for every transaction. More critically: knowledge is non-rivalrous. A knower who discloses to one buyer can disclose the same information to N buyers, but the sale was priced as exclusive. This creates an information re-selling attack that destroys the capital-credibility link. Family B requires either exclusivity enforcement (impractical on-chain) or repricing every disclosure (destroys the market).
+
+**Family A survives.** The critical design choices that make Family A work:
+1. Knowers attest to a shared public state (S_cred), not to private-buyer channels — eliminates reselling attack
+2. External oracle is the sole truth anchor — eliminates circular validation
+3. Credibility compounds with calibration — separates epistemic quality from capital size
+4. Bilateral demand signal (q_bonus) — prices information demand without requiring private bilateral deals
+
+(#r239)
+
+---
+
+### 4. Market Roles — Knowers, Unknowers, and the Capital Flow Direction (#r239)
+
+**Who pays whom:**
+
+```
+Unknowers to Knowers:
+  Direct: q_bonus committed at EQ event (demand signal payment)
+  Indirect: query fee for S_cred snapshot access
+
+Knowers to Protocol:
+  Escrow posted at T3 installation (locked against calibration)
+  Forfeited fraction at resolution if wrong (redistributed to accurate knowers)
+
+Protocol to Knowers:
+  q_bonus release on Phase-2 participation
+  tau_bonus for early-epoch claims
+  log-score-weighted redistribution from forfeitures
+```
+
+**The knowledge marketplace flow is not symmetric.** Unknowers pay for certified state access. Knowers pay capital as certification bond. The protocol is the clearinghouse that:
+(a) Certifies knower credibility (via credibility_ratio track record)
+(b) Holds knower capital (escrow)
+(c) Distributes unknower demand (q_bonus routing)
+(d) Enforces truth resolution (external oracle settlement)
+
+**What makes this different from a fee-for-information service:** The escrow forfeiture mechanism. A pure information service sells content; if the content is wrong, the seller faces reputational but not capital consequence. In the knowledge marketplace, wrong knowledge destroys knower capital. This converts "information" into "credible attested knowledge" — a higher-value epistemic commodity. (#r239)
+
+---
+
+### 5. Settlement Model — Exogenous Oracle as the Non-Negotiable Anchor (#r239)
+
+The settlement model depends entirely on oracle_declared being exogenous (Invariant #354). Three oracle modes (Invariant #327): AUTOMATED, COMMITTEE, HYBRID_EXTERNAL.
+
+**For the knowledge-marketplace framing, the key settlement property is:**
+
+Information transfer is valuable iff the receiver can later verify it was accurate. Settlement is the verification event. Without it, the knowledge marketplace collapses to unverifiable assertion — cheaper and less useful than the cheapest information service.
+
+**Partial truth resolution** (Invariants #358-#360): range oracles, dimension-indexed deferral, HDI compression for stochastic oracles (#r237). These are all methods to ensure the external oracle can verify claims even when truth is imprecisely known — preserving the knowledge-marketplace's truth-anchor while accommodating real-world epistemic complexity.
+
+**What if truth is only partially observed:** The HDI compression (Invariant #359) and dimension-indexed deferral (Invariant #360) are the mechanism's answers. Partial truth resolution does not invalidate the knowledge marketplace — it narrows the claim scope to what is verifiable. A knower who claims dimensions beyond the verifiable oracle scope forfeits that escrow share (T_deferral_max forfeiture, Invariant #360). The epistemic commitment is to the oracle-verifiable portion only. (#r239)
+
+---
+
+### 6. Attack Surface — Mapping to Knowledge-Marketplace Vocabulary (#r239)
+
+The prior attack surface work is consolidated here in knowledge-marketplace terms:
+
+| Attack | Knowledge-marketplace description | Defence |
+|---|---|---|
+| Bluffing | Knower posts high-stake claim without genuine private signal | Escrow forfeiture at resolution; calibration_ratio decay |
+| CPA cluster (Invariants #311-#316) | Coordinated knowers co-move S_cred as a bloc without independent signals | CPA detection via correlation clustering; cluster penalty |
+| Sybil / wash credibility | One actor operates many knower identities to amplify apparent credibility | Identity bond minimum; CPA_IdentityRegistry tracking |
+| Cheap talk | Knower claims without meaningful stake (low-stake spam) | effective_weight = C_a x log(1 + escrow) — minimum escrow for non-trivial influence |
+| Oracle gaming | Knowers who also control the oracle manipulate resolution | oracle_declared exogeneity as hard constraint; COMMITTEE mode with S_cred blinding (Invariant #303) |
+| Information front-running | Knowing the oracle answer before resolution, gaming tau_bonus window | tau_bonus staleness decay; commit-reveal in COMMITTEE mode (Invariant #348) |
+| Demand-signal spoofing | Unknowers post fake q_bonus commitments to misdirect knower attention | q_bonus requires committed capital (forfeited if no query materialises) |
+
+The knowledge-marketplace framing does not add new attack vectors — all were identified in prior runs. What it clarifies: **bluffing is the mechanism's defining adversarial action.** In LMSR, the corresponding action is noise trading. The mechanism defends against bluffing via calibration-weighted escrow — structurally superior to LMSR's defence (no direct defence; noise trading is profitable in thin markets). (#r239)
+
+---
+
+### 7. Comparison to LMSR, Orderbooks, and Batch Auctions (#r239)
+
+**LMSR comparison:**
+
+| Property | LMSR | Knowledge Marketplace (GestAlt) |
+|---|---|---|
+| What moves | Capital moves the shared log-odds price function | Capital certifies claim credibility; S_cred moves by credibility-weighted aggregation |
+| Incentive for accuracy | Only at the final position (last trader wins) | All knowers: calibration track record compounds over time |
+| Source of truth | Implicit in the clearing price (endogenous) | External oracle (exogenous); mechanism cannot affect oracle |
+| Capital-epistemic link | Weak: any capital moves price regardless of knower quality | Strong: only calibration-weighted capital has S_cred influence |
+| Manipulation resistance | Susceptible to CPA-style manipulation (whale-driven price distortion) | CPA detection; bluff-resistant via escrow forfeiture |
+| Demand signal | None: all positions are supply-demand unified in price | Explicit q_bonus demand signal; epistemic demand is priced separately |
+| Liquidity requirement | Market maker required (or price range restrictions) | No market maker required; bilateral-flow does not require continuous liquidity |
+
+**Orderbooks:** Compound LMSR's weaknesses: speed races (front-running), no canonical knowledge representation, correlation clustering undetectable, early movers front-run knowledge signals. The knowledge marketplace provides all three improvements: no speed advantage, canonical credibility track record, correlation detection (CPA). Orderbooks have one advantage: immediate liquidity for large positions. This advantage is irrelevant in the knowledge marketplace where the exchange is information access, not positional liquidity.
+
+**Batch Auctions:** Reduce front-running within a window. GestAlt's batch-epoch design (macro-epochs, EAT boundary commits) provides equivalent front-running protection. Additional knowledge-marketplace advantage: **credibility compounding** — batch auctions treat each auction period as independent; knowledge quality does not persist across batches. In GestAlt, calibration_ratio compounds across all resolutions — a persistent knowledge quality signal no batch auction architecture provides.
+
+**Summary:**
+
+| Mechanism | Capital-epistemic link | Source of truth | Demand pricing | Bluff resistance | Credibility compounding |
+|---|---|---|---|---|---|
+| LMSR | Weak | Endogenous | None | None | None |
+| Orderbook | Weak | Endogenous | None | None | None |
+| Batch auction | Moderate | Endogenous | None | Low | None |
+| Knowledge marketplace (GestAlt) | Strong | Exogenous | Explicit (q_bonus) | High (escrow + calibration) | Yes (credibility_ratio) |
+
+(#r239)
+
+---
+
+### 8. Simplest Viable Mechanism Sketch (#r239)
+
+Strip GestAlt to its minimal knowledge-marketplace instance:
+
+```
+Actors:
+  K = {k_1, ..., k_m}  knowers with private signals
+  U = {u_1, ..., u_n}  unknowers who need state estimates
+
+Variables:
+  {x_1, ..., x_p}  hidden state variables with external oracle resolution at T_anchor
+
+Knower action (any epoch e < T_anchor):
+  k posts (x_i, value_estimate_v, escrow_amount_s)
+  s locked until T_anchor
+
+Unknower action (any epoch):
+  u posts query(x_i, fee_f)
+  Receives: S_cred(x_i) = credibility-weighted average of posted estimates
+  fee_f distributes to calibrated knowers on x_i (pro-rata by effective_weight)
+
+At T_anchor:
+  oracle_declared(x_i) = external truth value
+  For each knower k on x_i:
+    if |v_k - oracle_declared(x_i)| <= q_threshold:
+      k receives: log-score bonus from loser pool + uncollected query fees
+      credibility_k += delta_correct
+    else:
+      k forfeits: fraction of s proportional to error
+      credibility_k -= delta_wrong
+
+Next epoch:
+  effective_weight_k = credibility_k x log(1 + escrow_k)
+  S_cred(x_i) = sum_k(effective_weight_k x v_k) / sum_k(effective_weight_k)
+```
+
+This is the minimal instance. GestAlt adds: TOWL solvency accounting, zone management, implication chains, COMMITTEE mode, bilateral-flow demand curve, EAT integrity, DA stack, CPA detection. All additions solve real failure modes without changing the base primitive.
+
+The simplest viable mechanism is functional in ~40 lines of pseudocode. The full GestAlt spec is ~239 runs of invariant development — each run solving a failure mode the simple version cannot handle. (#r239)
+
+---
+
+### 9. Strongest Reason This Idea Fails (#r239)
+
+**The oracle-dependency bottleneck.**
+
+The knowledge marketplace is epistemically superior to LMSR only if the oracle is:
+(a) Genuinely exogenous (mechanism cannot affect oracle_declared)
+(b) Timely (T_anchor is short enough for information to be actionable)
+(c) High-coverage (oracle covers the coordinate dimensions that knowers are attesting to)
+(d) Manipulation-resistant (oracle source is not capturable by knowers)
+
+For many of the coordinates where a knowledge marketplace is most valuable — complex events, subjective assessments, multi-causal phenomena, long-horizon outcomes — the oracle fails on 2 or more of these dimensions:
+
+- **Geopolitical outcomes:** oracle = election result, years away, manipulable by actors who can both know and influence
+- **Scientific claims:** oracle = publication or consensus, delayed by years, subject to social dynamics
+- **Subjective quality:** oracle = expert panel, potentially captured by knowers who also influence the panel
+
+In these cases, LMSR actually performs acceptably well because it does not need a verified oracle — it settles from crowd belief, which is self-consistent even if epistemically wrong. The knowledge marketplace needs external truth; LMSR doesn't.
+
+The failure mode: **a knowledge marketplace deployed on oracle-resistant coordinates degrades to a bluffing contest.** Knowers post high-stake claims knowing resolution will never come or will be manipulated. Unknowers pay for state estimates that are never externally validated. Capital is consumed without improving epistemics.
+
+**Quantified threshold (informal):** The mechanism is epistemically productive iff oracle independence probability > 0.50 x (1 - CPA_probability). Below this threshold, LMSR or orderbooks are better primitives because their endogeneity is at least consistent and predictable. (#r239)
+
+---
+
+### 10. Best Surviving Variant if the Raw Idea Is Wrong (#r239)
+
+**Prediction-conditional attestation via implication chains.**
+
+If direct oracle verification is unavailable for Y, knowers can attest: "IF X (verifiable) THEN Y (not directly verifiable) will be in range Z."
+
+The implication chain mechanism (cross-class implications, from #r73 onward) enables this:
+- Class A: X is directly oracle-verifiable (e.g., event indicator)
+- Class B: Y is conditionally attested (e.g., economic impact)
+- Implication declaration: k attests A->B with conditional range
+
+If X oracle resolves, A-side stake is evaluated normally. B-side claim is evaluated conditional on A being in the declared range. The mechanism preserves calibration tracking and escrow forfeiture for the A-side; the B-side requires only conditional consistency checking.
+
+**Why this survives oracle-dependency:** The knowledge-marketplace primitive is preserved — credibility compounds, capital is epistemic commitment, external oracle anchors at least one coordinate. The bilateral information flow operates on the A->B conditional structure. Unknowers bid on B-side state updates knowing they depend on A-side resolution.
+
+**Where it breaks down:** Long implication chains (depth > 3) degrade rapidly due to the chain-length discount gamma^(depth-1) (#r73). For fundamentally oracle-resistant coordinates with no verifiable upstream predictor, no implication chain can save the mechanism. These coordinates are genuinely outside the knowledge-marketplace scope. (#r239)
+
+---
+
+## Structural Synthesis: Thread Pivot — Knowledge Marketplace Family (#r239)
+
+| Section | Synthesis | Key reference |
+|---|---|---|
+| Base primitive | Credibility-attested state claim; capital = certification bond | Invariant #354 (warranty-oracle coupling) |
+| State model | Bilateral-flow update: S_cred = credibility-weighted EMA + demand scaling | Invariant #337 (four conserved-quantity answers) |
+| Mechanism families | Family A (Attested-Signal) survives; B (Direct Transfer) killed by Green Lumber + reselling; C (Peer Scoring) killed by circular validation | This run |
+| Market roles | Unknowers pay for certified access; knowers pay escrow; protocol is clearinghouse | This run |
+| Settlement | Oracle exogeneity is the non-negotiable anchor; partial truth via HDI + dimension deferral | Invariants #358-#360 |
+| Attack surface | Bluffing is the defining adversarial action; calibration-weighted escrow is the defence | Invariants #311-#316 |
+| LMSR/OB/batch comparison | Knowledge marketplace dominates on all epistemic dimensions; LMSR wins only on oracle-resistant coordinates | This run |
+| Simplest sketch | ~40 lines of pseudocode; 238 prior runs add failure-mode defences | This run |
+| Failure mode | Oracle-dependency bottleneck; mechanism degrades to bluffing contest on oracle-resistant coordinates | This run |
+| Surviving variant | Prediction-conditional attestation via implication chains; preserves mechanism when direct oracle unavailable | From #r73 |
+
+---
+
+## Run Log Update
+
+- **#r239** — 2026-04-04T14:24Z — Thread pivot: knowledge marketplace founding analysis. Three mechanism families examined; B (direct transfer: Green Lumber + reselling) and C (peer scoring: circular validation) eliminated; Family A (GestAlt attested-signal) survives. Formal 10-section structure completed in knowledge-marketplace vocabulary. Strongest failure mode identified: oracle-dependency bottleneck on oracle-resistant coordinates. Surviving variant: prediction-conditional attestation via implication chains. Comparison table: knowledge marketplace dominates LMSR/orderbooks/batch auctions on all epistemic dimensions except oracle-free deployment. No new numbered invariants — this is founding vocabulary work, not invariant refinement.
+
+---
+
+## Open Questions for #r240+
+
+1. **Oracle-resistance threshold formalisation:** The failure analysis identifies an informal threshold: mechanism productive iff oracle independence probability > 0.50 x (1 - CPA_probability). Formalise this as a class-registration eligibility criterion — governance must attest oracle independence probability at class registration; classes below threshold are rejected.
+
+2. **Green Lumber problem boundary for Family B:** Family B (direct knowledge transfer) is killed by the reselling attack for non-rivalrous information. But some knowledge IS rivalrous (trade secrets, non-public data, exclusive access). Is there a Family B variant limited to rivalrous knowledge types, and can it coexist with Family A on a shared class?
+
+3. **Implication chain and oracle-resistant coordinate:** When all dimensions of a multi-coordinate class are oracle-resistant, can an implication chain from an oracle-verifiable upstream class serve as the resolution path for the entire class? Define the minimum upstream verifiability requirement for a valid implication chain to substitute for direct oracle.
+
+4. **Mechanism comparison: knowledge marketplace vs proper scoring rules without capital:** Proper scoring rules (Brier score, log score) elicit calibrated beliefs without capital at risk. GestAlt adds capital commitment to the scoring rule. Under what conditions does capital commitment improve over pure scoring — and is there a regime where large capital requirements deter high-quality knowers who cannot afford the escrow (adverse selection on wealth, not knowledge)?
+
+*Last updated: #r239 — 2026-04-04T14:24Z*
