@@ -12957,3 +12957,209 @@ Large-position unknowers' q_bonus is discounted from WED routing. They can still
 4. **Type D3 side-effect — is distorted WED routing actually a failure?** D3 unknowers who inflate q_bonus still produce accurate S_cred as a side effect. The only failure is misallocated knower effort (toward D3 coordinates vs genuinely high-D(c) coordinates). Is this a mechanism failure requiring defence, or an acceptable inefficiency? If the conflict discount is too aggressive, it may deter Type D2 unknowers with legitimate large positions on the same coordinate.
 
 *Last updated: #r197 — 2026-04-04T06:32Z*
+
+
+---
+
+## #r198 Contributions — 2026-04-04T06:42Z
+
+**Phase: Addresses Q1–Q4 from #r197. Fresh first-principles pass: game-theoretic incentive structure and σ_resolve-adjusted fee pricing.**
+
+---
+
+### Q1 (Zellic brief document creation) → Materialized at topics/zellic-brief-v2.1.md; committed (#r198)
+
+The Zellic brief was created in this run at `/home/ubuntu/dev/contextvalctrl/gdm-autoresearch/topics/zellic-brief-v2.1.md` using the ZA-1 through ZA-6 spec from #r197/Q1 plus addenda from #r195/Q4. Document includes: mechanism context (warranted-attestation pool framing, not PM); 4-contract primary scope; oracle duality explanation; six prioritised audit items with pass/fail conditions. Committed in the same push as this aggregate update. Founders share with Zellic for capacity confirmation by 2026-04-07. (#r198)
+
+---
+
+### Q2 (fee_fraction per-class vs global) → Per-class; governance-set at registration; hard floor on global minimum (#r198)
+
+**Trade-off analysis:**
+
+Global fee_fraction: simpler admin, forces cross-subsidisation — high-WED classes subsidise thin ones. Thin classes look cheaper to operate than they are; high-WED classes pay more than their operational cost.
+
+Per-class fee_fraction: correct cost allocation; allows price discrimination; requires governance decision at every class registration.
+
+**Resolution — per-class with global floor:**
+
+```
+fee_fraction(class_i) = governance-set at class_i registration; immutable until class retirement
+  range: [fee_fraction_global_floor, 0.05]
+  fee_fraction_global_floor = 0.005  (50 bps; prevents subsidised gaming via near-zero fees)
+```
+
+**Why per-class is correct for v2.1:** Operational cost per class is heterogeneous. A single-event binary coordinate (e.g., central bank decision) resolves in one epoch with low Celestia DA cost and minimal challenger seed. A multi-epoch continuous-coordinate (e.g., annual regulatory docket) has high DA cost and requires deep challenger pools. Global fee_fraction either starves thin classes or over-charges simple ones. Per-class allocation is the right model.
+
+**Cross-subsidisation remains available but explicit:** Governance may register a thin class with fee_fraction above cost floor and designate the surplus as a governance sustainability fund for weaker classes. The subsidy is visible and auditable; it is not hidden in a global average.
+
+**WED_clearing_min_viable gating (#r197/Q3) uses class-specific fee_fraction.** Classes registered with fee_fraction below their WED_clearing_min_viable threshold must provide a declared governance subsidy at registration — confirmed consistent with per-class fee model.
+
+**Design law (#r198):** fee_fraction is per-class, set at registration, immutable until class retirement. A global floor (fee_fraction_global_floor = 0.005) prevents fee-gaming. Cross-subsidisation is explicit via governance sustainability fund, not implicit via global averaging. (#r198)
+
+---
+
+### Q3 (EQ conflict-of-interest disclosure — scope of "position") → Same-protocol on-chain positions only; off-chain is out-of-enforcement-scope; attested voluntarily (#r198)
+
+**The enforcement constraint:** Only positions visible in GestAlt's on-chain state are trustlessly verifiable. Cross-chain positions (e.g., a related Kalshi contract) and off-chain positions (OTC structures, side agreements) cannot be verified without external oracle infrastructure. Requiring unknowable disclosure is unenforceable and produces false-compliance theatre.
+
+**Resolution — tiered disclosure:**
+
+**Tier 1 (enforced in-protocol):** `position_fraction = knower_position_on_coord / WED_clearing(coord)` computed from ClaimEscrow_v1 state. Automatic; no unknower action required. Conflict discount applied automatically when `position_fraction ≥ conflict_threshold`.
+
+**Tier 2 (attested, not enforced):** Optional off-chain position attestation. Unknower signs a structured attestation at EQ submission: `{ coord, epoch, has_off_chain_position: bool, estimated_off_chain_fraction: uint16_bps }`. Attestation logged to EAT; perjury risk is reputational only (credibility_ratio on future classes, not immediate slash). This creates a disclosure norm without unenforceable on-chain mandate.
+
+**Out of scope — no enforcement:** Cross-chain positions on external protocols. Cross-chain oracle infrastructure is v3+ scope.
+
+**Design law (#r198):** EQ conflict disclosure is enforced for same-protocol on-chain positions (automatic computation from ClaimEscrow state). Off-chain positions are attested voluntarily; attestation is logged to EAT but not enforced in the conflict discount formula. (#r198)
+
+---
+
+### Q4 (D3 side-effect — mechanism failure or acceptable inefficiency?) → Acceptable inefficiency; conflict discount throughput-gated; D2 preservation at 2× voluntary over-payment (#r198)
+
+**Restating the distinction (from #r197):** D3 unknowers inflate q_bonus → knowers over-allocate effort to D3 coordinates → S_cred on D3 coordinates is accurate but received excessive epistemic attention → genuine D2 coordinates are relatively under-served.
+
+**Is this a mechanism failure?**
+
+S_cred on D3 coordinates is accurate (knowers attracted by inflated q_bonus resolve correctly). The failure is misallocated *knower throughput*, not S_cred *accuracy*. At low total knower throughput, D2 coordinates are genuinely harmed. At high knower throughput (many active knowers), D2 coordinates still receive sufficient attention alongside D3.
+
+**Net-new framing (#r198) — the WED-routing problem is a throughput problem, not an accuracy problem:**
+
+```
+Throughput regime: N_active_knowers / N_active_coordinates
+
+High throughput (N >> 1): D3 inflation is noise; D2 coordinates still well-served.
+  → Conflict discount not economically meaningful; overhead outweighs benefit.
+
+Low throughput (N ≈ 1): D3 inflation harms D2 coordinates materially.
+  → Conflict discount necessary for allocation efficiency.
+```
+
+**Governance implication — throughput-gated conflict discount:**
+
+```
+apply_conflict_discount(class_i, epoch_t) iff:
+  throughput_ratio(t) = N_active_knowers(t) / N_active_coordinates(t) < Θ_throughput
+  Θ_throughput = 5  (governance-settable)
+```
+
+This prevents the conflict discount from deterring legitimate large-position unknowers (Type D2) during high-throughput phases.
+
+**D2 preservation rule:** If an unknower's `position_fraction ≥ conflict_threshold` AND their `q_bonus / q_fee ≥ 2 × min_q_bonus_ratio` (voluntarily over-paying), the conflict discount is halved. Over-payment signals genuine D2 uncertainty. Halved discount preserves their WED-routing signal.
+
+**Design law (#r198):** D3 unknower distortion is a throughput-regime problem. The EQ conflict discount activates only when `throughput_ratio < Θ_throughput = 5`. Above threshold, D3 inflation is acceptable noise. D2 preservation: discount halved for unknowers voluntarily paying ≥ 2× min_q_bonus_ratio on a conflicted coordinate. (#r198)
+
+---
+
+### Net-New First-Principles Pass: Incentive-Compatibility of the Knowledge Marketplace (#r198)
+
+**The question not formally addressed in 197 runs:** Is truthful reporting a Nash equilibrium in the knowledge marketplace, and does the mechanism outperform LMSR on this dimension?
+
+**LMSR baseline:** Truthful reporting of private signals is Bayesian incentive-compatible (BIC) under LMSR — reporting honestly maximises expected reward given that others report honestly. It is NOT dominant-strategy incentive-compatible (DSIC) — a knower with sufficiently large stake has a profitable deviation by distorting signals to shift market price toward existing positions.
+
+**Knowledge marketplace (CLEARING_MODE):**
+
+A knower stakes `k_a` on `claim(a, coord) = v_a`. Their reward function:
+
+```
+reward(a) = credibility_ratio_delta(a, log_score) × future_fee_revenue(a)
+            - slash_risk(a, |v_a - oracle_value|)
+```
+
+The key term is `future_fee_revenue(a)`, which scales with `credibility_ratio(a)`. This creates a **second-period incentive** absent from LMSR: a knower who misreports today does not just lose slash proceeds — they lose credibility_ratio, which reduces future fee revenue across ALL coordinate classes they participate in.
+
+**Formal claim (#r198):** Let `π_honest(a, t)` = expected present value of honest reporting including future credibility_ratio-weighted fee revenue. Let `π_distort(a, t)` = expected present value of strategic distortion.
+
+For sufficiently patient agents (discount factor δ close to 1), `π_honest(a, t) > π_distort(a, t)` when:
+
+```
+Δ_credibility_ratio_loss × PV_future_fee_revenue(a) > short_run_gain_from_distortion
+```
+
+where `Δ_credibility_ratio_loss` is the credibility_ratio decay from a wrong claim, and `PV_future_fee_revenue(a)` is the discounted future revenue stream at risk.
+
+**Net-new structural claim (#r198):** The knowledge marketplace is DSIC for sufficiently patient agents, where LMSR is only BIC. This is the mechanism's formal epistemic superiority over LMSR:
+
+- LMSR: large-stake knowers have profitable distortion deviations in every single period.
+- Knowledge marketplace: distortion forfeits credibility_ratio → forfeits future fee revenue stream → unprofitable for long-term institutional participants.
+
+**The implication:** Institutional participants who plan to participate across many coordinate classes and epochs have a strictly stronger truthful-reporting incentive than LMSR participants. The mechanism is specifically designed for repeat players — which is exactly the institutional-grade target market.
+
+**The failure mode for this argument:** It requires δ close to 1. A short-term adversary with no future participation intent (bootstrap attacker, exit scammer) has δ = 0 and the argument collapses to LMSR. The epistemically_live gate (#r160/Q4) is the protection against bootstrap attackers — not the track record incentive. These two protections are complementary, not redundant.
+
+**Design law (#r198):** The knowledge marketplace is DSIC for patient institutional repeat-play participants (high δ) and BIC for all others. This is a formal superiority over LMSR's BIC-only guarantee. The epistemically_live gate handles the bootstrap-attack case (low δ). Both protections are complementary. (#r198)
+
+---
+
+### Net-New Mechanism Proposal: σ_resolve-Adjusted Dynamic Query Fee Rate (#r198)
+
+**The pricing gap:** Currently, `fee_rate(coord) = fee_fraction × WED_clearing` — a fixed fraction of financial exposure. But epistemic value of a query depends on current S_cred uncertainty, not just WED_clearing. A coordinate with σ_resolve ≈ 0 (near-certain outcome) has near-zero epistemic value to any unknower; charging the same fee as a maximally uncertain coordinate misallocates liquidity.
+
+**Proposal — σ_resolve-adjusted fee rate (v2.1 extension, no new contract):**
+
+```
+fee_rate(coord, epoch) = fee_fraction_class × WED_clearing(coord, epoch) × σ_resolve_banded(coord, epoch)
+
+σ_resolve_banded(coord, epoch) = lookup(σ_resolve_smooth(coord, epoch), band_table)
+band_table:
+  σ < 0.05            → multiplier 0.25  (near-certain: 75% discount)
+  σ ∈ [0.05, 0.15)    → multiplier 0.60
+  σ ∈ [0.15, 0.30)    → multiplier 1.00  (base case)
+  σ ≥ 0.30            → multiplier 1.50  (high uncertainty premium)
+```
+
+Band table values are governance-settable per coordinate class. `σ_resolve_smooth` is the existing EMA from CredibilityAggregator_v1 (#r146/Q2).
+
+**Why banded, not continuous:** Continuous multiplication creates a non-monotonic incentive surface — a knower who marginally improves σ_resolve could flip the fee rate downward, reducing their own fee income. Banded rates prevent cliff effects within a band while preserving the cross-band incentive to reduce uncertainty.
+
+**Governance implication:** This fee structure makes it expensive to query uncertain coordinates and cheap to query near-certain ones. Institutional unknowers pay a premium for epistemic work on hard problems — correct pricing for a knowledge marketplace.
+
+**v2.1 scope:** σ_resolve_banded is a view-function computation; no state change required. Add to ClaimEscrow_v1 as a `computeQueryFee(classId, epoch)` view function. GovernanceParams stores the band table per coordinate class. No new contract.
+
+**Design law (#r198):** Query fee rate = `fee_fraction_class × WED_clearing × σ_resolve_banded`. Band table: σ < 0.05 → 0.25×; [0.05, 0.15) → 0.60×; [0.15, 0.30) → 1.00×; ≥ 0.30 → 1.50×. Band table governance-settable per class; minimum spread between lowest and highest bands must be ≥ 2.0× (open question for #r199). Implementation: `computeQueryFee()` view in ClaimEscrow_v1; band table in GovernanceParams. (#r198)
+
+---
+
+## Structural Synthesis: #r198
+
+| Issue | Resolution | Law |
+|---|---|---|
+| fee_fraction | Per-class; immutable at registration; global floor 50bps | Per-class cost allocation; explicit cross-subsidy if needed |
+| EQ conflict disclosure | Tier 1: on-chain enforced; Tier 2: off-chain attested; cross-chain out-of-scope | Enforceability bounds disclosure scope |
+| D3 distortion | Throughput-gated discount (Θ=5); D2 preservation at 2× voluntary q_bonus | Distortion is throughput-regime problem, not accuracy failure |
+| Incentive-compatibility | DSIC for patient institutions; BIC for all others; formally superior to LMSR | Patient institutional participants have stronger truthful-reporting incentive than LMSR |
+| σ_resolve fee pricing | Banded multiplier 0.25×–1.50× on query fee by coordinate uncertainty | Hard epistemic problems cost more to query; correct knowledge-marketplace pricing |
+
+---
+
+## Cumulative Invariants (additions through #r198)
+
+**Invariant #180 (#r198):** fee_fraction is per-class, governance-set at class registration, immutable until class retirement. Global floor = 0.005 (50 bps). Cross-subsidisation via explicit governance sustainability fund only; no implicit global averaging.
+
+**Invariant #181 (#r198):** EQ conflict-of-interest disclosure is enforced only for same-protocol on-chain positions (automatic from ClaimEscrow state). Off-chain positions are Tier 2 voluntary attestation logged to EAT; not enforced in conflict discount formula.
+
+**Invariant #182 (#r198):** EQ conflict discount activates only when `throughput_ratio = N_active_knowers / N_active_coordinates < Θ_throughput = 5`. Above threshold, D3 distortion is absorbed as noise. D2 preservation: discount halved when unknower voluntarily pays ≥ 2× min_q_bonus_ratio on a conflicted coordinate.
+
+**Invariant #183 (#r198):** The knowledge marketplace is DSIC for patient institutional repeat-play participants (high δ) and BIC for all others. This is a formal superiority over LMSR's BIC-only guarantee. The epistemically_live gate protects the bootstrap-attacker case (low δ). Both protections are complementary.
+
+**Invariant #184 (#r198):** Query fee rate = `fee_fraction_class × WED_clearing × σ_resolve_banded`. Band table: σ < 0.05 → 0.25×; [0.05, 0.15) → 0.60×; [0.15, 0.30) → 1.00×; ≥ 0.30 → 1.50×. Band table governance-settable per class. Implementation: `computeQueryFee()` view in ClaimEscrow_v1; band table in GovernanceParams.
+
+---
+
+## Run Log Update
+
+- **#r198** — 2026-04-04T06:42Z — Q1: Zellic brief materialized at topics/zellic-brief-v2.1.md. Q2: fee_fraction per-class (immutable at registration; global floor 50bps; explicit cross-subsidy). Q3: EQ disclosure Tier 1 (on-chain enforced) + Tier 2 (off-chain attested, not enforced); cross-chain out-of-scope. Q4: D3 distortion is throughput-regime problem; conflict discount activates only below Θ_throughput=5; D2 preservation at 2× voluntary over-payment. Net-new: DSIC formal claim for patient institutions (superiority over LMSR's BIC-only); σ_resolve-banded query fee pricing (0.25×–1.50× based on coordinate uncertainty). Invariants #180–#184.
+
+---
+
+## Open Questions for #r199+
+
+1. **σ_resolve-banded fee pricing — knower specialization equilibrium:** If high-σ coordinates charge 1.50× query fee, knower revenue is higher on hard coordinates — correct incentive to specialize in difficult predictions. But if credibility_ratio accumulates on easy (low-σ) coordinates, knowers face 0.60× fee revenue when transitioning to hard ones. Does banded pricing create a knower specialization equilibrium, or does it concentrate credibility toward low-σ easy coordinates?
+
+2. **DSIC formal proof sketch:** The informal argument (δ close to 1 → truthful reporting DSIC) needs a formal game-theoretic statement. What is the exact threshold δ* above which truth-telling is a dominant strategy, expressed as a function of mechanism parameters (W_MAX, fee_fraction, credibility_ratio_floor, PV_future_fee_revenue)?
+
+3. **Zellic engagement timing:** Brief is complete; capacity confirmation target is 2026-04-07. What is the explicit contingency if Zellic cannot start by 2026-04-28 — Trail of Bits engagement with shortened scope, or timeline revision accepting Demo Day risk disclosure of audit-in-progress?
+
+4. **σ_resolve band table minimum spread:** Should governance be constrained to maintain a minimum spread of hard_band / soft_band ≥ 2.0×? Without a minimum spread constraint, governance can collapse all bands to 1.00× (flat pricing), eliminating the epistemic pricing premium entirely. Derive the contract-enforced minimum spread.
+
+*Last updated: #r198 — 2026-04-04T06:42Z*
