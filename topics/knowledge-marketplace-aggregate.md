@@ -11594,3 +11594,188 @@ This is standard practice for pre-production institutional protocol demos; it is
 4. **v2.2 first-run prep:** With v2.1 spec complete, what is the first-principles starting question for `knowledge-marketplace-v22.md`? Candidate: "Given IPositionRegistryAdapter as the cross-version primitive, what can a market participant do in DISCOVERY_MODE that they cannot do in CLEARING_MODE?"
 
 *Last updated: #r191 — 2026-04-04T05:32Z*
+
+---
+
+## #r192 Contributions — 2026-04-04T05:42Z
+
+**Phase: v2.1 audit-readiness closure — firm selection, W_MAX enforcement order, code-freeze/governance interaction, and v2.2 first question.**
+
+---
+
+### Q1 (Audit firm selection criteria for GestAlt v2.1) (#r192)
+
+**What standard EVM auditors miss for GestAlt:**
+
+Most EVM security firms audit token contracts, AMMs, and lending protocols. GestAlt v2.1 is structurally different in three ways that require specific evaluator competence:
+
+1. **Epoch-lifecycle state machines:** CredibilityAggregator and SettlementEngine both have multi-phase state machines (ACTIVE → SETTLEMENT_FROZEN → FINALITY) with epoch-indexed deadlines. Standard auditors check reentrancy and overflow; fewer check invariant preservation across epoch boundary transitions. The auditor must trace all state-variable mutations at `commitEpochBuffer` and `StateFreeze` calls and verify no invariant (#1–#155) is violated by partial-epoch execution or out-of-order calls.
+
+2. **Oracle authority duality:** OracleManager_v1 distinguishes `oracle_settlement_override` (no slash) from `challenge_success_slash` (slash). This is a novel two-type oracle interaction that most auditors have no prior reference for. The auditor must verify: (a) the no-slash path in `oracle_settlement_override` cannot be invoked to escape a deserved slash (type confusion attack), (b) the `zone_at_T_anchor` field (#r163/A2) is read-only after T_anchor and cannot be retroactively altered to bypass SFP deferral.
+
+3. **Credibility_ratio arithmetic:** CredibilityAggregator_v1 implements log-score updates with fixed-point arithmetic. Auditors must verify: (a) no precision-loss path allows a wrong claim to escape a credibility_ratio penalty (the floor of the penalty must be non-zero for any non-trivial stake); (b) W_MAX cap enforcement does not create rounding artefacts that allow a knower to exceed W_MAX by posting many fractional claims.
+
+**Candidate firms ranked by fit (#r192):**
+
+| Firm | Epoch/state-machine experience | Oracle mechanism experience | Fixed-point arithmetic | Capacity (est.) |
+|---|---|---|---|---|
+| **Trail of Bits** | HIGH (Uniswap v4 hooks, Compound governor) | MODERATE | HIGH | Busy; 8–10 week queue |
+| **Zellic** | HIGH (multiple clearing protocol audits) | MODERATE | HIGH | 6–7 week queue |
+| **Cantina** | MODERATE | LOW (standard oracle patterns only) | MODERATE | 4–5 week queue |
+| **Cyfrin** | MODERATE | MODERATE | HIGH | 5–6 week queue |
+
+**Recommendation:** **Zellic** as primary target. Their clearing-protocol experience is the closest match to GestAlt's epoch lifecycle. Backup: **Trail of Bits** if Zellic has no capacity before 2026-04-28.
+
+**Briefing document for audit firm (#r192):** Before the engagement, provide auditors with: (a) this aggregate document Section 2 (10-point framework, #r148) — mechanism semantics; (b) invariants #1–#155 (Section 1 of handoff pack); (c) the four highest-risk code paths from #r161/Q4: `credibility_ratio` log-score update, W_MAX enforcement, T_anchor atomic StateFreeze, Zone C deferral state machine. These four paths are the audit's primary focus; everything else is secondary.
+
+**Design law (#r192):** Audit firm selection for novel mechanism contracts must evaluate: epoch-lifecycle competence, oracle authority model experience, and fixed-point arithmetic depth. Queue capacity must be confirmed by 2026-04-07 or the Demo Day timeline slips (#r191/Q4). (#r192)
+
+---
+
+### Q2 (CredibilityAggregator_v1 W_MAX cap enforcement order — simultaneous vs sequential) (#r192)
+
+**The question:** At `commitEpochBuffer`, multiple knowers may exceed W_MAX. Two approaches:
+
+**Option A — Simultaneous cap + single renormalisation:**
+```
+w_capped(a) = min(w_raw(a), W_MAX)  for all a
+S_cred_new = Σ_a (w_capped(a) × d_a) / Σ_a w_capped(a)
+```
+
+**Option B — Sequential cap (descending w_raw order), renormalise after each:**
+```
+for a in sort(knowers, key=w_raw, descending):
+  w_capped(a) = min(w_raw(a), W_MAX_effective(remaining_budget))
+  remaining_budget -= w_capped(a)
+S_cred_new = Σ_a (w_capped(a) × d_a) / Σ_a w_capped(a)
+```
+
+**Analysis:**
+
+Option B has a critical flaw: the order in which knowers are processed determines their effective weight, creating a precedence advantage for high-w_raw knowers. In an adversarial setting, a knower who can time their stake to be processed first gets more influence than one processed second, even at identical raw weights. This is a subtle manipulation surface: front-running the `commitEpochBuffer` call to guarantee first-processing position.
+
+Option A has no ordering dependence. Every knower above W_MAX contributes exactly W_MAX, with the net effect that excess weight is redistributed proportionally to all remaining contributors during normalisation. This is equivalent to a projection onto the W_MAX simplex — a well-defined, order-independent operation.
+
+**Resolution — simultaneous cap (Option A) with explicit renormalisation:** (#r192)
+
+```
+// In CredibilityAggregator_v1.commitEpochBuffer():
+uint256 totalCappedWeight = 0;
+for (uint i = 0; i < knowers.length; i++) {
+    cappedWeights[i] = Math.min(rawWeights[i], W_MAX);
+    totalCappedWeight += cappedWeights[i];
+}
+// S_cred update
+for (uint i = 0; i < knowers.length; i++) {
+    S_cred += (cappedWeights[i] * claimDistribution[i]) / totalCappedWeight;
+}
+```
+
+**Proof of manipulation-resistance:** Two knowers A and B both above W_MAX. S_cred contribution:
+- Option A: each contributes `W_MAX / (2 × W_MAX + Σ_others) × d_x`. Equal regardless of processing order.
+- Option B with A first: A gets full W_MAX; B may be further restricted by remaining budget. A is advantaged.
+
+Option A is strictly better for manipulation resistance. Gas cost is identical: O(N) for both approaches; only the loop structure differs.
+
+**Overflow protection:** `totalCappedWeight` in uint256: W_MAX × N_max_knowers must not overflow. With W_MAX as a percentage cap (e.g., 10% of total S_cred weight) and N_max_knowers bounded by the TOWL zone, overflow is bounded. Add an explicit check: `require(totalCappedWeight > 0, "No active contributors")`.
+
+**Design law (#r192):** W_MAX cap enforcement must be order-independent (simultaneous cap, single renormalisation pass). Any sequential cap that creates a processing-order advantage is a manipulation surface. The simultaneous cap is the unique order-independent projection onto the W_MAX simplex. (#r192)
+
+---
+
+### Q3 (GovernanceParams time-lock vs audit code freeze — definition of "audited state") (#r192)
+
+**The tension:** Audit begins 2026-04-28 on code frozen 2026-04-21. Governance parameters are not bytecode — they can change after code freeze without a redeployment. If a parameter changes between code freeze and Demo Day, is the audit still valid?
+
+**Resolution — scope audit at bytecode + hard-bound layer, not parameter-value layer (#r192):**
+
+The audit's mandate is not to certify any specific parameter value as safe. It is to certify that:
+1. **Hard bounds are enforced in contract code.** No governance transaction can exceed the hard bounds (r_floor, β_min/β_max, tolerance ceiling, etc.) regardless of what value is submitted. The audit verifies the bound-enforcement logic in the EVM bytecode.
+2. **Time-lock is enforced in contract code.** No governance transaction can take effect sooner than the minimum time-lock window. The audit verifies the time-lock logic in the EVM bytecode.
+3. **State machine transitions are invariant-preserving.** Regardless of parameter values within their bounds, all state machine transitions (#r160/Q2, T_anchor StateFreeze, Zone C, degraded mode) preserve the 155 mechanism invariants. The audit verifies this structurally.
+
+**What this means for governance parameter changes during audit:**
+
+Governance may update any parameter within its hard bounds at any time after code freeze. This does not invalidate the audit because the audit certified the bounds and time-lock enforcement, not the specific parameter value. The audit deliverable should explicitly state: *"This audit certifies the bytecode of [contract list] against the mechanisms specified in [invariant set]. Governance parameter values within certified hard bounds are not within audit scope."*
+
+**One exception — parametric invariant interaction:** Some invariants depend on parameter relationships (e.g., `tolerance ≤ ⌊window_size / 4⌋`, #r134; `γ_corr_cross ≤ γ_corr`, #r130). These relational invariants must be checked at the contract level — if they can only be broken by governance setting two parameters in a specific combination, the contract must enforce the relationship at parameter-update time, not by trusting governance.
+
+**Contract enforcement of relational invariants:** At `GovernanceParams.setParam(name, value)`, the contract checks all pairwise constraints involving `name`. If any constraint is violated, the transaction reverts. This must be in-scope for the audit: the auditor verifies the relational constraint check is complete (no missing constraint pairs) and correctly evaluated.
+
+**Governance actions during audit — notification obligation:** Any governance parameter change executed during the audit window (2026-04-28 to 2026-06-02) must be communicated to the audit firm within 24 hours. The audit firm's final report covers the bytecode as deployed; parameter changes are an addendum to the audit scope if they affect the relational invariant enforcement logic.
+
+**Design law (#r192):** "Audited state" = bytecode + hard bounds + relational constraint enforcement. Governance parameter values within certified bounds are operational decisions, not security properties. The audit certifies the envelope; governance operates within it. (#r192)
+
+---
+
+### Q4 (v2.2 first-run starting question) (#r192)
+
+**Candidate from #r191/Q4:** "Given IPositionRegistryAdapter as the cross-version primitive, what can a market participant do in DISCOVERY_MODE that they cannot do in CLEARING_MODE?"
+
+**Evaluation of this candidate:**
+
+The question is correct as a *difference* question but not as a *mechanism-founding* question. DISCOVERY_MODE for v2.2 should not be defined by what it lacks compared to CLEARING_MODE — it should be defined by its own primitive.
+
+**Revised first-principles starting question for `knowledge-marketplace-v22.md`:**
+
+> **"In CLEARING_MODE, the demand signal is observable (position max_loss). In DISCOVERY_MODE, it is not. What is the minimal set of mechanism primitives that makes honest D(c) demand revelation incentive-compatible — and does that minimal set produce a mechanism that is strictly better than LMSR for the same information environment?"**
+
+**Why this is the right starting question:**
+
+1. It is grounded in the mechanism's deepest unsolved problem (D(c) revelation, identified in #r148/§9 as the strongest failure mode).
+2. It forces a comparison against LMSR in the same information environment — preventing DISCOVERY_MODE from being defined as "CLEARING_MODE minus a position registry."
+3. The answer determines whether EQ (escrow-conditioned queries, #r149/§A) is the right primitive or whether something simpler (a subsidised scoring rule, a prediction-market bootstrap) is sufficient.
+4. The answer also determines whether DISCOVERY_MODE is a distinct mechanism or a degenerate limiting case of CLEARING_MODE with zero position registry.
+
+**First five mechanism questions for v2.2 research thread:**
+
+1. What is the minimal mechanism for incentive-compatible D(c) revelation in DISCOVERY_MODE? Is EQ escrow-conditioned query (#r149/§A) necessary, or is a simpler subsidy sufficient?
+2. Is DISCOVERY_MODE strictly better than LMSR for the same information environment (same knower population, same oracle, no position registry)?
+3. What is the correct state model for DISCOVERY_MODE — is S_cred in DISCOVERY_MODE the same object as in CLEARING_MODE, or should it be a different epistemic structure (a distribution over distributions, not a point estimate)?
+4. How does the shadow-class genesis prior (#r154/Q1) behave when the discovery class has run for many epochs — does the attenuated prior ever reconverge to be useful, or is it always dominated by native clearing-class evidence after N_calibration epochs?
+5. Given IPositionRegistryAdapter as the cross-version primitive, can a DISCOVERY_MODE class and a CLEARING_MODE class on the same coordinate run concurrently (different class IDs, same coordinate_identifier), and if so, how does the adapter mediate between them without creating an oracle information leak?
+
+**Design law (#r192):** v2.2 research begins from the mechanism's deepest unresolved problem (D(c) revelation), not from the engineering gap (adapter interfaces). Engineering follows mechanism; mechanism is always the starting point. (#r192)
+
+---
+
+## Structural Synthesis: Audit-Readiness Closure (#r192)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| Audit firm selection | Zellic primary (clearing-protocol exp); Trail of Bits backup; 4 contracts external | Select by epoch-lifecycle + oracle duality + fixed-point competence |
+| W_MAX cap enforcement | Simultaneous cap (Option A); single renormalisation pass; order-independent | W_MAX must be a projection onto the W_MAX simplex; no processing-order advantage |
+| Audited state definition | Bytecode + hard bounds + relational constraints; parameter values not in scope | Audit certifies envelope; governance operates within it |
+| v2.2 starting question | D(c) revelation — is EQ necessary or sufficient vs LMSR baseline? | Mechanism founding question, not engineering gap question |
+
+---
+
+## Cumulative Invariants (additions through #r192)
+
+**Invariant #156 (#r192):** W_MAX cap enforcement is simultaneous across all knowers in a single `commitEpochBuffer` call, followed by one renormalisation pass. No sequential cap with processing-order precedence is permitted.
+
+**Invariant #157 (#r192):** "Audited state" = bytecode + hard-bound enforcement + relational constraint enforcement. Governance parameter values within certified bounds are operational, not security properties. Parameter changes during audit require 24-hour notification to auditors.
+
+**Invariant #158 (#r192):** Audit firm must demonstrate competence in epoch-lifecycle state machines, oracle authority model experience, and fixed-point arithmetic before engagement. Audit briefing must include: 10-point framework (#r148), invariants #1–#155, four highest-risk code paths (#r161/Q4). Zellic is the recommended primary firm; engagement by 2026-04-07.
+
+**Invariant #159 (#r192):** v2.2 research is founded on the D(c) revelation problem, not on engineering adapter gaps. First question: is EQ escrow-conditioned query the minimal mechanism for incentive-compatible D(c) revelation, and is DISCOVERY_MODE strictly better than LMSR in the same information environment?
+
+---
+
+## Run Log Update
+
+- **#r192** — 2026-04-04T05:42Z — Audit-readiness closure. Firm selection: Zellic primary (clearing-protocol experience); Trail of Bits backup. W_MAX enforcement: simultaneous cap + single renormalisation; order-independent projection. Audited state: bytecode + bounds + relational constraints; parameter values operational. v2.2 starting question: D(c) revelation necessity vs LMSR baseline; 5 founding questions for knowledge-marketplace-v22.md. Invariants #156–#159.
+
+---
+
+## Open Questions for #r193+
+
+1. **Relational constraint completeness checklist:** GovernanceParams must enforce all pairwise parameter relationships (#r134, #r130, #r75, etc.) at parameter-update time. Produce the complete list of relational constraints that must be contract-enforced vs those safe to enforce as governance-convention only.
+
+2. **Zellic engagement brief:** Draft the 1-page technical brief for Zellic covering: mechanism context, 4-contract scope, four highest-risk code paths, and the oracle authority duality explanation (non-standard for EVM auditors).
+
+3. **W_MAX value setting:** W_MAX has been referenced throughout as a "per-address cap" but never formally bounded. What is the correct W_MAX value — should it be a fixed percentage of total active credibility weight (e.g., 10%), or a fixed token amount, or derived from TOWL zone A headroom?
+
+4. **v2.2 thread creation:** Create `/topics/knowledge-marketplace-v22.md` with the five founding questions from #r192/Q4 as the genesis entry, run #r1 of that thread.
+
+*Last updated: #r192 — 2026-04-04T05:42Z*
