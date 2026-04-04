@@ -20946,16 +20946,228 @@ This is Invariant #337 generalised to its logical foundation. (#r235)
 
 **Invariant #354 (#r235):** Warranty-oracle coupling: Warranty(claim_a) = Pr[|S_cred(c, T_anchor) − oracle_declared(c, T_anchor)| ≤ q_quality_threshold_a]. oracle_declared is the sole exogenous variable. Mechanism integrity is equivalent to oracle_declared being exogenous. Endogenous oracle renders warranty circular; this is why all three class_oracle_mode values (AUTOMATED, COMMITTEE, HYBRID_EXTERNAL) require external oracle independence. This is the logical foundation of Invariant #337.
 
+
 ---
 
-## Open Questions for #r236+
+## #r236 Contributions — 2026-04-04T13:52Z
 
-1. **AdapterRegistry write authorization and multi-sig requirements:** The mutable AdapterRegistry is governance-multisig gated. Define the minimum multisig threshold for adapter writes (e.g., 3-of-5 vs 2-of-3) and whether adapter writes require a time-lock (e.g., 48-hour time-lock to enable community inspection before an adapter goes live).
+Addresses all four open questions from #r235. Net-new structural insight: the AdapterRegistry upgrade path resolves by establishing the **minimal forwarding proxy as the sole legitimate proxy pattern in GestAlt** — not for core contracts, but exclusively for the mutable-tier anchor.
 
-2. **τ_commit_bonus and protocol_maintenance_reserve epoch draw computation:** The epoch draw from protocol_maintenance_reserve is shared between Phase-2 maintenance bonus and τ_commit_bonus. Is the total epoch draw fixed (governance-set reserve draw rate × reserve balance) or uncapped (total payout = sum of all eligible bonuses)? If uncapped, reserve depletion is unbounded in high-participation epochs.
+---
 
-3. **Two-tier registry and AdapterRegistry upgrade:** If AdapterRegistry itself needs an upgrade (bug fix; new write-authorization model), it must be replaced while all adapters remain accessible. Define the AdapterRegistry upgrade path: new AdapterRegistry address replaces the ADAPTER_REGISTRY_SLOT in ProtocolAddressRegistry — but ProtocolAddressRegistry is immutable post-finalize. How is ADAPTER_REGISTRY_SLOT changed without breaking the immutability guarantee?
+### Q1 (AdapterRegistry write authorization and multi-sig requirements) → 3-of-5 multisig + 48-hour time-lock for registration; 4-of-5 emergency path for deregistration only; no time-lock on deregistration (#r236)
 
-4. **Warranty-oracle coupling and partial-truth resolution:** Invariant #354 addresses full oracle resolution. Under partial-truth resolution (oracle fires but only partially covers the coordinate space — e.g., range instead of point value), is the warranty evaluated at the partial resolution midpoint? At the interval boundary closest to S_cred? Or does partial-truth resolution defer warranty evaluation to next full-resolution event?
+**Threat model for adapter writes:**
 
-*Last updated: #r235 — 2026-04-04T13:42Z*
+A malicious adapter registered to the AdapterRegistry and pointed to an adversarial contract would intercept calls from SettlementEngine_v2 or CommitteeStateEngine_v2 routed through the adapter path. This is a code-execution surface. Time-lock enables community review before activation.
+
+**Resolution:**
+
+```
+AdapterRegistry governance parameters:
+
+  Adapter registration (new adapter or address change):
+    Multisig threshold:  3-of-5 governance multisig
+    Time-lock:           48 hours between proposal and activation
+    EAT events:          adapter_registration_proposed { slot, address, activation_epoch }
+                         adapter_registration_activated { slot, address }
+
+  Adapter deregistration (remove compromised or deprecated adapter):
+    Multisig threshold:  4-of-5 governance multisig  [higher; defensive action should be hard to fake]
+    Time-lock:           NONE  [emergency defensive action must be immediate]
+    EAT events:          adapter_deregistered { slot, reason, epoch }
+```
+
+**Why deregistration uses higher multisig but no time-lock:** Deregistration removes code from the call path — it cannot introduce malicious behaviour. Speed is the priority for emergency deregistration. Requiring 4-of-5 prevents a 3-of-5 majority from silently deregistering adapters used by live production classes.
+
+**Why registration uses 48-hour time-lock:** New adapters introduce untested code. 48 hours matches the Invariant #41 re-audit intent scaled to a single-contract surface. Batch adapter writes share one time-lock window — prevents circumvention via many small registrations.
+
+**Design law (#r236):** New code entering the call path = time-locked. Code leaving the call path = no time-lock (defensive). Higher multisig threshold for deregistration prevents abuse of the emergency path by a simple majority. (#r236)
+
+---
+
+### Q2 (τ_commit_bonus and protocol_maintenance_reserve epoch draw — fixed draw rate, prorated on overflow) → Fixed fractional draw rate; epoch_draw = α_draw × reserve_balance; overflow prorated; draw floor to prevent asymptotic-zero stall (#r236)
+
+**Uncapped payout depletion:** At full-k participation, total payout = k × τ_bonus_rate × slot_base_reward + Phase-2 maintenance for all active knowers. No ceiling = reserve depletion in finite epochs under sustained high participation.
+
+**Resolution — fixed fractional draw:**
+
+```
+protocol_maintenance_reserve_epoch_draw(class_i, t) =
+    max(
+        α_draw × protocol_maintenance_reserve_balance(class_i, t),
+        epoch_draw_floor
+    )
+
+α_draw = governance-set per class ∈ [0.01, 0.10]; default 0.03
+epoch_draw_floor = min_viable_maintenance_payment (governance-set)
+```
+
+Fractional draw ensures geometric convergence — reserve asymptotically approaches zero but never reaches it from legitimate participation alone.
+
+**Overflow proration:**
+
+```
+if eligible_total > epoch_draw:
+    τ_commit_bonus_share = τ_budget_fraction × epoch_draw
+    Phase2_share = (1 − τ_budget_fraction) × epoch_draw
+
+    Each eligible Phase-1 committer:
+        τ_bonus_a = τ_commit_bonus_share × (slot_base_reward_a / Σ slot_base_reward_eligible)
+
+    Each eligible Phase-2 knower:
+        Phase2_bonus_a = Phase2_share × (WED_contribution_a / Σ WED_contributions)
+```
+
+Proration preserves relative reward rankings. **Reserve low-warning** at `balance < 10 × epoch_draw` triggers replenishment SLA (Invariant #333).
+
+**Design law (#r236):** Epoch draw is fixed and fractional (geometric convergence). Overflow prorated by relative weight. epoch_draw_floor prevents asymptotic-zero stall. Reserve low-warning at 10× epoch_draw. (#r236)
+
+---
+
+### Q3 (Two-tier registry and AdapterRegistry upgrade — minimal forwarding proxy as sole legitimate proxy in GestAlt) → Minimal forwarding proxy for ADAPTER_REGISTRY_SLOT only; all core contracts remain proxy-free (#r236)
+
+**The structural tension:** ADAPTER_REGISTRY_SLOT in the immutable ProtocolAddressRegistry must point to a stable address whose implementation can change. Invariant #349 prohibits proxying ProtocolAddressRegistry itself — but the AdapterRegistry anchor is a different, narrower case.
+
+**Resolution — minimal forwarding proxy:**
+
+```solidity
+contract AdapterRegistryForwardingProxy {
+    address public implementation;
+    address public governance;
+
+    constructor(address _impl, address _gov) {
+        implementation = _impl;
+        governance = _gov;
+    }
+
+    function upgradeImpl(address newImpl, bytes calldata verificationProof)
+        external onlyGovernance {
+        // verificationProof: 3-of-5 multisig approval + 48-hour time-lock proof
+        implementation = newImpl;
+        emit ImplementationUpgraded(implementation, newImpl);
+    }
+
+    fallback() external {
+        address impl = implementation;
+        assembly {
+            calldatacopy(0, 0, calldatasize())
+            let result := delegatecall(gas(), impl, 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
+            switch result case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
+        }
+    }
+}
+```
+
+**Conditions that make this proxy legitimate (vs prohibited patterns):**
+
+1. **Address cannot change** — ADAPTER_REGISTRY_SLOT is registered in the immutable ProtocolAddressRegistry.
+2. **Logic must change** — AdapterRegistry implementation requires updates for wave migration and new adapter types.
+3. **Interface is stable** — two functions: `getAdapter(slot)` and `isAdapterAvailable(slot)`. ABI change risk is minimal.
+
+Core protocol contracts (CredibilityAggregator, SettlementEngine, CommitteeStateEngine, CoordinateRegistry, ClaimEscrow) fail condition 3 — their interfaces evolve across versions. Interface commitment for core contracts is provided by version-specific CREATE2 addresses (Invariant #349), not by proxy stability.
+
+**Architectural law:** Proxies are legitimate iff: address-anchored + logic-mutable + interface-stable. The number of such contracts in a well-designed protocol should be minimal (ideally one). Finding yourself justifying a proxy for a core contract signals an upgrade-discipline problem, not an interface-stability solution.
+
+**Design law (#r236):** AdapterRegistryForwardingProxy is the sole legitimate proxy in GestAlt. Implementation upgrades: 3-of-5 + 48-hour time-lock. All other protocol contracts remain proxy-free. (#r236)
+
+---
+
+### Q4 (Warranty-oracle coupling and partial-truth resolution) → Interval distance metric for range coordinates; dimension-indexed deferred evaluation for partial-domain; midpoint evaluation prohibited (#r236)
+
+**Three partial-truth cases formalised:**
+
+**Case 1 — Range oracle (interval [L, R]):**
+
+```
+oracle_declared(c, T_anchor) = [L, R]
+
+dist(S_cred, [L, R]) = max(0, L − S_cred, S_cred − R)
+
+Claim correct iff dist(S_cred, [L, R]) ≤ q_quality_threshold_a
+```
+
+The midpoint heuristic (evaluating against (L+R)/2) is explicitly rejected: it penalises a knower whose S_cred is at L − ε (just outside the interval) as if they missed the midpoint by (R−L)/2 + ε. The error is the oracle's imprecision, not the knower's inaccuracy.
+
+**Case 2 — Partial-domain oracle (multi-dimensional coordinate, oracle covers subset of dimensions):**
+
+```
+covered_dimensions ⊂ {d_1..d_n} at T_anchor:
+  covered: standard warranty evaluation immediately
+  uncovered: deferred to T_anchor_effective(d_j) — first T_anchor where d_j is covered
+
+T_deferral_max = T_class_expected_life_epochs
+  if T_anchor_effective(d_j) > T_deferral_max: resolved wrong (installation error — knower
+     warranted a dimension with no oracle path)
+```
+
+Deferred dimensions share the full claim's escrow lock. Escrow is released only when all dimensions resolve.
+
+**Case 3 — Stochastic oracle (probability distribution):** Left to #r237. Flagged as an open question.
+
+**Backward compatibility:** Point oracle is Case 1 with L = R. Interval distance = |S_cred − oracle_declared|. No ABI change.
+
+**Design law (#r236):** Range oracle → interval distance. Partial-domain → dimension-indexed deferred evaluation bounded by T_deferral_max. Midpoint evaluation prohibited — oracle imprecision ≠ knower inaccuracy. (#r236)
+
+---
+
+## Net-New Structural Observation: Proxy Legitimacy as Architectural Principle (#r236)
+
+The resolution to Q3 surfaces a general principle applicable beyond GestAlt:
+
+**When is a proxy legitimate in a mechanism-design protocol?**
+
+Proxies sacrifice interface commitment. They are legitimate only when three conditions hold simultaneously:
+1. The call-site address **cannot change** (anchor is registered in an immutable reference)
+2. The logic **must change** (implementation requires updates across the contract's lifetime)
+3. The interface **is stable** (ABI will not change between implementations)
+
+AdapterRegistryForwardingProxy satisfies all three. Core protocol contracts fail condition 3 — their interfaces evolve with mechanism version upgrades. If you find yourself justifying a proxy for a core contract, you are solving an upgrade-discipline problem, not an interface-stability problem.
+
+The number of legitimate proxies in a well-designed protocol should be small (ideally one — the mutable-tier anchor). This is an EVM contract architecture law, not a GestAlt-specific rule. (#r236)
+
+---
+
+## Structural Synthesis: #r236
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| AdapterRegistry multisig + time-lock | 3-of-5 + 48h for registration; 4-of-5 + no time-lock for deregistration | New code time-locked; defensive removal immediate; higher threshold prevents abuse |
+| Epoch draw fixed vs uncapped | Fixed fractional α_draw × balance; overflow prorated by relative weight; draw floor; low-warning at 10× | Fractional draw = geometric convergence; proration preserves relative rankings |
+| AdapterRegistry upgrade path | Minimal forwarding proxy (delegatecall) at ADAPTER_REGISTRY_SLOT; sole legitimate proxy in GestAlt; all core contracts proxy-free | Proxy iff: address-anchored + logic-mutable + interface-stable; core contracts fail condition 3 |
+| Partial-truth resolution | Interval distance for range oracles; dimension-indexed deferred evaluation bounded by T_deferral_max; midpoint rejected | Range oracle uncertainty ≠ knower inaccuracy; defer only uncovered dimensions |
+
+---
+
+## Cumulative Invariants (#r236)
+
+**Invariant #355 (#r236):** AdapterRegistry writes: registration requires 3-of-5 governance multisig + 48-hour time-lock; deregistration requires 4-of-5 governance multisig + no time-lock (emergency defensive). Batch registrations share one time-lock window. EAT events: `adapter_registration_proposed`, `adapter_registration_activated`, `adapter_deregistered`.
+
+**Invariant #356 (#r236):** protocol_maintenance_reserve epoch draw is fixed and fractional: epoch_draw = max(α_draw × reserve_balance, epoch_draw_floor); α_draw default 0.03 (governance [0.01, 0.10]). Overflow prorated by relative weight within each sub-budget. Reserve low-warning at balance < 10 × epoch_draw triggers replenishment SLA (Invariant #333).
+
+**Invariant #357 (#r236):** AdapterRegistryForwardingProxy is the sole legitimate proxy pattern in GestAlt. Scoped to ADAPTER_REGISTRY_SLOT only. Conditions for legitimate proxy: (1) address cannot change (immutable anchor); (2) logic must change; (3) interface is stable. Core protocol contracts (CredibilityAggregator, SettlementEngine, CommitteeStateEngine, CoordinateRegistry, ClaimEscrow) are proxy-free; interface commitment by version-specific CREATE2 addresses (Invariant #349). Implementation upgrades: 3-of-5 multisig + 48-hour time-lock.
+
+**Invariant #358 (#r236):** Partial-truth resolution: (1) Range oracle [L, R]: dist(S_cred, [L,R]) = max(0, L−S_cred, S_cred−R); midpoint evaluation prohibited. (2) Partial-domain oracle: covered dimensions resolve immediately; uncovered deferred to T_anchor_effective (first oracle event covering that dimension), bounded by T_deferral_max = T_class_expected_life_epochs; expired deferral → resolved wrong. (3) Stochastic oracle formulation deferred to #r237.
+
+---
+
+## Run Log Update
+
+- **#r236** — 2026-04-04T13:52Z — Q1: AdapterRegistry: 3-of-5 + 48h for registration; 4-of-5 + no time-lock for deregistration. Q2: Fixed fractional epoch draw (α_draw × balance); overflow prorated; reserve low-warning at 10× epoch_draw. Q3: AdapterRegistryForwardingProxy = sole legitimate proxy; conditions for legitimate proxy formalised (address-anchored + logic-mutable + interface-stable); all core contracts proxy-free. Q4: Range oracles → interval distance; partial-domain → dimension-indexed deferred evaluation bounded by T_deferral_max; midpoint evaluation prohibited. Invariants #355–#358.
+
+---
+
+## Open Questions for #r237+
+
+1. **Stochastic oracle formulation:** When oracle_declared is a probability distribution (e.g., Gaussian N(μ, σ²)), what is the warranty evaluation function? Options: (a) evaluate against mean μ; (b) evaluate using Wasserstein or KL-divergence between oracle distribution and delta mass at S_cred; (c) treat as range [μ − 2σ, μ + 2σ] and use Case 1 from Invariant #358. Which is epistemically correct?
+
+2. **T_deferral_max for indefinite-life classes:** T_deferral_max = T_class_expected_life_epochs is undefined when governance declares no class expiry. Define a per-dimension deferral ceiling independent of class lifetime for open-ended classes.
+
+3. **AdapterRegistryForwardingProxy storage layout compatibility across implementations:** delegatecall shares storage layout with the proxy. If AdapterRegistry V1 stores adapters at storage slot 5 and V2 relocates them to slot 7, the proxy delegates against the old layout — silent storage corruption. Define the storage layout compatibility requirement for AdapterRegistry implementation upgrades.
+
+4. **Proration and τ_commit_bonus incentive degradation at sustained full-k participation:** If all k committee members always commit Phase-1 and the budget is always constrained, each committer receives less than slot_base_reward × τ_bonus_rate. At what proration ratio does τ_commit_bonus lose its participation incentive effect, and should the protocol define a minimum per-member bonus floor?
+
+*Last updated: #r236 — 2026-04-04T13:52Z*
+
