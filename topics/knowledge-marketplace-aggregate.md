@@ -22368,3 +22368,184 @@ The oracle type registry elevates oracle governance from a per-class judgment to
 4. **oracle_type_registry and COMMITTEE mode:** COMMITTEE mode oracle_declared is the committee's credibility-weighted median. Should COMMITTEE be in the oracle_type_registry with a historical_independence_rate derivable from past committee oracle accuracy, or is COMMITTEE independence inherently per-class (each committee is composed differently)?
 
 *Last updated: #r241 — 2026-04-04T14:44Z*
+
+---
+
+## #r242 Contributions — 2026-04-04T14:54Z
+
+Addresses all four open questions from #r241. Net-new structural insight: **Family B's epistemic capability boundary** — the mechanism can guarantee delivery confirmation but not quality verification, and this is correct rather than incomplete. The asymmetry with Family A is a design constraint, not a design flaw.
+
+---
+
+### Q1 (oracle_type_registry TOWL concentration alert — remediation path) → Three severity tiers; friction-based gating on new registrations; no collateral penalty on existing classes; critical tier blocks new registrations and triggers reserve supplement (#r242)
+
+**First-principles analysis:**
+
+TOWL concentration by oracle type creates correlated systemic risk. A single oracle failure or manipulation event at >50% TOWL share affects the majority of outstanding epistemic obligations. The remediation must: (a) reduce future concentration without penalising existing classes, (b) not create perverse incentives by penalising the most widely-used oracle types (which may be common precisely because they are most reliable), and (c) preserve protocol solvency under correlated oracle failure.
+
+**Three severity tiers:**
+
+```
+TOWL_concentration_fraction(oracle_type_id) = TOWL backed by that type / total_TOWL
+
+Tier 1 — WATCH (50–70% TOWL share):
+  Action: governance warning emitted (EAT event: towl_concentration_watch)
+  New registrations using over-represented oracle_type: require explicit governance
+    acknowledgment of concentration risk at class registration (documentation field)
+  No hard block; no collateral change.
+
+Tier 2 — ELEVATED (70–85% TOWL share):
+  Action: EAT event: towl_concentration_elevated
+  New registrations using over-represented oracle_type: 4-of-5 governance vote required
+  Existing classes unaffected.
+  Governance diversity target: produce a registered alternative oracle_type within N_calibration
+    epochs (soft target; logged if missed).
+
+Tier 3 — CRITICAL (>85% TOWL share):
+  Action: new registrations of over-represented oracle_type BLOCKED (hard gate)
+  EAT event: towl_concentration_critical { oracle_type_id, share_fraction, epoch }
+  Existing classes continue unaffected.
+  Protocol-level reserve supplement:
+    X_supplement = TOWL_backed_by_type × alpha_concentration_supplement (default 0.01)
+    Source: debt_retirement_reserve → settlement_reserve
+  Block lifts when share drops below 75% (hysteresis)
+```
+
+**Why not collateral raising for the over-represented type:** Penalising the most-used oracle type creates adverse selection — it is most common because it has the best performance record. Friction-based gating on new registrations (requiring higher governance threshold) is the correct instrument: it slows accumulation without penalising established oracle reliability.
+
+**Concentration portfolio dashboard:** Each epoch, EAT records `towl_oracle_distribution { epoch, [(oracle_type_id, share_fraction)] }`. Long-run design target: no single oracle_type_id exceeds 40% TOWL share.
+
+**Design law (#r242):** Oracle concentration remediation is friction-based (higher governance threshold for new registrations), not collateral-based. Tiers escalate from documentation friction (Tier 1) to supermajority gate (Tier 2) to hard block + reserve supplement (Tier 3). Hysteresis prevents flip-flopping. (#r242)
+
+---
+
+### Q2 (γ_oracle per-pair override vs protocol-level γ_oracle drift — which governs) → Hierarchical: protocol-level is the prior; per-pair overrides when sample_n >= N_calibration; inconsistency is epistemic precision, not a bug (#r242)
+
+**Resolution — Bayesian hierarchy:**
+
+```
+effective_gamma_oracle(A, B):
+  if sample_n(A, B) < N_calibration:
+    return gamma_oracle_protocol_level          [prior; insufficient data]
+  else:
+    return gamma_oracle_empirical(A, B)         [posterior; sufficient data]
+```
+
+Per-pair specificity (γ_empirical(A,B) = 0.96 vs protocol-level 0.82) is intended epistemic precision. A chain with 30 resolved epochs is demonstrably more reliable than an unproven chain — applying the same γ to both mis-represents the epistemic situation.
+
+**Protocol-level drift:** As per-pair data accumulates, protocol-level γ_oracle (the median of per-pair empiricals) drifts to reflect the actual reliability distribution. New chains without per-pair data benefit from this prior drift. This is the protocol learning.
+
+**Governance flag:** If any per-pair γ_empirical(A, B) differs from protocol-level by >0.15 and sample_n(A, B) >= 2 × N_calibration, governance is alerted (`gamma_outlier_flag`). Alert prompts review: is this pair genuinely exceptional (retain override) or is the oracle_type_registry for this pair's upstream class stale (update registry)?
+
+**Design law (#r242):** γ_oracle hierarchy: protocol-level prior → per-pair empirical posterior when sample_n >= N_calibration. Per-pair specificity is epistemic precision. Protocol-level drifts as pair data accumulates. Outliers flagged at 2×N_calibration for governance review. (#r242)
+
+---
+
+### Q3 (ZK_PROOF_VERIFICATION and post-delivery quality — correct epistemic boundary for Family B) → Delivery-oracle-only is the permanent correct boundary; satisfaction-conditional escrow creates dominant-strategy dissatisfaction; asymmetry with Family A is a design constraint, not a deficiency (#r242)
+
+**Satisfaction-conditional escrow attack:** If unknowers receive escrow conditional on rating knowledge as satisfactory, the dominant strategy is always to claim dissatisfaction and retain the bonus. This is standard "satisfaction guarantee attack" — expected equilibrium for rational actors.
+
+**On-chain quality arbitration requires subjective judgment:** Bonding buyers to honest ratings requires an arbitrator to determine truthful dissatisfaction. On-chain arbitration of subjective claims requires either COMMITTEE mode machinery (expensive; violates Family A/B isolation) or trusted third-party (re-introduces trust problem).
+
+**The asymmetry with Family A:**
+
+Family A achieves quality verification at zero additional trust cost because the oracle resolves the hidden variable exogenously. Family B has no equivalent: "quality of disclosed knowledge" is a relational property between content and buyer context, not a hidden variable resolved by external reality. There is no oracle for "was this useful to me."
+
+**Design law (permanent):** Family B is trust-minimized delivery confirmation, not trust-minimized quality attestation. Quality assurance is off-chain and contractual. Protocol must disclose this boundary via EQ metadata field `delivery_oracle_only: true`. (#r242)
+
+---
+
+### Q4 (COMMITTEE in oracle_type_registry — meta-type vs per-class) → Meta-type with 4 structural sub-categories; per-class Bayesian posterior from η_realized after N_calibration; posterior below gate → independence_degraded alert (#r242)
+
+**Resolution — hierarchical registry entry:**
+
+```
+oracle_type_registry: COMMITTEE (meta-type)
+  Sub-categories (governance-declared at class registration):
+    COMMITTEE_SMALL       : k ∈ [3,5], general domain
+      historical_independence_rate: 0.78
+    COMMITTEE_DOMAIN_5    : k ∈ [3,7], credentialed domain experts
+      historical_independence_rate: 0.84  (default; consistent with #r241)
+    COMMITTEE_DOMAIN_10   : k ∈ [8,15], large expert panel
+      historical_independence_rate: 0.88
+    COMMITTEE_REGULATORY  : regulatory/legal body
+      historical_independence_rate: 0.92
+    [All values: governance-estimated priors; updated quarterly from resolved η_realized data]
+```
+
+**Per-class Bayesian posterior update:**
+
+After N_calibration resolved epochs for class i:
+
+```
+P_oracle_independent_posterior(class_i) = Bayesian_update(
+  prior = oracle_type_registry[sub_category_i].historical_independence_rate,
+  observations = binary alignment events from η_realized history,
+  model = Beta conjugate update
+)
+alignment_event_i(epoch_t) = 1 iff |S_cred(class_i, T_anchor_t) - oracle_declared_t| <= q_threshold_t
+```
+
+Beta prior: α_0 = P_prior × 20; β_0 = (1 − P_prior) × 20 (N=20 equivalent sample weight).
+
+**Dynamic gate:** If P_oracle_independent_posterior(class_i) < registration gate threshold after N_calibration epochs → `committee_independence_degraded` EAT event → epistemic_live_degraded state → governance recruitment alert.
+
+**Why per-class posterior matters:** A COMMITTEE_DOMAIN_5 class with systematic η_realized bias (four of five members consistently skewed in same direction) will have its posterior decay below the 0.84 registry prior, revealing idiosyncratic capture the population-level prior cannot detect.
+
+**Design law (#r242):** COMMITTEE registered as meta-type with 4 sub-categories in oracle_type_registry. Population priors updated quarterly from resolved η_realized data. Per-class Bayesian posterior activates after N_calibration resolved epochs; idiosyncratic committee capture is detectable through posterior degradation. (#r242)
+
+---
+
+## Net-New Structural Observation: Oracle Dependency as Epistemological Anchor (#r242)
+
+Family B analysis confirms from the opposite direction what §9 of the knowledge-marketplace analysis identified as the mechanism's strongest failure mode.
+
+Family B can operate with only a delivery oracle — not a truth oracle. But delivery confirmation is epistemically weaker than truth verification. Family A requires truth oracle exogeneity because that is what it is certifying: accuracy relative to independently-determined reality.
+
+**A knowledge marketplace that could operate without external truth oracles would certify internal consensus, not external truth.** This is Family C (peer scoring), eliminated in #r239 for circular validation. Oracle dependency is not a bug to engineer away — it is the mechanism's epistemological anchor.
+
+**Formal statement:** The mechanism's epistemic value proposition is: *"This claim was accurate relative to an independently-determined truth."* Removing the independent determination (oracle exogeneity) converts the claim to: *"This claim was consistent with the mechanism's own prior beliefs."* These are different commodities. The knowledge marketplace sells the first. Prediction markets (LMSR/orderbook family) sell the second. The oracle dependency distinguishes them. (#r242)
+
+---
+
+## Structural Synthesis: #r242
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| TOWL concentration remediation | Three tiers: WATCH/ELEVATED/CRITICAL; friction gating; reserve supplement at CRITICAL; hysteresis 75% | Friction gates new registrations; no collateral penalty on existing classes |
+| γ_oracle per-pair vs protocol-level | Hierarchical: prior → per-pair empirical when sample_n >= N_calibration; drift = protocol learning; outlier flag at 2×N_calibration | Per-pair specificity = epistemic precision; protocol-level prior is the default |
+| Family B quality boundary | Delivery-oracle-only permanent; satisfaction escrow prohibited; EQ metadata disclosure required | Mechanism certifies delivery not quality; asymmetry with Family A is a design constraint |
+| COMMITTEE in oracle_type_registry | Meta-type with 4 sub-categories; per-class Bayesian posterior from η_realized; posterior below gate → independence_degraded | Registry provides prior; class history provides posterior; idiosyncratic capture detectable |
+| Oracle dependency as feature | Oracle dependency is the epistemological anchor; removing it converts knowledge marketplace to prediction market | "Accurate relative to external truth" ≠ "consistent with mechanism's beliefs" |
+
+---
+
+## Cumulative Invariants (#r242)
+
+**Invariant #372 (#r242):** TOWL oracle-type concentration: WATCH at 50–70% (documentation friction), ELEVATED at 70–85% (4-of-5 governance vote for new registrations), CRITICAL at >85% (hard block on new registrations + reserve supplement X_supplement = TOWL_backed_by_type × alpha_concentration_supplement default 0.01 from debt_retirement_reserve). Block clears at <75% (hysteresis). No collateral penalty on existing classes. EAT event `towl_oracle_distribution` recorded each epoch. Long-run design target: no oracle_type_id exceeds 40% TOWL share.
+
+**Invariant #373 (#r242):** γ_oracle hierarchy: protocol-level prior used for chain pairs with sample_n < N_calibration. Per-pair empirical γ_oracle(A,B) overrides when sample_n(A,B) >= N_calibration. Protocol-level γ_oracle drifts as median of all per-pair empiricals with sufficient data (protocol-level learning). Per-pair deviations >0.15 from protocol-level at sample_n >= 2×N_calibration trigger `gamma_outlier_flag` governance alert for review: pair exceptionalism vs registry staleness.
+
+**Invariant #374 (#r242):** Family B epistemic boundary is permanent: delivery confirmation only. Satisfaction-conditional escrow is prohibited (dominant-strategy dissatisfaction attack). On-chain quality arbitration requires subjective judgment outside mechanism scope. EQ metadata for Family B classes must include `delivery_oracle_only: true`. Off-chain quality assurance is the buyer's responsibility.
+
+**Invariant #375 (#r242):** COMMITTEE is registered in oracle_type_registry as a meta-type with 4 structural sub-categories (SMALL k=3-5: 0.78, DOMAIN_5 k=3-7: 0.84, DOMAIN_10 k=8-15: 0.88, REGULATORY: 0.92; all governance-estimated priors updated quarterly). Per-class P_oracle_independent_posterior is a Bayesian update from sub-category prior using η_realized binary alignment history (Beta conjugate; N=20 equivalent prior weight), activating after N_calibration resolved epochs. Posterior below registration gate threshold triggers `committee_independence_degraded` EAT event and epistemic_live_degraded state.
+
+---
+
+## Run Log Update
+
+- **#r242** — 2026-04-04T14:54Z — Q1: TOWL oracle concentration: three tiers (WATCH/ELEVATED/CRITICAL); friction-based gating; reserve supplement at CRITICAL (alpha default 0.01); hysteresis at 75%. Q2: γ_oracle hierarchy: protocol prior → per-pair empirical when sample_n >= N_calibration; drift = protocol learning; outlier flag at 2×N_calibration. Q3: Family B delivery-oracle-only boundary permanent; satisfaction-conditional escrow prohibited (dominant-strategy attack); off-chain quality is buyer's responsibility; EQ metadata disclosure required. Q4: COMMITTEE in registry as meta-type with 4 sub-categories (0.78/0.84/0.88/0.92); per-class Bayesian posterior from η_realized; posterior below gate → committee_independence_degraded alert. Net-new: oracle dependency is the mechanism's epistemological anchor — removing it converts knowledge marketplace to prediction market. Invariants #372–#375.
+
+---
+
+## Open Questions for #r243+
+
+1. **alpha_concentration_supplement calibration — reserve supplement sizing at CRITICAL concentration:** The reserve supplement at CRITICAL tier = TOWL_backed × 0.01. Is 1% adequate? Define the analysis: if the over-represented oracle type fails simultaneously for all backed classes (worst case), what fraction of outstanding TOWL obligations become immediately at-risk, and what reserve fraction would cover the tail?
+
+2. **gamma_outlier_flag governance review — two outcomes (retain per-pair vs update registry):** When per-pair γ_empirical(A,B) deviates from protocol-level by >0.15 at 2×N_calibration events, governance must decide: retain per-pair override (pair is genuinely exceptional) or update oracle_type_registry for A's type (population-level prior is stale). Define the decision criteria — what evidence distinguishes pair-level exceptionalism from registry staleness?
+
+3. **committee_independence_degraded — pathway to re-elevated P_oracle_independent:** When a class enters epistemic_live_degraded due to posterior P falling below gate, can it recover? If committee composition is improved (underperforming members replaced), does the Bayesian update retroactively benefit, or does the class need to demonstrate N_calibration clean epochs to exit degraded state?
+
+4. **Knowledge marketplace scope declaration for oracle-resistant coordinate gap:** §9 identifies oracle-resistant coordinates as the mechanism's failure domain. §10 proposes implication chains as the surviving variant. Are there coordinate domains where the mechanism adds positive epistemic value even with P_oracle_independent < 0.35 (below registration gate) — and if yes, should the gate be a hard prohibition or a fee/collateral-escalated path for high-risk oracle classes?
+
+*Last updated: #r242 — 2026-04-04T14:54Z*
