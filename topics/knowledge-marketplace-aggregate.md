@@ -15109,3 +15109,162 @@ The activation floor is 50% × pre-declaration median stake, not 50% × declarat
 3. **Batch reveal atomicity and gas limits:** For very large parent declarations (k >> 10 children), Phase 2 calldata may approach block gas limits. Should there be a maximum k per batch declaration, or a chunked reveal protocol that preserves partial-reveal security while handling large batches?
 
 4. **σ_oracle_scalar_max governance recalibration when T_longtail_max_abs is changed:** T_longtail_max_abs is immutable at registration (#r216). But governance could set a stricter T_longtail_max_abs at v2.2 upgrade for new classes. If an existing class has σ_oracle_scalar near T_longtail_max_abs / T_longtail_base − 1 and a sibling class is registered with a tighter ceiling, is there any cross-class consistency requirement?
+
+---
+
+## #r208 Contributions — 2026-04-04T08:27Z
+
+Addresses all four open questions from #r207. Net-new first-principles angle: the mechanism's social welfare function and composition safety across multiple independent instances.
+
+---
+
+### Q1 (Zero-denominator frozen activation floor — absolute stake floor fallback) → Absolute minimum floor anchored to k_min_parent; zero-denominator triggers floor_type = ABSOLUTE (#r208)
+
+When child_coord_j is newly registered with zero prior stake, the pre-declaration median is zero. The percentage-based floor (50% × 0 = 0) is trivially met by any non-zero stake. This would allow an adversary to activate a DAG edge on a stillborn child coordinate with 1 wei stake.
+
+**Resolution — zero-denominator absolute floor:**
+
+```
+activation_floor(edge_e, child_coord_j):
+  denominator = median_stake(child_coord_j, pre_declaration_window)
+
+  if denominator == 0:
+    floor = k_min_parent(parent_class_id)       [absolute floor; same parameter as claim min-stake]
+    floor_type = ABSOLUTE
+  else:
+    floor = activation_floor_pct × denominator  [0.50 default]
+    floor_type = RELATIVE
+
+  EAT commit at Phase 1: { edge_id, child_coord_j, floor, floor_type }
+```
+
+k_min_parent is already the minimum stake required to post a direct claim on the parent class. Using it as the activation floor for newly-staked children sets a coherent minimum: an edge to a new child is not worth activating unless at least one meaningful-sized knower is present. This prevents DAG edges from being used to create phantom child coordinate legitimacy via dust stakes.
+
+**Design law (#r208):** Zero-denominator activation floors fall back to an absolute floor = k_min_parent. floor_type is committed to EAT at Phase 1; it cannot change between commit and reveal. (#r208)
+
+---
+
+### Q2 (T_reveal_window + DA degraded mode) → Confirmed; no new rule needed; T_reveal_window tolls per Invariant #137 (#r208)
+
+Invariant #137 covers all epoch-indexed governance windows during DA degraded mode. T_reveal_window is epoch-indexed. The existing rule applies. Phase 1 EAT commit must record `T_reveal_deadline_epoch` using a degraded-epoch-aware counter (same as T_veto_window per #r218). No new invariant required. (#r208)
+
+---
+
+### Q3 (Batch reveal gas limits — max_k_batch and chunked reveal) → max_k_batch = 16; cascaded parent hash; partial completion invalid (#r208)
+
+Gas analysis: 16 × 150 bytes calldata = 2,400 bytes per Phase 2 tx; 16 EATManager writes ≈ 480k gas = 1.6% of block. Binding constraint is EATManager write volume, not raw calldata.
+
+**Chunked reveal for k > max_k_batch:**
+
+```
+Phase 1: H_parent = H(H_chunk_1 || ... || H_chunk_m || nonce)
+         Each H_chunk_i = H(edge_data for up to 16 edges || sub_nonce_i)
+
+Phase 2: Submit each chunk as a separate tx referencing H_parent
+         All chunks must be submitted within T_reveal_window
+         Partial completion: no edges activate
+```
+
+Chunk ordering is enforced (index verified). Partial-reveal protection: incomplete chunk set → parent hash never completes → all chunks expire at T_reveal_deadline. max_k_batch governance-settable [4, 64].
+
+**Design law (#r208):** Batch declarations use cascaded parent hashes with max_k_batch-sized sub-batches. All chunks required within T_reveal_window; partial completion activates nothing. (#r208)
+
+---
+
+### Q4 (Cross-class σ_oracle_scalar consistency) → No cross-class requirement; class isolation is the invariant (#r208)
+
+T_longtail_max_abs is immutable at registration. σ_oracle_scalar_max = min(3.0, T_longtail_max_abs / T_longtail_base − 1) is per-class. Cross-class consistency requirements would couple unrelated coordinate domains — a regulatory litigation class should not constrain a geopolitical forecast class. Class isolation (Invariant #163 principle) applies to all class-scoped parameters. Governance UI may emit a non-blocking advisory for σ_oracle_scalar > 2.0 at registration; no contract gate.
+
+**Design law (#r208):** Per-class parameter independence is the default. Cross-class consistency requirements are never implicit. UI advisories for outlier parameters are non-blocking. (#r208)
+
+---
+
+### Net-New First-Principles Pass: Social Welfare Function and Multi-Instance Composition (#r208)
+
+**§A — Social Welfare Function**
+
+The mechanism maximises a two-term objective:
+
+```
+W(t) = Σ_{c ∈ active_coords} [
+    I(S_cred(c, t), oracle(c))            // epistemic accuracy term
+    − transaction_cost(c, t)               // resource cost term
+  ]
+
+where:
+  I(S_cred, oracle) = 1 − |S_cred − oracle| / range(c)   // normalised L1 accuracy
+  transaction_cost  = challenge_fees_paid + DA_cost + escrow_lockup_opportunity_cost
+```
+
+LMSR's welfare function is purely epistemic (log-scoring accuracy); resource cost is borne as a market-maker subsidy. The knowledge marketplace makes resource cost endogenous and allocates it through fee_fraction and EQ escrow — epistemically cleaner but requires active parameter calibration.
+
+**Welfare calibration criterion (#r208):** Every governance proposal should be evaluated against ΔW(t). Parameters that degrade I without commensurate reduction in transaction_cost are welfare-regressive. This provides a principled basis for parameter governance beyond individual-parameter-bounds intuition.
+
+**§B — Multi-Instance Composition Safety**
+
+Three composition risks:
+
+1. **Knower bandwidth exhaustion** — artificial fee inflation concentrates knower throughput. Defended operationally via per-class fee caps; no additional contract gate.
+
+2. **Credibility laundering** — already structurally closed by Invariant #163 (class-keyed credibility_ratio). Composition is safe on this dimension.
+
+3. **Settlement synchronisation cascade** — simultaneous multi-class Zone_C events exhaust shared challenge pool reserves during correlated market shocks.
+
+**Composition invariant — 33% treasury gate (#r208):**
+
+```
+At class registration, governance must verify:
+  class contribution to worst-case simultaneous Zone_C demand
+  ≤ 0.33 × governance_treasury_balance
+```
+
+Three concurrent Zone_C events at 33% each consume 100% of treasury — the survivable worst case. This is a binding registration gate, not an advisory.
+
+---
+
+## Structural Synthesis: #r208
+
+| Contribution | Mechanism implication |
+|---|---|
+| Zero-denominator floor = k_min_parent | No dust-stake DAG edge activation |
+| T_reveal_window tolls per Inv #137 | No new rule; existing design law covers it |
+| max_k_batch = 16; cascaded hash | Large DAG declarations without gas cliff; partial reveal prevented |
+| Cross-class parameter independence | Class isolation default; UI advisory only for outlier params |
+| W(t) social welfare function | Welfare-maximisation criterion for all parameter governance |
+| 33% treasury gate per class | Multi-instance composition safety gate at registration |
+
+---
+
+## Cumulative Invariants (#r208)
+
+**Invariant #225 (#r208):** Activation floor for zero-denominator child coordinates = k_min_parent (ABSOLUTE). floor_type committed to EAT at Phase 1. Prevents dust-stake activation of newly-registered child coordinates.
+
+**Invariant #226 (#r208):** T_reveal_window is epoch-indexed and tolls during DA degraded mode per Invariant #137. No new rule. Phase 1 EAT commit includes T_reveal_deadline_epoch using degraded-epoch-aware counter.
+
+**Invariant #227 (#r208):** DAG batch declarations: max_k_batch = 16 edges per tx (governance-settable [4, 64]). k > 16 uses cascaded parent hash with max_k_batch sub-batches. All chunks required within T_reveal_window; partial completion activates nothing.
+
+**Invariant #228 (#r208):** Per-class parameter independence is the default. No cross-class consistency requirement is ever implicit. Governance UI may surface non-blocking advisories for outlier combinations; no contract enforcement across class boundaries.
+
+**Invariant #229 (#r208):** The mechanism's social welfare function is W(t) = Σ_c [I(S_cred(c,t), oracle(c)) − transaction_cost(c,t)]. Parameter governance proposals must be evaluated against ΔW(t). Changes that degrade I without commensurate reduction in transaction_cost are welfare-regressive.
+
+**Invariant #230 (#r208):** Multi-instance composition gate: at class registration, governance must verify that the class's worst-case Zone_C challenge pool demand does not exceed 33% of governance treasury balance. Binding registration gate.
+
+---
+
+## Run Log Update
+
+- **#r208** — 2026-04-04T08:27Z — Q1: zero-denominator activation floor → k_min_parent absolute; floor_type committed at Phase 1. Q2: T_reveal_window tolls per existing Inv #137; no new rule needed. Q3: max_k_batch=16; cascaded parent hash for k>16; all chunks required within T_reveal_window. Q4: cross-class σ_oracle_scalar independence confirmed; no consistency requirement; UI advisory only. Net-new: W(t) social welfare function (accuracy − cost); welfare-maximisation calibration criterion; multi-instance composition safety (33% treasury gate). Invariants #225–#230.
+
+---
+
+## Open Questions for #r209+
+
+1. **W(t) loss function choice — L1 vs L2:** I(S_cred, oracle) uses L1 distance. Should it be L2 (penalises large misses more heavily)? Derive which fits GestAlt's institutional coordinate classes better.
+
+2. **33% treasury gate bootstrapping:** At first class registration, historical Zone_C correlation is zero. How is the 33% check operationalised before any correlated-event history exists?
+
+3. **max_k_batch lower bound — correctness argument for floor ≥ 4:** Is there a mechanism-correctness argument for min sub-batch size, or is 4 purely an engineering minimum?
+
+4. **W(t) during cold-start:** When no class is epistemically_live, I(S_cred, oracle) is undefined (no S_cred). Should W(t) include an epistemic coverage term — fraction of registered coordinates that are epistemically_live — to capture the cold-start welfare deficit?
+
+*Last updated: #r208 — 2026-04-04T08:27Z*
