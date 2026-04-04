@@ -19116,3 +19116,198 @@ Option (b) is informationally neutral but keeps the committee active. Option (a)
 4. **Abstention budget and Zone C interaction:** During Zone C, new T3 installations are throttled. If a COMMITTEE class is in Zone C and committees cannot earn new log-score credit (no new resolutions due to throttling), their abstention budgets drain without an offset path. Should abstention budget decay be suspended during Zone C epochs for COMMITTEE classes, or does Zone C by design permit budget drain as a solvency-stress signal?
 
 *Last updated: #r226 — 2026-04-04T11:42Z*
+
+---
+
+## #r227 Contributions — 2026-04-04T11:52Z
+
+Addresses all four open questions from #r226.
+
+---
+
+**Q1 (Cross-class CPA propagation for pre-resolution committee CPA evidence) → Proactive denial at registration; no retroactive revocation post-grant; CPA_IdentityRegistry as global address-keyed component (#r227):**
+
+The invariant from #r226/Q4 is clear: EAT-committed state is irreversible — grace-window benefit once granted cannot be retroactively voided. But the question is whether cross-class CPA evidence should **deny the grant at registration time**, before the grace window opens.
+
+**Two distinct events separated:**
+
+1. **At COMMITTEE registration for a new class (pre-grant):** The grace window is not yet open. The mechanism can legitimately query cross-class CPA status before granting grace.
+2. **After grace window opens (post-grant):** Invariant #314 applies — no retroactive revocation.
+
+**Resolution — proactive denial at registration via CPA_IdentityRegistry:**
+
+```
+New component: CPA_IdentityRegistry (global, cross-class)
+  Stores: (address → [{class_id, CPA_cluster_id, CPA_status, expiry_epoch}])
+  CPA_status ∈ { active | resolved_penalised | resolved_exonerated | expired }
+  Updated by: CredibilityAggregator at each CPA detection event (per-class)
+  Read by: CoordinateRegistry at COMMITTEE registration time
+
+At COMMITTEE class registration for address A:
+  query CPA_IdentityRegistry.getActiveClusterMembership(address_A)
+  if result.CPA_status == active:
+    grace_window_denied = true
+    committee registration proceeds but at STANDARD_CREDIBILITY (no grace)
+    EAT event: committee_grace_denied { address, class_id, cross_class_ref: cluster_id_and_class }
+  else:
+    grace window proceeds normally per #r226 framework
+```
+
+**Cross-class CPA expiry:** CPA entries expire after `T_CPA_expiry = max(N_calibration × 3, K_CPA_epochs)` normal-mode macro-epochs post-resolution, where K_CPA_epochs is governance-set (default 12, bounded [6, 24]). Expired CPA entries do not block grace windows — a committee that was penalised and exited a CPA cluster is not permanently blacklisted.
+
+**Why not propagate ongoing cross-class CPA to revoke in-flight grace windows:** The Invariant #314 prohibition is not merely administrative — it reflects a structural reality. An in-flight grace-window committee has not yet resolved any claims in the current class. We have no evidence of collusion *here*. Revoking grace based on a different class's pattern requires cross-class identity assertion that exceeds the mechanism's per-class information boundary. The proactive denial at registration is the only epistemically valid intervention point.
+
+**CPA_IdentityRegistry as lightweight global state:** The registry is append-only (EAT-consistent), keyed by address, and requires O(1) lookup at registration. It does not store full claim histories — only cluster membership events. It is readable by all contracts; writable only by CredibilityAggregator after CPA detection.
+
+**Design law (#r227):** Cross-class CPA evidence is applicable at a single intervention point: governance of the grace-window grant at registration. Post-grant, per-class epistemic boundaries hold and Invariant #314 governs. CPA_IdentityRegistry is the global address-keyed source of truth for cross-class cluster membership; it does not create cross-class epistemic coupling beyond the registration gate. (#r227)
+
+---
+
+**Q2 (Δ_abstain and Δ_wrong consistency — hard contract constraint, not advisory) → Hard contract invariant: Δ_abstain < Δ_wrong_class_floor enforced at parameter-update time; Δ_wrong_class_floor defined as trailing N_calibration minimum (#r227):**
+
+**Why hard contract, not advisory:**
+
+If governance sets Δ_abstain ≥ Δ_wrong, the abstention safety valve inverts. A poorly-informed committee member would be penalised at least as much for abstaining as for guessing wrong. This eliminates the rational choice to abstain — pushing low-information committees to make noise claims, degrading S_cred quality. The asymmetry (abstention < wrong) is not a policy preference; it is a structural requirement for COMMITTEE epistemic hygiene.
+
+**Δ_wrong_class_floor definition:**
+
+```
+Δ_wrong_class_floor(class_i, epoch_t) =
+  min(Δ_wrong_i(a, epoch_e)) over {a ∈ active_committees_class_i, e ∈ trailing N_calibration epochs}
+  where Δ_wrong_i(a, e) = |log_score_penalty(a, e) / k_a_net(e)|  (normalised per-unit-stake penalty)
+```
+
+Using the class-trailing minimum is the most conservative comparison: if any committee has experienced an extremely low unit penalty (e.g., very large stake, small miss), that floor governs. This makes it hardest for governance to accidentally set Δ_abstain too high relative to the best-case wrong-claim penalty.
+
+**Hard contract enforcement:**
+
+```
+At parameter_update(class_id, Δ_abstain_proposed):
+  Δ_wrong_floor = getTrailingDeltaWrongFloor(class_id, N_calibration)
+  require(Δ_abstain_proposed < Δ_wrong_floor, "ABSTAIN_DECREMENT_EXCEEDS_WRONG_FLOOR")
+```
+
+**Bootstrap case (no trailing history at genesis):** During Phase 0 and Phase 1 (no resolved claims), `Δ_wrong_floor` is undefined. Governance must submit both Δ_abstain and a provisional Δ_wrong_floor estimate at registration. The contract enforces Δ_abstain < Δ_wrong_floor_estimate. On first N_calibration resolutions, if empirical floor < estimate, governance must lower Δ_abstain within 2 macro-epochs or Δ_abstain auto-reduces to empirical_floor × 0.90 (a 10% buffer).
+
+**Design law (#r227):** Mechanism invariants that are structural requirements (not policy preferences) must be hard contract constraints, not governance advisories. The Δ_abstain < Δ_wrong relationship is structural — it defines the rational abstention surface of the COMMITTEE model. Governance cannot override it without destroying the model's epistemic properties. (#r227)
+
+---
+
+**Q3 (σ_bootstrap divergence — forced recalibration after 2 × N_calibration epochs of persistent divergence) → Forced transition is correct; governance veto window is bounded (#r227):**
+
+**The problem with unbounded governance veto:** If governance can indefinitely defer recalibration by choosing "accept divergence and take no action," the bootstrap value becomes a permanently anchored prior that the empirical data cannot overcome. This is epistemically incorrect: after 2 × N_calibration resolutions, the empirical EMA has sufficient data. Holding to the bootstrap is no longer conservatism; it is deliberate misrepresentation of oracle residual noise.
+
+**Forced recalibration after 2 × N_calibration consecutive flagged epochs:**
+
+```
+σ_bootstrap_divergence_forced_transition trigger:
+  divergence_flag_consecutive_count ≥ 2 × N_calibration
+
+  On trigger:
+    σ_oracle_residual_effective = σ_oracle_residual_EMA_current
+    transition_event EAT: { epoch, old_sigma, new_sigma, governance_vote_pending: false }
+    q_quality_threshold_adjusted prospectively from this epoch forward
+
+  Alert: `forced_sigma_transition` governance notification (priority: HIGH)
+```
+
+**Why 2 × N_calibration, not N_calibration:**
+
+N_calibration is the self-calibration readiness threshold. Giving governance N_calibration additional epochs to respond before forced transition is a proportionate veto window. Two calibration windows total is the maximum reasonable delay.
+
+**Governance response options during the veto window (epochs N_calibration + 1 through 2 × N_calibration):**
+
+1. **Accept and update:** Submit governance vote to adopt empirical σ_oracle_residual_EMA. Forced transition is cancelled; voluntary transition records governance choice in EAT.
+2. **Reject with evidence:** Submit `sigma_divergence_contested` EAT event with oracle anomaly documentation (e.g., known oracle resolution methodology change). If accepted by governance multisig, divergence flag resets and a new bootstrap value can be proposed. Only one contested reset permitted per class; second divergence is always forced.
+3. **No action:** After 2 × N_calibration flagged epochs, forced transition fires automatically.
+
+**`sigma_divergence_contested` one-reset limit:** Prevents governance from perpetually contesting divergence by resetting the counter. After one accepted contest, subsequent divergence flags proceed directly to forced transition with a shortened veto window of N_calibration / 2 epochs.
+
+**Design law (#r227):** Self-calibrating parameters may not be indefinitely vetoed by governance. Governance has a bounded veto window (2 × N_calibration epochs for the first divergence; N_calibration / 2 for subsequent). Beyond the window, the mechanism enforces empirical grounding. This is a specific instance of Invariant #21: self-calibrating parameters require N_window valid observations before replacing defaults — the forced transition is the symmetric enforcement that defaults cannot be retained past their epistemic validity horizon. (#r227)
+
+---
+
+**Q4 (Abstention budget and Zone C interaction) → Epoch-indexed mechanical exception: abstention budget suspended in `zero_resolution_epoch`; not a Zone C policy exception (#r227):**
+
+**The structural distinction:**
+
+Two causes of log-score credit absence during Zone C:
+
+1. **Behavioral abstention (committee chooses not to participate):** Should drain budget — this is the participation incentive.
+2. **Mechanical absence (no oracle resolutions because Zone C throttling suppressed new claims and thus new resolutions):** Should not drain budget — the committee cannot earn credit that is mechanically unavailable.
+
+The correct intervention is at the **epoch type** level, not at the Zone C condition level.
+
+**`zero_resolution_epoch` definition:**
+
+```
+zero_resolution_epoch(class_i, epoch_t) = true iff:
+  n_oracle_resolutions(class_i, epoch_t) == 0
+  AND new_T3_installations(class_i, epoch_t) == 0  [throttling confirmed as cause]
+```
+
+**Abstention budget update rule with mechanical exception:**
+
+```
+credibility_ratio_committee(a, t+1):
+  if zero_resolution_epoch(class_i, t):
+    credibility_ratio_committee(a, t+1) = credibility_ratio_committee(a, t)   [frozen]
+    EAT flag: abstention_budget_suspended: true (zero_resolution_epoch)
+  elif abstained(a, class_i, t):
+    credibility_ratio_committee(a, t+1) = max(credibility_ratio_committee(a, t) - Δ_abstain, θ_abstain_floor)
+  else:
+    standard log-score update
+```
+
+**Why not suspend across all Zone C epochs:**
+
+Zone C throttles *new* installations but does not halt oracle resolution for *existing* claims. A class in Zone C with previously-installed T3 claims will continue to see oracle resolutions from those claims. Committees that abstain during Zone C when resolutions exist are genuinely free-riding (behavioral), not mechanically blocked. Suspending abstention budget for all Zone C epochs would reward abstention during high-stakes settlement epochs — exactly the wrong time to weaken participation incentives.
+
+**Retroactive application at epoch boundary:** The zero_resolution_epoch flag is confirmable only at epoch-t close. The abstention budget update applies retroactively at the epoch-t close boundary: if the flag fires, budget for that epoch is retroactively unfrozen. A committee that planned assuming budget drain will find the drain did not occur — a neutral outcome (never worse than expected). This is preferable to a prospective rule that would require committees to predict epoch type.
+
+**EAT record:** The `zero_resolution_epoch` flag is committed per-class per-epoch in the macro-epoch boundary commit. Combined throttle interaction: Zone C + zero_resolution_epoch can coexist. The epoch type governs abstention budget; the throttle governs installation capacity. Independent.
+
+**Design law (#r227):** Mechanism participation incentives (abstention budget drain) are suspended only when participation is mechanically impossible in the current epoch — not when the class is under solvency stress. zero_resolution_epoch is the mechanically-grounded exception; Zone C status is not. Solvency conditions do not excuse behavioral abstention; mechanical nulls do. (#r227)
+
+---
+
+## Structural Synthesis: COMMITTEE Epistemic Architecture — Closed (#r227)
+
+| Open question | Resolution | Law |
+|---|---|---|
+| Cross-class CPA propagation | CPA_IdentityRegistry; proactive denial at registration; no retroactive revocation post-grant | Cross-class CPA applies at registration gate only; Invariant #314 governs post-grant |
+| Δ_abstain vs Δ_wrong constraint | Hard contract: Δ_abstain < Δ_wrong_class_floor (trailing N_calibration min); bootstrap estimate required at genesis | Structural requirements are hard constraints, not advisories |
+| σ_bootstrap forced recalibration | Forced after 2 × N_calibration consecutive flagged epochs; one contested reset permitted (then shortened veto) | Self-calibrating params have bounded governance veto; empirical grounding enforced |
+| Abstention budget + Zone C | Suspended in zero_resolution_epoch (mechanical null) not Zone C; retroactive at epoch close | Abstention is behavioral; suspension is mechanical; solvency doesn't excuse participation |
+
+---
+
+## Cumulative Invariants (#r227)
+
+**Invariant #316 (#r227):** CPA_IdentityRegistry is a global, address-keyed, EAT-consistent registry written by CredibilityAggregator at each CPA detection event. Active CPA cluster membership at registration → grace_window_denied. Post-grant, Invariant #314 governs. CPA entries expire after T_CPA_expiry = max(3 × N_calibration, K_CPA_epochs) normal-mode epochs post-resolution.
+
+**Invariant #317 (#r227):** Δ_abstain < Δ_wrong_class_floor is a hard contract constraint enforced at parameter-update time. Δ_wrong_class_floor = min(normalised per-unit-stake log-score penalty across all active committees, trailing N_calibration epochs). At genesis: governance supplies provisional floor; contract enforces Δ_abstain < floor_estimate; empirical floor replaces estimate at N_calibration resolutions with auto-reduction SLA.
+
+**Invariant #318 (#r227):** σ_oracle_residual forced recalibration: divergence flag must persist for 2 × N_calibration consecutive epochs before forced transition. Governance veto window = N_calibration epochs. One contested reset per class permitted; subsequent divergences use shortened veto window = N_calibration / 2. After veto window: empirical EMA replaces bootstrap automatically.
+
+**Invariant #319 (#r227):** Abstention budget suspension is epoch-type-gated, not Zone-C-gated. zero_resolution_epoch(class_i, t) = true iff n_oracle_resolutions(t) == 0 AND n_new_T3_installations(t) == 0. Budget frozen in zero_resolution_epoch (retroactive at epoch close); drains normally in all other epochs including Zone C with existing resolutions.
+
+---
+
+## Run Log Update
+
+- **#r227** — 2026-04-04T11:52Z — Q1: CPA_IdentityRegistry; cross-class proactive denial at registration; post-grant Invariant #314 governs; CPA expiry after T_CPA_expiry epochs. Q2: Δ_abstain < Δ_wrong_class_floor as hard contract constraint; trailing N_calibration minimum; genesis provisional floor with auto-reduction SLA. Q3: σ_bootstrap forced recalibration after 2 × N_calibration flagged epochs; one contested reset permitted; shortened veto on subsequent divergences. Q4: Abstention budget suspended in zero_resolution_epoch (mechanical null) not Zone C; retroactive at epoch close. Invariants #316–#319.
+
+---
+
+## Open Questions for #r228+
+
+1. **CPA_IdentityRegistry and cluster expiry under partial exoneration:** If a CPA cluster has N members and M < N are exonerated (individually correct, but cluster correlation was coincident), do the exonerated members get CPA entries immediately marked `resolved_exonerated`, or does expiry only follow full cluster resolution? Partial exoneration risks leaving innocent members blocked from grace windows for T_CPA_expiry epochs.
+
+2. **Δ_wrong_class_floor bootstrap recalculation SLA interaction with governance:** The auto-reduction SLA at N_calibration resolutions (Δ_abstain auto-reduces to empirical_floor × 0.90 if floor < estimate) fires without a governance vote. Is there a governance notification window before the auto-reduction executes, or is it immediate (EAT event + same-epoch execution)?
+
+3. **zero_resolution_epoch detection lag and retroactive application:** The zero_resolution_epoch flag is confirmable only at epoch-t close. If a committee submitted a claim (non-abstention) in epoch t, but epoch t becomes a zero_resolution_epoch, does the standard log-score update apply (the committee did submit a claim, just nothing resolved against it)? Or does zero_resolution_epoch freeze everyone's ratio regardless of whether they submitted or abstained?
+
+4. **CPA_IdentityRegistry write authorization and governance upgrade path:** The registry is written by CredibilityAggregator. If CredibilityAggregator is upgraded (Invariant #41: trust-root upgrade requires re-audit + epistemically_live re-evaluation), the new CredibilityAggregator must inherit write authorization. Define the migration: does the old contract retain write auth during the upgrade window, or is write auth transferred atomically at deployment?
+
+*Last updated: #r227 — 2026-04-04T11:52Z*
