@@ -23037,4 +23037,210 @@ Every legitimate class type has exactly one applicable oracle mode. Classes that
 
 4. **IMPLICATION_CHAIN and CPA detection:** CPA clustering detects co-movement of S_cred among knowers on the same class. For IMPLICATION_CHAIN classes, knowers' claims are conditional on A's outcome — genuine common knowledge about B|A may appear as coordination. Define a CPA detection adjustment for IMPLICATION_CHAIN classes that distinguishes structural correlation (shared conditioning on A) from adversarial coordination.
 
-*Last updated: #r244 — 2026-04-04T15:22Z*
+*Last updated: #r245 — 2026-04-04T15:32Z*
+
+---
+
+## #r245 Contributions — 2026-04-04T15:32Z
+
+Addresses all four open questions from #r244. Net-new: implication_escrow_factor closed-form derivation supersedes governance default.
+
+---
+
+**Q1 (Zone C + Zone C_oracle simultaneous — priority tiebreak) → Per-oracle-type gate, then cross-gated by Zone C; no multiplicative compounding (#r245):**
+
+Zone C (operational) and Zone C_oracle operate at different scopes: Zone C is a class-level continuous throttle rate; Zone C_oracle is an oracle-type-level binary freeze. They are orthogonal (Invariant #381) and do not compound multiplicatively.
+
+**Full simultaneous-active protocol:**
+
+For each oracle type `ot` in a coordinate class `c` at epoch `t`:
+
+```
+installation_allowed(c, ot, t) =
+    NOT oracle_type_frozen(ot, t)            // Zone C_oracle gate (binary, type-level)
+    AND within_zone_c_throttle_budget(c, t)  // Zone C gate (rate, class-level)
+```
+
+**Interpretation by case:**
+
+| Zone C | Zone C_oracle | oracle_type frozen? | Result |
+|--------|--------------|---------------------|--------|
+| Active | Active | ot contributes >30% EL_oracle | Zero new installations for ot; Zone C throttle applies to remaining oracle types |
+| Active | Active | ot does NOT contribute >30% | Zone C throttle rate applies; oracle-type freeze does not restrict ot |
+| Active | Inactive | — | Zone C throttle rate only |
+| Inactive | Active | ot frozen | Zero new installations for ot; other oracle types unrestricted |
+
+**Why not additive/multiplicative:** The oracle-type freeze is already a hard zero for affected oracle types — Zone C throttle (e.g. 50% of normal) cannot be "more restrictive" than zero. For non-frozen oracle types under simultaneous Zone C, the Zone C throttle applies independently and fully. The "more restrictive gate" phrasing in Invariant #381 referred to the class-level aggregate (which metric governs the broader throttle policy), not to per-oracle-type stacking.
+
+**EAT record at simultaneous activation:** When both conditions are active, `zone_c_oracle_entered` and `zone_c_entered` are separate EAT events with cross-references. Governance alert identifies which oracle types are frozen and which remaining types are Zone C throttled — distinct remediation actions.
+
+**Design law (#r245):** Multi-scope simultaneous restrictions apply per-scope independently, not multiplicatively. A binary freeze at scope A cannot be further tightened by a rate throttle at scope B for the same resource. Rate throttles at scope B apply only to resources not already binary-frozen at scope A. (#r245)
+
+---
+
+**Q2 (implication_escrow_factor derivation — 1.25× vs variance-based) → Closed-form: 1/p_upstream_in_range; 1.25× default confirmed as exact neutral factor at p_upstream = 0.80 (#r245):**
+
+The implication_escrow_factor compensates for the additional risk that a B-side claim forfeits entirely if A misses its upstream_range — regardless of whether the knower's B-claim would have been correct.
+
+**Derivation from neutral-return condition:**
+
+Let:
+- `p_A` = P(A resolves within upstream_oracle_range) — governance-estimated at registration
+- A B-side knower's expected net return must be ≥ that of an equivalent single-class claim
+
+For a single-class claim of escrow `k`: expected return = `k × P(B correct) × reward_rate − k × P(B wrong) × 1`
+
+For a B-side implication claim of escrow `k_B`:
+- Returns `k_B × P(B correct | A in range) × reward_rate × p_A` if A in range and B correct
+- Forfeits `k_B × 1` if A misses range (probability `1 − p_A`)
+- Normal slash if A in range and B wrong
+
+Neutral escrow multiplier (so that B-claim has same expected forfeiture exposure per unit of information as a single-class claim):
+
+```
+k_B × (1 − p_A) = k_single × 0   [single-class claim has no range-miss forfeiture]
+k_B = k_single × (1 / p_A)
+
+implication_escrow_factor = 1 / p_upstream_in_range
+```
+
+**Governance default 1.25× confirmed:**
+`implication_escrow_factor = 1 / 0.80 = 1.25` — exact neutral factor at p_upstream = 0.80. The default is not arbitrary; it reflects an assumption that upstream classes resolve in-range 80% of the time.
+
+**Per-registration derivation:**
+
+```
+implication_escrow_factor(class_B) = 1 / p_upstream_estimate
+p_upstream_estimate: governance-declared at class_B registration
+  Default: 0.80 (implication_escrow_factor = 1.25)
+  Bounds: p_upstream_estimate ∈ [0.50, 0.99]
+          → implication_escrow_factor ∈ [1.01, 2.00]
+```
+
+**Empirical update:** After N_calibration resolved epochs, `p_upstream_estimate` is replaced by `p_upstream_observed` (rolling N_calibration average of A-in-range frequency). The implication_escrow_factor updates prospectively from the next epoch boundary. `parameter_genesis_exit` EAT event emitted on first empirical update.
+
+**Design law (#r245):** Pre-funding escrow multipliers for conditional claims must be derived from the forfeiture probability of the conditioning event, not from variance ratios. The neutral-return condition anchors the derivation to expected forfeiture equivalence with the simpler unconditional claim. (#r245)
+
+---
+
+**Q3 (B-side early exit — retraction with partial escrow penalty) → Opt-in retraction mechanism; penalty = retraction_fraction_base × (1 − t/T_deferral_max) × escrow_locked (#r245):**
+
+Full lockup for up to 5 × N_calibration epochs is rational for knowers who are confident about B|A. But a knower's private information may change (new evidence emerges about whether A will enter range), and forcing them to hold a claim that no longer reflects their belief degrades S_cred quality. Early exit improves epistemic hygiene at the cost of introducing retraction complexity.
+
+**Resolution — opt-in retraction:**
+
+```
+retraction available iff:
+  (1) class_B registered with retraction_enabled = true at class registration
+  (2) A has not yet resolved in upstream_range (B T_anchor has not fired)
+  (3) retraction_request submitted by the knower who posted the B-side claim
+
+retraction_penalty(t_retract) =
+    retraction_fraction_base × max(0, 1 − (t_retract − t_declaration) / T_deferral_max) × escrow_locked
+
+retraction_fraction_base: governance-settable at class registration; default 0.20; bounds [0.05, 0.40]
+```
+
+**Properties:**
+- At declaration epoch (t_retract = t_declaration): full penalty = retraction_fraction_base × escrow. Early exit costs 20% of escrow.
+- At T_deferral_max − 1: penalty → 0. Near-expiry retraction is near-free (the claim is about to forfeit anyway).
+- Penalty flows to the class challenger_pool (not loser pool — no opponent exists for a retracted claim).
+
+**Capital release on retraction:**
+`escrow_returned = escrow_locked × (1 − retraction_penalty_fraction)`
+
+**S_cred adjustment:**
+B-side claim's effective_weight drops to 0 at retraction epoch. S_cred re-aggregation runs at the next macro-epoch boundary excluding the retracted claim. credibility_ratio is not penalised for retraction — epistemic retraction is not a quality failure.
+
+**Interaction with implication_bonus_escrow:**
+If a B-side claim with an associated implication_bonus_escrow is retracted, the bonus escrow is released pro-rata at the same penalty fraction. The conditional bonus is no longer earnable.
+
+**Retraction is CLEARING_MODE opt-in only:** DISCOVERY_MODE shadow-classes with implication chain declarations use the standard escrow lockup. Retraction adds settlement-window complexity inappropriate for discovery-phase capital.
+
+**Design law (#r245):** Retraction mechanisms for conditional claims must apply a time-decaying penalty: high early-retraction cost prevents gaming the mechanism's commitment structure; near-zero late-retraction cost prevents needless capital lockup on claims that are functionally terminal. The decay function should reach zero at the mechanism's natural expiry horizon. (#r245)
+
+---
+
+**Q4 (CPA detection adjustment for IMPLICATION_CHAIN structural correlation) → Conditioning-event partition: CPA test applied within B|A-conditioned subgroup only; inter-group divergence is structural, not adversarial (#r245):**
+
+CPA (Coordinated Positioning Anomaly) detection flags clusters of knowers whose S_cred contributions co-move in ways inconsistent with independent private information. For IMPLICATION_CHAIN classes, when A resolves in-range, all B-side knowers activate simultaneously — a genuine correlated event that mimics adversarial coordination.
+
+**Root cause of false positive:** The CPA test was designed for classes where each knower's claim is conditioned on the same underlying truth (single oracle event). For IMPLICATION_CHAIN, knowers' claims are additionally conditioned on A's range outcome — a shared event that produces structural cross-knower correlation in timing and signal direction.
+
+**Resolution — conditioning-event partition of CPA test:**
+
+```
+CPA_adjusted(class_B, epoch_t):
+  Partition active B-side knowers by conditioning event C_A ∈ {in_range, out_of_range, pending}:
+    - Group IN:   knowers with claims conditional on A ∈ upstream_range (majority)
+    - Group OUT:  knowers with claims conditional on A ∉ upstream_range (if any registered)
+    - Group PEND: knowers with pending claims (A not yet resolved)
+
+  Apply CPA within each partition separately:
+    CPA_within_group(G):
+        applies standard CPA test to S_cred co-movement among members of G
+        shared conditioning on A does NOT contribute to CPA score
+
+  Cross-group correlation (IN vs OUT activating simultaneously) is:
+    → structural (they share common conditioning class A) — excluded from CPA
+    → NOT an adversarial signal
+
+  CPA_score(class_B) = max(CPA_within_group(IN), CPA_within_group(OUT))
+```
+
+**What CPA within-group still catches:**
+- Knowers in Group IN who show S_cred co-movement beyond what is explained by their shared conditioning on A ∈ upstream_range — i.e., they have additional unexplained correlation in their B|A estimates. This is the genuine adversarial signal: coordinating on the B-given-A estimate, not just on the conditioning event.
+
+**Independence filter for within-group CPA:**
+Use the existing effective_oracle_independence score of class_B's knowers (established for all oracle mode classes). Residual correlation after accounting for shared conditioning on A is the operative CPA input.
+
+```
+residual_correlation(a, b) =
+    correlation(S_cred_contribution_a, S_cred_contribution_b) conditioned on A_outcome
+    = corr(B_claim_a, B_claim_b) − corr(B_claim_a, A_range_outcome) × corr(B_claim_b, A_range_outcome)
+```
+
+**EAT metadata addition:** IMPLICATION_CHAIN class registration requires `cpa_partition_policy: conditioning_event_partitioned`. Existing classes (AUTOMATED, COMMITTEE, HYBRID_EXTERNAL) retain `cpa_partition_policy: standard`. CPA events on IMPLICATION_CHAIN classes are labelled with the partition applied.
+
+**Design law (#r245):** CPA tests must partition the knower population by shared conditioning events before measuring within-group co-movement. Structural correlation arising from common conditioning is not an adversarial signal. Only residual unexplained correlation within the conditioned subgroup is the legitimate CPA input. This generalises to any class where claims are conditioned on an exogenous shared event — IMPLICATION_CHAIN is the first instance; the principle applies to any future class with conditional claim structure. (#r245)
+
+---
+
+## Structural Synthesis: IMPLICATION_CHAIN Mechanism Closure (#r245)
+
+| Issue | Resolution | Design law |
+|---|---|---|
+| Zone C + Zone C_oracle simultaneous | Per-oracle-type binary freeze, then rate throttle for remaining types; no multiplicative compounding | Multi-scope restrictions apply per-scope independently |
+| implication_escrow_factor derivation | 1/p_upstream_in_range; 1.25× = neutral factor at p_upstream = 0.80; empirical update post N_calibration | Neutral-return condition anchors escrow to forfeiture equivalence |
+| B-side early exit | Opt-in retraction; penalty = retraction_fraction_base × (1 − t/T_deferral_max); challenger_pool | Time-decaying penalty: commitment preserved early; capital released near expiry |
+| IMPLICATION_CHAIN CPA detection | Conditioning-event partition; within-group residual correlation only; cross-group excluded | CPA partitions by shared conditioning events; structural correlation excluded |
+
+---
+
+## Cumulative Invariants (#r245)
+
+**Invariant #386 (#r245):** Zone C + Zone C_oracle simultaneous: oracle_type_frozen(ot) binary zero for affected types; Zone C throttle rate applies to non-frozen types independently. No multiplicative compounding. Multi-scope restrictions are per-scope independent — a hard zero at scope A cannot be further restricted by a rate at scope B. EAT: separate `zone_c_entered` and `zone_c_oracle_entered` events with cross-references; governance alert distinguishes frozen types from throttled types.
+
+**Invariant #387 (#r245):** implication_escrow_factor = 1 / p_upstream_in_range (derived from neutral-return condition). Governance default 1.25× is exact neutral factor at p_upstream = 0.80. Bounds: p_upstream_estimate ∈ [0.50, 0.99] → factor ∈ [1.01, 2.00]. Empirical update to p_upstream_observed after N_calibration resolved epochs; `parameter_genesis_exit` EAT event on first empirical update.
+
+**Invariant #388 (#r245):** B-side IMPLICATION_CHAIN retraction (opt-in at class registration): penalty = retraction_fraction_base (default 0.20; bounds [0.05, 0.40]) × (1 − elapsed/T_deferral_max) × escrow_locked; penalty flows to challenger_pool; credibility_ratio not penalised; effective_weight → 0 at retraction epoch; implication_bonus_escrow released at same penalty fraction. Retraction available only before T_anchor(B) fires. CLEARING_MODE opt-in only.
+
+**Invariant #389 (#r245):** CPA detection for IMPLICATION_CHAIN classes uses conditioning-event partition: knowers partitioned by A outcome {in_range, out_of_range, pending}; CPA applied within each partition on residual correlation (correlation conditioned on A_range_outcome); cross-group correlation excluded as structural. `cpa_partition_policy: conditioning_event_partitioned` registered at class registration. CPA events on IMPLICATION_CHAIN classes labelled with partition applied.
+
+---
+
+## Run Log Update
+
+- **#r245** — 2026-04-04T15:32Z — Q1: Zone C + Zone C_oracle simultaneous resolved — per-oracle-type binary freeze independent of Zone C rate throttle; no multiplicative compounding; per-scope independent restriction. Q2: implication_escrow_factor closed-form derivation = 1/p_upstream_in_range; 1.25× default confirmed as exact neutral factor at p_upstream = 0.80; empirical update protocol post N_calibration. Q3: B-side opt-in retraction mechanism; time-decaying penalty reaching zero at T_deferral_max; penalty to challenger_pool; credibility_ratio preserved. Q4: CPA conditioning-event partition for IMPLICATION_CHAIN; within-group residual correlation only; cross-group structural correlation excluded. Invariants #386–#389.
+
+---
+
+## Open Questions for #r246+
+
+1. **Retraction and TOWL capacity recapture:** When a B-side claim is retracted, its escrow is returned (minus penalty). Does the TOWL capacity consumed by that claim's β_escrow recapture immediately (same epoch), or only at the next epoch boundary? Immediate recapture could allow gaming: retract then reinstall to briefly exceed capacity before throttle recalculates.
+
+2. **p_upstream_observed update frequency and implication_escrow_factor volatility:** If p_upstream_observed is a rolling N_calibration average and A's in-range frequency changes across market regimes, the implication_escrow_factor could shift materially epoch-to-epoch. Should p_upstream_observed be EMA-smoothed (analogous to ρ_smooth for reference rate) before computing the escrow factor, to prevent knowers from facing sharply different escrow requirements on sequentially submitted claims?
+
+3. **Within-group CPA residual correlation formula — data availability:** The residual correlation `corr(B_claim_a, B_claim_b) − corr(B_claim_a, A_range_outcome) × corr(B_claim_b, A_range_outcome)` requires knowledge of each knower's historical B_claim vs A_range_outcome correlation. For new classes with few resolved epochs, this is poorly estimated. Should IMPLICATION_CHAIN classes have a CPA detection grace window analogous to the N_calibration bootstrap condition?
+
+4. **Retraction opt-in and class-level liquidity signalling:** A class where many knowers retract near T_deferral_max signals to the market that A is unlikely to enter the upstream range. This is genuine price discovery — but the retraction mechanism was designed for capital efficiency, not as a secondary signalling mechanism. Should retraction events be committed to EAT as public information (allowing other participants to observe retraction rates), or kept private until T_anchor fires (preventing retraction from becoming a front-running signal)?
