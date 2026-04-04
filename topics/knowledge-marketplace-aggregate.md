@@ -5753,3 +5753,165 @@ Genuine experts have non-zero loss rates. Near-zero long-run loss rate on large 
 4. **MEV/block-ordering attack on StateFreeze transaction (#r160/Q2):** A validator controlling transaction ordering could delay StateFreeze to insert a last-second S_cred update before T_anchor capture. Should StateFreeze be a protocol-reserved transaction slot, or should v2.1 tolerate this as a residual miner-extractable-value risk?
 
 *Last updated: #r164 — 2026-04-04T01:02Z*
+
+---
+
+## #r165 Contributions — 2026-04-04T01:12Z
+
+**Phase: Adversarial stress-testing continued. Addresses all four open questions from #r164.**
+
+---
+
+**Q1 (Established-address coordination — persistent cluster penalty vs S_cred_concentration_index + SLA) → Persistent cluster cap on combined W_max; governance must explicitly disband (#r165):**
+
+The provisional γ_corr formula (Layer 1, #r164/Q1) covers cold-start Sybil: new addresses with thin track records contribute near-zero S_cred weight. But two established accounts, each with credibility_ratio ≈ 0.90 and resolved_claims >> N_track_threshold, coordinate their staking — both at γ_corr = 1.0, both at W_max. Combined weight = 2 × W_max. If the cluster adds K members, combined = K × W_max, unbounded.
+
+The governance SLA (Layer 2) creates a reaction lag: cluster forms, S_cred is corrupted for up to 2 macro-epochs before governance responds. For high-stakes settlement epochs, 2 macro-epochs is a significant window.
+
+**Resolution — persistent cluster combined W_max cap:**
+
+Once governance confirms a cluster (after the SLA window), it commits a `cluster_registration` EAT event:
+```
+cluster_registration: {
+  cluster_id,
+  member_addresses: [a_1, ..., a_K],
+  combined_W_max_cap: W_max  // entire cluster treated as one agent for cap purposes
+  disbandment_condition: governance_explicit_clear
+}
+```
+
+Effect: `effective_weight_cluster = min(W_max, Σ_members w_a)`.
+The cluster's combined contribution to S_cred is capped at single-entity W_max, regardless of how many members it contains, until governance explicitly issues a `cluster_disbandment` EAT event.
+
+**Disbandment proof requirement:** Governance may only issue `cluster_disbandment` if: (a) ≥ N_calibration normal-mode epochs have elapsed since last cluster confirmation, and (b) S_cred_concentration_index has returned to below alert_threshold for that period. This prevents adversarial churn — form cluster, get flagged, disband, reform, repeat.
+
+**Provisional γ_corr retained for cold-start:** Layer 1 (provisional formula) continues to operate independently of cluster registration. New addresses are penalised by thin track record before governance can form any cluster opinion. Both layers are always active.
+
+**Design law (#r165):** Governance-confirmed coordination clusters are subject to persistent combined W_max caps. Single-event penalties are insufficient for coordination attacks that can re-coordinate after penalty expiry. Persistent cap requires explicit governance disbandment with a stability-window condition. (#r165)
+
+---
+
+**Q2 (expected_range: hard bounds vs statistical envelope) → Stratified anomaly model: inner 3-sigma rolling envelope + outer hard fence; each triggers a different response (#r165):**
+
+Hard bounds alone are gameable: a controlled oracle can output values at 99.9% of the expected_range and never trigger the A6 anomaly signal. A rolling 3-sigma envelope alone introduces an oracle-of-the-oracle dependency: who certifies the historical distribution used to compute sigma?
+
+**Resolution — stratified two-layer anomaly model:**
+
+```
+inner_envelope: 3-sigma rolling over N_sigma_window = N_calibration epochs of historical oracle outputs
+  trigger: oracle_resolution outside inner_envelope → oracle_anomaly_alert (governance signal only)
+
+outer_fence: hard governance-set [min_value, max_value] at class registration
+  trigger: oracle_resolution outside outer_fence → auto-SFP challenge window opened (Invariant #52)
+```
+
+**Stratified response:**
+
+| Layer | Trigger | Response | Governance action |
+|---|---|---|---|
+| Inner (3-sigma) | Statistical outlier | oracle_anomaly_alert, EAT event | Review; no mechanism change |
+| Outer (hard fence) | Extreme manipulation | Auto-SFP window; ≥2 → mandatory oracle review (Invariant #52) | Possible oracle deregistration |
+
+**3-sigma source without oracle-of-the-oracle problem:** The historical distribution is computed from prior oracle outputs already committed to the EAT. It does not require an external certifier — the EAT IS the historical record. The 3-sigma threshold is derived from the same immutable data that governs EAT compaction eligibility.
+
+**Governance interface addition:** (N_sigma_window, outer_fence_min, outer_fence_max). inner_envelope derived per-epoch from EAT history.
+
+**Design law (#r165):** Anomaly detection requires stratified thresholds with proportionate responses. Statistical-envelope triggers soft governance signals; hard-fence triggers mechanism-level actions. Combining both eliminates the gamesmanship of either alone. (#r165)
+
+---
+
+**Q3 (N_attester set management — rotation, failure, registry) → Governance-managed attester registry with heartbeat SLA; N_attester_min = 3 hard floor; offline replacement within 2 macro-epochs (#r165):**
+
+The multi-attester EAT Merkle root commitment (Invariant #53) requires N_attester ≥ 3 independent parties. Without lifecycle governance, attester set degrades over time (parties go offline, lose keys, become adversarial).
+
+**Resolution — attester registry design:**
+
+```
+AttesterRegistry (governance-deployed):
+  attester_address[]        — registered attester set
+  N_attester_target = 5     — governance-set; hard min = 3 (from Invariant #53)
+  heartbeat_sla = 1 macro-epoch (attester must sign ≥1 Merkle root per epoch)
+  offline_threshold = 2 consecutive missed epochs → attester flagged as offline
+  replacement_sla = 2 macro-epochs from offline_flag → governance must add replacement attester
+    if SLA breached: N_attester falls below N_attester_target → governance_alert
+    if N_attester falls below N_attester_min = 3: EATManager enters degraded_attestation mode
+      → Merkle roots still committed (mechanism liveness preserved) with WARNING flag
+      → dispute proofs accepted with ≥2 of remaining attester signatures
+      → governance must restore N_attester ≥ 3 within 4 macro-epochs or new classes are blocked
+```
+
+**Rotation protocol:** Governance may proactively rotate an attester (e.g., key compromise suspected) via `attester_rotate` EAT event. Old attester removed; new attester registered; heartbeat SLA begins immediately for the new attester. Old attester's prior signatures remain valid (EAT immutability: historical roots they signed are still canonical).
+
+**Attester independence requirement:** Attesters must not share operational infrastructure — governance declares attesters are independent (a convention rather than a verifiable on-chain property). Reuses governance accountability model: governance is responsible for attester independence; the mechanism provides the structure for governance to exercise that responsibility.
+
+**Design law (#r165):** Multi-party witness sets (attesters, oracle councils, multisigs) require explicit lifecycle governance: heartbeat SLAs for liveness, replacement SLAs for offline parties, hard minimums with degraded-mode operation below floor. The pattern is: N_target > N_min > N_byzantine_tolerance. (#r165)
+
+---
+
+**Q4 (MEV/block-ordering attack on StateFreeze) → One-epoch clearing buffer is the complete defence; no protocol-reserved slot needed for v2.1 (#r165):**
+
+The StateFreeze transaction (#r160/Q2) captures S_cred at T_anchor by calling CredibilityAggregator for a snapshot. A block-ordering validator (block proposer) could attempt to delay the StateFreeze to insert a self-beneficial S_cred update in the same block before the capture.
+
+**Analysis of attack feasibility:**
+
+The one-epoch clearing buffer (#r71/Q4) means the settlement S_cred snapshot is from epoch T-1, not from epoch T:
+```
+settlement_candidate_price = S_cred(epoch_T-1)  (committed at the T-1/T boundary)
+StateFreeze reads this from SettlementEngine's storage, not from CredibilityAggregator's live state
+```
+
+The adversary cannot insert a T epoch S_cred update to influence the T-1 epoch snapshot — the T-1 snapshot is already written to contract storage at the T-1/T epoch boundary. The StateFreeze transaction merely reads this pre-committed value and marks the class as settlement_frozen.
+
+**What a validator could do:** Reorder *other* transactions in the same block to front-run a position registration deadline. This is standard MEV — external to the mechanism's price formation. The T_anchor_lock (Invariant #51, N_lock_epochs ≥ 1) ensures at least 1 full epoch between position registration close and StateFreeze. No MEV within the lock window is possible because the lock is at the epoch boundary level, not the block level.
+
+**Residual: StateFreeze transaction delay to a different epoch:** A validator could theoretically not include the StateFreeze transaction for an epoch. This would delay T_anchor by one epoch. The oracle has already fired; the epoch buffer already captured the snapshot. Delay is inconvenient but not an attack on the settlement price. The mechanism's T_anchor finality is oracle-driven, not transaction-sequencing-driven.
+
+**Conclusion:** No protocol-reserved transaction slot is required for v2.1. The defence hierarchy is:
+1. One-epoch clearing buffer → S_cred snapshot is already committed at epoch boundary (immutable by the time StateFreeze executes)
+2. T_anchor_lock (N_lock_epochs ≥ 1 macro-epoch) → no same-block position-registration MEV
+3. Settlement price = stored epoch-T-1 value → validator cannot alter it by reordering transactions
+
+**Design law (#r165):** MEV resistance in epoch-based mechanisms derives from epoch-boundary atomicity, not transaction-slot reservation. Epoch-boundary commits are the primary defence; transaction-ordering games within an epoch cannot alter committed epoch-boundary state. (#r165)
+
+---
+
+## Structural Synthesis: Adversarial Hardening Round — Closed (#r165)
+
+| Attack surface | Final defence | Invariant |
+|---|---|---|
+| Established-address coordination | Persistent cluster combined W_max cap; governance disbandment with stability condition | #r165 (no new number — extends #r50) |
+| expected_range gamesmanship | Stratified: inner 3-sigma (alert) + outer hard fence (auto-SFP) | #r165 (extends #r52) |
+| Attester set degradation | Attester registry; heartbeat SLA; replacement SLA; degraded_attestation mode | #r165 (extends #r53) |
+| MEV on StateFreeze | Epoch-buffer is complete defence; no reserved slot; epoch-boundary atomicity is sufficient | #r165 (confirms #r51 one-epoch floor is adequate) |
+
+**v2.1 spec additions from #r165 (by contract):**
+
+1. **CredibilityAggregator:** cluster_registration / cluster_disbandment operations; combined W_max cap enforcement; disbandment stability-window check.
+2. **CoordinateRegistry:** inner_envelope (3-sigma rolling) per-epoch computation; N_sigma_window parameter; oracle_anomaly_alert (inner) vs auto-SFP (outer) routing.
+3. **EATManager:** AttesterRegistry lifecycle; heartbeat SLA; degraded_attestation mode (WARNING flag on sub-minimum attester set); replacement SLA.
+
+---
+
+## Cumulative Invariants (extensions through #r165)
+
+**Invariant #50 (extended, #r165):** Governance-confirmed clusters are subject to persistent combined W_max caps. Disbandment requires explicit governance action with a stability-window condition (N_calibration epochs of sub-alert S_cred_concentration_index).
+
+**Invariant #52 (extended, #r165):** oracle_anomaly detection is stratified: inner 3-sigma rolling envelope triggers oracle_anomaly_alert (governance signal); outer hard fence triggers auto-SFP. Both are active simultaneously.
+
+**Invariant #53 (extended, #r165):** EATManager operates an AttesterRegistry with N_attester_min = 3 (hard floor), N_attester_target = 5 (governance-set), heartbeat SLA (1 macro-epoch), replacement SLA (2 macro-epochs), and degraded_attestation mode below N_attester_min.
+
+**Invariant #55 (#r165):** MEV resistance in epoch-based mechanisms is provided by epoch-boundary commit atomicity. The one-epoch clearing buffer and T_anchor_lock together prevent transaction-ordering attacks on S_cred and position registration. No protocol-reserved transaction slot is required.
+
+---
+
+## Open Questions for #r166+
+
+1. **Cluster cap interaction with TOWL:** When a confirmed cluster's combined W_max cap is active, does the cluster's collective TOWL contribution also cap at single-entity W_max × stake, or does each member's escrow count independently toward TOWL capacity? (TOWL is financial backing; W_max cap is epistemic weight — they may warrant different treatment.)
+
+2. **Inner 3-sigma envelope bootstrap:** New coordinate classes have no historical oracle output. Before N_sigma_window epochs, the inner envelope cannot be computed. Should the inner envelope default to a governance-estimated distribution at genesis (analogous to genesis prior), or should oracle_anomaly_alert simply be inactive until N_sigma_window epochs of history exist?
+
+3. **Attester heartbeat in degraded mode (DA outage):** During DA outage, Celestia blobs cannot be written. Do attester heartbeat SLAs toll during degraded mode (consistent with epoch-indexed deadline freezing), or does the heartbeat SLA advance independently (since EATManager Ethereum calldata commits continue during DA outage even if Celestia is down)?
+
+4. **Complete adversarial stress-test declaration:** After nine attack families (A1–A9) evaluated across #r163–#r165, are there additional novel attack classes specific to the v2.1 5-contract architecture that remain unevaluated? Candidate: (a) economic denial-of-service via micro-spam claims consuming CoordinateRegistry gas; (b) S_cred poisoning via deliberate wrong claims timed to inflate targeted knowers' credibility_ratio via the loser pool redirect; (c) SettlementEngine re-entrancy beyond the call-ordering invariant specified in #r160/Q2.
+
+*Last updated: #r165 — 2026-04-04T01:12Z*
