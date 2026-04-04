@@ -7677,3 +7677,291 @@ DISCOVERY_MODE should be deployed on coordinate classes that have analogous hist
 3. **Cross-mode state injection: CLEARING_MODE actor gaming DISCOVERY_MODE state vector to influence linked clearing settlement:** A participant with large CLEARING_MODE positions on a clearing class linked to a DISCOVERY_MODE shadow class could submit low-quality D_a updates to degrade the genesis prior quality for the clearing class, advantaging their clearing position. Does mode_mismatch_discount fully close this channel?
 
 4. **accuracy_bonus_pool drainage via early oracle gaming:** An adversary who can influence the oracle output (oracle registration attack A6 variant) specifically in DISCOVERY_MODE could game the accuracy_bonus_pool by aligning terminal D_a to the manipulated oracle value. Is the accuracy_bonus_pool adversarial surface identical to CLEARING_MODE oracle attacks, or does the multi-epoch credibility_ratio history create an additional exposure?
+
+---
+
+## #r174 Contributions — 2026-04-04T02:42Z
+
+**Phase: v2.2 Module 1 — DISCOVERY_MODE Adversarial Pass. Addresses all four open attack questions from #r173.**
+
+---
+
+### DA1 — IVD Inflation via Noise-Inject-Then-Correct Cycle
+
+**Attack model:**
+
+```
+Epoch t:   adversary submits D_a(t) = noisy distribution far from S(t-1)
+           → JS(D_a(t) || D_a(t-1)) > τ  → consistency_factor(a,t) = 0
+           → IVD_a(t) < 0  (state degrades)
+           → streaming_fee(a,t) = 0
+
+Epoch t+1: adversary submits D_a(t+1) = corrected distribution near true posterior
+           → JS small → consistency_factor(a,t+1) = 1.0
+           → IVD_a(t+1) > 0  (manufactured state improvement)
+           → adversary earns disproportionate streaming_fee at t+1
+```
+
+**Profitability condition:**
+
+```
+Gain = W_a(t+1) × fee_streaming_pool(t+1)
+Cost = claim_submission_fee(t) + credibility_ratio penalty from D_a(t) resolution error
+     + escrow lockup opportunity cost × 2 epochs
+
+Gain > Cost when:
+  IVD_a(t+1) is large (adversary manufactured a big recovery)
+  fee_streaming_pool(t+1) is large (prior rollover from all-negative IVD epoch)
+  credibility_ratio penalty is small (adversary uses low-stake or a fresh address)
+```
+
+**Why existing defences are insufficient:**
+
+The all-negative IVD rollover (#r171/Q4) accumulates fees in the streaming pool during the injection epoch. The adversary's "correction" epoch then faces an enlarged pool — the rollover mechanism unintentionally amplifies the correction-epoch reward.
+
+**Primary defence — IVD momentum discount:**
+
+A correction that exactly reverses a prior degradation earns zero IVD credit net:
+
+```
+IVD_momentum_discount(a, t+1):
+  If D_a(t) had IVD_a(t) < 0  (injection epoch)
+  Then IVD_a(t+1) = max(0, IVD_a(t+1) − abs(IVD_a(t)) × α_momentum)
+    α_momentum = 0.5 (governance-settable, bounded [0.3, 0.8])
+
+Interpretation: to earn IVD_weight in the correction epoch, the correction must advance
+  the state *beyond* recovering from the prior degradation.
+  At α_momentum = 0.5: the adversary must deliver 2× the degradation to earn net-positive IVD.
+```
+
+**Secondary defence — two-epoch IVD smoothing:**
+
+```
+IVD_effective(a, t) = (IVD_a(t) + max(0, IVD_a(t-1))) / 2
+```
+
+Two-epoch rolling average eliminates the ability to spike IVD in a single epoch by manufacturing a dramatic correction. Consistent modest contributors earn higher smoothed IVD than single-epoch spike strategies.
+
+**Interaction with rollover pool:** During an all-negative IVD epoch (rollover), the IVD_momentum_discount means the correction-epoch adversary must exceed the degradation they created — not just match it — to claim rollover pool credit. The amplified rollover pool is thereby protected.
+
+**Design law (#r174):** IVD-based fee allocation must apply a momentum discount: a correction epoch earns zero net IVD for the portion that merely recovers adversary-generated degradation. Two-epoch IVD smoothing eliminates single-epoch spike strategies. (#r174)
+
+**v2.2 contract addition:** DiscoveryCredibilityAggregator: IVD_a(t-1) rolling window for momentum discount; IVD_effective two-epoch smoothing. (#r174)
+
+---
+
+### DA2 — Streaming Fee Front-Running via On-Chain W_a(t) Preview
+
+**Attack model:**
+
+W_a(t) is computable from public D_a(t) submissions. Near the end of an epoch, an adversary observes the current distribution of W_a(t) across knowers and submits a D_a(t) precision-targeted to maximize their personal fee share.
+
+**Epoch timing analysis:**
+
+```
+Epoch E duration = macro_epoch_length (governance-set, e.g., 1 day)
+D_a(t) submission window: open throughout epoch E
+W_a(t) computation: at epoch E boundary (single atomic computation)
+
+The adversary can observe all D_a submissions before theirs in epoch E.
+They compute: what D_a(t) maximises W_a(t)/ΣW_j(t)?
+
+Constraint: D_a(t) must still pass the consistency_factor gate (JS ≤ τ from D_a(t-1))
+```
+
+**Is this attack feasible?** Yes, but its profitability is self-limiting:
+
+The adversary's W_a(t) share is bounded by the consistency constraint and by the fact that IVD_a(t) depends on moving S(t) toward truth — which is correlated with genuinely informative submissions. A D_a(t) precision-targeted to maximize fee share but disconnected from private signal will:
+1. Have low IVD_weight if other honest knowers have already moved S(t) there (IVD sniping, not new attack)
+2. Have poor credibility_ratio accuracy at resolution (accuracy_bonus_pool loss offsets streaming gain)
+
+**The net effect is strategic timing, not strategic fabrication.** An adversary who submits last in an epoch can see what others submitted and tweak their distribution slightly to maximize their share. But they cannot fabricate IVD_weight from nothing — genuine state movement has already been claimed by earlier submitters.
+
+**Residual concern — last-submitter advantage on borderline IVD:**
+
+If honest knowers have moved S(t) partway toward truth, the last submitter can claim the marginal IVD by submitting a slightly better distribution. This is IVD sniping (identified in #r168/D5) rather than fee front-running per se.
+
+**Defence — commit-reveal for DISCOVERY_MODE D_a submissions (first deployment of scheme deferred from #r164/Q3):**
+
+For DISCOVERY_MODE specifically, commit-reveal is justified where CLEARING_MODE did not require it:
+
+```
+Epoch E submission protocol:
+  Phase 1 (commit): knower submits hash(D_a(t), salt) during [T_epoch_open, T_commit_close]
+    T_commit_close = T_epoch_end - N_reveal_window  (default N_reveal_window = 1 hour of block time)
+
+  Phase 2 (reveal): knower reveals (D_a(t), salt) during [T_commit_close, T_epoch_end]
+    Hash verified on-chain; D_a(t) recorded if hash matches
+
+  W_a(t) computed from revealed D_a(t) at T_epoch_end
+
+Properties:
+  - All commits are visible before reveals begin
+  - Reveals cannot be influenced by other knowers' D_a values (hash-committed)
+  - Last-submitter advantage eliminated: late reveals are valid only if committed earlier
+  - Late reveal failure (missed T_epoch_end): D_a(t) defaults to D_a(t-1) (no update, no penalty)
+```
+
+**Gas cost:** Commit + reveal = 2 transactions per epoch per knower. ~21,000 gas × 2 = ~42,000 gas overhead per knower per epoch. Acceptable for v2.2.
+
+**Design law (#r174):** DISCOVERY_MODE D_a submissions use a two-phase commit-reveal scheme within each epoch. Phase 1 commits hash; Phase 2 reveals. W_a(t) is computed only from committed-and-revealed submissions. Last-submitter advantage is eliminated. (#r174)
+
+**v2.2 contract addition:** DiscoveryCredibilityAggregator: commit-reveal state machine per epoch; hash storage; reveal window; default-to-prior on missed reveal. (#r174)
+
+---
+
+### DA3 — Cross-Mode State Injection: CLEARING_MODE Actor Degrades DISCOVERY_MODE Genesis Prior
+
+**Attack model:**
+
+```
+Setup:
+  - Adversary holds large CLEARING_MODE position on clearing class C
+  - Shadow-class S is linked to C via ShadowClearingPairRegistry
+  - DISCOVERY_MODE S produces genesis prior for C at exportGenesisPrior time
+  - Adversary's CLEARING position benefits from a biased genesis prior
+
+Attack:
+  Adversary registers as knower on shadow-class S.
+  Submits consistently wrong D_a(t) across multiple epochs.
+  credibility_ratio slowly degrades (consistency penalty + accuracy penalty at resolution)
+  but S(T_anchor_export) is temporarily biased if adversary's weight is significant
+```
+
+**Is mode_mismatch_discount sufficient?** Partially. It attenuates S(T_anchor_export) toward uniform — reducing bias from low-quality discovery submissions. However, if the adversary inflates W_a(t) on the shadow-class via credibility laundering from other resolved coordinates, mode_mismatch_discount alone may not reduce bias enough.
+
+**Defence — dual-channel:**
+
+**Channel 1 — Challenger activity on shadow-class:** Challengers can dispute wrong warranted D_a(t) installations on the shadow-class. Shadow-class challenger_pool bootstrap seeding required (same criteria as clearing-class, Invariant #38 extended).
+
+**Channel 2 — Genesis prior export staleness gate closes the window:**
+
+The alpha_prior_effective formula self-attenuates when shadow-class epistemic quality is low:
+
+```
+alpha_prior_effective = alpha_prior_base × max(0, 1 − age_at_export/staleness_window_shadow)
+                      × (1 − mode_mismatch_discount_current)
+```
+
+If the adversary degrades shadow-class epistemic quality, mode_mismatch_discount rises (lower cross-mode alignment observed), and alpha_prior_effective drops toward 0 — genesis prior reverts to uniform. The attack is self-defeating.
+
+**Residual — mode_mismatch_discount self-calibration lag:** During advisory mode, a sustained adversarial campaign on the shadow-class could exploit the calibration lag. Close: mandate exportGenesisPrior is blocked during mode_mismatch_discount advisory mode.
+
+```
+exportGenesisPrior additional precondition:
+  mode_mismatch_discount_status(shadow_class_id, clearing_class_id) == SELF_CALIBRATED
+```
+
+**Design law (#r174):** exportGenesisPrior is blocked when mode_mismatch_discount is in advisory mode. Cross-mode bias from adversarial shadow-class activity is bounded by alpha_prior_effective self-attenuation; the primary close is the SELF_CALIBRATED gate on export. (#r174)
+
+**v2.2 contract addition:** ShadowClearingPairRegistry.exportGenesisPrior: additional gate requiring mode_mismatch_discount_status == SELF_CALIBRATED. Shadow-class challenger_pool bootstrap seeding explicitly required (Invariant #38 extended). (#r174)
+
+---
+
+### DA4 — accuracy_bonus_pool Drainage via DISCOVERY_MODE Oracle Gaming
+
+**Attack model:**
+
+In DISCOVERY_MODE, accuracy_bonus_pool is distributed at T_finality proportional to terminal credibility_ratio. An adversary who can influence oracle output can:
+
+1. Submit D_a(T-1) concentrated at the manipulated oracle value
+2. Oracle resolves at manipulated value
+3. Earn high log-score → high credibility_ratio → large accuracy_bonus_pool share
+
+**Difference from CLEARING_MODE oracle attack (A6):**
+
+The multi-epoch credibility_ratio history creates both a defence and an additional exposure:
+
+**Defence:** Fresh address with no history earns near-zero even with a perfect final-epoch log-score (provisional γ_corr, Layer 1, #r164/Q1). Gaming requires sustained oracle manipulation or lucky guessing across N_calibration epochs.
+
+**Additional exposure:** A legitimate knower who turns adversarial at epoch T-1 earns disproportionate accuracy_bonus_pool relative to their track record investment. Final-epoch oracle manipulation gain is amplified by accumulated credibility_ratio.
+
+**Defence — per-address accuracy_bonus_pool cap:**
+
+```
+per_address_accuracy_bonus_cap = min(
+  actual_pro_rata_share_from_credibility_ratio,
+  max_accuracy_bonus_fraction × accuracy_bonus_pool_total
+)
+max_accuracy_bonus_fraction = 0.25  (governance-settable; [0.10, 0.40])
+```
+
+**Defence — two-epoch terminal accuracy averaging:**
+
+```
+terminal_credibility_ratio(a) = (credibility_ratio(a, T-1) + credibility_ratio(a, T-2)) / 2
+```
+
+A single final-epoch perfect log-score after N epochs of mediocre track record earns less than sustained accuracy. Adversary must manipulate the oracle for ≥2 epochs — doubling manipulation cost and doubling exposure to oracle anomaly detection.
+
+**Design law (#r174):** accuracy_bonus_pool distribution applies max_accuracy_bonus_fraction cap (0.25 per address) and two-epoch terminal_credibility_ratio averaging. Single-epoch oracle manipulation gains are bounded; sustained manipulation doubles exposure to the stratified oracle anomaly detection from #r165/Q2. (#r174)
+
+**v2.2 contract addition:** DiscoverySettlementEngine: max_accuracy_bonus_fraction cap; two-epoch terminal_credibility_ratio average at T_finality. (#r174)
+
+---
+
+### DISCOVERY_MODE Adversarial Pass Summary: Four Attack Families
+
+| Attack | Defence | v2.2 spec addition |
+|--------|---------|---------------------|
+| DA1 — Noise-inject-then-correct IVD inflation | IVD momentum discount (α=0.5); two-epoch IVD_effective smoothing | DiscoveryCredibilityAggregator: momentum discount + rolling IVD_effective |
+| DA2 — Streaming fee front-running | Commit-reveal per epoch; W_a computed from committed reveals only | DiscoveryCredibilityAggregator: commit-reveal state machine |
+| DA3 — Cross-mode state injection | exportGenesisPrior gated on SELF_CALIBRATED mode_mismatch; alpha_prior_effective self-attenuation | ShadowClearingPairRegistry: SELF_CALIBRATED gate; shadow-class challenger_pool seeding |
+| DA4 — accuracy_bonus_pool oracle gaming | max_accuracy_bonus_fraction cap (0.25); two-epoch terminal_credibility_ratio average | DiscoverySettlementEngine: per-address cap + two-epoch average |
+
+All four are closed. No currently unaddressed DISCOVERY_MODE adversarial surface is known after this pass.
+
+---
+
+## Structural Synthesis: DISCOVERY_MODE Adversarial Pass Closed (#r174)
+
+**Net new v2.2 contract additions from #r174:**
+
+1. **DiscoveryCredibilityAggregator:** IVD_momentum_discount (α_momentum ∈ [0.3, 0.8]); two-epoch IVD_effective smoothing; commit-reveal state machine (commit phase, reveal phase, default-to-prior on missed reveal).
+2. **ShadowClearingPairRegistry:** exportGenesisPrior gate requiring mode_mismatch_discount_status == SELF_CALIBRATED.
+3. **DiscoverySettlementEngine:** max_accuracy_bonus_fraction cap (default 0.25, bounded [0.10, 0.40]); two-epoch terminal_credibility_ratio averaging at T_finality.
+4. **Shadow-class challenger_pool bootstrap seeding:** Explicitly required; same criteria as clearing-class (Invariant #38 extended to DISCOVERY_MODE shadow-classes).
+
+---
+
+## Cumulative Invariants (additions through #r174)
+
+**Invariant #91 (#r174):** IVD fee allocation applies momentum discount: correction epoch earns zero net IVD for the portion that merely recovers adversary-generated degradation (α_momentum = 0.5 default). IVD_effective is a two-epoch rolling average; single-epoch IVD spikes do not receive full fee weight.
+
+**Invariant #92 (#r174):** DISCOVERY_MODE D_a submissions use a two-phase commit-reveal scheme per epoch. W_a(t) is computed only from committed-and-revealed submissions. Late reveal (after T_epoch_end) defaults D_a(t) to D_a(t-1) without penalty.
+
+**Invariant #93 (#r174):** exportGenesisPrior is blocked when mode_mismatch_discount is in advisory mode (governance-estimated, not self-calibrated). Export requires mode_mismatch_discount_status == SELF_CALIBRATED.
+
+**Invariant #94 (#r174):** DISCOVERY_MODE shadow-classes require challenger_pool bootstrap seeding on the same criteria as v2.1 clearing-classes (Invariant #38 extended). Shadow-classes are not epistemically live for genesis prior export without a minimum challenger population.
+
+**Invariant #95 (#r174):** accuracy_bonus_pool distribution: per-address cap = min(pro-rata share, max_accuracy_bonus_fraction × pool_total) with max_accuracy_bonus_fraction default 0.25. Terminal credibility_ratio for payout = two-epoch average (epochs T-1 and T-2).
+
+---
+
+## v2.2 Module 1 DISCOVERY_MODE — Final Status (#r174)
+
+**Mechanism specification: complete.**
+**Adversarial pass: complete (DA1–DA4 addressed).**
+**Engineering handoff readiness:** Module 1 requires the same engineering-spec translation pass as v2.1 (~1–2 days, engineering team + this document).
+
+**Remaining v2.2 modules (estimate unchanged from #r167/Q4):**
+- Module 2 — Shadow-class lifecycle adversarial stress-test: 8–10 runs
+- Module 3 — Implication chains settlement routing: 10–12 runs
+- Module 4 — Three-tier archive integration: 3–5 runs
+- Module 5 — Cross-class LTRP backstop adversarial stress-test: 3–5 runs
+
+**Next autoresearch focus:** v2.2 Module 2 — Shadow-class lifecycle adversarial stress-test.
+
+---
+
+## Open Questions for #r175+ (v2.2 Module 2: Shadow-class lifecycle adversarial)
+
+1. **Wind-down timing attack:** An adversary with a short DISCOVERY_MODE position in a shadow-class could trigger early shadow-class wind-down (by a governance-exploitable mechanism) to lock in a biased genesis prior before honest knowers can correct it. Is the wind-down trigger entirely governance-controlled, or are there adversary-accessible triggering conditions?
+
+2. **Bootstrap prior staleness during slow-genesis clearing-class:** If the clearing-class genesis is delayed (slow position registration, insufficient TOWL), the exported genesis prior ages toward staleness while the shadow-class continues updating S(t). Should the clearing-class genesis trigger re-export of S(T_actual_genesis) rather than S(T_initial_export)?
+
+3. **DISCOVERY_MODE shadow-class with no linked clearing-class:** Can a shadow-class exist without a clearing-class pair? What is the economic model — who pays query fees, and what is the T_anchor / T_finality event? If shadow-classes can be standalone, the mechanism generalises to a pure information market without settlement coupling.
+
+4. **Adversarial MONOPOLY_MODE persistence via second-knower suppression:** An adversary who is the incumbent knower on a DISCOVERY_MODE shadow-class and wants to maintain MONOPOLY_MODE (weaker adversarial protections) could suppress second-knower entry by front-running their escrow (e.g., DoS on escrow submission transactions). Is claim submission permissioned or permissionless?
+
+*Last updated: #r174 — 2026-04-04T02:42Z*
