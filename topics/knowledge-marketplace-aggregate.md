@@ -11357,3 +11357,240 @@ NEW DOCUMENT: /topics/gestalt-demo-day-2026.md
 4. **Demo Day date-sensitive preparation:** YC X26 Demo Day is 2026-06-16. What is the latest date to finalise mechanism audit (enabling accurate Demo Day risk disclosure) given typical audit durations? Working backward: if audit takes 6 weeks, latest audit-start date is 2026-05-05.
 
 *Last updated: #r190 — 2026-04-04T05:22Z*
+
+---
+
+## #r191 Contributions — 2026-04-04T05:32Z
+
+**Phase: v2.1 implementation handoff — IPositionRegistryAdapter spec, slot fee governance consolidation, audit scope confirmation, Demo Day timeline.**
+
+---
+
+### Q1 (IPositionRegistryAdapter — concrete Solidity spec with storage layout requirements) (#r191)
+
+**The cross-version coupling problem:**
+
+v2.2 CredibilityAggregator_v2 must read position data from v2.1 contracts without a direct storage reference to SettlementEngine_v1 (which would create an upgrade-blocking dependency). The adapter is a stateless read-only interface layer.
+
+**Full Solidity interface (#r191):**
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
+
+/// @title IPositionRegistryAdapter
+/// @notice Stateless read-only interface between v2.1 position storage and v2.2+ consumers.
+///         Deploy one adapter per v2.1 SettlementEngine/GestAltVault pair.
+///         v2.2 contracts reference adapters by address stored in CoordinateRegistry_v2.adapterRegistry.
+interface IPositionRegistryAdapter {
+
+    // ─── Core queries ──────────────────────────────────────────────────────────
+
+    /// @notice Returns tier-weighted WED_clearing for a coordinate class at a settled epoch.
+    /// @dev    Reads from SettlementEngine_v1.batchSettled[epoch].towlSnapshot.
+    ///         Returns 0 if epoch not yet settled.
+    function getWEDClearing(bytes32 classId, uint256 epoch)
+        external view returns (uint256 wedClearing);
+
+    /// @notice Returns the sum of max-loss-if-wrong across all open positions on classId.
+    /// @dev    Reads from GestAltVault_v1.siloObligations summed across tiers (T1/T2/T3).
+    ///         Tier-weighted per tier_weight_at_registration (Invariant #129).
+    function getPositionMaxLoss(bytes32 classId)
+        external view returns (uint256 maxLoss);
+
+    /// @notice Returns true if a position was registered on classId before anchorEpoch.
+    /// @dev    Reads from ClaimEscrow_v1.claimsByAddress[classId][positionHolder].registrationEpoch.
+    function isPositionRegisteredBefore(
+        bytes32 classId,
+        address positionHolder,
+        uint256 anchorEpoch
+    ) external view returns (bool);
+
+    /// @notice Returns the protocol version this adapter reads from.
+    /// @return semver string, e.g. "v2.1.0"
+    function sourceVersion() external pure returns (string memory);
+
+    // ─── Extended queries (v2.2 shadow-class genesis prior) ───────────────────
+
+    /// @notice Returns the two-epoch terminal credibility_ratio average for a knower
+    ///         on classId at the shadow-class export anchor epoch.
+    /// @dev    Required by ShadowClearingPairRegistry.exportGenesisPrior() (#r174).
+    ///         Reads from CredibilityAggregator_v1.knowerRecords[classId][knower].
+    function getTerminalCredibilityRatio(
+        bytes32 classId,
+        address knower,
+        uint256 exportEpoch
+    ) external view returns (uint256 credibilityRatioBps);
+
+    /// @notice Returns active challenger count at a given epoch for epistemic liveness audit.
+    /// @dev    Reads from CredibilityAggregator_v1.activeChallengerCount[classId][epoch].
+    function getChallengerCount(bytes32 classId, uint256 epoch)
+        external view returns (uint256 count);
+
+    // ─── Registry coupling ─────────────────────────────────────────────────────
+
+    /// @notice Validates that this adapter is registered for classId in the CoordinateRegistry.
+    /// @dev    v2.2 consumers call this before trusting adapter data.
+    ///         Prevents stale or spoofed adapter references.
+    function isRegisteredFor(bytes32 classId) external view returns (bool);
+}
+```
+
+**Storage layout requirements for v2.1 contracts (#r191):**
+
+Each v2.1 contract must expose the following view primitives so the adapter can read without custom integration:
+
+| Adapter method | v2.1 contract | Required storage field |
+|---|---|---|
+| `getWEDClearing` | SettlementEngine_v1 | `batchSettled[epoch].towlSnapshot` (uint256) |
+| `getPositionMaxLoss` | GestAltVault_v1 | `siloObligations[classId][tier]` (mapping) |
+| `isPositionRegisteredBefore` | ClaimEscrow_v1 | `claimsByAddress[classId][addr].registrationEpoch` (uint256) |
+| `getTerminalCredibilityRatio` | CredibilityAggregator_v1 | `knowerRecords[classId][addr].credibilityRatioBps` + `lastUpdateEpoch` |
+| `getChallengerCount` | CredibilityAggregator_v1 | `activeChallengerCount[classId][epoch]` (uint256; epoch-snapshotted) |
+
+**Critical constraint — `activeChallengerCount` must be epoch-snapshotted:**
+
+The current CredibilityAggregator_v1 spec (#r183) stores `activeChallengerCount[marketId]` as a running total. For `getChallengerCount(classId, epoch)` to work across versions, this field must be stored as a mapping `activeChallengerCount[classId][epoch]` (snapshotted at epoch boundary by `commitEpochBuffer`). Add this as a v2.1 storage spec addition.
+
+**Adapter deployment:**
+
+```
+Constructor(address _settlementEngine, address _vault, address _claimEscrow, address _credAgg, address _registry)
+  - All addresses stored as immutable; no admin setters.
+  - isRegisteredFor() reads CoordinateRegistry_v2.adapterRegistry[address(this)].
+  - sourceVersion() returns keccak-verified version string set at deploy time.
+```
+
+**Design law (#r191):** IPositionRegistryAdapter is stateless and immutable post-deployment. v2.1 contract storage layout must include epoch-snapshotted `activeChallengerCount[classId][epoch]` to enable historical queries from v2.2. All v2.2 cross-version reads route through adapter; no direct storage references to v2.1 contracts are permitted in v2.2 code. (#r191)
+
+---
+
+### Q2 (CorrelationBonusManager slot fee vs challenge_submission_fee — consolidation) (#r191)
+
+**The conflict:**
+
+Both fees are r_floor-scaled friction mechanisms for related entry points (challenge submission from #r141/Q1; correlated declaration from #r190/Q1). If governed independently, they can be miscalibrated in opposite directions.
+
+**Resolution — unified `rFloorFrictionFactor` governance namespace (#r191):**
+
+```solidity
+// In GovernanceParams:
+mapping(bytes32 => uint256) public rFloorFrictionFactor;
+// Key: keccak256("challenge_submission_fee") or keccak256("correlation_slot_fee")
+// Default for both: 1.0x (= 100% of r_floor for that class)
+
+// Derived fees:
+challenge_submission_fee(classId) =
+  r_floor(classId) * rFloorFrictionFactor[keccak256("challenge_submission_fee")]
+
+correlation_slot_fee(classId) =
+  r_floor(classId) * rFloorFrictionFactor[keccak256("correlation_slot_fee")]
+
+// Hard bounds (applied regardless of governance setting):
+challenge_submission_fee: [0.05 * r_floor, 0.50 * r_floor]
+correlation_slot_fee:      [0.02 * r_floor, 0.15 * r_floor]  // (from #r190/Q1)
+```
+
+**Why separate keys rather than a single scalar:** Challenge submission and correlated declaration serve different purposes. Challenges are epistemic enforcement mechanisms — their cost should scale with r_floor-linked economic stakes. Correlated declarations are supplemental incentive features — their cost should be lower. A single scalar would force them into lockstep; separate keys allow governance to tune the ratio while both remain r_floor-anchored.
+
+**Governance miscalibration protection:** If either fee is set above its hard bound, the cap reverts silently to the bound. EAT event `governance_param_capped` emitted. Governance actors cannot suppress challenges below the 0.05× floor.
+
+**Design law (#r191):** All r_floor-scaled friction mechanisms share the `rFloorFrictionFactor` governance namespace with per-mechanism keys and independent hard bounds. Shared naming prevents namespace proliferation; independent bounds prevent cross-mechanism miscalibration. (#r191)
+
+---
+
+### Q3 (v2.1 security audit scope — external vs internal by contract) (#r191)
+
+**Assessment:**
+
+| Contract | Financial safety | Epistemic attack | Novel mechanism | Audit recommendation |
+|---|---|---|---|---|
+| GestAltVault_v1 | HIGH — holds all escrow | Low | Moderate | **External audit** |
+| CredibilityAggregator_v1 | Low | HIGH — governs S_cred | HIGH (net-new, no prior) | **External audit** |
+| SettlementEngine_v1 | HIGH — routes payouts | HIGH — StateFreeze | HIGH | **External audit** |
+| OracleManager_v1 | Moderate | Moderate — ResolutionType routing | HIGH (novel oracle duality) | **External audit** |
+| CoordinateRegistry_v1 | Low | Low | Low | Internal review + spot-check |
+| EATManager_v1 | Low | Low | Moderate (CID chain) | Internal review + spot-check |
+| GovernanceParams | Low | Moderate | Low | Internal review + time-lock spot-check |
+
+**Revised scope (#r191):** OracleManager_v1 elevated from "internal review" to external audit. Its oracle_settlement_override + ResolutionType routing is a novel mechanism with no prior audit history; adversarial creativity is expected.
+
+**External audit: 4 contracts.** Internal review + spot-check: 3 contracts (CoordinateRegistry, EATManager, GovernanceParams).
+
+**Spot-check focus areas:**
+- CoordinateRegistry: epistemically_live gate enforcement (known additive fix from #r182)
+- EATManager: CID chain integrity; compaction eligibility criteria
+- GovernanceParams: time-lock bypass; hard bound enforcement; param_capped event emission
+
+**Design law (#r191):** External audit priority = (financial surface ∪ novel epistemic attack surface) × upgrade-blocking factor. OracleManager_v1 meets the threshold due to novel oracle authority duality with no prior audit reference. (#r191)
+
+---
+
+### Q4 (Demo Day timeline — critical path working backward from 2026-06-16) (#r191)
+
+**Critical path:**
+
+| Milestone | Latest date | Duration | Notes |
+|---|---|---|---|
+| Demo Day | 2026-06-16 | — | Fixed |
+| Final internal review complete | 2026-06-09 | 1 week buffer | Post-audit cleanup |
+| External audit complete | 2026-06-02 | — | Audit firm delivery |
+| External audit begins | 2026-04-28 | 5 weeks (4 contracts) | Mid-tier firm; standard for this scope |
+| Code freeze | 2026-04-21 | 1 week pre-audit | No contract changes after freeze |
+| CredibilityAggregator_v1 + integration tests green | 2026-04-14 | ~10 days from today | Highest-complexity net-new |
+| All scaffold deltas implemented | 2026-04-10 | ~6 days from today | TOWL zones, OracleManager wiring, StateFreeze |
+
+**Float analysis:**
+
+- Today (2026-04-04) to code freeze: 17 days. Achievable if CredibilityAggregator is the single implementation focus.
+- 5-week audit is aggressive for 4 novel contracts. 6-week audit pushes audit-start to 2026-04-21, eliminating pre-audit hardening buffer. **Engage audit firm this week to confirm capacity.**
+- 1-week remediation buffer is tight for structural findings. If structural issue found in CredibilityAggregator or SettlementEngine, escalate to founders immediately; do not absorb into engineering sprint silently.
+
+**Demo Day risk disclosure if audit not complete:**
+> "Mechanism audit in progress at time of Demo Day; production deployment pending audit completion."
+This is standard practice for pre-production institutional protocol demos; it is not a narrative risk.
+
+**Design law (#r191):** Critical path for Demo Day runs through CredibilityAggregator_v1 implementation. Any slip in CredAgg directly slips audit start. Audit firm engagement is on the critical path; confirm capacity before 2026-04-07 (this week). (#r191)
+
+---
+
+## Structural Synthesis: v2.1 Implementation Readiness — Final (#r191)
+
+| Item | Status | Next action |
+|---|---|---|
+| IPositionRegistryAdapter spec | Complete — 6-method interface + storage layout requirements | Engineering: add epoch-snapshotted activeChallengerCount to CredAgg_v1 |
+| Slot fee governance consolidation | Complete — rFloorFrictionFactor namespace | Engineering: add to GovernanceParams |
+| Audit scope | Confirmed — 4 contracts external; 3 contracts internal + spot-check | Founders: engage audit firm before 2026-04-07 |
+| Demo Day timeline | Critical path defined | Founders: confirm audit capacity this week |
+
+---
+
+## Cumulative Invariants (additions through #r191)
+
+**Invariant #152 (#r191):** IPositionRegistryAdapter is stateless and immutable post-deployment. All v2.2 cross-version reads route through the adapter; no direct storage references to v2.1 contracts in v2.2 code. CredibilityAggregator_v1 must epoch-snapshot `activeChallengerCount[classId][epoch]` to support historical queries.
+
+**Invariant #153 (#r191):** All r_floor-scaled friction fees share the `rFloorFrictionFactor` governance namespace with per-mechanism keys and independent hard bounds. challenge_submission_fee: [0.05x, 0.50x] r_floor. correlation_slot_fee: [0.02x, 0.15x] r_floor.
+
+**Invariant #154 (#r191):** External audit scope = GestAltVault_v1 + CredibilityAggregator_v1 + SettlementEngine_v1 + OracleManager_v1. Internal review + spot-check = CoordinateRegistry_v1 + EATManager_v1 + GovernanceParams. OracleManager_v1 elevated to external audit due to novel oracle authority duality.
+
+**Invariant #155 (#r191):** Demo Day critical path: CredibilityAggregator_v1 complete by 2026-04-14 → code freeze 2026-04-21 → audit start 2026-04-28 → audit complete 2026-06-02 → remediation 2026-06-09 → Demo Day 2026-06-16. Audit firm engagement must happen before 2026-04-07.
+
+---
+
+## Run Log Update
+
+- **#r191** — 2026-04-04T05:32Z — IPositionRegistryAdapter 6-method Solidity interface + storage layout requirements (epoch-snapshotted challenger count addition flagged); rFloorFrictionFactor governance namespace consolidating challenge and slot fees with independent hard bounds; audit scope confirmed (4 external + 3 internal/spot-check, OracleManager_v1 elevated); Demo Day critical path defined (17d implementation → 5w audit → 1w remediation → 2026-06-16). Invariants #152–#155.
+
+---
+
+## Open Questions for #r192+
+
+1. **Audit firm selection criteria:** What distinguishes a suitable auditor for GestAlt v2.1 from a generic EVM auditor? Key: experience with novel mechanism economics (batch auction / epoch lifecycle contracts), oracle authority models, non-standard escrow routing. Candidate firms: Trail of Bits, Zellic, Cantina, Cyfrin.
+
+2. **CredibilityAggregator_v1 W_MAX cap enforcement order:** At `commitEpochBuffer`, if two knowers both have `w_raw_a > W_MAX`, are they each capped simultaneously then renormalised together, or is the cap applied sequentially (largest first, renormalise after each)? The final S_cred value differs between approaches.
+
+3. **GovernanceParams time-lock interaction with audit code freeze:** If governance adjusts any parameter between code freeze (2026-04-21) and audit completion (2026-06-02), the audited parameter set diverges from production. Resolution: audit bytecode + all hard bounds; exclude specific governance-variable values from the "audited state" definition.
+
+4. **v2.2 first-run prep:** With v2.1 spec complete, what is the first-principles starting question for `knowledge-marketplace-v22.md`? Candidate: "Given IPositionRegistryAdapter as the cross-version primitive, what can a market participant do in DISCOVERY_MODE that they cannot do in CLEARING_MODE?"
+
+*Last updated: #r191 — 2026-04-04T05:32Z*
