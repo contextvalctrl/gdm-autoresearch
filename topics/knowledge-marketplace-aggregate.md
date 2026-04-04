@@ -24372,3 +24372,189 @@ The calibration deadline (2×N_calibration epochs) may be structurally shorter t
 4. **IMPLICATION_CHAIN upstream partial-quorum and downstream retraction:** Downstream retraction is blocked when upstream is "pending" (Invariant #413: upstream quorum). But between upstream first vote and upstream quorum, a downstream knower can observe upstream vote direction and retract strategically. Should IMPLICATION_CHAIN downstream retraction be blocked from the upstream's first committee vote (earlier block) or only from quorum (current rule)?
 
 *Last updated: #r251 — 2026-04-04T16:42Z*
+
+---
+
+## #r252 Contributions — 2026-04-04T16:52Z
+
+Addresses all four open questions from #r251. Adds one net-new structural insight: calibration clock and data clock are governed by different invariants and must be explicitly decoupled.
+
+---
+
+**Q1 (Calibration deadline tension at genesis — correct formula) → Extended deadline: max(2×N_calibration, N_blocks_required + N_calibration); no N_blocks_required reduction for early-protocol classes (#r252):**
+
+Three candidates were proposed in #r251.
+
+**Candidate 2 eliminated (N_blocks_required reduction for early-protocol):** Reducing N_blocks_required for sparse protocol environments inverts conservatism — sparser data warrants more model conservatism, not less.
+
+**Candidate 3 eliminated (Gaussian fallback as permanent state for genesis classes):** Creates a two-tier system where genesis-era classes never receive tighter calibration. Incentivises delaying class registration until protocol is mature — counterproductive.
+
+**Resolution — Candidate 1 extended with data-completion grace:**
+
+```
+calibration_deadline(class_j) = max(
+  2 × N_calibration,
+  N_blocks_required + N_calibration
+)
+measured from class_live_epoch in normal-mode epoch units
+```
+
+The `+ N_calibration` term provides one calibration window of grace after block-bootstrap completes. Deadline epoch published at registration: `calibration_deadline_epoch = class_live_epoch + max(2×N_calibration, N_blocks_required + N_calibration)`.
+
+**Behavior:** When N_blocks_required ≤ N_calibration: original 2×N_calibration deadline unchanged. When N_blocks_required > N_calibration: deadline extends proportionally. No genesis class misses calibration window due to data scarcity.
+
+**Design law (#r252):** Calibration deadlines scale with the data requirement, not with governance convention. When the data requirement exceeds N_calibration, the deadline extends to accommodate it. (#r252)
+
+---
+
+**Q2 (within_class_latent_exposure_fraction empirical estimation) → PCA-derived f_latent; EMA-smoothed; dual-condition transition from governance default (#r252):**
+
+**Derivation from observed within-class variance structure:**
+
+At each macro-epoch boundary for coordinate class j with n_j active claims:
+1. Compute de-meaned claim correlation matrix (n_j × n_j).
+2. Compute eigenvalues λ_1 ≥ λ_2 ≥ ... ≥ λ_{n_j}.
+3. `f_latent_j = λ_1 / Σ λ_i` (fraction explained by first latent factor).
+
+**Cross-class aggregate:**
+```
+within_class_latent_exposure_fraction(t) =
+    Σ_j (w_j × f_latent_j_smooth) / Σ_j w_j
+    w_j = n_active_claims_j
+    f_latent_j_smooth = EMA(f_latent_j, N_latent_smooth = N_calibration)
+```
+
+**Dual-condition transition:** Genesis default = 0.30 until n_j >= 3 for N_calibration consecutive normal-mode epochs (consistent with #r143/Q3 dual-condition pattern). Governance sets f_latent_floor [0.05], f_latent_ceil [0.60], N_latent_smooth.
+
+**EAT record:** `latent_exposure_estimate { class_j, epoch, f_latent_j_raw, f_latent_j_smooth, n_claims, pca_eligible: bool }`.
+
+**Design law (#r252):** Observable structural quantities (latent factor exposure) transition from governance-declared defaults to empirical PCA-derived estimates once data is sufficient. The dual-condition transition pattern applies universally. (#r252)
+
+---
+
+**Q3 (COMMITTEE quorum — member-count vs credibility-weight) → Hybrid dual threshold: member-count floor AND credibility-weight threshold; both required simultaneously (#r252):**
+
+**Member-count only fails:** A quorum of low-credibility members fires T_anchor before high-credibility members vote, potentially capturing S_cred at a distorted state.
+
+**Credibility-weight only fails:** One very-high-credibility member plus a few others could satisfy the threshold while the broader committee has not participated — thin epistemic aggregation.
+
+**Resolution — hybrid dual threshold:**
+
+```
+T_anchor fires for COMMITTEE class j iff:
+  (1) member_count_voted(j, t) >= ceiling(k × quorum_fraction_count, default 0.60)
+  AND
+  (2) credibility_weight_voted(j, t) >= credibility_quorum_fraction × Σ all_member_cred_weights
+      credibility_quorum_fraction default 0.50 [0.30, 0.70]
+```
+
+Both conditions must hold simultaneously at epoch boundary. Governance must disclose `expected_quorum_achievability` at class registration (achievability given historical participation).
+
+**Retraction blocking unchanged:** IMPLICATION_CHAIN downstream retraction remains blocked from upstream first vote (conservative pending definition, Invariant #413). Hybrid quorum only changes when T_anchor fires, not when it becomes pending. (#r252)
+
+---
+
+**Q4 (IMPLICATION_CHAIN downstream retraction — first vote vs quorum block) → Block from first upstream vote + anti_snipe_delay; queued retractions cancelled by T_anchor (#r252):**
+
+**The strategic window (recap):** Between upstream first vote and quorum, downstream knower can observe vote direction and retract opportunistically. Quorum-only blocking leaves this window exploitable.
+
+**Resolution — first-vote block with anti-snipe delay:**
+
+```
+downstream retraction blocked from:
+  max(upstream_first_vote_block + anti_snipe_delay, T_anchor_pending_epoch_start)
+  anti_snipe_delay = 1 micro-epoch (governance-settable, [0, 2] micro-epochs)
+```
+
+Retraction requests submitted within the anti_snipe_delay window are **queued**, not processed. On T_anchor firing: queued retractions cancelled (Invariant #406 applies). On delay expiry without T_anchor: queued retractions processed normally.
+
+**Anti-snipe delay rationale:** Prevents single-vote lock-in exploit — a committee member cannot submit a single vote specifically to freeze downstream retractions indefinitely. The exploiter must hold the lock for at least 1 micro-epoch during which downstream knowers observe and can prepare.
+
+**Residual risk acknowledged:** Strategic retraction between anti_snipe_delay expiry and quorum is costly (retraction fee + forfeited epistemic-service bonus) but not fully blocked. This is the correct calibration — costly but not impossible. Full block would unjustly prevent legitimate retractions in low-quorum-participation scenarios.
+
+**Updated IMPLICATION_CHAIN definition (supersedes #r251 partial definition for retraction-blocking):**
+- T_anchor pending: from upstream first committee vote (conservative)
+- Retraction block: from (first_vote_block + anti_snipe_delay)
+- Queued retractions: cancelled by T_anchor, processed on delay expiry if no T_anchor
+
+**EAT record:** `implication_chain_retraction_event { downstream_class, retraction_status: queued | processed | cancelled_by_T_anchor, upstream_first_vote_block, anti_snipe_delay_applied }`. (#r252)
+
+---
+
+## Net-New Structural Insight: Calibration Clock and Data Clock Are Structurally Independent (#r252)
+
+The genesis deadline tension exposes a deeper structural point never formally stated:
+
+**Two distinct protocol clocks:**
+
+| Clock | Governed by | Update trigger | Tracks |
+|---|---|---|---|
+| **Calibration clock** | N_calibration; governance-set | Normal-mode epoch boundary | Mechanism maturity — enough operational history to trust derived parameters |
+| **Data clock** | N_blocks_required; oracle + class structure | Resolved oracle events | Epistemic data richness — enough empirical data for statistical estimation |
+
+These advance together in steady-state (one oracle event per epoch on fast classes) but diverge for:
+- Slow-oracle classes (data clock slow; calibration clock normal)
+- Multi-resolution classes (multiple oracle events per epoch; data clock faster)
+- Degraded-mode epochs (calibration clock pauses; data clock may advance if DA restores mid-epoch)
+- Genesis classes (data clock starts with a deficit; calibration clock starts at 0)
+
+**The correct invariant (net-new, #r252):**
+
+- Features gated by **mechanism maturity** → calibration clock (N_calibration normal-mode epochs)
+- Features gated by **data sufficiency** → data clock (N_blocks_required resolved oracle events)
+- Features requiring **both** → conjunction: max() for deadline formulas; dual-condition transition for parameter activation
+
+**Annotation requirement:** Every mechanism transition condition should declare which clock governs it. Mixed-clock features must declare the conjunction explicitly. This closes the implicit assumption that N_calibration and N_blocks_required always track together — they do not, and every spec feature must handle divergence explicitly.
+
+**Clock assignments for existing features (audit through #r252):**
+
+| Feature | Clock | Basis |
+|---|---|---|
+| β_effective activation | Calibration (N_calibration normal-mode epochs) | Mechanism maturity |
+| α_cap activation | Calibration (dual: N_calibration + N_ρ) | Mechanism maturity + rate data |
+| T3 admission gate | Calibration | Mechanism maturity |
+| mode_mismatch_discount transition | Data (N_align_window clearing resolutions) | Empirical alignment data |
+| within_class_latent_exposure_fraction | Data (n_j >= 3 for N_calibration epochs) | PCA data sufficiency |
+| alignment_score_smooth activation | Data (N_align_window observations) | Empirical alignment data |
+| Calibration deadline (Invariant #414) | max(Calibration, Data + grace) | Both; conjunction |
+
+(#r252)
+
+---
+
+## Structural Synthesis: #r252
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Calibration deadline formula | max(2×N_calibration, N_blocks_required + N_calibration); published at registration | Deadline scales with data requirement; grace = +N_calibration after data complete |
+| within_class_latent_exposure_fraction | PCA-derived f_latent; EMA-smoothed; dual-condition transition from governance default | Observable structural quantities → empirical estimate when data sufficient |
+| COMMITTEE quorum | Hybrid: member-count floor AND credibility-weight threshold; both required | Prevents low-credibility-bloc capture AND thin-participation settlement |
+| IMPLICATION_CHAIN retraction | First vote + anti_snipe_delay; queued retractions cancelled by T_anchor | Closes strategic observation window; anti-snipe delay blocks single-vote lock-in |
+
+---
+
+## Cumulative Invariants (#r252)
+
+**Invariant #414 (#r252):** Calibration deadline = max(2×N_calibration, N_blocks_required + N_calibration) from class_live_epoch. `calibration_deadline_epoch` published at registration. Supersedes any implicit 2×N_calibration-only formula for classes where N_blocks_required > N_calibration.
+
+**Invariant #415 (#r252):** within_class_latent_exposure_fraction: governance default 0.30 until n_j >= 3 for N_calibration consecutive normal-mode epochs; then PCA-empirical = EMA(λ_1/Σλ_i, N_latent_smooth=N_calibration) across de-meaned claim correlation matrix; cross-class = claim-count-weighted mean. Governance: f_latent_floor [0.05], f_latent_ceil [0.60], N_latent_smooth. EAT: `latent_exposure_estimate` per epoch per class.
+
+**Invariant #416 (#r252):** COMMITTEE T_anchor dual-threshold: member_count_voted >= ceiling(k × quorum_fraction_count, default 0.60) AND credibility_weight_voted >= credibility_quorum_fraction (default 0.50) × total_committee_credibility_weight. Both required simultaneously at epoch boundary. `expected_quorum_achievability` disclosed at class registration.
+
+**Invariant #417 (#r252):** IMPLICATION_CHAIN downstream retraction blocked from (upstream_first_committee_vote_block + anti_snipe_delay), anti_snipe_delay = 1 micro-epoch [0, 2] governance-settable. Retractions within anti_snipe window queued; cancelled if T_anchor fires during window; processed on delay expiry if no T_anchor. Supersedes #r251 retraction-blocking definition for IMPLICATION_CHAIN.
+
+**Invariant #418 (#r252) [net-new]:** Calibration clock (N_calibration normal-mode epochs) and data clock (N_blocks_required oracle events) are structurally independent. Features gated by mechanism maturity: calibration clock. Features gated by data sufficiency: data clock. Features requiring both: conjunction (max() for deadline formulas; dual-condition transition for parameter activation). Every transition condition in the spec must declare which clock governs it; divergence between clocks is expected and must be handled explicitly.
+
+---
+
+## Open Questions for #r253+
+
+1. **Anti-snipe delay and micro-epoch universality:** `anti_snipe_delay = 1 micro-epoch` requires micro-epoch structure. For batch-only epoch classes with no micro-epochs, what is the anti-snipe delay default? Should it be defined as a block count (e.g., 100 EVM blocks) for universal applicability?
+
+2. **PCA during MEDIUM_CONSENSUS fallback:** Invariant #415 requires de-meaned PCA. During MEDIUM_CONSENSUS fallback (Invariant #408), synthetic claim data populates block-bootstrap. Should PCA run on synthetic+real combined claims (risks artificial n_j satisfaction) or exclusively on real claims?
+
+3. **Credibility-weight quorum at genesis (all members near-zero credibility):** For a newly registered COMMITTEE class where all members have genesis credibility_ratio, the credibility-weight threshold is near-meaningless. Does the dual-threshold quorum degrade gracefully to member-count-only during bootstrap when credibility differentiation is insufficient?
+
+4. **Cross-class calibration regime divergence in implication declarations:** An A→B declaration spans two classes potentially at different calibration states (one in normal calibration, one reverted to level-correlation after deadline). Should the implication bonus use the weaker calibration of the two, or are coordinates scored independently against their own calibration state?
+
+*Last updated: #r252 — 2026-04-04T16:52Z*
