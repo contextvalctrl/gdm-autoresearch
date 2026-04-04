@@ -19311,3 +19311,199 @@ Zone C throttles *new* installations but does not halt oracle resolution for *ex
 4. **CPA_IdentityRegistry write authorization and governance upgrade path:** The registry is written by CredibilityAggregator. If CredibilityAggregator is upgraded (Invariant #41: trust-root upgrade requires re-audit + epistemically_live re-evaluation), the new CredibilityAggregator must inherit write authorization. Define the migration: does the old contract retain write auth during the upgrade window, or is write auth transferred atomically at deployment?
 
 *Last updated: #r227 — 2026-04-04T11:52Z*
+
+---
+
+## #r228 Contributions — 2026-04-04T12:32Z
+
+Addresses all four open questions from #r227.
+
+---
+
+**Q1 (CPA partial exoneration — cluster expiry under individual exoneration) → Per-member CPA status updated at individual resolution; no cluster-gate on exoneration timing (#r228):**
+
+The CPA cluster is a correlation detection artefact, not a legal entity. Individual members may have submitted identical wrong claims by coincidence (Invariant #311 James-Stein shrinkage handles small-cluster noise), or may have genuinely been part of a coordination scheme. At oracle resolution, individual scoring resolves each member's claim independently.
+
+**Structural argument against cluster-gated exoneration:**
+
+A rule requiring full cluster resolution before any member gets `resolved_exonerated` creates an indefinite blocking period when:
+- Some cluster members have pending claims on slow-oracle coordinates (T_longtail-delayed resolution).
+- Cluster members are distributed across classes with different oracle latencies.
+- An adversarial cluster member deliberately delays resolution to hold innocent co-accused in limbo.
+
+The last attack is particularly acute: a colluder who knows they are in a CPA cluster can refuse oracle engagement (for off-chain oracle sources) or delay position closure to prevent full cluster resolution, blocking innocent members from grace windows on new classes.
+
+**Resolution — per-member individual status update at individual oracle resolution:**
+
+```
+CPA_IdentityRegistry update rules at oracle_resolution:
+
+  For each member_a in CPA_cluster_c:
+    if oracle_confirms(claim_a) correct:
+      entry_a.CPA_status = resolved_exonerated (immediately)
+      EAT event: CPA_member_exonerated { address_a, cluster_id: c, class_id, resolution_epoch }
+      Exonerated member no longer blocked from grace windows from next epoch.
+
+    if oracle_confirms(claim_a) wrong:
+      entry_a.CPA_status = resolved_penalised
+      CPA penalty applied per #r226/Q1 shrinkage formula
+      Standard credibility_ratio update
+
+  Cluster entry itself transitions:
+    if all members resolved: cluster_status = resolved_complete
+    if some members unresolved: cluster_status = partially_resolved
+    partially_resolved clusters remain in registry; unresolved members retain active status
+```
+
+**Why this is epistemically correct:** The CPA cluster is evidence of correlated wrong claims at a point in time. If member A's claim resolves correct and member B's resolves wrong, A's exoneration is real information — A was not colluding on this claim. B's wrong resolution is real information — B may have been colluding, or may be miscalibrated. These are independent epistemic events.
+
+**Adversarial partial exoneration gaming:** An adversary could try to be exonerated on easy coordinates while colluding on hard ones, cycling CPA entries to appear clean at registration time. Defence: CPA_IdentityRegistry retains the full cluster history including `resolved_exonerated` events. A pattern of repeated exoneration-then-new-cluster membership across classes is visible in the EAT. Governance can flag addresses with `n_CPA_cycles > CPA_cycle_flag_threshold` (governance-set, default 2). Flagged addresses require governance review before new grace window eligibility — independent of their current CPA_status. This is a soft governance gate, not a hard block, since repeated exoneration is also consistent with being a legitimate knower in volatile market conditions. (#r228)
+
+---
+
+**Q2 (Δ_wrong bootstrap recalculation SLA — notification window before auto-reduction) → 1-macro-epoch governance notification window; auto-executes at next epoch boundary if no governance action (#r228):**
+
+The auto-reduction is a safety correction preventing abstention-incentive inversion. It should not be immediate (no governance awareness), nor should it be indefinitely deferrable (same failure mode as σ_bootstrap divergence veto, #r227/Q3). The bounded-veto pattern applies.
+
+**Resolution — 1-macro-epoch governance notification window:**
+
+```
+Trigger: empirical Δ_wrong_class_floor < Δ_abstain_current at N_calibration resolutions
+
+EAT event: delta_abstain_reduction_pending {
+  class_id, current_Δ_abstain, empirical_floor, proposed_Δ_abstain_new = empirical_floor × 0.90,
+  governance_response_deadline: current_epoch + 1 macro-epoch
+}
+
+Governance response options within 1 macro-epoch:
+  1. Accept auto-reduction: no action required; auto-executes at deadline.
+  2. Propose alternative Δ_abstain_new with evidence: must satisfy Δ_abstain_new < empirical_floor.
+     If accepted by multisig: alternative executes; EAT event records governance choice.
+  3. Declare bootstrap_estimate_contested: provide evidence empirical floor is
+     temporarily distorted (e.g., single anomalous resolution). One-time per class.
+     If governance multisig accepts: SLA extended 1 additional macro-epoch; no more extensions.
+
+No response within deadline: auto-executes Δ_abstain_new = empirical_floor × 0.90.
+EAT event: delta_abstain_auto_reduced { class_id, old_Δ_abstain, new_Δ_abstain, trigger_reason }
+```
+
+**Why 1-macro-epoch notification, not 0 (immediate) or longer:**
+- 0: governance has no awareness before change fires; single anomalous resolution → permanent lower Δ_abstain.
+- >1: same indefinite-veto problem as σ_bootstrap divergence. Δ_abstain correction is a safety issue; governance has all data at the N_calibration resolution event.
+- 1 epoch: short enough to prevent deferral; long enough for governance to act with intention.
+
+**Asymmetric windows vs σ_oracle_residual (#r227/Q3):** Δ_abstain: 1 macro-epoch (immediate safety — abstention-incentive inversion is acute). σ_oracle_residual: 2 × N_calibration epochs (distributional — less acute). Asymmetry reflects urgency asymmetry.
+
+**Design law (#r228):** Safety-correction parameters require short bounded governance notification windows (1 macro-epoch for immediate-safety parameters; longer for distributional parameters). Auto-execution after the window is the designed behaviour, not a fallback. (#r228)
+
+---
+
+**Q3 (zero_resolution_epoch detection lag — non-abstaining committee log-score treatment) → zero_resolution_epoch applies only to abstainers; non-abstaining committees unaffected; abstention mechanics are participation-tracking, not resolution-tracking (#r228):**
+
+**The conceptual clarification:**
+
+The abstention budget tracks whether a committee member chose to participate in an epoch. Log-score updates fire at oracle resolution, not at claim submission. A committee submitting a claim in epoch t receives their log-score when the oracle resolves — which could be epoch t, epoch t+5, or epoch t+500. The log-score update is resolution-triggered.
+
+For a non-abstaining committee (who submitted a claim in epoch t), there is no abstention budget update in epoch t regardless of zero_resolution_epoch — they participated; their budget was not debited. The zero_resolution flag is only relevant to abstainers facing a budget debit.
+
+**Resolution — formal scoping:**
+
+```
+zero_resolution_epoch(class_i, t) applies exclusively to:
+  committees where abstained(a, class_i, t) = true
+
+For non-abstaining committees in epoch t:
+  No abstention budget update in epoch t regardless of zero_resolution_epoch.
+  Log-score update fires at oracle resolution epoch (independent of epoch t type).
+  zero_resolution_epoch has no effect on non-abstainers.
+```
+
+**Retroactive flag application for abstainers:** At epoch-t close, the zero_resolution_epoch flag is determinable. For abstainers, the budget update is held in a pending local validator state until close. If flag fires: pending budget debit cancelled (frozen). If flag does not fire: debit applies. The pending state is a local validator concern; no EAT commit until epoch-t close.
+
+**Edge case — submitted claim AND zero_resolution_epoch:** Committee submitted claim (non-abstaining). zero_resolution flag: irrelevant. Claim recorded in EAT at epoch t. Log-score update deferred to oracle resolution epoch. No special treatment.
+
+**Design law (#r228):** Abstention budget mechanics are participation-tracking (did the committee submit a claim this epoch?). They are independent of resolution-tracking (what happened to claims at oracle resolution?). The zero_resolution_epoch suspension is a mechanical exception to abstention penalty only. It has no effect on log-score lifecycles of submitted claims. (#r228)
+
+---
+
+**Q4 (CPA_IdentityRegistry write authorization during CredibilityAggregator upgrade) → Upgrade-freeze pattern: atomic write-auth transfer; zero overlap window; pending-write queue drained by new contract (#r228):**
+
+**Why no dual-writer window:** A window with both old and new CredibilityAggregator holding write access creates a race condition: both contracts independently process the same oracle resolution event, writing conflicting or duplicate CPA cluster entries. Even if entries are identical, the EAT would contain duplicate write events from different addresses — violating the single-writer-per-resource principle.
+
+**Resolution — upgrade-freeze pattern:**
+
+```
+Phase 1 — Announce (epoch T_announce):
+  EAT event: credibility_aggregator_upgrade_announced {
+    old_address, new_address, freeze_epoch: T_freeze,
+    registry_transfer_epoch: T_freeze + 1
+  }
+  Constraint: T_announce ≥ T_freeze − 4 × N_calibration (re-audit window per Invariant #41)
+
+Phase 2 — Write freeze (at epoch boundary T_freeze):
+  old_CredibilityAggregator: write_auth_to_CPA_registry = false
+  Pending CPA writes (cluster events detected but not yet written) → queued in old contract
+  EAT event: credibility_aggregator_write_frozen { epoch: T_freeze, pending_writes: N }
+
+Phase 3 — Write-auth transfer + queue drain (T_freeze + 1):
+  new_CredibilityAggregator: write_auth_to_CPA_registry = true
+  Processes pending_CPA_writes from old contract queue (inherited with EAT lineage refs)
+  EAT event: CPA_registry_write_auth_transferred {
+    old_address, new_address, pending_writes_count, drain_epoch
+  }
+
+Phase 4 — Decommission:
+  old_CredibilityAggregator: read-only mode.
+  Open claims in old-contract state: resolved through their T_longtail horizon (static escrow, #r137).
+```
+
+**Why queue drained by new contract (not old):** Pending writes at T_freeze are cluster events from claims processed by the old contract, but the registry's write authority has transferred. The new contract commits these as its first actions with EAT lineage referencing the old contract's claim data — single-writer-per-epoch with correct lineage attribution.
+
+**Freeze window oracle events (between T_freeze and T_freeze + 1):** Oracle resolution events during the freeze window are processed by old_CredibilityAggregator (still alive for claim processing; only write auth to registry is frozen). Resulting CPA cluster detections are added to the pending-write queue, drained in Phase 3. No CPA events are lost.
+
+**Governance access control:** CPA_IdentityRegistry `write_authorized_contracts` list is governance-managed. Phase 2 removes old_address; Phase 3 adds new_address — two separate governance transactions at consecutive epoch boundaries. Governance bears accountability for executing both in sequence.
+
+**Design law (#r228):** Singleton registries with single-writer authority require upgrade-freeze patterns with zero write-auth overlap. The 1-epoch freeze window with pending-write queue is the standard architecture: clean auth transfer, no races, full EAT auditability. Static-escrow design law (#r137) extends to registry write obligations: in-flight write obligations are inherited by the new contract via queue, not forced-migrated. (#r228)
+
+---
+
+## Structural Synthesis: CPA Architecture + COMMITTEE Mechanics — Closed (#r228)
+
+| Open question | Resolution | Law |
+|---|---|---|
+| CPA partial exoneration | Per-member status at individual resolution; no cluster-gate; adversarial cycling tracked by CPA_cycle counter | Individual epistemic events independent of cluster completion |
+| Δ_abstain auto-reduction notification | 1-macro-epoch governance notification; auto-executes if no action; one-time contested extension | Safety corrections have bounded veto; asymmetric window reflects urgency |
+| zero_resolution_epoch scope | Abstainers only; non-abstaining unaffected; abstention ≠ resolution tracking | Participation-tracking mechanics independent of resolution-tracking |
+| CPA_IdentityRegistry upgrade | Upgrade-freeze: zero overlap, 1-epoch gap, new contract drains queue | Single-writer-per-resource; static-escrow extends to write obligations |
+
+---
+
+## Cumulative Invariants (#r228)
+
+**Invariant #320 (#r228):** CPA exoneration is per-member at individual oracle resolution — not cluster-gated. `resolved_exonerated` fires when member's individual claim resolves correct, regardless of remaining cluster. Partially-resolved clusters remain active in registry. Addresses with n_CPA_cycles > CPA_cycle_flag_threshold (default 2) require governance review before new grace window eligibility.
+
+**Invariant #321 (#r228):** Δ_abstain auto-reduction SLA: at N_calibration resolutions, empirical Δ_wrong_class_floor < Δ_abstain → 1-macro-epoch governance notification → auto-executes Δ_abstain_new = empirical_floor × 0.90 if no action. One-time bootstrap_estimate_contested per class; no further extensions. 1-epoch window reflects immediate-safety urgency vs σ_oracle_residual 2 × N_calibration window.
+
+**Invariant #322 (#r228):** zero_resolution_epoch applies only to abstainers. Non-abstaining committees unaffected — their log-score fires at oracle resolution (any future epoch). Abstention budget mechanics are participation-tracking; log-score mechanics are resolution-tracking. These are independent.
+
+**Invariant #323 (#r228):** CPA_IdentityRegistry upgrade uses upgrade-freeze pattern: (T_freeze) old write auth removed + pending writes queued; (T_freeze + 1) new contract receives write auth and drains queue. Zero overlap window. Upgrade announcement ≥ 4 × N_calibration epochs before T_freeze (Invariant #41 re-audit window). In-flight write obligations inherited via queue, not force-migrated.
+
+---
+
+## Run Log Update
+
+- **#r228** — 2026-04-04T12:32Z — Q1: Per-member CPA exoneration at individual oracle resolution; no cluster-gate; adversarial cycling mitigated by CPA_cycle counter flag. Q2: Δ_abstain auto-reduction has 1-macro-epoch governance notification window; auto-executes if no action; one-time contested extension per class. Q3: zero_resolution_epoch applies only to abstainers — non-abstaining committees unaffected; abstention mechanics are participation-tracking not resolution-tracking. Q4: Upgrade-freeze pattern for CPA_IdentityRegistry write auth: zero overlap, 1-epoch freeze gap, pending-write queue drained by new contract. Invariants #320–#323.
+
+---
+
+## Open Questions for #r229+
+
+1. **CPA_cycle_flag governance review SLA:** An address with n_CPA_cycles > threshold requires governance review before new grace window eligibility. What is the governance review SLA? If governance does not review within a defined window, does the grace window proceed (innocent-until-reviewed) or remain blocked (blocked-until-cleared)?
+
+2. **Δ_abstain auto-reduction and expanding abstention budgets:** When Δ_abstain is reduced mid-lifecycle (e.g., 0.05 → 0.035), existing abstention budgets [(credibility_ratio − θ_committee_min) / Δ_abstain] expand instantly. Is this an intentional benefit (conservative parameter correction benefits participants) or a perverse windfall (committees near threshold gain unexpected runway)?
+
+3. **Queue drain timing and oracle events during the freeze window itself:** Oracle resolution events between T_freeze and T_freeze + 1 are processed by old_CredibilityAggregator (claim processing continues; only registry writes frozen). These add to the pending-write queue. But what if T_freeze + 1 is delayed by DA outage (degraded mode)? Does Phase 3 queue drain toll alongside challenge windows?
+
+4. **COMMITTEE model vs standard T3 coexistence at a single coordinate class:** Can a single class simultaneously host standard T3 knowers and COMMITTEE participants? Or is COMMITTEE a class-level mode flag replacing T3 mechanics entirely? If coexistent, how does S_cred aggregation weight the two populations?
+
+*Last updated: #r228 — 2026-04-04T12:32Z*
