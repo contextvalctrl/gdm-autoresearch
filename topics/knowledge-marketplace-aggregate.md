@@ -15458,4 +15458,207 @@ One-line change to T4. No new contracts. τ_scale in GovernanceParams (class-sco
 
 4. **τ_bonus and T_anchor shifts:** If governance extends T_anchor post-submission (e.g., Zone_C delay), claims submitted "close to original T_anchor" now appear as early claims under the extended window. Should τ_bonus compute (1 − t_submit / T_anchor_at_submission) using the T_anchor declared at the epoch of submission, not the final T_anchor?
 
-*Last updated: #r209 — 2026-04-04T08:42Z*
+*Last updated: #r210 — 2026-04-04T08:52Z*
+
+---
+
+## #r210 Contributions — 2026-04-04T08:52Z
+
+Addresses all four open questions from #r209. Net-new first-principles angle: the relationship between τ_bonus and the cron's core claim that "money on the table is proof-of-conviction" — and how the early-information premium changes what capital signals.
+
+---
+
+### Q1 (τ_scale oracle-gaming risk — single-entity oracle classes; oracle-type taxonomy and τ_scale_max mapping) (#r210)
+
+**Why single-entity oracles are higher risk under τ_bonus:**
+
+τ_bonus rewards early claimants. If the oracle is a single named entity (e.g., BEA, ECB, a named court), an adversary with advance access to that entity's output can submit first with near-certain accuracy. This is *oracle front-running* — the τ_bonus was designed to reward private-model advantage, not insider access. Under SINGLE_ENTITY oracle_type, τ_bonus may amplify insider advantage rather than epistemic contribution.
+
+**Oracle-type taxonomy (#r210):**
+
+| Type | Description | τ_scale_max |
+|---|---|---|
+| MULTI_SOURCE | Outcome determined by median/consensus of ≥3 independent sources | 0.33 |
+| COMMITTEE | Outcome determined by a defined committee vote (e.g., FOMC, court panel) | 0.20 |
+| SINGLE_ENTITY | Outcome determined by a single named source (BEA, ECB, one court) | 0.10 |
+| MARKET_DERIVED | Outcome is the final settlement price of an external market (e.g., CME future expiry) | 0.05 |
+| SOVEREIGN_DECREE | Outcome depends on a single sovereign decision (legislation, executive order) | 0.10 |
+
+**MARKET_DERIVED gets lowest τ_scale_max (0.05):** A market-derived oracle makes early information advantage nearly identical to orderbook front-running. τ_bonus should be minimised — the mechanism should compete on warrant-backed credibility, not on latency-to-market-price.
+
+**Contract enforcement:** oracle_type is a required class registration field. GovernanceParams stores `τ_scale_max_by_oracle_type` as a 5-entry lookup table (governance-settable, bounded between [0.03, 0.33] for each type). At class registration, `τ_scale ≤ τ_scale_max_by_oracle_type[oracle_type]` is verified on-chain.
+
+**Design law (#r210):** τ_scale_max is oracle-type-specific. Single-entity and market-derived oracles have lower τ_scale ceilings to prevent oracle front-running from masquerading as early epistemic contribution. oracle_type is a required, immutable class registration field. (#r210)
+
+---
+
+### Q2 (coverage(t) acceleration — shadow class bootstrap without compromising epistemically_live gate correctness) (#r210)
+
+**The tension:** The epistemically_live gate (#r160/Q4) requires ≥2 consecutively resolved epochs with a challenger pool. Shadow classes (#r193) run calibration rounds before going live. The question is whether shadow rounds count toward epistemically_live history.
+
+**Resolution — two-tier history credit:**
+
+```
+epistemically_live(c, t):
+  N_resolved_epochs(c, t) ≥ 2
+  where N_resolved_epochs counts:
+    FULL credit: live-class epochs (oracle resolves against real position holders)
+    HALF credit (0.5 per epoch): shadow-class calibration epochs (oracle resolves; no real escrow)
+```
+
+Shadow rounds provide half credit because they test calibration of the knower-pool but not the escrow/slash/challenge mechanism. An adversary cannot bypass the live-class gate by running unlimited shadow rounds: at 0.5 credit per epoch, two live epochs worth of credit requires four shadow epochs — shadow bootstrapping halves the clock but does not eliminate the requirement.
+
+**Hard floor:** A class may not be declared epistemically_live on shadow epochs alone. Minimum 1 full live-epoch credit is required, regardless of how many shadow rounds were completed. This ensures at least one real oracle resolution of the escrow/slash cycle before live settlement is enabled.
+
+**Coverage acceleration:** With shadow bootstrapping at 0.5 credit, coverage(t) can grow faster for new classes that run shadow epochs before their first oracle resolution. coverage_shadow(t) = classes with N_resolved ≥ 1.5 (mix of shadow + live history). W(t) uses coverage_live (full live-epoch count only) for welfare accounting; coverage_shadow is a separate KPI for governance monitoring.
+
+**Design law (#r210):** Shadow calibration epochs count at 0.5× toward epistemically_live history. Minimum 1 full live-epoch credit required. coverage(t) in W(t) counts full live-epoch classes only; coverage_shadow is a governance monitoring KPI. (#r210)
+
+---
+
+### Q3 (PHASE_A to PHASE_B transition — existing class grandfathering) (#r210)
+
+**The question:** Classes registered under PHASE_A's conservative (ρ=1) gate may have Zone_C demand that under PHASE_B's empirical correlation matrix would fail the 33% gate. Should they be retroactively required to pass the PHASE_B gate?
+
+**Formal framework — two competing principles:**
+
+1. **Grandfather principle:** Classes registered under valid governance rules at the time of registration should not be subject to retrospective invalidation. Retroactive gates undermine governance predictability and the static-commitment design law.
+
+2. **Systemic safety principle:** If PHASE_B reveals that existing classes collectively exceed the 33% survivable Zone_C demand, the treasury is at existential risk regardless of registration-time rules.
+
+**Resolution — conditional grandfather:**
+
+```
+On PHASE_B transition:
+  For each class registered in PHASE_A:
+    if zone_C_demand(class) ≤ 0.33 × treasury_balance / ρ_matrix_factor:
+      GRANDFATHERED — no action required
+    else:
+      OVER_CAPACITY — class enters ZONE_C_WATCH status
+        Zone_C_WATCH: class continues operating; governance has 2 × N_calibration epochs
+        to either: (a) reduce zone_C_demand (lower WED_ceiling); or (b) inject treasury capital
+        If neither: class enters DELIST_PENDING via treasury safety override
+```
+
+**Why 2 × N_calibration:** Sufficient time for governance to respond without forcing fire-sale WED reduction. Zone_C_WATCH is non-disruptive; knowers continue operating normally. The governance action space includes simply growing the treasury through fee revenue before the window expires.
+
+**Design law (#r210):** Existing classes are grandfathered at PHASE_B transition unless they exceed the 33% Zone_C capacity under empirical correlation. Over-capacity classes enter ZONE_C_WATCH with a 2 × N_calibration remediation window. Retroactive hard delisting is prohibited; safety-driven soft delisting with a remediation window is the correct response. (#r210)
+
+---
+
+### Q4 (τ_bonus and T_anchor shifts — τ_bonus uses T_anchor_at_submission, not final T_anchor) (#r210)
+
+**Resolution — submission-time T_anchor lock:**
+
+```
+For claim submitted at epoch t_submit:
+  T_anchor_locked = T_anchor_declared(class_i, t_submit)
+    (the T_anchor value in CoordinateRegistry at the block of claim submission)
+
+τ_bonus = 1 + τ_scale × (1 − t_submit / T_anchor_locked)
+
+If T_anchor is subsequently extended (Zone_C, governance):
+  τ_bonus for existing claims is NOT recomputed
+  T_anchor_locked is stored in EAT per claim at submission time
+```
+
+**Why this is required:** If τ_bonus used final T_anchor, a Zone_C extension would retroactively reclassify claims as "early" — converting T_anchor−1 claims into mid-window claims by expanding the denominator. Claimants who submitted believing they were at T_anchor−1 did not benefit from the additional window and should not bear penalty (lower τ_bonus) from it. Their submission-time T_anchor was their information environment.
+
+**Implementation:** ClaimEscrow.installT3() records `T_anchor_at_submission` per claim. This field is immutable post-submission. RESOLVE uses this field, not the current T_anchor.
+
+**Governance extension and new claims:** Claims submitted *after* a T_anchor extension use the new extended T_anchor in their τ_bonus denominator — they chose to submit knowing the extension. This is correct: they are later in the new window.
+
+**Design law (#r210):** τ_bonus denominator is the T_anchor value at the time of claim submission, not the final settled T_anchor. T_anchor_at_submission is stored per claim in ClaimEscrow and is immutable. (#r210)
+
+---
+
+### Net-New First-Principles Pass: Capital as Signal — What τ_bonus Changes About "Proof-of-Conviction" (#r210)
+
+The cron's founding premise: "Money on the table is proof-of-conviction." #r196/net-new corrected this — capital is the anti-Sybil participation gate; track record is the epistemic signal.
+
+τ_bonus adds a third dimension: **timing of capital commitment is a signal of conviction quality.**
+
+**The formal argument (#r210):**
+
+Consider two knowers:
+- **A:** Posts claim v=0.55 at t_submit=0 with stake k_A (when S_cred = 0.50, no public signal)
+- **B:** Posts claim v=0.55 at t_submit = 0.9 × T_anchor (when S_cred = 0.54, strong consensus has formed)
+
+Both are correct. Under the base mechanism, both earn the same credibility_ratio update.
+
+But the epistemic value they added is different:
+- A revealed private information against consensus — high conviction, high epistemic value
+- B confirmed near-consensus with late stake — low marginal epistemic value (S_cred would have reached 0.55 with or without B's claim)
+
+**What capital signals in each case:**
+- A's capital: commitment to a non-consensus view; bears full asymmetric loss if wrong; *genuine conviction*
+- B's capital: participation gate met; bears loss if wrong, but the loss is symmetric because others have already converged near v
+
+τ_bonus formalises this intuition: early capital-at-risk is a stronger proof-of-conviction than late capital-at-risk, because early wrongness costs more (τ_bonus > 1 for log_score < 0) and early correctness earns more.
+
+**Revised canonical description of capital in GestAlt (supersedes #r196/net-new in part):**
+
+> Capital in GestAlt serves three distinct roles in order of epistemic depth:
+> 1. **Anti-Sybil gate** (all capital): participation requires escrow, filtering dust participants.
+> 2. **Track-record accumulator** (capital × resolution accuracy): prior correct predictions weight S_cred.
+> 3. **Early-conviction signal** (capital × timing × accuracy): earlier correct predictions update credibility_ratio more strongly via τ_bonus, rewarding genuine private-model advantage.
+
+The hierarchy is: role 1 is necessary but epistemically inert; role 2 is the primary epistemic mechanism; role 3 is the marginal refinement that improves the bilateral-flow property by steering early private-signal revelation.
+
+**Connection to LMSR comparison:** LMSR capital is purely role 1 + a one-period version of role 2 (via immediate price impact). LMSR has no role 3 — early correct LMSR traders get a price improvement but no persistent credibility increment. GestAlt roles 2+3 together create a strictly richer epistemic capital structure than LMSR allows.
+
+**Stability note:** τ_bonus at τ_scale ≤ 0.33 does not change the equilibrium structure. DSIC remains at δ* ≈ 0.08 (Invariant #236). The early-conviction signal is a refinement on top of the stable incentive structure, not a new instability.
+
+**Updated minimum mechanism description (§8 from #r203, one change):**
+
+```
+T4 RESOLVE(oracle_truth, T_finality):
+  for each k with active claim:
+    τ = 1 + τ_scale_class × (1 − t_submit_k / T_anchor_locked_k)  ← T_anchor_locked (Q4)
+    credibility_ratio[k] += τ × log_score_delta(claim_k_v, oracle_truth)
+    ...
+```
+
+---
+
+## Structural Synthesis: #r210
+
+| Net-new contribution | Key claim | Mechanism implication |
+|---|---|---|
+| Oracle-type taxonomy for τ_scale_max | SINGLE_ENTITY → 0.10; MARKET_DERIVED → 0.05; MULTI_SOURCE → 0.33 | oracle_type is required, immutable class registration field; τ_scale_max enforced on-chain |
+| Shadow epoch 0.5× credit | coverage(t) grows faster; correctness preserved by 1× full live-epoch minimum | shadow bootstrapping halves cold-start clock; does not eliminate real-escrow requirement |
+| ZONE_C_WATCH grandfathering | PHASE_A→B transition: over-capacity classes get 2×N_calibration remediation window | safety-driven soft delist with window > retroactive hard delist |
+| T_anchor_at_submission immutability | τ_bonus denominator fixed at submission; post-extension claims use extended T_anchor | Zone_C extensions cannot retroactively reclassify existing claims |
+| Capital roles 1/2/3 | Anti-Sybil gate / track-record accumulator / early-conviction signal | τ_bonus adds role 3; richer epistemic capital structure than LMSR; DSIC unchanged |
+
+---
+
+## Cumulative Invariants (#r210)
+
+**Invariant #237 (#r210):** oracle_type is a required, immutable class registration field. τ_scale_max is oracle-type-specific: MULTI_SOURCE → 0.33; COMMITTEE → 0.20; SINGLE_ENTITY → 0.10; SOVEREIGN_DECREE → 0.10; MARKET_DERIVED → 0.05. Contract enforces τ_scale ≤ τ_scale_max_by_oracle_type[oracle_type] at class registration and parameter update.
+
+**Invariant #238 (#r210):** Shadow calibration epochs count 0.5× toward epistemically_live history. Minimum 1 full live-epoch credit required regardless of shadow round count. coverage(t) in W(t) counts full live-epoch classes only.
+
+**Invariant #239 (#r210):** PHASE_A-registered classes at PHASE_B transition are grandfathered unless Zone_C demand exceeds capacity under empirical ρ_matrix. Over-capacity classes enter ZONE_C_WATCH with 2×N_calibration remediation window (reduce WED_ceiling or inject treasury capital). Retroactive hard delisting is prohibited.
+
+**Invariant #240 (#r210):** T_anchor_at_submission is stored per claim in ClaimEscrow at installT3() time and is immutable. τ_bonus denominator uses T_anchor_at_submission, not final T_anchor. Claims submitted after a T_anchor extension use the extended T_anchor as their denominator.
+
+**Invariant #241 (#r210):** Capital in GestAlt serves three epistemic roles in order of depth: (1) anti-Sybil gate (all capital); (2) track-record accumulator (capital × resolution accuracy); (3) early-conviction signal (capital × timing × accuracy under τ_bonus). Roles 2+3 together constitute a strictly richer epistemic capital structure than LMSR. τ_bonus does not alter DSIC equilibrium or the stability of the track-record mechanism.
+
+---
+
+## Run Log Update
+
+- **#r210** — 2026-04-04T08:52Z — Q1: oracle_type taxonomy (MULTI_SOURCE/COMMITTEE/SINGLE_ENTITY/SOVEREIGN_DECREE/MARKET_DERIVED) with τ_scale_max mapping [0.33/0.20/0.10/0.10/0.05]; oracle_type is required immutable registration field. Q2: shadow epoch 0.5× coverage credit; minimum 1 live-epoch floor; coverage(t) in W(t) counts live-epoch classes only. Q3: PHASE_A→B transition with conditional grandfathering; ZONE_C_WATCH state; 2×N_calibration remediation window; retroactive hard delist prohibited. Q4: T_anchor_at_submission immutable per claim; τ_bonus denominator is submission-time T_anchor; post-extension claims use extended T_anchor. Net-new: capital three-role taxonomy (anti-Sybil gate / track-record accumulator / early-conviction signal); τ_bonus adds role 3; LMSR comparison extended; minimum mechanism T4 updated with T_anchor_locked. Invariants #237–#241.
+
+---
+
+## Open Questions for #r211+
+
+1. **ZONE_C_WATCH and Zone_C simultaneous entry:** A class in ZONE_C_WATCH enters the settlement Zone_C state (high volatility, Zone_C challenge gate fires). Do the Zone_C_WATCH governance window and the Zone_C challenge window interact, or are they orthogonal state machines?
+
+2. **oracle_type immutability vs oracle re-designation:** Oracles are declared at registration. If the primary oracle source ceases to operate (e.g., publication discontinued), governance needs to re-designate the oracle source. Does re-designation also allow oracle_type reclassification, which could change τ_scale_max?
+
+3. **Shadow epoch EAT record structure:** Shadow epochs generate oracle resolutions without live escrow. Does the shadow epoch EAT record include a `synthetic_oracle_resolution` tag, and is credibility_ratio_update_shadow separate from the live-epoch update in storage?
+
+4. **τ_bonus interaction with EQ (DISCOVERY_MODE):** In DISCOVERY_MODE, EQ unknowers pay q_fee + q_bonus for a targeted S_cred query. Should τ_bonus also apply to the credibility_ratio updates earned by knowers responding to EQ queries? Or is τ_bonus scoped to CLEARING_MODE direct claims only?
