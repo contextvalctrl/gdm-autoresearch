@@ -23244,3 +23244,135 @@ residual_correlation(a, b) =
 3. **Within-group CPA residual correlation formula — data availability:** The residual correlation `corr(B_claim_a, B_claim_b) − corr(B_claim_a, A_range_outcome) × corr(B_claim_b, A_range_outcome)` requires knowledge of each knower's historical B_claim vs A_range_outcome correlation. For new classes with few resolved epochs, this is poorly estimated. Should IMPLICATION_CHAIN classes have a CPA detection grace window analogous to the N_calibration bootstrap condition?
 
 4. **Retraction opt-in and class-level liquidity signalling:** A class where many knowers retract near T_deferral_max signals to the market that A is unlikely to enter the upstream range. This is genuine price discovery — but the retraction mechanism was designed for capital efficiency, not as a secondary signalling mechanism. Should retraction events be committed to EAT as public information (allowing other participants to observe retraction rates), or kept private until T_anchor fires (preventing retraction from becoming a front-running signal)?
+
+---
+
+## #r246 Contributions — 2026-04-04T15:42Z
+
+Addresses all four open questions from #r245. Net-new structural observation: **retraction events carry genuine price-discovery information** — suppressing them reduces market efficiency, but real-time disclosure enables within-epoch cascade retractions. The correct resolution is epoch-boundary publication with within-epoch aggregate metrics only, a pattern that generalises to any conditional-claim secondary signal.
+
+---
+
+### Q1 (Retraction and TOWL capacity recapture — immediate vs next epoch boundary) → Next-epoch-boundary recapture; penalty self-limits gaming; consistent with epoch-frozen TOWL accounting (#r246)
+
+**Gaming attack:** Knower retracts claim → escrow returns minus penalty → if TOWL recaptures immediately, knower can reinstall a new claim at a different coordinate within the same epoch, briefly exceeding the effective capacity the throttle gate was computed against.
+
+**First-principles analysis — TOWL accounting is epoch-frozen:**
+
+TOWL positions are snapshot-frozen at epoch open. Zone C and Zone C_oracle throttles are computed from that epoch-open snapshot. All within-epoch actions (retraction, new installation) are logged but TOWL recalculation runs only at epoch close. This invariant exists for consistency: within-epoch TOWL mutations would require continuous solvency recomputation, creating a dependency on ordering of within-epoch transactions.
+
+**Resolution:**
+
+TOWL capacity freed by retraction: β_escrow contribution of retracted claim drops from TOWL at next epoch boundary. Within-epoch: retraction is logged; TOWL unchanged; new installation throttle evaluated against epoch-open TOWL.
+
+Self-limiting cycle: Each retract-reinstall cycle costs retraction_fraction_base (default 0.20) × escrow_locked. At 20% penalty, 5 cycles consume full escrow. Net TOWL per cycle = zero (freed TOWL at epoch close offsets new claim's TOWL at epoch close of installation). No capacity gaming benefit: (a) TOWL freed offsets TOWL consumed; (b) each cycle loses penalty; (c) within-epoch no freed headroom.
+
+**Design law (#r246):** TOWL capacity from retracted claims recaptures at next epoch boundary, consistent with epoch-frozen TOWL snapshot accounting. Within-epoch retraction creates no installation headroom. The penalty (20% default) makes retract-reinstall cycles economically self-terminating. (#r246)
+
+---
+
+### Q2 (p_upstream_observed EMA smoothing — escrow factor regime volatility) → EMA smoothed p_upstream_smooth = α_p × p_observed + (1−α_p) × p_prev; α_p = 0.10 default; raw rolling average retained as secondary metric; floor at N_calibration resolved events (#r246)
+
+**The volatility problem:** p_upstream_observed is the rolling N_calibration average of A-in-range events. Regime changes can move the average by 0.10–0.20 in a single epoch when old observations roll out. implication_escrow_factor = 1/p_upstream flips from 1.67 to 1.25 accordingly, creating sharp discontinuities for sequentially submitted claims.
+
+**Resolution — EMA smoothing:**
+
+p_upstream_smooth(t) = α_p × p_upstream_observed(t) + (1 − α_p) × p_upstream_smooth(t-1). α_p: governance-set ∈ [0.05, 0.30]; default 0.10. implication_escrow_factor(t) = 1 / p_upstream_smooth(t). Floor on p_upstream_smooth: max(p_upstream_smooth, 0.50) — escrow factor ceiling = 2.0×. Activation: computed only when N_resolved_A_epochs >= N_calibration. Below N_calibration: use governance-declared p_upstream_estimate (default 0.80).
+
+At α_p = 0.10, EMA half-life ≈ 6.6 epochs — long enough to damp one-epoch spikes, short enough to adapt to genuine regime changes within ~15 epochs.
+
+**Secondary metric:** p_upstream_observed (raw) recorded in EAT each epoch. If |p_upstream_observed − p_upstream_smooth| > 0.15 for ≥ N_calibration consecutive epochs, `p_upstream_regime_shift_alert` EAT event emitted.
+
+**Design law (#r246):** All epoch-to-epoch parameters feeding escrow minimums should be EMA-smoothed to prevent single-epoch volatility from disrupting knower commitment economics. Raw rolling averages retained as secondary diagnostic metrics. Regime-shift alert at persistent deviation ≥ 0.15 across N_calibration epochs triggers governance review. (#r246)
+
+---
+
+### Q3 (CPA grace window for IMPLICATION_CHAIN — bootstrap residual correlation formula) → Population-average prior for residual correlation baseline during grace window; individual empirical switch at N_calibration B-side resolved epochs (#r246)
+
+**The bootstrap problem:** For new IMPLICATION_CHAIN classes with < N_calibration resolved B-side claim epochs, corr(B_claim_a, A_range) per knower is estimated from a tiny sample — producing noisy residual correlations that generate both false positives and false negatives.
+
+**Resolution — population-average prior:**
+
+During grace window [class_live_epoch, class_live_epoch + N_calibration - 1]:
+  corr_prior = population_average_corr(B_claim, A_range) computed from all IMPLICATION_CHAIN classes sharing the same upstream_class_id with >= N_calibration resolved B-side epochs. If no such class exists: corr_prior = 0.0 (most conservative — all inter-knower correlation attributed to coordination).
+
+residual_correlation_grace(a, b) = corr(B_claim_a, B_claim_b) − corr_prior^2
+
+After grace window: switch to individual knower-specific corr(B_claim_a, A_range) per Invariant #389. EAT: `cpa_grace_window_exited { class_id, epoch }`.
+
+CPA threshold is NOT relaxed during grace window — this is baseline correction, not threshold relaxation.
+
+**Design law (#r246):** CPA bootstrap uses population-average corr(B, A_range) prior from same-upstream classes. 0.0 if none exist. Individual empirical history activates at N_calibration. Baseline correction preserves detection sensitivity; threshold relaxation would not. (#r246)
+
+---
+
+### Q4 (Retraction events — public vs private vs epoch-lagged) → Epoch-boundary publication with within-epoch anonymised aggregates; individual retraction identity private within epoch; full record public at epoch close (#r246)
+
+**The tension:** Retraction rates near T_deferral_max carry genuine price-discovery information. Real-time individual disclosure enables within-epoch cascade coordination that may be self-reinforcing regardless of actual A-range probability.
+
+**Resolution — epoch-boundary publication with within-epoch aggregate-only:**
+
+Within epoch: EAT records retraction with class_id, epoch, retraction_count_delta (+1 aggregate increment, publicly visible), knower_id MASKED. Public during epoch: retraction_rate_running = retraction_count / total_B_side_claims_at_epoch_open — aggregate only, not knower-specific.
+
+At epoch close: all retraction events un-masked. Full knower_id, escrow_returned, penalty committed to EAT.
+
+Cascade damping: displayed retraction_rate = retraction_count from (current_epoch - 1). This epoch's count delta is visible as raw number but not as a rate (denominator = prior epoch's claim count). Rate-based cascade logic is disrupted because current-epoch rate is not computable in real-time.
+
+**Why aggregate rate is sufficient:** Unknowers and knowers need to know "Is the market abandoning this class?" — not "Who specifically retracted." Aggregate retraction_rate_running carries the signal. Individual identity within epoch enables copying high-credibility knowers' retraction decisions; aggregate rate does not.
+
+**Post-epoch CPA:** At epoch close, un-masked retraction records are available for CPA detection. Correlated retraction among a cluster of high-credibility knowers is a secondary signal for adversarial coordination analysis.
+
+**Design law (#r246):** Retraction events: aggregate count real-time (masked identity); full attribution at epoch close; prior-epoch retraction rate displayed; current-epoch raw delta only. Preserves price-discovery signal (lagged rate) while preventing within-epoch cascade amplification via real-time rate feedback. This publication pattern generalises to any within-period participant action that carries epistemic signal in a small-participant market. (#r246)
+
+---
+
+## Net-New Structural Observation: Epoch-Boundary vs Real-Time Publication as a General Mechanism Design Primitive (#r246)
+
+When individual participant actions carry genuine information AND cascade coordination is a failure mode, the correct publication protocol is: (1) real-time: aggregate count or rate only, not attributable to individuals; (2) post-period: full attribution.
+
+The aggregate signal serves legitimate epistemic updating. Post-period attribution serves ex-post calibration tracking and CPA detection. The one-epoch lag on rate display disrupts cascade amplification without suppressing the signal.
+
+**General form:** For any within-epoch participant action carrying an epistemic signal, publication latency for attributable actions should match the mechanism's epoch length, not be real-time. Real-time publication of attributable actions in small participant groups produces coordination externalities outside mechanism design scope. (#r246)
+
+---
+
+## Structural Synthesis: #r246
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| TOWL recapture at retraction | Next epoch boundary; within-epoch: no headroom; penalty self-limits cycling | Epoch-frozen TOWL snapshot; mid-epoch mutations log-only |
+| p_upstream_observed EMA smoothing | EMA α_p = 0.10; escrow factor uses smooth; raw rolling retained; regime alert at 0.15 sustained deviation | Escrow minimums use smoothed parameters; raw metrics for governance diagnostics |
+| CPA grace window — residual correlation bootstrap | Population-average corr(B, A_range) prior from same-upstream classes; 0.0 if none; individual empirical at N_calibration | Correct baseline (not relaxed threshold) prevents false positives without missing coordination |
+| Retraction publication | Aggregate count real-time (masked identity); full attribution at epoch close; prior-epoch rate displayed; current-epoch raw delta only | Aggregate signal preserves price discovery; epoch-boundary attribution disrupts cascade amplification |
+
+---
+
+## Cumulative Invariants (#r246)
+
+**Invariant #390 (#r246):** TOWL capacity freed by retraction recaptures at next epoch boundary only. Within-epoch retraction generates no installation headroom (epoch-open TOWL snapshot governs all within-epoch throttle checks). Retract-reinstall cycles: net TOWL effect is zero per cycle; each cycle incurs retraction_fraction_base × escrow penalty. Self-terminating at ~5 cycles with default 20% penalty.
+
+**Invariant #391 (#r246):** implication_escrow_factor uses EMA-smoothed p_upstream_smooth = α_p × p_observed + (1−α_p) × p_prev; α_p default 0.10 (governance [0.05, 0.30]). Activates at N_calibration resolved A epochs (prior to activation: governance-declared p_upstream_estimate used). Floor: max(p_upstream_smooth, 0.50). Raw rolling average p_upstream_observed retained as secondary EAT metric. Regime-shift alert: `p_upstream_regime_shift_alert` when |p_observed − p_smooth| > 0.15 for ≥ N_calibration consecutive epochs.
+
+**Invariant #392 (#r246):** CPA bootstrap for IMPLICATION_CHAIN grace window (< N_calibration B-side resolved epochs): residual_correlation uses population_average_corr(B, A_range) as the structural conditioning prior, drawn from other IMPLICATION_CHAIN classes sharing the same upstream_class_id with ≥ N_calibration resolved epochs. If no such class exists: corr_prior = 0.0 (conservative; all inter-knower correlation attributed to coordination). Full individual empirical correlation history activates at N_calibration; EAT: `cpa_grace_window_exited`. CPA threshold is NOT relaxed during grace window — baseline correction, not threshold relaxation.
+
+**Invariant #393 (#r246):** Retraction publication protocol: within-epoch aggregate count delta publicly visible in EAT (knower_id MASKED); full individual identity un-masked at epoch close. Displayed retraction_rate = prior-epoch retraction count / prior-epoch B-side claim count (lagged by one epoch). Current-epoch count delta visible as raw number only, not as a rate. Disrupts cascade amplification via rate-threshold feedback while preserving price-discovery signal. Post-epoch un-masked records available for CPA correlation analysis.
+
+---
+
+## Run Log Update
+
+- **#r246** — 2026-04-04T15:42Z — Q1: TOWL recapture next-epoch-boundary; within-epoch retraction creates no headroom; penalty self-terminates cycling; consistent with epoch-frozen TOWL snapshot. Q2: p_upstream_smooth EMA (α_p = 0.10 default); escrow factor uses smooth; raw rolling secondary; regime-shift alert at 0.15 sustained deviation. Q3: CPA grace window uses population-average corr(B, A_range) prior from same-upstream classes; baseline correction (not threshold relaxation); switch to individual empirical at N_calibration. Q4: Epoch-boundary retraction publication — aggregate count real-time (masked), attribution at epoch close; prior-epoch rate displayed; current-epoch raw delta only; disrupts cascade without suppressing price-discovery signal. Net-new: epoch-boundary vs real-time publication as a general mechanism design primitive for cascade-prone within-period participant actions. Invariants #390–#393.
+
+---
+
+## Open Questions for #r247+
+
+1. **Epoch-frozen TOWL and correlated mass retraction:** If many knowers retract in the same epoch, the TOWL freed in aggregate at epoch close could drop the next epoch's solvency metrics significantly. Should there be a per-epoch retraction rate cap (e.g., ≤ 20% of B-side claims on a class per epoch may retract) to prevent destabilising the TOWL profile, or is the epoch-boundary recapture sufficient protection?
+
+2. **p_upstream_smooth and implication_escrow_factor at α_p = 0.10 — new knower escrow disadvantage:** Knowers who enter a class after a negative A-regime-shift (p_upstream falling from 0.80 to 0.50) face implication_escrow_factor ≈ 2.0× while early knowers under the old smooth estimate face 1.25×. Should implication_escrow_factor lock at claim-declaration epoch (so each knower pays only what was fair when they declared) or should it be a live class parameter that requires top-up from existing knowers when the smooth changes significantly?
+
+3. **Population-average corr(B, A_range) prior and systematic bias across upstream classes:** If all classes with the same upstream are in the same market regime, the population-average prior may be systematically high during boom periods — making the CPA baseline too lenient and harder to detect real coordination. Should the prior be regime-adjusted (using only cross-sectional variation in corr(B, A_range) rather than the level), or is regime sensitivity an acceptable limitation?
+
+4. **Retraction EAT record and post-epoch CPA attribution:** At epoch close, retraction records are fully attributed. Define the CPA detection variant for retraction-correlated events: is "many high-credibility knowers retracted in the same epoch" itself a CPA-triggerable event, or is retraction correlation categorically different from S_cred claim-movement correlation and treated as non-adversarial?
+
+*Last updated: #r246 — 2026-04-04T15:42Z*
