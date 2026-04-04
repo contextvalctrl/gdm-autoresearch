@@ -4593,3 +4593,187 @@ The backstop transfer is a clearing-class LTRP outflow triggered at T_wind_down_
 4. **Mechanism completeness and GestAlt v2.1 mapping:** The mechanism design is now complete (Invariants #1–#31; 10-point framework answered in #r148; clearing/discovery modes in #r149–#r158). What is the canonical minimal subset of this mechanism that is necessary and sufficient to implement GestAlt v2.1 clearing? Identify which invariants and mechanism features can be deferred to v2.2+ without compromising the v2.1 solvency-first mandate.
 
 *Last updated: #r158 — 2026-04-04T00:02Z*
+
+---
+
+## #r159 Contributions — 2026-04-04T00:12Z
+
+Addresses all four open questions from #r158. Q4 is the centrepiece: canonical minimal GestAlt v2.1 feature subset.
+
+---
+
+**Q1 (`arweave_mirror_closed` — risk acknowledgment obligation) → Mandatory `arweave_absence_acknowledged` companion record; linked to compaction_event (#r159):**
+
+The `arweave_mirror_closed` governance action terminates Arweave retries and leaves the epoch permanently IPFS-only. This is a policy decision with audit-permanence consequences that may surface years later in regulatory or dispute contexts. Governance must not be able to close retry silently.
+
+**Resolution — mandatory companion acknowledgment:**
+
+```
+arweave_mirror_closed EAT event must be submitted jointly with:
+  arweave_absence_acknowledged: {
+    epoch_range:          affected epochs
+    storage_fallback:     "IPFS_multi_provider_only"
+    acknowledged_by:      governance multisig address
+    settlement_records_present: true | false  (CLEARING_MODE flag)
+    rationale:            governance-submitted string (required, minimum 1 char)
+  }
+```
+
+Contract gate: `arweave_mirror_closed` without a co-submitted or immediately-preceding `arweave_absence_acknowledged` in the same epoch is rejected.
+
+**Retroactive close:** If Arweave retry was closed before this spec was implemented (protocol upgrade scenario), a retrospective acknowledgment is required within 4 macro-epochs of protocol upgrade activation. Protocol flags all `arweave_status: failed_closed` records from pre-upgrade history for retrospective acknowledgment during grace period.
+
+**Design law (#r159):** Any governance action that permanently degrades a named mechanism guarantee (Arweave permanence is such a guarantee for CLEARING_MODE) requires a co-submitted, immutable acknowledgment record. The acknowledgment does not grant additional authority — it creates a public audit obligation. Accountability without blockage. (#r159)
+
+---
+
+**Q2 (Tier upgrade and alignment pool continuity — N_blend_epochs transition) → N_blend_epochs = N_calibration linear interpolation; weight shifts linearly over blend window (#r159):**
+
+A TIER_3→TIER_1 upgrade class has alignment_score_smooth history from TIER_3 standalone data. Abrupt switch to TIER_1 pool risks either underweighting the class's pre-upgrade independent signal (old TIER_3 data discarded) or over-crediting the TIER_1 pool by injecting a thin-history newcomer at full weight.
+
+**Resolution — linear pool interpolation over N_blend_epochs = N_calibration:**
+
+```
+mode_mismatch_discount(class_i, epoch_t):
+  if t < t_upgrade:
+    alignment_score = standalone TIER_3 score
+  if t_upgrade <= t < t_upgrade + N_blend_epochs:
+    blend_weight = (t - t_upgrade) / N_blend_epochs    [0 -> 1 linearly]
+    alignment_score = (1 - blend_weight) * standalone_score + blend_weight * pool_score
+  if t >= t_upgrade + N_blend_epochs:
+    alignment_score = pool_score exclusively
+```
+
+The class's contribution to the TIER_1 pool phases in linearly: during the blend window, the class contributes to pool weight at `blend_weight × full_contribution`. Full pool membership at blend completion.
+
+**Pool N_align_window re-evaluation:** The pool's N_align_window condition counts valid observations from all fully-contributing members only. During blend window, the class is a partial contributor and does not count toward N_align_window for the pool.
+
+**Downgrade (TIER_1→TIER_3):** Same N_blend_epochs transition in reverse, symmetrically. No new primitive: N_blend_epochs = N_calibration. (#r159)
+
+---
+
+**Q3 (`stale_proposal_invalidated` — quorum bond refund) → Full refund; force-majeure for good-faith governance participants (#r159):**
+
+Governance participants who engaged in quorum for a proposal that is later auto-invalidated by an emergency bypass acted in good faith. The emergency bypass is a protocol-level action triggered by a separate decision pathway — not evidence of governance failure by the quorum participants.
+
+**Resolution — full participation bond refund on auto-invalidation:**
+
+```
+stale_proposal_invalidated event:
+  refund_participation_bonds: true
+  refund_source: governance_treasury
+  refund_rationale: "emergency_bypass_superseded"
+  EAT record: { proposal_id, invalidation_epoch, bonds_refunded, emergency_bypass_ref }
+```
+
+**Treasury sustainability:** Auto-alert if refund events exceed N_alert_refunds = 3 per N_refund_window = 12 macro-epochs (`emergency_bypass_overuse_flag`). Governance must respond within 2 macro-epochs.
+
+**Design law (#r159):** Force-majeure invalidation does not impose cost on good-faith governance participants. Refund is mandatory. Governance treasury bears the cost of the emergency bypass, not quorum participants. (#r159)
+
+---
+
+**Q4 (GestAlt v2.1 minimal viable subset — necessary and sufficient for solvency-first clearing) (#r159):**
+
+GestAlt v2.1 core mandate: solvency first, batch-auction fairness, institutional liquidity through capital relationships. This is CLEARING_MODE operation. The epistemic machinery (DISCOVERY_MODE, shadow-classes, implication chains, WED routing) is the long-horizon research layer.
+
+**v2.1 Minimal Viable Mechanism — 5 contracts:**
+
+```
+1. CoordinateRegistry
+   Class registration (mode=CLEARING_MODE only for v2.1)
+   Staleness parameters (staleness_window_i, kappa_i)
+   TOWL capacity tracking
+
+2. ClaimEscrow
+   T3_escrow_standard lockup and release
+   T3_escrow_longtail routing to LTRP
+   Standard slash path (challenge_success_slash)
+   oracle_settlement_override no-slash path
+
+3. CredibilityAggregator
+   S_cred credibility-weighted state update
+   credibility_ratio log-score update at resolution
+   W_max per-agent cap (single-agent dominance prevention)
+   Epoch-gated clearing feed (one-epoch buffer)
+
+4. SettlementEngine
+   Settlement Freeze Protocol: T_anchor -> challenge window -> T_finality
+   settlement_finality challenge type (Zone C deferred)
+   Position registry integration
+   oracle_settlement_override routing
+
+5. EATManager
+   Per-epoch Merkle root to Ethereum calldata
+   Full state commit to Celestia warm tier
+   Degraded mode state machine
+```
+
+**Feature classification:**
+
+| Layer | Feature | v2.1? |
+|---|---|---|
+| Core | TOWL zone management (A/B/C) | YES |
+| Core | Standard + longtail escrow | YES |
+| Core | S_cred aggregation | YES |
+| Core | Settlement Freeze Protocol | YES |
+| Core | oracle_settlement_override no-slash | YES |
+| Core | credibility_ratio track record | YES |
+| Core | EAT Ethereum anchor + Celestia warm | YES |
+| Core | Degraded mode specification | YES |
+| Deferrable | Implication chains (A->B declarations) | v2.2+ |
+| Deferrable | EQ escrow-conditioned queries | v2.2+ |
+| Deferrable | Shadow-class two-registration pattern | v2.2+ |
+| Deferrable | Cold archive three-tier (Arweave) | v2.2+ |
+| Deferrable | LTRP seed recall mechanics | v2.2+ |
+| Deferrable | settlement_reserve opt-in | v2.2+ |
+| Deferrable | market_structure_tier alignment pools | v2.2+ |
+| Not applicable | DISCOVERY_MODE full stack | NO |
+| Not applicable | Implication bonus + bifurcated alpha_cap | NO |
+| Not applicable | Shadow-class wind-down machine | NO |
+
+**v2.1 required invariants (20 of 31):** #2, #3, #4, #5, #7, #8, #9, #10, #11, #12, #13, #14, #15, #16, #20, #21, #23, #26, #28, #30.
+
+**Deferrable without compromising solvency mandate:** #6 (implication pre-funding), #17-#19, #22 (shadow-class/wind-down), #24-#25, #27 (archive tiers/compaction), #29 (tier objectivity), #31 (cross-class LTRP backstop), #33-#35 (from this run).
+
+**One-line v2.1 scope statement:**
+
+> GestAlt v2.1 is a solvency-bounded, credibility-weighted, CLEARING_MODE-only warranted state marketplace with a Settlement Freeze Protocol and oracle-authority/attestor duality — no implication chains, no discovery mode, no shadow-classes. Minimum 5 contracts, 20 invariants.
+
+This is a buildable, auditable, Demo-Day-defensible scope. The remaining mechanism complexity is v2.2+ institutional and multi-market expansion headroom. (#r159)
+
+---
+
+## Structural Synthesis: Mechanism Lifecycle Completeness (#r159)
+
+| Issue | Resolution | Law |
+|---|---|---|
+| `arweave_mirror_closed` acknowledgment | Mandatory co-submitted `arweave_absence_acknowledged`; retroactive on protocol upgrade | Permanent guarantee degradation requires immutable acknowledgment |
+| Tier upgrade alignment pool | N_blend_epochs = N_calibration linear interpolation; partial contribution during blend | Continuity over transition; no abrupt pool switch |
+| Stale proposal quorum bond | Full refund from governance treasury; auto-alert if bypass overuse >=3/12 epochs | Force-majeure != participant cost; governance treasury absorbs |
+| GestAlt v2.1 minimal subset | 5 contracts, 20 of 31 invariants, CLEARING_MODE only | Deferrable: implication chains, shadow-class, archive tiers, cross-class backstop |
+
+---
+
+## Cumulative Invariants (additions through #r159)
+
+**Invariant #32 (#r159):** Permanent guarantee degradation (closing Arweave retry) requires a co-submitted immutable acknowledgment record. Accountability without blockage.
+
+**Invariant #33 (#r159):** Tier transitions use N_blend_epochs = N_calibration linear interpolation. Abrupt pool switches prohibited.
+
+**Invariant #34 (#r159):** Force-majeure proposal invalidation mandates full participation bond refund from governance treasury. Good-faith participants do not bear protocol-level event costs.
+
+**Invariant #35 (#r159):** GestAlt v2.1 minimal viable scope: 5 contracts, 20 invariants, CLEARING_MODE only. Implication chains, shadow-class pattern, three-tier archive, and cross-class LTRP backstop are v2.2+ features.
+
+---
+
+## Open Questions for #r160+
+
+1. **v2.1 → v2.2 upgrade path:** When live on v2.1 (CLEARING_MODE only) and v2.2 introduces DISCOVERY_MODE shadow-classes, how does the upgrade avoid disrupting live v2.1 clearing classes? Define the upgrade state machine: new contract deployment, migration window, parameter compatibility.
+
+2. **5-contract architecture concurrency safety:** CredibilityAggregator and SettlementEngine must coordinate on S_cred at T_anchor. Define safe call-ordering invariant and whether any cross-contract atomic transaction is required for T_anchor freezing.
+
+3. **Demo Day narrative for the mechanism:** Given the v2.1 minimal scope, what is the one-paragraph investor-facing description that distinguishes GestAlt from Polymarket/Kalshi/Betfair without mechanism jargon? Communications deliverable.
+
+4. **Minimum viable challenger population for v2.1 launch:** The mechanism depends on challengers detecting wrong warranted installations. What is the minimum challenger participation threshold before the v2.1 mechanism can be considered epistemically live?
+
+*Last updated: #r159 — 2026-04-04T00:12Z*
