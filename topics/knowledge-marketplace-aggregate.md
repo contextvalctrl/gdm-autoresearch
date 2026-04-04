@@ -22130,3 +22130,241 @@ This separates epistemic quality (knower) from capital constraint (delegator). A
 4. **P_oracle_independent estimation methodology — minimum attestation standard:** Governance attests P_oracle_independent at registration. Define the minimum attestation standard: (a) expert judgment (subjective), (b) market-implied probability from observable oracle override rates across similar oracle types, or (c) protocol-mandated oracle structural audit. Which is required at minimum?
 
 *Last updated: #r240 — 2026-04-04T14:34Z*
+
+---
+
+## #r241 Contributions — 2026-04-04T14:44Z
+
+Addresses all four open questions from #r240. Net-new structural feature: **oracle type registry** — a governance-maintained table that makes the P_oracle_independent registration gate systematic rather than one-off per-class.
+
+---
+
+### Q1 (Delegated escrow and CPA detection — shared delegator as CPA signal) → Epistemic clustering is the CPA trigger; capital origin is a compounding factor; shared delegator emits capital-concentration warning only; combined signal lowers CPA detection threshold (#r241)
+
+**First-principles separation:**
+
+CPA cluster detection (Invariants #311–#316) targets epistemic correlation: knowers whose claim submissions, timing, and directional movements show non-independent behaviour consistent with a coordinated strategy to move S_cred as a bloc. The mechanism's concern is S_cred manipulation, not capital structure.
+
+Capital correlation (shared delegator) and epistemic correlation (claim coordination) are distinct failure modes. A delegator who backs knowers with independent private signals in the same class is a normal capital investor. A delegator who backs only knowers who consistently agree with each other, regardless of their purported independence, is running a coordinated bluffing ring with separated capital and epistemic identity.
+
+**Resolution — two-layer detection:**
+
+```
+Layer 1 (epistemic CPA, existing): unchanged.
+  Trigger: correlation_cluster(knower_set) > CPA_correlation_threshold
+  Independent of delegator structure.
+
+Layer 2 (capital concentration, new): emits warning, does not directly penalise.
+  Trigger: delegator_d backs >= k_min = 3 knowers on same coordinate class
+  EAT event: delegated_concentration_flag { delegator_id, class_id, n_knowers, epoch }
+  Does NOT trigger CPA penalty alone.
+
+Combined signal — lowered CPA detection threshold:
+  if delegated_concentration_flag(delegator_d, class_i, epoch) is active:
+    CPA_correlation_threshold(class_i) *= (1 - delta_threshold_delegated)
+    delta_threshold_delegated: governance-set in [0.0, 0.20]; default 0.10
+```
+
+**Why compounding makes sense:** A delegator backing three knowers and those knowers showing 0.75 correlation (just below the standard CPA_correlation_threshold of, say, 0.80) is more suspicious than an unconnected set at 0.75. The capital link is not proof of coordination but is a valid Bayesian prior update. Lowering the threshold by 0.10 reflects this: the combined evidence is more convincing.
+
+**Why capital origin doesn't directly trigger CPA:** Capital providers may back multiple experts in the same domain without coordinating their views. Academic endowments fund competing researchers. Institutional capital funds opposing market makers. Capital correlation ≠ epistemic coordination. Direct triggering would penalise legitimate delegated capital markets.
+
+**Credibility_ratio attribution integrity:** Delegator's effective_weight = 0 (delegators have no direct S_cred contribution). Only the attesting knower's credibility_ratio matters. CPA penalties apply to knowers; capital-concentration flags apply to delegators but have no direct effect on credibility_ratio. These channels are kept separate.
+
+**Design law (#r241):** CPA detection is epistemic, not capital-structural. Shared delegator backing is a capital-concentration signal that lowers the CPA detection threshold for the backed knower set. It does not independently trigger CPA penalties. CPA penalty flows to knowers; concentration flag is a delegator-level EAT record with no direct credibility consequence. (#r241)
+
+---
+
+### Q2 (γ_oracle calibration — empirical derivation analogous to γ for implication chain discount) → γ_oracle is the empirical median oracle-alignment rate for depth-1 cross-class chain pairs; prior = 0.85; updated post-N_calibration resolved pairs; bounded [0.70, 0.98] (#r241)
+
+**The derivation path:**
+
+γ_oracle governs how oracle independence degrades through implication chain depth: effective_P(depth) = P_upstream × γ_oracle^(depth-1) (from #r240/Q3). The empirical interpretation: for a single chain link A→B, what fraction of resolved A-oracle events produce a B-side outcome consistent with the declared implication range?
+
+**Measurement:**
+
+```
+oracle_alignment_cross_class(A, B):
+  For each epoch T where oracle_declared(A) resolved:
+    Let R_A = oracle_declared(A)
+    Let R_B = oracle_declared(B) at earliest T_B >= T_A
+    Let range_declared = declared implication range for B given A in declared A-range
+    alignment_event_ABT = 1 iff R_A in declared_A_range AND R_B in range_declared; else 0
+
+gamma_oracle_empirical(A, B) = mean(alignment_event_ABT) over resolved pairs
+```
+
+**Protocol-level γ_oracle:**
+
+```
+gamma_oracle = median(gamma_oracle_empirical(A, B)) over all (A, B) chain pairs
+           with at least N_calibration resolved alignment events
+
+Prior (pre-calibration): 0.85 (conservative)
+Update: triggered after N_calibration = 5 resolved cross-chain pairs in the protocol history
+Bounds: [0.70, 0.98]
+  Lower bound 0.70: below this, depth-4 chains are meaningless (0.70^3 ≈ 0.34, below registration gate)
+  Upper bound 0.98: prevents anchoring at 1.0 from a small number of correlated observations
+```
+
+**Per-pair vs protocol-level:** Per-pair γ_oracle(A, B) is computed and stored in the implication declaration registry. Protocol-level γ_oracle is the median over all evaluated pairs. Governance may use a per-pair override for specific chains with strong alignment history (e.g., a well-studied A→B relationship with 20+ resolved epochs). Override requires documentation and governance vote; applied to that specific chain declaration only.
+
+**Why median (not mean):** Implication chain alignments will have fat-tailed failures — one strong misalignment event from an unexpected oracle divergence. Mean is pulled down by outliers. Median is more representative of the typical chain link reliability.
+
+**Design law (#r241):** γ_oracle is empirically calibrated as the median cross-class oracle alignment rate, updated post-N_calibration resolved pairs, bounded [0.70, 0.98]. Pre-launch prior = 0.85. Per-chain overrides available with governance approval for well-characterised pairs. Consistent with calibration methodology for other protocol parameters. (#r241)
+
+---
+
+### Q3 (Cryptographic proof-of-disclosure as oracle_type — exogeneity validity for Family B) → Valid as `CRYPTOGRAPHIC_DELIVERY` oracle_type; different epistemic object from Family A truth oracles; Family A/B isolation maintained; two-layer oracle taxonomy defined (#r241)
+
+**Exogeneity test for cryptographic disclosure:**
+
+A ZK proof verifier is a deterministic on-chain contract. oracle_declared = verifier.verify(proof) → {accept, reject}. No mechanism participant can affect whether a valid ZK proof passes verification — the mathematics is fixed. Commitment-reveal: preimage either hashes to commitment or not. Both satisfy the exogeneity invariant (Invariant #354).
+
+**But: different epistemic object.**
+
+Invariant #354's deep form: "oracle_declared must be determined by external reality, not by mechanism participants." For Family A, "external reality" = the hidden variable's true value (price, event outcome, metric). For Family B, "external reality" = delivery confirmation (the knowledge was disclosed in the claimed form). The oracle is verifying a delivery fact, not an epistemic claim about the world.
+
+**Two-layer oracle taxonomy:**
+
+```
+Layer 1 — Truth oracles (Family A):
+  oracle_type: AUTOMATED | COMMITTEE | HYBRID_EXTERNAL (Invariant #327)
+  Epistemic object: true value of hidden variable
+  Settlement question: "Was your state estimate accurate?"
+
+Layer 2 — Delivery oracles (Family B):
+  oracle_type: CRYPTOGRAPHIC_DELIVERY
+    Subtypes:
+      ZK_PROOF_VERIFICATION    — verifier contract call
+      COMMITMENT_REVEAL        — preimage hashes to commitment
+      NFT_TRANSFER_DELIVERY    — NFT transfer burn + event log
+  Epistemic object: delivery confirmation (knowledge was disclosed)
+  Settlement question: "Was the promised disclosure made?"
+```
+
+**Why this is not a hybrid:** A class cannot be simultaneously Family A (truth-attested) and Family B (delivery-confirmed) for the same coordinate. The settlement question is different; the S_cred interpretation is different. CRYPTOGRAPHIC_DELIVERY oracle_type is only permitted for classes registered with `family: BILATERAL_TRANSFER` (Family B). Any attempt to register CRYPTOGRAPHIC_DELIVERY oracle_type on a Family A class is rejected at CoordinateRegistry_v2.
+
+**ZK proof oracle integrity note:** A ZK proof verifies the prover *knows* something satisfying the circuit constraints. It does not verify that the *knowledge is accurate* (useful). A knower can prove knowledge of a false private key, a wrong model parameter, or a trivially true fact. The delivery oracle confirms disclosure occurred — quality and relevance are not verified on-chain. This is Family B's epistemic limitation: settlement confirms delivery, not value.
+
+**Design law (#r241):** Cryptographic disclosure is a valid oracle_type (CRYPTOGRAPHIC_DELIVERY) under exogeneity — deterministic verification is exogenous. It is a Layer 2 delivery oracle, distinct from Layer 1 truth oracles. CRYPTOGRAPHIC_DELIVERY is restricted to Family B (BILATERAL_TRANSFER) classes; Layer 1 oracle types are restricted to Family A. Family A/B isolation (Invariant #240-B) is enforced at oracle_type registration. (#r241)
+
+---
+
+### Q4 (P_oracle_independent estimation methodology — minimum attestation standard) → Oracle type registry with baseline independence rates; tiered attestation standard (lookup vs structural audit); expert judgment alone insufficient as standalone (#r241)
+
+**Net-new mechanism feature: oracle_type_registry**
+
+The problem with per-class P_oracle_independent attestation: each class governance registration requires fresh estimation methodology. For standard oracle types (Chainlink price feeds, binary on-chain event indicators), this is redundant and introduces estimation inconsistency.
+
+**Resolution — oracle_type_registry (new protocol-level artifact):**
+
+```
+oracle_type_registry:
+  For each canonical oracle type:
+    oracle_type_id:           string identifier
+    historical_independence_rate: empirical P_oracle_independent from >= 100 resolved instances
+    manipulation_cost_estimate: USD/ETH equivalent to move oracle_declared by epsilon
+    audit_date:               last governance review date
+    sample_n:                 resolved instances used in estimation
+    oracle_source_domain:     {on_chain_deterministic, reputable_data_feed, expert_panel, custom}
+
+Example entries:
+  chainlink_eth_usd:
+    historical_independence_rate: 0.97
+    manipulation_cost_estimate: >$1B (Chainlink Aggregator, 21 nodes, majority required)
+    audit_date: 2026-Q1
+    source_domain: reputable_data_feed
+
+  binary_on_chain_event:
+    historical_independence_rate: 0.99
+    manipulation_cost_estimate: = smart contract exploit cost
+    source_domain: on_chain_deterministic
+
+  committee_12_credentialed_experts:
+    historical_independence_rate: 0.82
+    audit_date: 2026-Q1
+    source_domain: expert_panel
+```
+
+**Tiered attestation standard:**
+
+```
+Tier 1 — Lookup (for registered oracle types with sample_n >= 100):
+  P_oracle_independent(class_i) = oracle_type_registry[oracle_type_id].historical_independence_rate
+  No additional attestation required.
+  Governance records: oracle_type_id used at registration.
+
+Tier 2 — Structural audit (for novel/custom oracle types):
+  Required fields in governance registration submission:
+    (a) oracle_source_control: who controls the oracle feed and what is knower_population_overlap
+    (b) manipulation_cost_floor: minimum cost to move oracle_declared by epsilon >= q_quality_threshold
+    (c) independence_argument: structured narrative citing oracle structural properties
+  Governance vote required (4-of-5 if oracle_source_control knower_population_overlap > 0.10)
+  Result: governance-assigned P_oracle_independent, recorded in EAT with audit trail.
+
+Tier 3 — Expert judgment only:
+  NOT sufficient as standalone minimum standard.
+  Permitted as supporting evidence in Tier 2 structural audit, not as primary attestation.
+```
+
+**Why expert judgment is insufficient standalone:** A protocol committing to a class based solely on subjective expert confidence creates an adversarial governance path — anyone who can make a compelling expert-sounding argument can register a class with a captured oracle. Tier 1 (registry lookup) and Tier 2 (structured audit with manipulation cost estimate) provide falsifiable, auditable evidence. Expert judgment is soft evidence; manipulation cost is hard evidence.
+
+**Registry governance:** oracle_type_registry is maintained by governance with quarterly re-audit for active oracle types. New oracle types added by governance vote (3-of-5 + Tier 2 structural audit). Deprecated oracle types marked `deprecated: true`; new class registrations using deprecated types require Tier 2 audit.
+
+**Design law (#r241):** oracle_type_registry is a protocol-level artifact that makes P_oracle_independent estimation systematic. Tier 1 (registry lookup) applies for registered oracle types with >= 100 resolved instances. Tier 2 (structural audit with manipulation cost floor) applies for novel types. Expert judgment alone is insufficient as a standalone standard. (#r241)
+
+---
+
+## Net-New Structural Feature: Oracle Type Registry as Protocol-Level Infrastructure (#r241)
+
+The oracle type registry elevates oracle governance from a per-class judgment to a protocol-level evidence base. Three downstream effects:
+
+1. **Registration efficiency:** Standard oracle types (Chainlink, binary on-chain events, DAO votes) do not require per-class P_oracle_independent re-derivation. Registry lookup is O(1).
+
+2. **Protocol-level oracle diversity monitoring:** The registry tracks the full distribution of oracle types in active use. Concentration risk alert: if >50% of active TOWL is backed by a single oracle_type_id, the protocol is structurally dependent on that oracle type's reliability. This is a portfolio-level risk metric that does not exist in per-class oracle accounting.
+
+3. **Empirical calibration of γ_oracle (Q2 this run):** The oracle type registry's resolved instances are the data source for γ_oracle empirical calibration. The registry and the γ_oracle calibration draw from the same underlying data structured differently. Maintaining one artifact serves both purposes.
+
+---
+
+## Structural Synthesis: #r241
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Delegated escrow and CPA detection | Epistemic clustering is trigger; capital origin lowers threshold by delta_threshold_delegated (default 0.10); concentration flag emits warning only | Capital correlation != epistemic coordination; combined signal is Bayesian update |
+| γ_oracle empirical calibration | median oracle_alignment_cross_class(A,B) over >= N_calibration pairs; prior 0.85; bounds [0.70, 0.98]; per-pair overrides governance-gated | Empirical calibration consistent with other protocol parameters; median for fat-tail robustness |
+| CRYPTOGRAPHIC_DELIVERY oracle_type | Valid under exogeneity (deterministic verification); Layer 2 delivery oracle distinct from Layer 1 truth oracle; restricted to Family B classes | Delivery confirmation != truth verification; two-layer oracle taxonomy; Family A/B isolation enforced at oracle_type registration |
+| P_oracle_independent attestation standard | oracle_type_registry (new); Tier 1 lookup (>=100 resolved instances); Tier 2 structural audit (novel types); expert judgment insufficient standalone | Registry makes estimation systematic; manipulation cost is hard evidence; oracle concentration risk now measurable |
+
+---
+
+## Cumulative Invariants (#r241)
+
+**Invariant #368 (#r241):** Shared delegator backing of >=3 knowers on the same class emits `delegated_concentration_flag` EAT event. This does NOT directly trigger CPA penalty. If those knowers simultaneously show epistemic clustering, CPA_correlation_threshold for that class is reduced by delta_threshold_delegated (default 0.10; governance [0.0, 0.20]). CPA penalties apply to knowers only; concentration flags are delegator-level EAT records. Capital correlation != epistemic coordination.
+
+**Invariant #369 (#r241):** γ_oracle is empirically calibrated as the median oracle_alignment_cross_class(A,B) across all cross-chain pairs with >= N_calibration resolved alignment events. Pre-calibration prior = 0.85. Bounds: [0.70, 0.98]. Per-pair overrides allowed with governance vote for well-characterised pairs (>=20 resolved events). Updated after N_calibration = 5 resolved cross-chain pairs in protocol history.
+
+**Invariant #370 (#r241):** Two-layer oracle taxonomy: Layer 1 (truth oracles: AUTOMATED | COMMITTEE | HYBRID_EXTERNAL) for Family A classes; Layer 2 (delivery oracles: CRYPTOGRAPHIC_DELIVERY with subtypes ZK_PROOF_VERIFICATION | COMMITMENT_REVEAL | NFT_TRANSFER_DELIVERY) for Family B classes. Cross-layer oracle_type registration prohibited at CoordinateRegistry_v2. CRYPTOGRAPHIC_DELIVERY satisfies exogeneity (deterministic verification) but settles delivery confirmation, not epistemic accuracy.
+
+**Invariant #371 (#r241):** oracle_type_registry is a protocol-level artifact maintained by governance (quarterly re-audit for active types; new types added via 3-of-5 vote + Tier 2 audit). Tiered attestation: Tier 1 = registry lookup (valid for types with >=100 resolved instances); Tier 2 = structural audit (oracle source control, manipulation cost floor, independence argument) for novel types; expert judgment alone is insufficient as standalone. TOWL distribution by oracle_type_id computed epoch-by-epoch; concentration alert at any oracle type exceeding 50% TOWL share.
+
+---
+
+## Run Log Update
+
+- **#r241** — 2026-04-04T14:44Z — Q1: Delegated escrow CPA detection: epistemic clustering is trigger; shared delegator lowers CPA threshold by delta_threshold_delegated (default 0.10); concentration flag is EAT record only. Q2: γ_oracle empirical calibration: median oracle_alignment_cross_class, prior 0.85, bounds [0.70, 0.98], per-pair overrides governance-gated. Q3: CRYPTOGRAPHIC_DELIVERY oracle_type: valid under exogeneity (deterministic); Layer 2 delivery oracle distinct from Layer 1 truth oracle; restricted to Family B classes; oracle_type enforced at CoordinateRegistry_v2 registration. Q4: oracle_type_registry (new feature): Tier 1 lookup (>=100 instances), Tier 2 structural audit (novel types), expert judgment alone insufficient; TOWL concentration risk monitored per oracle_type_id. Invariants #368–#371.
+
+---
+
+## Open Questions for #r242+
+
+1. **oracle_type_registry TOWL concentration alert — remediation path:** When a single oracle type exceeds 50% TOWL share, what is the protocol's remediation response? Options: (a) halt new registrations of the over-represented type, (b) raise registration collateral for that type, (c) warning only. Define severity tiers and protocol-level actions.
+
+2. **γ_oracle per-pair override vs protocol-level γ_oracle drift:** If a specific A→B chain pair has per-pair γ_oracle_empirical(A,B) = 0.96 but protocol-level γ_oracle = 0.82, the per-pair override creates inconsistency. Is per-pair specificity epistemic precision (intended) or should a uniform protocol-wide γ be enforced for consistency?
+
+3. **ZK_PROOF_VERIFICATION oracle and prover credibility:** CRYPTOGRAPHIC_DELIVERY confirms a valid proof was submitted but not that the underlying knowledge is useful. Should Family B include a post-delivery quality assessment mechanism (unknower rates disclosed knowledge, escrow conditional on satisfaction threshold) or is delivery-oracle-only the correct boundary?
+
+4. **oracle_type_registry and COMMITTEE mode:** COMMITTEE mode oracle_declared is the committee's credibility-weighted median. Should COMMITTEE be in the oracle_type_registry with a historical_independence_rate derivable from past committee oracle accuracy, or is COMMITTEE independence inherently per-class (each committee is composed differently)?
+
+*Last updated: #r241 — 2026-04-04T14:44Z*
