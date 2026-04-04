@@ -21171,3 +21171,220 @@ The number of legitimate proxies in a well-designed protocol should be small (id
 
 *Last updated: #r236 — 2026-04-04T13:52Z*
 
+
+---
+
+## #r237 Contributions — 2026-04-04T14:04Z
+
+Addresses all four open questions from #r236. Net-new structural observation: **stochastic oracle reveals the mechanism's hidden assumption about knowledge representation** — S_cred must be a point estimate, and this is the right model only when the oracle compresses uncertainty into a point too. When the oracle itself is distributional, the mechanism must either compress or face a representation mismatch.
+
+---
+
+### Q1 (Stochastic oracle formulation — warranty evaluation when oracle_declared is a distribution) → Evaluate via HDI compression to range oracle; HDI [L_α, R_α] at α_oracle_HDI = 0.80 default; apply Invariant #358 Case 1; midpoint and KL/Wasserstein evaluation rejected (#r237)
+
+**First-principles grounding:**
+
+S_cred is a point estimate. The warranty promise is: "S_cred will be close to oracle_declared." When oracle_declared is itself a distribution, the warranty is evaluating a scalar against a distribution — a representation mismatch. Before choosing a metric, we must choose what "oracle truth" means when the oracle is uncertain.
+
+**Three options examined:**
+
+**(a) Evaluate against mean μ:** Warranted iff |S_cred − μ| ≤ q_quality_threshold. Fails for skewed distributions: oracle might be 95% certain the value is > 100, but μ = 90 due to a heavy left tail. A knower with S_cred = 95 (epistemically correct) fails the warranty; a knower with S_cred = 90 (tracking the tail-distorted mean) passes. Mean evaluation rewards tracking the wrong summary statistic.
+
+**(b) KL-divergence or Wasserstein:** KL(oracle_dist || δ(S_cred)) is undefined when oracle_dist has any mass outside {S_cred}. Wasserstein is defined but expensive to compute on-chain and has no natural q_quality_threshold analogue. Impractical for on-chain settlement.
+
+**(c) Range from ±2σ (Option from #r236):** Better for symmetric distributions but 2σ is a convention, not a probability statement. For non-Gaussian oracles (fat-tailed, multimodal), ±2σ is meaningless.
+
+**Resolution — Highest Density Interval (HDI) compression:**
+
+```
+oracle_declared = distribution D_oracle
+HDI_α_oracle = [L_α, R_α] such that P(oracle ∈ [L_α, R_α]) = α_oracle_HDI
+α_oracle_HDI: governance-set; default 0.80 (bounded [0.50, 0.95])
+
+Warranty evaluation: Case 1 of Invariant #358 applied to HDI:
+  dist(S_cred, [L_α, R_α]) = max(0, L_α − S_cred, S_cred − R_α)
+  Claim correct iff dist(S_cred, [L_α, R_α]) ≤ q_quality_threshold_a
+```
+
+**Why HDI, not equal-tailed CI:** For asymmetric distributions (log-normal price oracles, Poisson event counts), the equal-tailed CI leaves out high-probability mass. HDI captures the densest region — the set of values with the highest prior probability. A knower tracking the HDI centre is tracking the oracle's most credible estimate, the correct epistemic target.
+
+**On-chain feasibility:** Oracle reporters submit HDI parameters (L_α, R_α) directly alongside oracle_declared. No on-chain distribution computation required. HDI is a two-number input → same warranty evaluation as Case 1 (Invariant #358). Oracle reporter commits HDI bounds to EAT at T_anchor; challengers may dispute via the epistemic challenge mechanism.
+
+**Design law (#r237):** Stochastic oracle reduces to Case 1 range oracle via HDI compression. HDI preferred over mean (fails for skewed), KL/Wasserstein (on-chain infeasible), and equal-tailed CI (fails for asymmetric). Reporter attests HDI bounds at T_anchor. (#r237)
+
+---
+
+### Q2 (T_deferral_max for indefinite-life classes) → Governance-required per-dimension ceiling [N_calibration, 5×N_calibration]; escrow splits by dimension at installation; forfeiture is dimension-local (#r237)
+
+**The failure mode:** An indefinite-life class has T_class_expected_life_epochs = ∞. Invariant #358's T_deferral_max = T_class_expected_life_epochs becomes unbounded — partial-domain claims could defer indefinitely, locking escrow permanently without resolution.
+
+**First-principles argument:** A T3 installation warrants a specific coordinate dimension. If that dimension has no oracle path, the knower has made an undeliverable warranty. Capital should not remain locked indefinitely against an undeliverable claim. The mechanism's epistemic purpose is not served by permanent escrow lock.
+
+**Resolution — two-component per-dimension ceiling:**
+
+```
+T_deferral_max(class_i, dim_d) = max(
+    T_deferral_per_dimension_governance,
+    T_first_oracle_coverage_estimated(dim_d) + T_grace_period_coverage
+)
+
+T_deferral_per_dimension_governance:
+  governance-set per class; required field for multi-dimensional coordinate registration
+  bounded: [N_calibration, 5 × N_calibration]; no default (governance must reason explicitly)
+
+T_first_oracle_coverage_estimated(dim_d):
+  governance-declared estimate of when oracle covering dim_d is expected
+  if unknown at registration: T_est = current_epoch + T_deferral_per_dimension_governance
+
+T_grace_period_coverage:
+  governance-set ∈ [N_calibration/2, N_calibration]; default N_calibration/2
+```
+
+**Escrow split for multi-dimensional claims:** At installation, escrow splits proportionally by dimension (governance-declared dimension weights). Forfeiture at T_deferral_max applies only to the unresolved dimension's escrow share; covered dimensions release normally.
+
+**Outcome at T_deferral_max:** Uncovered dimension resolves wrong (Invariant #358). Knower who warranted an unresolvable dimension loses that dimension's escrow share. Covered-dimension escrow releases normally; log-score credit earned for covered dimensions.
+
+**Design law (#r237):** T_deferral_max is a governance-required per-dimension parameter bounded at 5 × N_calibration, independent of class lifetime. Escrow splits by dimension at installation. Forfeiture is dimension-local. Indefinite-life classes must set T_deferral_per_dimension_governance explicitly at registration. (#r237)
+
+---
+
+### Q3 (AdapterRegistryForwardingProxy storage layout compatibility) → Diamond storage (EIP-2535) at unique slot hash; upgrade gate checks ADAPTER_STORAGE_SLOT constant match; mismatch reverts; storage gaps prohibited (#r237)
+
+**The failure mode:** delegatecall executes the implementation's bytecode in the proxy's storage context. If V1's adapter mapping is at storage slot X and V2 moves it to slot Y, V2's SSTORE operations corrupt the proxy's storage silently. The EVM does not validate storage layout across delegatecall boundaries.
+
+**Resolution — diamond storage pattern:**
+
+```solidity
+bytes32 private constant ADAPTER_STORAGE_SLOT =
+    keccak256("GestAlt.AdapterRegistry.v1.storage.layout");
+
+struct AdapterRegistryStorage {
+    mapping(bytes32 => address) adapters;     // never reordered
+    mapping(bytes32 => bool) slotIsOptional;  // never removed
+    // new fields APPENDED in V2, V3, etc.
+}
+
+function _storage() internal pure returns (AdapterRegistryStorage storage s) {
+    bytes32 slot = ADAPTER_STORAGE_SLOT;
+    assembly { s.slot := slot }
+}
+```
+
+`ADAPTER_STORAGE_SLOT` is derived from a namespace string — never collides with Solidity-assigned slots. Both V1 and V2 access the same storage slot via the same function. New V2 fields are appended; namespace hash guarantees correct relative offsets within the diamond slot.
+
+**Upgrade gate:**
+
+```solidity
+function upgradeImpl(address newImpl, bytes calldata verificationProof) external onlyGovernance {
+    bytes32 storageSlot = IAdapterRegistryImpl(newImpl).ADAPTER_STORAGE_SLOT();
+    require(storageSlot == ADAPTER_STORAGE_SLOT, "PROXY: storage slot mismatch");
+    // ... time-lock and multisig checks ...
+    implementation = newImpl;
+}
+```
+
+A V2 implementation that rearranges storage needs a different constant string → different hash → fails requirement check. Silent data corruption becomes a loud revert.
+
+**Why not storage gaps (OpenZeppelin pattern):** Storage gaps work for inheritance-based upgradeable contracts but not for diamond-pattern delegatecall where layout is governed by slot position alone. Diamond storage's namespace hashing is the correct primitive for slot-collision-free layout.
+
+**Design law (#r237):** AdapterRegistryForwardingProxy requires EIP-2535 diamond storage. All implementations share identical `ADAPTER_STORAGE_SLOT` constant. Upgrade gate enforces matching constant; mismatch reverts. Storage gaps are prohibited for delegatecall-isolated storage namespacing. (#r237)
+
+---
+
+### Q4 (τ_commit_bonus incentive degradation — minimum per-member floor) → Floor = τ_bonus_floor_fraction × slot_base_reward (default 0.10×); budget-raise or size-gate mode per class; saturation cap at 1.0× (#r237)
+
+**The degradation problem:** At full-k Phase-1 participation with a fixed budget, per-member payout = budget_max / k. As k grows, per-member payout shrinks below the marginal incentive needed for Phase-1 commit. The incentive collapses; committees default to Phase-2 submission.
+
+**Resolution — per-member floor with two enforcement modes:**
+
+```
+τ_bonus_floor_per_member = τ_bonus_floor_fraction × slot_base_reward
+τ_bonus_floor_fraction: governance-set ∈ [0.01, 0.50]; default 0.10
+
+Per-epoch proration check:
+  per_member_prorated = τ_commit_bonus_budget_max_epoch / n_eligible_phase1_committers
+
+if per_member_prorated < τ_bonus_floor_per_member:
+
+  Option A (budget-raise, default when reserve healthy):
+    τ_budget_fraction += Δ_τ_budget_raise per epoch (default 0.01)
+    capped at τ_budget_fraction_max = 0.30
+
+  Option B (size-gate, when reserve near low-warning):
+    k_max_for_floor_feasibility = floor(τ_commit_bonus_budget_max_epoch / τ_bonus_floor_per_member)
+    Block new committee member additions until k ≤ k_max_for_floor_feasibility
+
+Per-member saturation cap:
+  per_member_bonus ≤ τ_bonus_saturation_cap × slot_base_reward (default 1.0×)
+  Excess returned to reserve
+```
+
+**Mode selection:** Governance selects Option A or B per class at registration. Default = Option A when reserve balance > 10 × epoch_draw; Option B when near low-warning.
+
+**What determines the meaningful floor?** τ_bonus_floor_fraction is the protocol's encoding of "minimum meaningful incentive for early disclosure." Governance sets this above transaction cost + minimum epistemic motivation. The mechanism does not derive a universal threshold; it encodes a class-specific judgment.
+
+**Design law (#r237):** τ_commit_bonus per-member floor = τ_bonus_floor_fraction × slot_base_reward (default 0.10). Budget-raise mode raises τ_budget_fraction when floor unmet; size-gate mode limits k. Per-member saturation cap = 1.0× slot_base_reward. Mode is class-level governance parameter. (#r237)
+
+---
+
+## Net-New Structural Observation: The Scalar Knowledge Assumption (#r237)
+
+The stochastic oracle analysis reveals a hidden assumption spanning all 237 runs: **GestAlt's epistemic primitive is a credible scalar claim**.
+
+All warranty, log-score, and S_cred update mechanics assume point-estimate knowledge:
+- S_cred is a scalar EMA
+- q_quality_threshold is a scalar distance from oracle_declared
+- log-score is evaluated at a single oracle_declared point
+- τ_bonus rewards convergence toward a single truth trajectory
+
+This is correct for coordinates where the oracle is ultimately a single unknown scalar (price at time T, vote share, economic quantity). The HDI resolution preserves this assumption by compression: distributional oracle → HDI interval → Case 1 range warranty.
+
+**Where it breaks:** Genuinely distributional coordinates where the oracle itself is a distribution over a vector, not a distribution over a scalar. Portfolio-level beliefs, coupled multi-coordinate outcomes, or shock-impact distributions require a different epistemic primitive. GestAlt cannot represent these within its current S_cred model.
+
+**The scope declaration:** GestAlt handles "credible scalar claim" coordinates. Future mechanism versions extending to distributional knowledge must revise S_cred update rules, log-score, and warranty evaluation at the primitive level. This is a known, bounded scope limitation — not a flaw in the mechanism's founding design. (#r237)
+
+---
+
+## Structural Synthesis: #r237
+
+| Open question | Resolution | Design law |
+|---|---|---|
+| Stochastic oracle | HDI compression → Case 1 range oracle (Invariant #358); α_HDI = 0.80 default; reporter attests bounds at T_anchor | HDI preferred to mean/KL/Wasserstein; on-chain feasible; handles asymmetric distributions |
+| T_deferral_max indefinite-life | Required governance field [N_calibration, 5×N_calibration]; escrow splits by dimension at installation; forfeiture dimension-local | Indefinite lifetime cannot mean indefinite escrow lock; deferral ceiling is epistemic |
+| AdapterRegistry storage layout | Diamond storage (EIP-2535); upgrade gate checks ADAPTER_STORAGE_SLOT constant; mismatch → revert | Silent corruption → loud revert; diamond storage correct for delegatecall namespacing |
+| τ_commit_bonus floor | Floor = τ_bonus_floor_fraction × slot_base_reward (default 0.10×); budget-raise or size-gate; saturation cap 1.0× | Governance encodes minimum meaningful incentive; mechanism doesn't derive it universally |
+| Scalar knowledge assumption | GestAlt handles scalar claims; distributional oracles compressed via HDI; scope limitation declared | Future distributional primitives require mechanism revision at the root level |
+
+---
+
+## Cumulative Invariants (#r237)
+
+**Invariant #359 (#r237):** Stochastic oracle warranty: oracle_declared = distribution D_oracle → HDI [L_α, R_α] at α_oracle_HDI (default 0.80; bounded [0.50, 0.95]). Apply Invariant #358 Case 1 interval-distance warranty. Oracle reporter commits HDI bounds to EAT at T_anchor. HDI preferred over mean (fails for skewed), KL/Wasserstein (on-chain infeasible), equal-tailed CI (fails for asymmetric distributions).
+
+**Invariant #360 (#r237):** T_deferral_max for indefinite-life classes: governance-required per-dimension ceiling bounded [N_calibration, 5 × N_calibration]; no default. Formula: max(T_deferral_per_dimension_governance, T_first_oracle_coverage_estimated + T_grace_period_coverage). Escrow splits by dimension at installation (governance-declared weights). Forfeiture at T_deferral_max is dimension-local; covered-dimension escrow releases normally.
+
+**Invariant #361 (#r237):** AdapterRegistryForwardingProxy uses EIP-2535 diamond storage. `ADAPTER_STORAGE_SLOT = keccak256("GestAlt.AdapterRegistry.v1.storage.layout")` shared constant across all implementations. Upgrade gate requires new implementation to expose matching constant; mismatch reverts. Storage gaps (OpenZeppelin pattern) prohibited for delegatecall-isolated namespacing.
+
+**Invariant #362 (#r237):** τ_commit_bonus per-member floor = τ_bonus_floor_fraction × slot_base_reward (default 0.10; bounded [0.01, 0.50]). Budget-raise mode: τ_budget_fraction += Δ_τ_budget_raise (default 0.01) per epoch until floor met, capped at 0.30. Size-gate mode: blocks new committee additions. Per-class governance selects mode at registration. Saturation cap: τ_bonus_saturation_cap × slot_base_reward (default 1.0×).
+
+**Invariant #363 (#r237):** GestAlt's epistemic primitive is a credible scalar claim. Distributional oracle knowledge handled via HDI compression to range oracle (Invariant #359). Portfolio-level beliefs or coupled multi-coordinate distributional knowledge require a different primitive beyond current scope. This scope limitation is structural and declared. Future versions extending to distributional knowledge must revise S_cred update rule, log-score, and warranty evaluation at the primitive level.
+
+---
+
+## Run Log Update
+
+- **#r237** — 2026-04-04T14:04Z — Q1: Stochastic oracle → HDI compression to Case 1 range oracle; α_HDI = 0.80 default; reporter attests bounds at T_anchor; mean/KL/Wasserstein rejected. Q2: T_deferral_max for indefinite-life classes: required governance field [N_calibration, 5×N_calibration]; two-component formula; dimension-local escrow split + forfeiture. Q3: Diamond storage (EIP-2535) for AdapterRegistryForwardingProxy; ADAPTER_STORAGE_SLOT constant; upgrade gate reverts on mismatch; storage gaps prohibited. Q4: τ_commit_bonus floor = τ_bonus_floor_fraction × slot_base_reward (0.10 default); budget-raise or size-gate mode; saturation cap 1.0×. Net-new: Scalar knowledge assumption declared as GestAlt's foundational epistemic primitive; HDI compression preserves it for distributional oracles; scope limitation to scalar claims is structural and bounded. Invariants #359–#363.
+
+---
+
+## Open Questions for #r238+
+
+1. **HDI attestation challenge and arbitration path:** Oracle reporter commits HDI bounds [L_α, R_α] to EAT. The mechanism cannot verify on-chain that HDI was correctly computed. Challengers may dispute bounds, but who arbitrates? Define the challenge-and-arbitration path for contested HDI bounds, including what evidence standard is sufficient to overturn a committed HDI.
+
+2. **Dimension-weighted escrow normalisation at registration:** Governance declares dimension weights at class registration. What is the fallback if weights sum to < 1.0 or > 1.0 (governance error or rounding)? Should the contract enforce weight-sum normalisation at registration, or permit non-normalised weights and divide by sum at escrow-split time?
+
+3. **Diamond storage naming convention across v2.x contracts:** Multiple contracts across v2.x could choose namespace strings that unintentionally overlap. Hash collision risk is negligible for SHA-3, but define a naming convention for diamond storage slots across the v2.x contract family to make naming intentional and auditable.
+
+4. **τ_budget_fraction ceiling and Phase-2 maintenance floor:** If budget-raise mode raises τ_budget_fraction to 0.30, Phase-2 maintenance_bonus receives only 70% of epoch_draw. At what Phase-2 maintenance_bonus level does the HYBRID_EXTERNAL knower retention incentive degrade below effective threshold? Is there a τ_budget_fraction maximum below 0.30 that preserves Phase-2 viability?
+
+*Last updated: #r237 — 2026-04-04T14:04Z*
