@@ -5915,3 +5915,296 @@ The adversary cannot insert a T epoch S_cred update to influence the T-1 epoch s
 4. **Complete adversarial stress-test declaration:** After nine attack families (A1–A9) evaluated across #r163–#r165, are there additional novel attack classes specific to the v2.1 5-contract architecture that remain unevaluated? Candidate: (a) economic denial-of-service via micro-spam claims consuming CoordinateRegistry gas; (b) S_cred poisoning via deliberate wrong claims timed to inflate targeted knowers' credibility_ratio via the loser pool redirect; (c) SettlementEngine re-entrancy beyond the call-ordering invariant specified in #r160/Q2.
 
 *Last updated: #r165 — 2026-04-04T01:12Z*
+
+---
+
+## #r166 Contributions — 2026-04-04T01:22Z
+
+**Phase: Adversarial stress-testing continued. Addresses all four open questions from #r165, plus three additional attack families (A10–A12) to complete the v2.1 adversarial coverage map.**
+
+---
+
+**Q1 (Cluster cap × TOWL — epistemic vs financial treatment) → TOWL counts per-member escrow independently; W_max cap applies only to epistemic S_cred weight (#r166):**
+
+The W_max cap on confirmed clusters (#r165/Q1) is an *epistemic* constraint: the cluster's combined influence on S_cred is capped at single-entity W_max. TOWL is a *financial* constraint: each member's escrow independently backs their warranty obligations. These are orthogonal channels (Invariant #3).
+
+**Incorrect conflation:** If TOWL also capped at single-entity W_max × stake for a cluster, members with valid escrow would not count toward TOWL capacity despite having real capital at risk. This would artificially reduce Zone A headroom and trigger spurious Zone C events — a solvency signal based on epistemic governance policy, not financial reality.
+
+**Resolution:**
+
+```
+For governance-confirmed cluster {a_1, ..., a_K}:
+  S_cred_contribution = min(W_max, Σ_k w_a_k)          // epistemic cap
+  TOWL_contribution   = Σ_k (escrow_k × tier_weight_k)  // per-member, independent, uncapped
+```
+
+TOWL counts full per-member escrow. The epistemic W_max cap does not reduce TOWL. This is consistent with: (a) Invariant #3 (TOWL/credibility_ratio orthogonality); (b) the bounded-liability architecture (#r130) which depends on accurate per-member escrow accounting; (c) the Zone C gating framework which reads TOWL directly.
+
+**Edge case — single-member cluster:** A cluster of K=1 (governance flags a solo address as a cluster for tracking purposes) behaves identically to a normal W_max-capped address. The cluster machinery adds no additional constraint; governance may use it for observation only.
+
+**Design law confirmed (#r166):** Financial and epistemic constraints must never be applied to the same variable at the same time from different governance contexts. Cluster W_max caps are epistemic-channel-only. TOWL remains financial-channel-only. (#r166)
+
+---
+
+**Q2 (Inner 3-sigma envelope bootstrap for new coordinate classes) → Inactive until N_sigma_window epochs; genesis default: governance-estimated σ_genesis with explicit bootstrap flag (#r166):**
+
+New coordinate classes have no oracle history. Before N_sigma_window normal-mode epochs of oracle output are committed to the EAT, the rolling 3-sigma envelope cannot be derived from data.
+
+**Two candidate bootstrap defaults:**
+- **Inactive (no inner envelope until N_sigma_window):** Simple. oracle_anomaly_alert fires only on outer-fence violations during bootstrap. No false alarms from uninitialised sigma.
+- **Governance-estimated genesis prior:** Governance submits (μ_genesis, σ_genesis) at class registration. Inner envelope = μ_genesis ± 3σ_genesis during bootstrap.
+
+**Resolution — governance-estimated genesis σ with explicit bootstrap flag:**
+
+Both: the inner envelope is active from genesis using governance-estimated (μ_genesis, σ_genesis), clearly tagged as `bootstrap_envelope = true` in the EAT. On N_sigma_window normal-mode epochs of oracle data: `bootstrap_envelope → false`; derived σ replaces σ_genesis.
+
+**Rationale:** A new coordinate class that receives an oracle output of 0 on its first epoch (a clear data error) would generate no alert if the inner envelope is inactive. Governance-estimated bounds provide a coarse sanity check from day 1. The bootstrap flag ensures auditors know the alert was generated from governance estimates, not from empirical history.
+
+**Interaction with oracle_anomaly_alert vs auto-SFP routing (#r165/Q2):**
+
+During bootstrap:
+- Inner envelope (bootstrap) → oracle_anomaly_alert only (governance signal). Bootstrap sigma is coarse; false positives are possible. Auto-SFP requires higher confidence.
+- Outer fence (hard governance bounds) → auto-SFP as always (Invariant #52).
+
+Post-bootstrap (N_sigma_window epochs): both layers operate normally.
+
+**Governance interface addition:** (μ_genesis, σ_genesis) per-class at registration. Required for all CLEARING_MODE classes; optional for DISCOVERY_MODE. (#r166)
+
+---
+
+**Q3 (Attester heartbeat SLA tolling during DA outage) → Epoch-indexed deadline → implicit freeze; heartbeat_light provides degraded-mode liveness via Ethereum calldata (#r166):**
+
+Attester heartbeats are EAT commits: each attester signs a Merkle root per epoch. During DA outage: full EAT Merkle root commits are suspended (EATManager in degraded mode, #r75). Attesters cannot produce valid heartbeats even if they are online.
+
+**Classification under #r137–#r138 deadline taxonomy:**
+
+Heartbeat SLA = "attester must sign ≥1 Merkle root per epoch." This is explicitly epoch-indexed: the deadline is expressed in epoch units, conditioned on an EAT commit event. Under Invariant #26 (non-monotone preconditions) and the #r137 design law (epoch-indexed deadlines auto-freeze with the epoch system), the heartbeat SLA tolls during DA outage automatically.
+
+**Resolution:** Heartbeat SLA advances only on normal-mode epochs where EATManager can accept Merkle root commits. Degraded-mode epochs do not count toward the missed-heartbeat counter. Attester offline_flag is not triggered by DA outage alone.
+
+**heartbeat_light (new) — Ethereum-calldata-only liveness during DA outage:**
+
+```
+heartbeat_light: {
+  attester_address,
+  last_committed_epoch_root_hash,  // hash of last successful full EAT commit
+  signature,
+  epoch
+}
+```
+
+heartbeat_light does NOT count toward the full EAT Merkle commit for dispute purposes. It only resets the offline_flag timer — confirming the attester is online and waiting for DA to restore. The offline_flag SLA (2 consecutive missed full-commit epochs) now excludes degraded-mode epochs; attester can satisfy liveness via heartbeat_light during DA outage with no penalty.
+
+**Design law (#r166):** Multi-party liveness proofs require a degraded-mode equivalent that uses the lowest available trust layer (Ethereum calldata) when higher layers (Celestia DA) are unavailable. The degraded-mode liveness proof must be explicitly distinguished from the normal-mode proof. (#r166)
+
+---
+
+**Q4 (Remaining novel attack families — A10, A11, A12) (#r166):**
+
+---
+
+#### A10 — Gas Denial-of-Service via Micro-Spam Claims (CoordinateRegistry)
+
+**Attack:** Adversary floods CoordinateRegistry with minimum-stake claims across many coordinates, saturating block gas and preventing legitimate claims from reaching the contract before T_anchor_lock.
+
+**Assessment:** Standard EVM gas-price market defence applies. Mechanism-level defence:
+
+```
+min_stake_absolute = k_min (governance-set per class; disclosed at registration)
+  k_min must exceed the gas cost of the claim submission transaction
+  ensures each spam claim costs more in expected loss than the gas rebate
+
+claim_submission_fee (already specified, #r141) = r_floor × fee_fraction
+  spam-filtered by economic cost
+```
+
+The existing claim_submission_fee already handles this. No new mechanism addition required beyond requiring explicit k_min governance disclosure at class registration.
+
+**v2.1 spec note:** k_min parameter must be explicitly specified at class registration. Already implied by existing escrow mechanics; needs explicit governance disclosure as "minimum viable claim stake per class." (#r166)
+
+---
+
+#### A11 — S_cred Poisoning via Loser-Pool Redirect
+
+**Attack:** Adversary deliberately stakes wrong claims on a target coordinate, knowing they will be slashed. Slash proceeds flow to the loser pool, distributed to credible S_cred contributors on that coordinate. If the adversary controls "correct-side" accounts via side-agreements, the slash effectively becomes a payout mechanism to the adversary's beneficiaries, boosting their credibility_ratio credits.
+
+**Formal model:**
+
+```
+Adversary controls: accounts {a_wrong_1, ..., a_wrong_M} and accounts {a_correct_1, ..., a_correct_N}
+A_wrong accounts stake large on wrong side; A_correct accounts stake correct side.
+A_wrong slashed → loser pool → A_correct earns loser pool share + query fees.
+A_correct credibility_ratio grows; A_wrong accounts abandoned.
+Net effect: credibility laundering via deliberate self-slash.
+```
+
+**Why distinct from A1 (credibility laundering):** A1 uses correct-outcome events to build credibility. A11 uses deliberate wrong-claim sacrifices to transfer value to pre-seeded correct-side accounts via the loser pool.
+
+**Defence — loser pool distribution concentration cap:**
+
+```
+per_epoch_loser_pool_cap_per_address(a) = min(
+  actual_pro_rata_share,
+  max_loser_pool_fraction_per_address × total_loser_pool_size
+)
+max_loser_pool_fraction_per_address = 0.20  (governance-set, bounded [0.05, 0.40])
+```
+
+An address can receive at most 20% of any single epoch's loser pool distribution. Excess redistributed pro-rata to remaining eligible contributors, or to challenger_pool if none remain.
+
+**Interaction with cluster cap:** A11 requires A_wrong and A_correct to appear independent. Post-cluster-registration (#r165/Q1), combined W_max cap limits A_correct's S_cred contribution. The loser-pool-cap provides an independent defence that does not require cluster identification first.
+
+**v2.1 spec addition:** max_loser_pool_fraction_per_address parameter in ClaimEscrow. (#r166)
+
+---
+
+#### A12 — SettlementEngine Re-entrancy Beyond #r160/Q2 Call-Ordering
+
+**Attack:** A malicious contract registered as a position holder calls back into SettlementEngine during T_finality position payout before the position is marked as settled, claiming the same payout twice.
+
+**Assessment:** The StateFreeze (#r160/Q2) writes to local storage before external calls — re-entrancy on T_anchor is not possible. The residual surface is the T_finality position payout loop.
+
+**Defence — standard checks-effects-interactions on position payout:**
+
+```
+settle_position(position_id, settlement_price):
+  require(positions[position_id].settled == false)
+  positions[position_id].settled = true  // effect BEFORE interaction
+  safeTransfer(position_holder, payout_amount)
+```
+
+Standard Solidity re-entrancy guard. Must be in the primary audit scope; already covered by Invariant #42 (three-contract primary audit). T_finality payout re-entrancy is the specific highest-risk path to flag in the audit briefing.
+
+**v2.1 audit note:** Explicitly add T_finality payout loop to the audit briefing as the SettlementEngine's highest re-entrancy risk path. (#r166)
+
+---
+
+### Adversarial Stress-Test Final Coverage: Twelve Attack Families
+
+| Attack | Status | v2.1 addition |
+|--------|--------|---------------|
+| A1 — Credibility laundering | Closed (#r163, #r165) | Provisional γ_corr; cluster W_max cap |
+| A2 — Zone C timing exploit | Closed (#r163) | zone_at_T_anchor; Invariant #48 |
+| A3 — Pre-resolution withdrawal | Closed (#r163) | Escape paths closed; Invariant #47 |
+| A4 — Oracle timing arbitrage | Closed (#r163, #r164) | T_anchor_lock; Invariant #49 |
+| A5 — Flood-challenge pool drain | Closed (#r163) | Rate limit; γ_corr_challenger; Invariant #50 |
+| A6 — Oracle registration attack | Closed (#r163, #r165) | Stratified oracle_anomaly; Invariant #52 ext |
+| A7 — EAT Merkle root manipulation | Closed (#r163, #r165) | Multi-attester; Invariant #53 ext |
+| A8 — Log-score precision | Closed (#r163) | Audit scope; Invariant #42 |
+| A9 — Phantom escrow inflation | Closed (#r163) | TOWL_concentration_anomaly; Invariant #54 |
+| A10 — Gas DoS via micro-spam | Closed (#r166) | k_min explicit disclosure |
+| A11 — S_cred poisoning via loser-pool redirect | Closed (#r166) | max_loser_pool_fraction_per_address |
+| A12 — SettlementEngine re-entrancy | Closed (#r166) | Audit scope; checks-effects-interactions on payout |
+
+**The v2.1 adversarial stress-test is complete. All twelve identified attack families have been evaluated and assigned a mechanism defence, an audit-scope item, or a confirmed non-issue.**
+
+---
+
+## Net-New Structural Insight: Two-Layer Defence Architecture as a Design Pattern (#r166)
+
+Across the adversarial stress-test (#r163–#r166), a consistent structural pattern emerges: the most robust defences are two-layer — Layer 1 is automatic (contract-enforced, zero governance latency) and Layer 2 is governance-reactive (SLA-gated, human-confirmed).
+
+**Pattern:**
+
+| Layer | Mechanism | Latency | Coverage |
+|---|---|---|---|
+| **Layer 1 (automatic)** | Contract-enforced formula, rate limit, or hard bound | Zero (immediate) | Cold-start, high-frequency attacks |
+| **Layer 2 (reactive)** | Governance-committed γ_corr, cluster cap, oracle deregistration | 1–2 macro-epochs | Sophisticated, coordinated attacks |
+
+**Two-layer instances across v2.1:**
+
+| Attack | Layer 1 | Layer 2 |
+|---|---|---|
+| Credibility laundering (A1) | Provisional γ_corr (thin track record → near-zero weight) | Cluster registration + combined W_max cap |
+| Oracle manipulation (A6) | Outer hard fence → auto-SFP | Inner 3-sigma alert → governance review |
+| Attester failure (A7) | Degraded_attestation mode below N_attester_min | Replacement SLA + governance rotation |
+| Challenge pool drain (A5) | Challenge rate limit R_max + γ_corr_challenger floor | Auto-refill from governance reserve |
+| S_cred poisoning (A11) | max_loser_pool_fraction_per_address (hard cap) | Cluster registration if coordination detected |
+
+**Why both layers are necessary:**
+
+Layer 1 alone: adversaries probe and adapt to automatic thresholds. A sophisticated attack calibrates to just under R_max, just inside the 3-sigma envelope.
+
+Layer 2 alone: governance-reactive defences are too slow for capital-efficient attacks within the governance latency window.
+
+**Two-layer together:** Layer 1 imposes non-zero economic cost on all attacks immediately. Layer 2 closes the residual coordination gap that Layer 1 cannot address without governance context.
+
+**Design law (#r166):** Every attack surface in the mechanism must be addressed by a two-layer defence: (1) automatic contract-enforced bound imposing immediate economic cost; (2) governance-reactive cap closing the coordination/sophistication gap. Single-layer defences are insufficient for v2.1 production deployment. (#r166)
+
+---
+
+## v2.1 Contract Spec Additions Summary (#r163–#r166)
+
+| Contract | Addition | Source |
+|---|---|---|
+| **CredibilityAggregator** | Provisional γ_corr formula (Layer 1 automatic) | #r164/Q1 |
+| | S_cred_concentration_index per-epoch EAT commit | #r163/A1 |
+| | γ_corr_challenger floor = 0.5; R_max challenge rate limit | #r163/A5 |
+| | cluster_registration / cluster_disbandment; combined W_max cap | #r165/Q1 |
+| | Disbandment stability-window check | #r165/Q1 |
+| **SettlementEngine** | zone_at_T_anchor EAT field; SFP Zone C immunity when zone_at_T_anchor ∈ {A,B} | #r163/A2 |
+| | oracle_anomaly auto-SFP trigger (outer fence) | #r163/A6 |
+| | Checks-effects-interactions re-entrancy guard on T_finality payout loop | #r166/A12 |
+| **ClaimEscrow** | Escape path enum exhaustively closed; voluntary withdrawal prohibited | #r163/A3 |
+| | max_loser_pool_fraction_per_address = 0.20 per epoch | #r166/A11 |
+| **CoordinateRegistry** | T_anchor_lock (N_lock_epochs ≥ 1); position registration gate | #r163/A4 |
+| | expected_range [min, max] at registration (outer fence) | #r163/A6 |
+| | (μ_genesis, σ_genesis) at registration; bootstrap_envelope flag | #r166/Q2 |
+| | N_sigma_window rolling 3-sigma inner envelope; stratified routing | #r165/Q2 |
+| | TOWL_concentration_anomaly monitoring | #r163/A9 |
+| | k_min explicit disclosure per class at registration | #r166/A10 |
+| | WED_clearing snapshot at T_anchor_lock | #r163/A4 |
+| **EATManager** | AttesterRegistry: N_attester_min=3, N_attester_target=5, heartbeat SLA | #r165/Q3 |
+| | Degraded_attestation mode (WARNING flag below N_attester_min) | #r165/Q3 |
+| | heartbeat_light Ethereum-calldata-only liveness event during DA outage | #r166/Q3 |
+| | attester_signatures on Merkle root commits | #r163/A7 |
+
+---
+
+## Cumulative Invariants (additions through #r166)
+
+**Invariant #55 (#r165):** MEV resistance provided by epoch-boundary commit atomicity + T_anchor_lock. No protocol-reserved transaction slot required.
+
+**Invariant #56 (#r166):** Cluster W_max cap (epistemic) does not affect TOWL accounting (financial). TOWL counts per-member escrow independently regardless of cluster governance status.
+
+**Invariant #57 (#r166):** Inner-envelope oracle anomaly detection uses governance-estimated (μ_genesis, σ_genesis) during bootstrap (bootstrap_envelope = true); transitions to derived rolling 3-sigma at N_sigma_window epochs. Inner envelope is active from genesis; bootstrap flag is mandatory.
+
+**Invariant #58 (#r166):** EATManager attester heartbeat SLA is epoch-indexed; it tolls during DA outage. heartbeat_light provides degraded-mode liveness proof via Ethereum calldata without Celestia dependency.
+
+**Invariant #59 (#r166):** Loser pool distribution is capped at max_loser_pool_fraction_per_address = 0.20 per address per epoch. Excess redistributed pro-rata or to challenger_pool.
+
+**Invariant #60 (#r166):** Every attack surface requires a two-layer defence: (1) automatic contract-enforced economic cost (zero latency, no governance dependency); (2) governance-reactive coordination cap (SLA-bounded). Single-layer defences are insufficient for v2.1.
+
+---
+
+## Updated Run Log Entry
+
+- **#r166** — 2026-04-04T01:22Z — Adversarial stress-test complete (A10–A12 + Q1–Q4 from #r165); two-layer defence architecture formalised; 22 v2.1 spec additions catalogued (#r163–#r166); Invariants #55–#60 added; v2.1 production readiness gate updated to include adversarial hardening gate.
+
+---
+
+## Updated v2.1 Production Readiness Criteria (#r166)
+
+| Gate | Criterion | Source |
+|------|-----------|--------|
+| Solvency | TOWL zone A or B | #r71 |
+| Epistemic liveness | active_challenger_count ≥ min for ≥2 normal-mode epochs | #r160/Q4 |
+| DA liveness | Normal mode (not degraded) | #r75 |
+| Oracle readiness | Oracle registered, TWAP data, expected_range + (μ_genesis,σ_genesis) set | #r144, #r166 |
+| EAT operational | Ethereum + Celestia live; N_attester ≥ 3 confirmed | #r75, #r165/Q3 |
+| Settlement contract audit | Three-contract primary scope audited | #r161/Q4 |
+| Adversarial hardening | All 22 engineering spec additions from #r163–#r166 implemented and reviewed | #r166 |
+
+---
+
+## Open Questions for #r167+
+
+1. **Cluster combined W_max cap and TOWL Zone A headroom:** Since TOWL counts per-member escrow independently for a cluster, Zone A headroom can be large while S_cred is capped at single-entity W_max. Is there a governance presentation that makes this asymmetry transparent — TOWL headroom vs epistemic effective capacity — so founders can evaluate actual epistemic quality of Zone A state?
+
+2. **Two-layer defence calibration — Layer 1 threshold vs Layer 2 SLA tradeoff:** The economic cost imposed by Layer 1 (provisional γ_corr, rate limits, concentration caps) determines how sophisticated an attack must be before Layer 2 is needed. Higher Layer 1 thresholds reduce Layer 2 load but increase friction for legitimate participants. Is there a principled tradeoff formula?
+
+3. **Governance parameter sensitivity analysis:** Which subset of the mechanism's governance parameters, if miscalibrated by ±20%, would push the mechanism into a degenerate equilibrium (no knower participation, no challenger participation, or solvency collapse)? Identifying the sensitive parameters narrows the pre-launch governance review to highest-impact decisions.
+
+4. **v2.2 design scope declaration:** With v2.1 adversarial stress-test complete and 22 spec additions catalogued, the mechanism is ready for engineering handoff. Define the v2.2 mechanism design scope: DISCOVERY_MODE full spec, shadow-class lifecycle formalisation, implication chains, three-tier archive, cross-class LTRP backstop opt-in. Estimate run count for v2.2 scope completion.
+
+*Last updated: #r166 — 2026-04-04T01:22Z*
