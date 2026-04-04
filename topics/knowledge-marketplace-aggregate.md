@@ -14,6 +14,7 @@
 - **#r133** — 2026-04-03T19:52Z
 - **#r135** — 2026-04-03T20:12Z — Debt retirement absorption cap (lifetime-escrow-anchored); toll-stacking doubling ceiling for implication_bonus_escrow; M_stable evaluation-boundary parameter activation; debt withholding scope — capital-at-risk only, contingent rewards exempt — `implication_bonus_escrow` as fourth first-class escrow category (protocol reserve, not TOWL-counted, bilateral lockup ceiling); Zone C epochs included in calibration (not excluded, flagged only); M_stable majority-window tolerance (1-of-5, non-consecutive); A-side conditional partial release for cross-class implication declarations with clawback obligation; escrow taxonomy complete.
 - **#r141** — 2026-04-03T21:12Z — Challenge submission fee replaces slash-gate (spam filter, never blocks small-stake challenge); bifurcated implication bonus: capital-comp (α_cap × β_escrow, staleness-insensitive) + epistemic-service (staleness-discounted via Σ eff_weight); cross-class bridge asymmetry confirmed consistent — no coordination rule; bonus settlement contract design-complete.
+- **#r185** — 2026-04-04T04:32Z — EATManager_v1 interface spec; BatchAuction clearing price = single epoch S_cred snapshot; PositionToken WED_clearing; handoff delivery plan. Invariant #135.
 - **#r160** — 2026-04-04T00:22Z — v2.1→v2.2 additive deployment (coordinate-class-level version pinning; no forced migration); atomic StateFreeze transaction for S_cred at T_anchor; Demo Day one-paragraph narrative vs Polymarket; epistemically-live threshold (1 challenger per 5 T3 installs, absolute floor 3); v2.1 production-readiness gate (6 criteria); Invariants #36–#38.
 
 ---
@@ -10267,3 +10268,198 @@ The live-vs-dead gap is ~6.25 percentage points. W_MAX is the dominant protectio
 4. **Engineering handoff delivery format:** markdown in gestalt-contracts/docs/, separate spec repo, or KBase? Recommendation and execution path for the formatting run.
 
 *Last updated: #r184 — 2026-04-04T04:22Z*
+
+---
+
+## #r185 Contributions — 2026-04-04T04:32Z
+
+Addresses all four open questions from #r184. Adds one net-new structural insight: PositionToken ERC-1155 is a v2.1 core primitive (not legacy) and its totalSupply is the canonical WED_clearing source.
+
+---
+
+**Q1 (EATManager_v1 interface spec) → Full state variables, write path, verify path, CID chain, degraded-mode flag, Arweave trigger (#r185):**
+
+```solidity
+interface IEATManager {
+    // ── Events ──────────────────────────────────────────────────────
+    event EpochRecordCommitted(uint256 indexed epoch, bytes32 merkleRoot, bytes32 celestiaTxHash);
+    event CIDChainExtended(uint256 indexed epoch, string cid, bytes32 priorRootHash);
+    event DegradedModeEntered(uint256 epoch, bytes32 lastGoodMerkleRoot);
+    event DegradedModeExited(uint256 epoch);
+    event ArweaveMirrorQueued(uint256 indexed epoch, string celestiaCID);
+    event ArweaveMirrorConfirmed(uint256 indexed epoch, string arweaveTxId);
+    event CompactionEligibilityInvalidated(uint256 indexed epoch, string paramChanged);
+
+    // ── State (read) ─────────────────────────────────────────────────
+    function epochMerkleRoot(uint256 epoch) external view returns (bytes32);
+    function epochCID(uint256 epoch) external view returns (string memory);
+    function isInDegradedMode() external view returns (bool);
+    function lastGoodEpoch() external view returns (uint256);
+    function lastGoodMerkleRoot() external view returns (bytes32);
+
+    // ── Write path ───────────────────────────────────────────────────
+    /// @notice Called by CredibilityAggregator at each macro-epoch boundary.
+    ///         Commits Merkle root to Ethereum calldata and queues Celestia blob write.
+    function commitEpochRecord(uint256 epoch, bytes32 root, bytes calldata events) external;
+
+    /// @notice Individual contracts record named EAT events; batched into epoch record.
+    function recordEvent(uint256 epoch, bytes32 eventType, bytes calldata payload) external;
+
+    // ── Verify path ──────────────────────────────────────────────────
+    /// @notice Verify historical EAT record via Merkle inclusion proof.
+    function verifyRecord(
+        uint256 epoch,
+        bytes32 leaf,
+        bytes32[] calldata proof
+    ) external view returns (bool valid);
+
+    // ── Degraded mode ────────────────────────────────────────────────
+    function enterDegradedMode() external;   // called by DA-liveness probe oracle
+    function exitDegradedMode(bytes32 firstPostRestoreRoot) external;
+
+    // ── Compaction ───────────────────────────────────────────────────
+    /// @notice Lazy eligibility evaluated at call time (Invariant #26).
+    function compactEpoch(uint256 epoch, string calldata celestiaCID) external;
+
+    /// @notice Emit invalidation event on governance parameter changes
+    ///         affecting active claim status.
+    function invalidateCompactionEligibility(uint256 fromEpoch, string calldata paramChanged) external;
+
+    // ── Arweave mirror ───────────────────────────────────────────────
+    function queueArweaveMirror(uint256 epoch, string calldata celestiaCID) external;
+    function confirmArweaveMirror(uint256 epoch, string calldata arweaveTxId) external;
+}
+```
+
+**Key internal state:**
+```solidity
+mapping(uint256 epoch => bytes32)        public epochMerkleRoot;
+mapping(uint256 epoch => string)         public epochCID;
+mapping(uint256 epoch => ArweaveStatus)  public arweaveStatus;
+// ArweaveStatus: NOT_REQUIRED | PENDING | CONFIRMED | FAILED_OPEN | FAILED_CLOSED
+uint256 public lastGoodEpoch;
+bytes32 public lastGoodMerkleRoot;
+bool    public isInDegradedMode;
+```
+
+**CID chain:** Each `compactEpoch` call emits `CIDChainExtended(epoch, cid, epochMerkleRoot[epoch-1])`, creating a hash-linked chain anchored to successive Ethereum roots. Four-step dispute verification: cold CID → blob retrieval → Merkle inclusion proof → Ethereum anchor (#r156).
+
+**Celestia write batching:** `commitEpochRecord` emits `events` bytes as Ethereum calldata and emits `EpochRecordCommitted` with the Celestia TX hash provided by a governance-registered off-chain keeper that relays the batch to Celestia. The keeper is monitored via EAT event auditing — its failure mode is addressed in #r186/Q2.
+
+**Arweave mandate:** `queueArweaveMirror` is mandatory for CLEARING_MODE epochs; optional for DISCOVERY_MODE (Invariant #24). `arweaveStatus` tracks retry state; compaction is never blocked by Arweave availability (Invariant #28). (#r185)
+
+---
+
+**Q2 (BatchAuction clearing price — epoch S_cred snapshot vs TWAP) → Single final committed epoch snapshot; no multi-epoch TWAP (#r185):**
+
+`candidatePrice = S_cred` committed at the close of epoch T_anchor − 1 (one-epoch buffer, #r71). The atomic `freezeForSettlement` reads a single stored value from CredibilityAggregator — O(1), ~800 gas.
+
+**Why multi-epoch TWAP is wrong:**
+
+1. The one-epoch buffer already provides the designed manipulation defence (#r71). Extending to an N_calibration TWAP would dampen the clearing price toward stale history, penalising accurate updates in the most recent epoch.
+2. Settlement Freeze Protocol requires an atomic point-in-time snapshot (Invariant #37). A TWAP aggregation across multiple epochs cannot be committed atomically in a single transaction.
+3. For clearing, the most recent credibility-weighted estimate is epistemically superior to an average that weights older — potentially stale — information equally.
+
+**Canonical definition:**
+```
+candidatePrice = CredibilityAggregator.getCommittedSCred(marketId, epochAtAnchor - 1)
+```
+
+Not raw epoch-T_anchor claims (not yet epoch-committed). Not a rolling average. The single Merkle-committed value from the immediately preceding epoch boundary. (#r185)
+
+---
+
+**Q3 (PositionToken.sol role in v2.1 — core primitive, not legacy artifact) (#r185):**
+
+`gestalt-contracts/src/core/PositionToken.sol` is ERC-1155. Each market produces two token IDs: YES = marketId × 2, NO = marketId × 2 + 1. `mintCompleteSet` requires equal YES+NO (collateral invariance); `redeemCompleteSet` burns equal YES+NO. Role-gated minting (`MINTER_BURNER_ROLE`).
+
+**This is the v2.1 position registry.** Positions are tradeable ERC-1155 — not non-transferable registry records. This is correct for institutional use: counterparties can offload or hedge positions on secondary markets.
+
+**WED_clearing derivation (net-new, this run):**
+
+For binary markets, `totalSupply(yesId) = totalSupply(noId)` always (complete-set invariant). Maximum loss if oracle resolves YES-against:
+
+```
+WED_clearing(marketId) = positionToken.totalSupply(marketId * 2) × collateralPerToken
+```
+
+This is on-chain, real-collateral-backed, and requires no D(c) revelation. It is the canonical instantiation of WED_clearing (#r149) in v2.1.
+
+**CoordinateRegistry addition needed:**
+```solidity
+function computeWEDClearing(uint256 marketId) external view returns (uint256) {
+    uint256 yesId = marketId * 2;
+    return IPositionToken(positionToken).totalSupply(yesId) * collateralPerToken;
+}
+```
+
+**Audit scope:** PositionToken.sol is audit-required. Its `mintCompleteSet` role gate is the entry point for WED_clearing integrity — a minting exploit inflates WED_clearing and distorts knower incentive routing. (#r185)
+
+---
+
+**Q4 (Engineering handoff delivery format → gestalt-contracts/docs/ primary; KBase archive; #r186 writes the files) (#r185):**
+
+**Recommended structure:**
+```
+gestalt-contracts/docs/
+  v2.1-architecture.md        — Doc 1 (#r184 prose + data flow diagram)
+  v2.1-interfaces.md          — Doc 2 (CredibilityAggregator + GovernanceParams + EATManager)
+  v2.1-security-briefing.md   — Doc 3 (#r182 adversarial simulation)
+  v2.1-governance-params.md   — Doc 4 (#r180 + #r183 + #r184 tables)
+  v2.1-launch-checklist.md    — Doc 5 (#r180 + #r185 PositionToken addition)
+```
+
+**Why gestalt-contracts/docs/ over a separate spec repo:**
+- Co-located with Foundry project; engineers find it without switching repos
+- Versioned with contracts — git blame traces spec changes to code delta
+- Audit firms expect co-located docs
+
+**KBase path** (non-engineering stakeholders): `/home/ubuntu/dev/contextvalctrl/KBase/valctrl/gestalt/v2.1-spec-<date>.md` as single-file rollup.
+
+**Execution plan for #r186:**
+1. Create `gestalt-contracts/docs/` if absent
+2. Write all five doc files from aggregated content in this document
+3. Commit as single PR: `docs: GestAlt v2.1 engineering handoff spec`
+4. Write KBase rollup
+
+This run does not produce the doc files — single-focused execution is the correct pattern. (#r185)
+
+---
+
+## Net-New Structural Insight: PositionToken totalSupply IS WED_clearing — Gap Closed (#r185)
+
+WED_clearing has been an abstract concept since #r149 (Σ max_loss_if_wrong). In v2.1 contracts it is concrete:
+
+```
+WED_clearing(marketId) = IPositionToken(addr).totalSupply(marketId * 2) × collateralPerToken
+```
+
+This closes the chain: WED_clearing → PositionToken.totalSupply → on-chain, trustless, real-collateral-backed. The complete-set minting invariant guarantees totalSupply(yesId) = totalSupply(noId) at all times, so the formula is non-ambiguous for binary markets.
+
+For multi-collateral support (v2.1 question #r186/Q4): if GestAltVault supports multiple collateral assets, collateralPerToken must be denomination-normalised via an oracle before summing. v2.1 should restrict to single-collateral until this is resolved.
+
+---
+
+## Cumulative Invariants (additions through #r185)
+
+**Invariant #135 (#r185):** WED_clearing for binary markets in v2.1 = `IPositionToken.totalSupply(marketId * 2) × collateralPerToken`. PositionToken.sol is audit-required for v2.1 launch. Minting exploit = WED_clearing integrity failure.
+
+---
+
+## Run Log Update
+
+- **#r185** — 2026-04-04T04:32Z — EATManager_v1 full interface spec (state, write path, verify, CID chain, degraded mode, Arweave trigger); BatchAuction clearing price = single final committed epoch S_cred snapshot (one-epoch buffer, no TWAP); PositionToken.sol is core v2.1 ERC-1155 position registry — WED_clearing = totalSupply(yesId) × collateralPerToken; handoff delivery plan (gestalt-contracts/docs/ primary; KBase archive; #r186 writes the docs). Invariant #135.
+
+---
+
+## Open Questions for #r186+
+
+1. **Doc file production (#r186 primary task):** Write all five v2.1 handoff docs to gestalt-contracts/docs/. Verify directory exists; create if needed. Commit as single PR.
+
+2. **EATManager keeper architecture:** The Celestia write is performed by a governance-registered off-chain keeper. If the keeper fails to write within the epoch boundary, does EATManager mark the epoch `celestia_pending` and retry, or enter degraded mode immediately?
+
+3. **BatchAuction 8-phase lifecycle spec:** Map the full 8-phase epoch lifecycle to actual state enum values and transition guards in the Solidity state machine from the shangrila scaffold.
+
+4. **PositionToken multi-collateral WED_clearing:** If GestAltVault supports multiple collateral assets, collateralPerToken is not a single constant. Restrict v2.1 to single-collateral, or aggregate in USD terms via an oracle?
+
+*Last updated: #r185 — 2026-04-04T04:32Z*
