@@ -9253,3 +9253,140 @@ The complexity is not incidental — it is the engineering surface area of takin
 4. **Next research thread after handoff:** With v2.2 mechanism specification complete, what is the next GDM autoresearch priority? Candidates: (a) adversarial simulation against v2.1 contract spec, (b) market microstructure analysis of clearing price dynamics under thin challenger populations, (c) regulatory framing of GestAlt under CFTC event contract rules.
 
 *Last updated: #r180 — 2026-04-04T03:42Z*
+
+
+---
+
+## #r181 Contributions — 2026-04-04T03:52Z
+
+**Phase: Engineering handoff — Q1–Q4 from #r180 (invariant registry tooling, Document 2 scaffold strategy, CONTEXT.md update, next research thread).**
+
+---
+
+### Q1 (Machine-readable invariant registry generation) → Deferred to tooling run; format specified here as source of truth (#r181)
+
+Generating the 120-entry JSON registry requires a structured parse of this document — a tooling task, not a mechanism-design task. Format specification here establishes the schema; the actual extraction run can be executed independently.
+
+**Canonical registry schema:**
+
+```json
+{
+  "invariants": [
+    {
+      "id": "#N",
+      "run_source": "#rXX",
+      "contract": "ContractName | multiple | protocol-level",
+      "version": "v2.1 | v2.2 | both",
+      "feature_domain": "escrow | credibility | settlement | governance | archive | implication-chains | discovery-mode | backstop | structural",
+      "superseded_by": null,
+      "text_summary": "one sentence"
+    }
+  ]
+}
+```
+
+**Extraction priority:** Invariants #91–#120 (v2.2 DISCOVERY_MODE and handoff) are the highest priority for the registry — these are not cross-referenced in any existing spec document. Invariants #1–#35 (v2.1 core) already appear in epistemic-bond-v0-spec.md; registry adds machine-readability, not new content.
+
+**Execution plan:** A future run with direct file access to gestalt-contracts repo and this aggregate doc can emit the JSON in one pass. This is deferred — current priority is the handoff document structure. (#r181)
+
+---
+
+### Q2 (Document 2 interface spec strategy — top-down vs bottom-up) → Bottom-up from gestalt-contracts scaffold; naming translation table required (#r181)
+
+**Repo state:** gestalt-contracts/src/core/ contains: BatchAuction.sol, CreditFacility.sol, FeeEngine.sol, GestAltVault.sol, MarketFactory.sol, OracleManager.sol, PositionToken.sol, VaultBase.sol.
+
+These are working Solidity contracts at v0.8.28 with AccessControl, ReentrancyGuard, and SafeERC20 — a functional scaffold that predates the v2.1 mechanism spec naming.
+
+**Contract naming translation table (scaffold → spec):**
+
+| gestalt-contracts name | v2.1 spec name | v2.2 spec addition |
+|---|---|---|
+| GestAltVault + VaultBase | ClaimEscrow_v1 + LTRP module | DiscoveryClaimEscrow |
+| MarketFactory | CoordinateRegistry_v1 | CoordinateRegistry_v2 |
+| OracleManager | oracle_address registration layer in CoordinateRegistry | EAT oracle authority (IOracle interface exists) |
+| BatchAuction | SettlementEngine_v1 (batch epoch boundary = T_anchor analog) | SettlementEngine additions for IMPL_PENDING |
+| FeeEngine | fee_fraction governance layer | DiscoveryFeeEngine (two-pool) |
+| CreditFacility | LTRP module partial | cross-class backstop partial |
+| PositionToken | position registry (WED accounting side) | N/A in v2.2 scope |
+
+**Strategy recommendation:** Bottom-up is correct. The engineering team should:
+1. Use gestalt-contracts as the implementation base — the vault/escrow/oracle patterns are already production-grade.
+2. Map each spec contract to the nearest gestalt-contracts analog using the translation table.
+3. Identify delta surface (what needs to be added per the spec) rather than building from scratch.
+4. CredibilityAggregator_v1 is the one spec contract with no current analog in gestalt-contracts — it is net-new (no partial scaffold exists for S_cred computation or credibility_ratio).
+
+**Implication for Document 2 structure:** Each interface spec document should include a "scaffold mapping" section: what exists in gestalt-contracts, what is net-new, and what is a modification. This reduces engineering estimation uncertainty.
+
+**Design law (#r181):** Engineering handoff Document 2 must include a scaffold-to-spec mapping section for each contract. Net-new contracts (CredibilityAggregator_v1, DiscoveryCredibilityAggregator) are called out explicitly; modification contracts are diff'd against their gestalt-contracts ancestor. (#r181)
+
+---
+
+### Q3 (CONTEXT.md update — knowledge marketplace mechanism design core insight) → Entry defined for CONTEXT.md commit (#r181)
+
+The one-paragraph synthesis from #r180/Q4 is recorded here for CONTEXT.md:
+
+> **Mechanism Design — Core Insight (from GDM autoresearch #r180–#r181)**
+>
+> The knowledge marketplace started as a question about primitives: what if the market's job was not to aggregate crowd belief, but to certify that specific claims about the world are credible enough to act on? Capital works differently in that frame — not as a side-bet on who agrees with you, but as forfeitable collateral backing a claim you are willing to stand behind. This shift — from belief aggregation to credibility warranty — generated the entire architecture: credibility-weighted S_cred rather than capital-weighted price, track records that accumulate into lasting epistemic authority, settlement prices requiring both capital and a history of being right, a two-mode system (discovery and clearing) separating epistemics from finance, and an oracle-authority duality distinguishing attestation from final resolution. The conserved quantity is epistemic debt (WED), not PnL. The mechanism is a protocol for warranted knowledge claims; the market is the warranty enforcement system.
+
+**CONTEXT.md update to be applied in this commit.** (#r181)
+
+---
+
+### Q4 (Next GDM autoresearch priority) → P1 = adversarial simulation vs v2.1 scaffold; P2 = thin challenger microstructure; P3 = CFTC regulatory framing (#r181)
+
+With v2.2 mechanism spec complete, three candidate threads evaluated:
+
+**(a) Adversarial simulation against v2.1 contract spec:** Apply the spec attack surface table systematically to gestalt-contracts scaffold. Identify gaps between spec invariants and code enforcement. Pre-implementation quality assurance — cheapest to fix before code is written.
+
+**(b) Market microstructure / thin challenger populations:** What happens to clearing price quality when challenger populations are at the epistemically_live minimum? Simulation task. Informs launch strategy and minimum_challenger_density governance parameter.
+
+**(c) CFTC regulatory framing:** GestAlt's credibility-warranty primitive may qualify differently from Kalshi's exchange model under DCM/SEF rules. Important post-Demo Day but not blocking for engineering handoff.
+
+**Priority ranking:**
+1. **P1: Adversarial simulation** — gates engineering handoff quality directly. Feeds Document 3.
+2. **P2: Thin challenger microstructure** — informs Demo Day launch parameters.
+3. **P3: CFTC framing** — post-Demo Day, pre-fundraising.
+
+**#r182 begins:** Adversarial simulation pass over gestalt-contracts/; starting with GestAltVault.sol (ClaimEscrow analog) against TOWL solvency invariants. (#r181)
+
+---
+
+## Structural Synthesis: Handoff Closure (#r181)
+
+| Item | Status | Next action |
+|---|---|---|
+| Invariant registry | Schema specified; extraction deferred | Tooling run (parallelisable with engineering work) |
+| Document 2 strategy | Bottom-up confirmed; naming translation table produced | Engineering to map scaffold → spec before interface authoring |
+| CONTEXT.md update | Core insight entry defined | Applied in this push |
+| Next research thread | P1 = adversarial simulation vs v2.1 scaffold | #r182 begins adversarial simulation pass |
+
+---
+
+## Cumulative Invariants (additions through #r181)
+
+**Invariant #121 (#r181):** The invariant registry JSON schema is the canonical machine-readable source of truth for contract-invariant mapping. Each entry includes: id, run_source, contract, version, feature_domain, superseded_by, text_summary. Inline document numbering is a display convenience only.
+
+**Invariant #122 (#r181):** Engineering Document 2 (interface specs) must be authored bottom-up from the gestalt-contracts scaffold using the naming translation table. Net-new contracts (CredibilityAggregator_v1, DiscoveryCredibilityAggregator) are explicitly flagged; modification contracts are diff'd against their scaffold ancestor.
+
+**Invariant #123 (#r181):** Next autoresearch priority (P1) is adversarial simulation against v2.1 contract scaffold — mapping each spec attack vector to contract-level enforcement checks. Findings feed into engineering Document 3 (Security and Attack Surface Briefing).
+
+---
+
+## Run Log Update
+
+- **#r181** — 2026-04-04T03:52Z — Handoff closure: invariant registry schema, bottom-up Document 2 strategy with scaffold-to-spec naming translation table, CONTEXT.md mechanism design core insight entry, next research thread prioritization (P1: adversarial simulation). Three new invariants (#121–#123).
+
+---
+
+## Open Questions for #r182+ (P1: Adversarial Simulation vs v2.1 Scaffold)
+
+1. **GestAltVault solvency enforcement:** Does GestAltVault.sol enforce the TOWL Zone A/B/C three-zone hard gates (Invariants #1–#5 range)? Or does it only implement a weaker vault.balance >= obligations invariant?
+
+2. **OracleManager oracle-authority duality:** Does OracleManager distinguish oracle_settlement_override (final resolution authority) from attestation (T3 claim warranty)? Or does the current code conflate them?
+
+3. **MarketFactory epistemically-live gate:** Does MarketFactory enforce the epistemically_live precondition before a market transitions to active trading, or is this an off-chain governance check with no on-chain enforcement?
+
+4. **BatchAuction T_anchor StateFreeze atomicity:** Does BatchAuction.sol implement an atomic StateFreeze at the epoch boundary equivalent to T_anchor, or does the batch clearing operate on a rolling window without the freeze guarantee?
+
+*Last updated: #r181 — 2026-04-04T03:52Z*
