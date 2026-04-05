@@ -124,7 +124,7 @@ So the non-PM contribution is not a better pricing rule; it is a different produ
 This is the narrowest non-PM sketch that still preserves the split between epistemic authorship and insured action-capacity while making the exchanged product visibly about justified relaxation away from safety rather than abstract action permission in the air. #r313 added the missing composability rule; #r314 sharpened that rule into a public stress-basis requirement; #r315 added that no departure should pay full capital cost merely for being authorized, nor escape capital cost by hiding execution; #r317 adds that no departure should be priced as safely extinguishable unless its unwind path is public and enforceable. The mechanism must meter reservation, use, and rollback burden. (ref: #r305, #r309, #r310, #r311, #r312, #r313, #r314, #r315, #r317)
 
 ## 9. Strongest reason this idea fails
-The strongest surviving kill is now: **the mechanism may need a public factor model, an honest activation meter, and a truthful rollback map - and any one of the three can turn into governable theater.** #r311 solved the worst claimant-side benchmark theater, #r312 correctly made the product explicit deviation from safety, #r313 surfaced that local warrant correctness is not enough, #r314 showed that composition needs a public stress-basis, #r315 showed that reservation-only accounting is structurally wrong, and #r317 clarifies the remaining structural failure: even if the factor map is decent and the activation meter is honest, the protocol still fails if it cannot observe how quickly and completely a bad exercised deviation can be forced back to fallback. Then either (a) omitted factors, shadow utilization, and sticky execution let the system blow through the true safe envelope while looking compliant, or (b) the protocol overstates irreversibility everywhere and taxes useful action into conservative gridlock. In that world capital does not improve epistemics; it buys passage through a mis-specified risk-usage-reversal taxonomy. That is structural, not a tuning bug. (#r310, #r311, #r312, #r313, #r314, #r315, #r317)
+The strongest surviving kill is now: **the mechanism may need a public factor model, an honest activation meter, a truthful rollback map, and a truthful rollback-bandwidth ledger - and any one of the four can turn into governable theater.** #r311 solved the worst claimant-side benchmark theater, #r312 correctly made the product explicit deviation from safety, #r313 surfaced that local warrant correctness is not enough, #r314 showed that composition needs a public stress-basis, #r315 showed that reservation-only accounting is structurally wrong, #r317 clarified that reversibility must be priced, and #r318 clarifies the next structural failure: even if the factor map, activation meter, and rollback labels are decent, the protocol still fails if many revocations silently depend on the same bottlenecked restoration channels. Then either (a) omitted factors, shadow utilization, sticky execution, and hidden shared unwind dependencies let the system blow through the true safe envelope while looking compliant, or (b) the protocol overstates congestion everywhere and taxes useful action into conservative gridlock. In that world capital does not improve epistemics; it buys passage through a mis-specified risk-usage-reversal-throughput taxonomy. That is structural, not a tuning bug. (#r310, #r311, #r312, #r313, #r314, #r315, #r317, #r318)
 
 ## 10. Best surviving variant if the raw idea is wrong
 The best fallback is now a **hybrid split architecture**:
@@ -132,7 +132,7 @@ The best fallback is now a **hybrid split architecture**:
 - use pooled underwriting only where risk classes are genuinely legible, fallback ladders are operationally credible, cumulative deviation away from safety can be measured cleanly on those public factors, downstream action flow is machine-visible enough to meter activation honestly, and unwind paths are operationally enforceable enough to meter reversibility honestly,
 - keep lower-stakes or hard-to-compose cases on a simpler self-insured stewardship model,
 - and let conventional PM/orderbook/batch-auction machinery handle external disagreement, hedgeable exposure, and broad price discovery elsewhere.
-That preserves the deepest surviving insight: capital should improve epistemics by underwriting **bounded departure from conservative default policy**, not by merely buying louder influence over a belief vector. The new constraint from #r317 is sharper than in #r315: if the domain cannot support a credible public stress-basis, a credible activation meter, **and** a credible rollback ladder, the raw knowledge-market idea should yield to simpler PM or governance machinery before factor-theater, usage-theater, and rollback-theater turn the insurance story into theater. (ref: #r305, #r310, #r311, #r312, #r313, #r314, #r315, #r317)
+That preserves the deepest surviving insight: capital should improve epistemics by underwriting **bounded departure from conservative default policy**, not by merely buying louder influence over a belief vector. The new constraint from #r318 is sharper still: if the domain cannot support a credible public stress-basis, a credible activation meter, a credible rollback ladder, **and** a credible rollback-bandwidth model for shared restoration bottlenecks, the raw knowledge-market idea should yield to simpler PM or governance machinery before factor-theater, usage-theater, rollback-theater, and congestion-theater turn the insurance story into theater. (ref: #r305, #r310, #r311, #r312, #r313, #r314, #r315, #r317, #r318)
 
 ### Candidate families tested in this run
 - **A) direct knowledge-market**: kept as base, with unresolved-truth safety branch
@@ -27062,6 +27062,13 @@ Use a dual threshold:
 
 Operational floor:
 
+`λ_min,eff(c,t) = λ_floor^(k(cs not a "live knob" for governance capture control.
+2. **Adaptive factor** `g_obs` from online calibration diagnostics:
+
+`g_obs(c,t) = sigmoid( κ_mis(c,t) - κ* )`, where `κ_mis` is Bayesian misspecification score (e.g., rolling log-score gap vs held-out pseudo-truth and PIT uniformity residual).
+
+Operational floor:
+
 `λ_min,eff(c,t) = λ_floor^(k(c)) × (1 + g_obs(c,t))`.
 
 So when residuals worsen (`κ_mis` high), admissible payout contracts shrink automatically; when diagnostics recover, the gate relaxes without governance intervention. This makes `λ_min` continuous in data quality while keeping governance control bounded to `λ_floor^(k)` only.
@@ -28259,3 +28266,9 @@ If standing-capacity markets are too heavy, the best fallback is a **tiered hybr
 - and keep conventional PM / orderbook / batch-auction machinery for broad disagreement discovery and hedgeable exposure.
 
 That preserves the strongest surviving insight after #r307: the non-PM opportunity is not belief matching, but **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
+al, machine-enforced action classes,
+- let smaller or lower-stakes warrants use the simpler #r306 model where underwriters attach more directly to specific warrants,
+- and keep conventional PM / orderbook / batch-auction machinery for broad disagreement discovery and hedgeable exposure.
+
+That preserves the strongest surviving insight after #r307: the non-PM opportunity is not belief matching, but **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
+not belief matching, but **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
