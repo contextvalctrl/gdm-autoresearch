@@ -1,7 +1,75 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r381** - 2026-04-06T00:14Z - Added a transportability correction: even ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless every paid update carries an explicit scope-of-validity and transfer map showing where the claimed contraction is admissible. Otherwise suppliers can monetize local truths as if they were global state movement, and capital buys overgeneralization rather than credible knowledge transfer.
 - **#r380** - 2026-04-06T00:02Z - Added an ontology-stability correction: even incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless artifact schemas, coordinate identities, and split/merge migrations are themselves lock-disciplined and liability-bearing. Otherwise suppliers can rename, refactor, split, or repackage state coordinates to reset inherited frontiers and re-monetize already-paid contraction through ontology churn.
+
+### #r381 refinement - even ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting fails unless every paid contraction declares a bounded transportability class and transfer map, because otherwise locally valid insight is over-sold as a global state update
+
+#r380 correctly killed ontology arbitrage by requiring coordinate identities, schema versions, and split/merge migrations to preserve inherited frontiers under representation change. But even that stronger family still fails if the protocol treats a supplier's valid local contraction as automatically portable across contexts, actors, regimes, or state neighborhoods. Many knowledge transfers are **conditional and local**: true for one counterparty type, one latency regime, one jurisdiction, one market microstructure, one model class, one sensor configuration, one causal neighborhood. If the mechanism pays as though that contraction tightened the whole global state vector when it really only tightened a bounded slice, then capital does not improve epistemics through credible transfer. It finances **scope laundering / overgeneralization arbitrage**: suppliers earn by taking narrow, context-bound insight and marketing it as common-state movement far beyond the domain where it was actually earned. The stronger surviving form is therefore **transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting**. Payment should attach only to the portion of state contraction whose domain of validity, transfer assumptions, and out-of-domain failure modes are explicitly declared, challengeable, and liability-bearing. (#r381)
+
+This is a real mechanism correction, not just a caveat label. #r378 killed provenance severance. #r379 killed wrapper resale of inherited contraction. #r380 killed ontology churn. #r381 kills the next failure: **transportability laundering / false generalization of local knowledge**. A knowledge marketplace should now distinguish among:
+1. local tranche validity,
+2. global state coherence,
+3. demand-side consequence legibility,
+4. marginal state improvement,
+5. timeliness of transfer,
+6. calibration of residual uncertainty,
+7. staged resolvability,
+8. diagnostic contribution,
+9. observability surface maintenance,
+10. decision-pivot effect,
+11. decision-contract lock,
+12. baseline sensing obligation,
+13. implementation commitment,
+14. public-state accretion,
+15. minimal sufficient disclosure,
+16. spillover internalization,
+17. provenance-linked liability,
+18. canonical inherited frontier,
+19. incremental novelty discipline,
+20. ontology stability,
+21. transportability scope - every artifact declares the bounded contexts, actor classes, time scales, operating regimes, jurisdictional or causal neighborhoods, and dependency assumptions under which its claimed contraction is admissible,
+22. transfer map - the protocol defines what additional evidence, adaptation, or bridge artifacts are required to port that contraction from one scope cell to another,
+23. scope laundering - actors collect payout for contraction earned in one local region while implying or pricing it as if it tightened the whole public state.
+Only the first twenty-two belong in the mechanism. The twenty-third collapses the family into a market where the easiest rent is to discover something true somewhere and sell it as true everywhere. If the protocol cannot discipline scope and transport, novelty subtraction and ontology stability are not enough. It will still overpay for knowledge that does not travel. (#r381)
+
+The family triage after this correction is:
+
+1. Ontology-stable novelty-subtracted lineage systems that still score contributions on gross apparent global usefulness - dead.
+   Better than ontology churn and wrapper resale, but still unstable because the dominant strategy becomes extracting a valid local edge and monetizing it as if it updated a much larger common state than the evidence supports. (#r379, #r380, #r381)
+
+2. Systems with informal analyst judgment about whether a contribution is "generalizable" - also weak.
+   Better than unrestricted overclaiming, but still structurally weak because the seam that determines payout is exactly whether transfer assumptions were valid, and that seam cannot be left to loose commentary if capital is supposed to certify epistemic movement. (#r381)
+
+3. Strongest surviving family: **transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition markets**.
+   Keep #r360-#r380's surviving stack, but require every artifact and derivative to publish not only stable coordinate IDs, migration operators, parent graph, inherited frontier, and liability propagation, but also a **scope vector** and **transfer map**: what region of the state space the evidence actually covers, what boundary conditions make it fail, what bridge evidence is needed to extend it, what inherited liability survives attempted transport, and what share of any downstream payout is discovery versus adaptation. Fresh payout should attach only to contraction inside the declared scope cell, with separate lower-ceiling payout for valid porting work into adjacent cells. (#r381)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** not just ontology-stable, novelty-subtracted authority transfer. The exchanged object is **transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivoting, observability-backed diagnostic staged-resolvable calibrated timely marginal contraction of admissible state under liability**.
+- **State model:** the global state vector must now carry a **scope / transfer layer**: scope IDs, regime tags, actor-class tags, locality constraints, invariance assumptions, adaptation edges, bridge artifacts, and out-of-domain hazard markers. A paid update does not automatically move all coordinates equally; it moves only the scoped cell it earned, plus any later cells reached through explicit bridge rules. (#r381)
+- **Credibility model:** capital becomes trustworthy only when it sits junior not just to wrong claims, wrapper resale, ontology churn, and other prior pathologies, but also to the temptation to take a narrow local truth and sell it as common-state movement. Money should buy fresh contraction on a state space whose admissible domain is explicit enough that buyers know what was learned, where it applies, and what remains unproven outside that scope. (#r381)
+- **Market roles:** along with lineage custodians, novelty auditors, and ontology custodians, **scope custodians / transport auditors** become first-class because some of the highest-stakes economic questions are whether a claim actually transfers across regime boundaries or whether a new payment is needed for adaptation. (#r381)
+- **Settlement:** in addition to all prior criteria, the mechanism must settle whether the artifact's declared scope was honest, whether consumption stayed inside that scope, whether a downstream user attempted out-of-domain use without paying for bridge evidence, whether a bridge artifact really extended validity, and how liability and payout propagate when a transported claim later fails out of scope. (#r381)
+
+**Why this is better or worse than LMSR / orderbooks / batch auctions:**
+- **Better:** it confronts a knowledge-market-specific pathology those mechanisms mostly suppress by trading a tightly defined instrument: in reusable state systems, the main economic abuse may be overclaiming how far an insight travels.
+- **Better:** it sharpens why capital improves epistemics: capital should reward not just discovering a true local state delta, but honestly delimiting its scope and only paying more when additional transfer work is actually done.
+- **Worse:** it adds a scope taxonomy and bridge grammar. If domains do not admit compact transfer classes, the protocol becomes governance over whether one context is "close enough" to another.
+So the edge remains real only where locality, regime changes, and admissible transport can be expressed by a small typed scope grammar rather than open-ended expert argument. (#r381)
+
+**Simplest viable mechanism sketch after #r381:**
+1. Add scope IDs and transfer-map hashes to the public state machine.
+2. Require every contribution to declare the exact scope cell it tightens and the assumptions under which the contraction holds.
+3. Treat any attempt to reuse a contribution outside its native scope as a separate transport action with its own bond, challenge window, inherited liability, and capped adaptation payout.
+4. Route purely rhetorical generalization into a zero-credit bucket unless a bridge artifact shows why the contraction survives the regime change.
+5. Let challengers earn by proving that a claimed global update was only a local contraction, that a bridge omitted key boundary conditions, or that an out-of-domain consumer free-rode on authority never actually earned in that cell. (#r381)
+
+**Strongest new reason this idea fails:**
+The deepest remaining kill becomes **scope-grammar overload**. If useful knowledge is highly contextual and transport across cells requires rich tacit judgment, then locking scope tightly enough to stop laundering may fragment the market into tiny local cells, while loosening scope reopens overgeneralization. (#r381)
+
+**Best surviving variant if this correction is too ambitious:**
+Restrict the family to domains with sparse regime classes, clear locality boundaries, and compact bridge tests. There, the best surviving descendant is not a general market in knowledge but a **transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition market**. In domains where every insight is deeply context-bound and scope transfer cannot be typed compactly, stop pretending there is one shared knowledge market and treat it as federated local markets with explicit adaptation procurement between them. (ref: #r379, #r380, #r381)
 - **#r379** - 2026-04-05T23:34Z - Added an incremental-novelty correction: even provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless every composite artifact is scored against a canonical inherited frontier so only net-new contraction is payable. Otherwise the same epistemic improvement can be repackaged and monetized repeatedly through wrapper stacks, and the mechanism degenerates into novelty laundering.
 - **#r378** - 2026-04-05T23:24Z - Added a provenance-liability correction: even spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless reused public-state artifacts carry lineage-linked residual liability and payout inheritance. Otherwise contributors can launder weak claims through downstream composites, sever blame from influence, and turn the commons into accountability-free knowledge stacking.
 - **#r377** - 2026-04-05T23:14Z - Added a demand-internalization correction: even minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless the mechanism internalizes public-state spillovers across beneficiaries. Otherwise the best reusable updates are systematically underfunded by any single demander and the system collapses toward underprovision, private side-deals, or advisory capture.
