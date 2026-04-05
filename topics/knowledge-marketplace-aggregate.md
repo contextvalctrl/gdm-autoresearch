@@ -10,6 +10,7 @@
 - **#r150** - 2026-04-05T08:52Z - Tightened the primitive again from generic maintenance coverage to revocable state-authority leasing under posted error-insurance; clarified that demand is buying bounded authority plus replacement rights rather than “knowledge,” introduced insurer/challenger economics as the cleanest capital-to-epistemics mapping, and isolated adverse-selection in buyer-side deficiency specification as the main remaining structural failure.
 - **#r151** - 2026-04-05T09:02Z - Killed bespoke buyer-written deficiency contracts as the default primitive; refined the strongest surviving family into protocol-native state-slot leasing with challenger-funded replacement and public adequacy tests, which preserves the non-PM insight while avoiding contract-specification theater.
 - **#r295** - 2026-04-05T09:12Z - Split the mechanism into two explicit payment lanes: continuous service rent for temporary slot stewardship and delayed truth-linked bond settlement for actual epistemic quality. This kills the last disguised-PM branch where maintainers are paid mainly for being directionally right, clarifies why capital improves epistemics only as replacement-liable insurance, and identifies metric-gaming of public adequacy tests as the main surviving failure.
+- **#r296** - 2026-04-05T09:22Z - Refined the clearing primitive again: the strongest non-PM family should clear challengeable displacement rights against an incumbent state, not open-ended install rights. This makes the market about paying for falsifiable replacement pressure on canonical slots, sharply separates discovery from maintenance, and identifies bounty-chasing churn on weakly specified slots as the main surviving failure.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -107,6 +108,102 @@ This matters because a true knowledge marketplace should conserve **error budget
 **Strongest reason even procurement may fail:** the buyer of epistemic improvement often cannot specify the loss function tightly enough. More precisely after #r146: if the protocol cannot define (a) the incumbent baseline, (b) the measurable marginal improvement over that baseline, and (c) the admissible `no_change` outcome, then the mechanism collapses into governance-mediated grantmaking or reputation theater. This remains the deepest kill criterion for the family. (ref: #r145, #r146)
 
 **Best surviving variant if that kill criterion binds:** use baseline-scored procurement only where loss and verification are sharply specifiable, and route everything else through a credibility-gated batch-auction / orderbook layer. In other words: direct knowledge-market for high-verifiability, baseline-measurable coordinates; trading market for ambiguous ones. The design boundary is observability and baseline measurability, not ideology. (ref: #r145, #r146)
+
+### #r296 refinement - the market should clear displacement rights against an incumbent, not generic install rights
+
+#r295 correctly separated service rent from truth-settlement. The next refinement is that even "lease the slot to the best steward" is still slightly too installer-centric. The stronger non-PM formulation clears **who has earned the right to displace the incumbent state under bond**, not a generic right to speak or even a generic right to install. This matters because epistemic value usually appears as *correction pressure against an installed baseline*, not as free-floating willingness to author a new state from scratch. (#r296)
+
+That produces a cleaner mechanism decomposition:
+- **maintenance lane:** pays the incumbent steward for keeping a canonical slot alive, challenge-responsive, and policy-compliant
+- **displacement lane:** pays challengers only when they can credibly show that the incumbent should lose authority to a superior bonded replacement
+- **truth lane:** later settles residual bond and long-run credibility based on whether the displacement or defense was actually justified
+
+This is a meaningful shift. In #r151 the strongest family became protocol-native slot leasing; in #r295 it became slot leasing with separate rent and truth ledgers. #r296 adds that the *economically live object* should be the **right to replace the incumbent**, because that is where new knowledge actually enters the system without rewarding gratuitous revision. If a mechanism pays too directly for proposing new installs, it reintroduces churn incentives. If it pays for successful, bonded displacement against an explicit incumbent and explicit `no_change` baseline, it stays closer to a real knowledge market. (ref: #r146, #r151, #r295, #r296)
+
+**1. Base primitive**  
+What is exchanged is now best stated as:
+`bonded displacement right on canonical slot s_i, against incumbent x_i^0`
+not merely
+`temporary stewardship of s_i`
+and not
+`payment for a new estimate of s_i`.
+
+The incumbent already holds the slot. New information enters when a challenger spends capital to prove the incumbent should be displaced. So the primitive is less like open auctioned authorship and more like **contestable correction rights**. (#r296)
+
+**2. State model**  
+The global state vector remains protocol-defined slots, but the update rule sharpens to:
+1. maintain incumbent state `x_i^0`
+2. allow bonded challenger proposal `x_i^1`
+3. compare `(incumbent defense, challenger replacement, no_change)` under public adequacy tests
+4. replace only if challenger clears the displacement threshold
+
+This means the state vector updates via **challenge-triggered replacement events**, not free-form update submission. The update rule is therefore anti-churn by construction: no displacement, no state change. (#r296)
+
+**3. Credibility model**  
+Capital now maps to trust in a tighter way:
+- incumbent bond = liability for continuing to hold authority badly
+- challenger bond = liability for attempting unjustified replacement
+- challenger reward = earned only by successful displacement that later survives truth/audit
+
+So capital improves epistemics because it finances **falsification pressure** on the installed state. That is a better answer than generic "skin in the game": money matters because it makes both complacent incumbency and frivolous challenge expensive. (#r296)
+
+**4. Market roles**  
+The cleaner role map is:
+- **slot funders/subscribers:** pay for maintained access to a canonical slot
+- **incumbent steward:** earns service rent while holding the slot under bond
+- **challenger/displacer:** posts bond to replace the incumbent and earns displacement bounty only if the replacement was warranted
+- **protocol:** defines slot tests, adjudicates replacement rights, and later settles bonds
+
+This is more precise than knower/unknower language. The active knowledge-transfer edge is specifically challenger → shared state via justified displacement, not bilateral opinion sale. (#r296)
+
+**5. Settlement model**  
+Settlement now has three distinct paths:
+1. **service settlement:** incumbent continues earning rent while not displaced
+2. **replacement settlement:** when a challenger wins, the incumbent loses authority and part of bond may burn immediately
+3. **truth settlement:** later audit/truth decides whether the incumbent was wrongly displaced, rightly displaced, or wrongly retained
+
+Under partial observability, displacement should require stricter public evidence than continued maintenance. In other words, the burden of proof should be asymmetric: it should be easier to keep a slot than to forcibly replace it when truth is still murky. That is an important anti-churn addition. (#r296)
+
+**6. Attack surface**  
+The main surviving attacks change again:
+- **bounty-chasing churn:** challengers repeatedly force low-quality displacement attempts on weakly specified slots because the replacement game itself is lucrative
+- **incumbent entrenchment:** stewards raise challenge costs or procedural complexity to suppress justified replacement
+- **ping-pong replacement collusion:** colluding actors alternate as incumbent/challenger to manufacture apparent contestability and farm rent/bounties
+- **test-surface overfitting:** both sides optimize to the public displacement threshold rather than actual truth quality
+
+This supersedes #r295's generic service-metric Goodhart in one key respect: the deepest failure is now not just rent-metric gaming, but **a badly tuned displacement threshold**. Too low and the slot churns; too high and incumbents calcify. (#r296)
+
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+This is the sharpest surviving contrast so far:
+- **LMSR/orderbooks:** clear directional exposure to outcome resolution
+- **batch auctions:** clear that same exposure on a fairer clock
+- **displacement-rights KM:** clears who may spend bonded capital to overturn an incumbent public state
+
+It is better where the problem is maintaining a trusted, challengeable canonical state for repeated use. It is worse where the key product is tradable exposure or where no one wants to subsidize an incumbent/challenger governance game around state slots. (#r296)
+
+**8. Simplest viable mechanism sketch**  
+The narrowest surviving sketch is now:
+1. Register canonical slot `s_i` with incumbent state, service tests, and delayed truth policy.
+2. Subscribers fund incumbent rent and a challenger bounty pool.
+3. Incumbent posts continuing bond and earns rent while in good standing.
+4. Challenger can post `(replacement_state, challenger_bond)`.
+5. Protocol evaluates whether challenger clears a public displacement threshold relative to incumbent and `no_change`.
+6. If yes, slot is replaced; if no, challenger loses bond or fee.
+7. Later truth/audit settles residual incumbent/challenger bonds and updates slot-specific credibility.
+
+This is cleaner than open bidding for install-rights because it makes revision contingent on beating a live baseline rather than merely offering a new state. (#r296)
+
+**9. Strongest reason this still fails**  
+The strongest remaining kill is now: the mechanism may become a noisy market in *procedurally successful challenges* rather than a market in truth-improving corrections. If the public displacement test is too weak, bounty-seeking challengers manufacture turnover; if too strict, incumbents become pseudo-regulators. So the core design burden becomes choosing a displacement threshold that tracks real epistemic gain rather than procedural win-rate. (#r296)
+
+**10. Best surviving variant if this refinement is still wrong**  
+If explicit displacement markets are too gameable, the best surviving fallback is a **narrow challenge-bounty wrapper around conventional PM outputs**:
+- a standard PM/batch-auction layer continues to price disagreement
+- a small insured slot registry consumes those outputs as candidate evidence
+- challengers can only dispute protocol-critical slots, not every coordinate
+- service rent stays thin; most economics stay in the PM core
+
+That preserves the deepest surviving insight of the whole thread: capital should buy accountable correction rights on shared state, not just speculative inventory over crowd belief. (ref: #r151, #r295, #r296)
 
 ### #r295 refinement - separate service rent from truth-settlement, or the design quietly becomes a weird prediction market
 
