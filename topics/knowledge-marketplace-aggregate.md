@@ -1,6 +1,7 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r335** - 2026-04-05T16:12Z - Added an order-independence correction: pivotal-elimination rewards should not depend on arbitrary arrival order or "last cut" luck. The stronger surviving form pays against ex post minimal unlock sets / necessity structure for the action-boundary crossing, with a thin timing premium only for materially earlier boundary acceleration; otherwise the mechanism degenerates into last-mover jackpot gaming or early spam on prerequisite cuts.
 - **#r334** - 2026-04-05T16:02Z - Added a contribution-accounting correction: when multiple exclusions are jointly required to narrow the admissible action set, the KM should not pay each elimination independently. Payment should attach to boundary-crossing / pivotal contraction of the live action set, with residual credit apportioned against declared prerequisite structure; otherwise the mechanism overpays ontology-chopping and underprices true decision-unlocking information.
 - **#r2** - 2026-04-04T17:32Z - Paused MatchingEngine line and restarted knowledge-marketplace mechanism design thread. Reframed the primitive as capped, escrow-bonded credible-information transfer; added unresolved-truth settlement branch; performed 3-family viability triage.
 - **#r145** - 2026-04-05T08:02Z - Refined the family comparison: killed the naive bilateral "knower sells belief to unknower" framing, elevated state-update procurement as the strongest non-LMSR primitive, and clarified why the wrong conserved quantity collapses back into prediction-market behavior.
@@ -49,6 +50,58 @@
 
 - **#r332** - 2026-04-05T15:42Z - Added an elimination correction: even threshold certification can still overreward premature positive classification. The stronger surviving product is bonded elimination of inadmissible decision regions, with canonical state only collapsing to a single region when all rivals have been excluded or timeout forces a coarse fallback. This sharpens the primitive from positive class assertion into liability-bearing exclusion rights, preserves the non-PM architecture, and moves the deepest residual kill from threshold-registry capture toward elimination-ladder design / hidden region coupling.
 - **#r333** - 2026-04-05T15:52Z - Added an action-equivalence correction: elimination should only be paid when it changes the admissible downstream action set. This refines the strongest surviving family from generic region elimination into bonded removal of action-distinct possibilities, collapses ontology that is decision-equivalent, and moves the deepest residual kill from generic hidden coupling toward action-partition misdesign / latent action differences hidden inside supposedly equivalent regions.
+
+### #r335 refinement - make pivotal credit order-independent, or the mechanism becomes a last-mover jackpot
+
+#r334 correctly moved payment away from raw per-exclusion rewards and toward **pivotal contraction** of the live action set. The next correction is that "pivotal" cannot be read naively as **who happened to submit the final exclusion that crossed the line**. In conjunctive elimination problems, several accepted exclusions may all be necessary for the same action-boundary crossing, and the literal last accepted cut may be mostly path-dependent luck. If the protocol pays the final arrival as if it alone created the epistemic value, actors will either race to snipe the last easy cut or avoid doing hard early eliminations whose value can later be expropriated by a cheap finisher. The stronger surviving product is therefore **order-independent pivotal elimination**: pay against the ex post minimal unlock set (or other public necessity structure) for the action-boundary crossing, not against raw temporal order, with only a thin premium for materially earlier acceleration of the crossing horizon. (#r335)
+
+This is a real mechanism correction, not a minor accounting cleanup. #r334 solved the problem of overpaying every locally valid exclusion. #r335 solves the next problem: overpaying whichever eliminator happened to arrive last. The KM should distinguish among:
+- **necessary exclusion** - this class had to be removed for the action menu to narrow,
+- **timing contribution** - removing it earlier accelerated the boundary crossing in calendar / decision time,
+- **arrival luck** - it happened to be the final accepted cut only because other prerequisites were already satisfied.
+
+The protocol should pay mainly for the first, modestly for the second, and minimally or not at all for the third. Otherwise the mechanism becomes a brittle race for terminal placement rather than a market for real decision-unlocking ambiguity reduction. (#r335)
+
+The family triage after this correction is:
+
+1. **Per-exclusion payout** - dead.
+   Already killed by #r334 and now even more clearly wrong because it ignores both necessity and order effects. (ref: #r333, #r334, #r335)
+
+2. **Naive last-mover pivotal payout** - also no longer acceptable.
+   Better than per-exclusion fees, but still structurally unstable because it converts joint necessity into an arbitrary terminal jackpot. (#r334, #r335)
+
+3. **Defect-triggered, order-independent pivotal elimination on action-distinct classes** - strongest surviving refinement.
+   Keep #r329's sparse defect chassis, #r331's protocol-native region registry, #r332's falsification-first elimination logic, #r333's action-equivalence partition, and #r334's boundary-crossing credit rule, but settle the main payout against a public ex post minimal unlock set or equivalent necessity graph, not against literal arrival order. This is the cleanest surviving non-PM primitive so far in threshold-governed domains where several eliminations jointly unlock a bounded action surface. (#r335)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** a bonded right to eliminate an action-distinct class, with economic credit tied to whether that elimination belongs to the minimal necessity set for an actual action-boundary crossing.
+- **State model:** global state on a facet must track not only live classes and action-boundary maps, but also enough public structure to evaluate ex post which accepted eliminations were genuinely necessary versus merely chronologically last.
+- **Credibility model:** stake still buys the right to remove a class under liability, but payout should depend on necessity-weighted contribution and only secondarily on acceleration value, not on final-arrival luck.
+- **Market roles:** demanders pay because a blocked action menu needs ambiguity removed; eliminators compete to strike classes under bond; challengers contest wrongful exclusions or fake necessity claims; the protocol must expose how necessity sets and acceleration premia are computed.
+- **Settlement:** first settle whether the admissible action set actually narrowed; then settle which accepted eliminations were in the minimal unlock set; only then distribute primary payout, with any timing premium applied separately and narrowly.
+
+**Why this is cleaner versus LMSR / orderbooks / batch auctions:**
+- LMSR/orderbooks/batch auctions reward **who moved inventory / price and when**.
+- #r334 moved the KM to **pivotal action unlocking**.
+- #r335 sharpens it further to **order-independent necessity in action unlocking**.
+The economic win condition is no longer "I got the last trade in before the crossing" or even "I arrived with the final exclusion." It is: "my exclusion was genuinely required for the action menu to narrow, and I am liable if that necessity claim was false." That is more tightly aligned with knowledge transfer than any timing-dominant or flow-dominant clearing rule. (#r335)
+
+**Simplest viable mechanism sketch after #r335:**
+1. Register a canonical facet with protocol-native regions, action-equivalence collapse, and a public map from live-class subsets to admissible action menus.
+2. Publish a public necessity representation for each relevant action-boundary crossing: exact minimal unlock sets where possible, or an auditable approximation rule where not.
+3. A demander opens a defect/elimination ticket because the current live class set still blocks a desired bounded action menu.
+4. Suppliers submit `(target class to eliminate, supporting evidence, bond, horizon)`.
+5. Protocol accepts only eliminations that satisfy public exclusion tests; accepted eliminations remove that class for the active horizon.
+6. When the updated live class set crosses a published action boundary, the protocol computes which accepted eliminations belong to the relevant minimal unlock set(s).
+7. Primary payout goes to those necessary eliminators by a public split rule; any thin timing premium is based only on demonstrated acceleration of the crossing horizon, not mere last-arrival status.
+8. Challengers may reopen wrongly excluded classes or dispute fake necessity claims in the unlock-set computation.
+9. On breach, the excluded class is restored and part of the eliminator's bond burns; later audit updates boundary-specific credibility based on whether the claimed unlock contribution was real. (#r335)
+
+**Strongest new reason this idea fails:**
+The deepest residual kill becomes **necessity-graph intractability / unlock-set theater**. In many domains, the protocol may not be able to compute or publish robust minimal unlock sets without sneaking in an enormous amount of ontology and action-graph design. If necessity is too hard to formalize, the mechanism either falls back to naive timing rewards or becomes a political fight over who was "really necessary." That is sharper than #r334's generic contribution-graph capture because it targets the exact new abstraction introduced here: order-independent necessity attribution. (#r335)
+
+**Best surviving variant if even this correction is too ambitious:**
+Keep #r329's defect-triggered chassis and #r334's boundary-crossing payout rule, but restrict paid markets to cases where the protocol can publish a small, robust, mostly unique unlock-set structure. Where minimal necessity is ambiguous, either pay only for the boundary crossing event itself via coarse shared credit, or do not run the market on that boundary at all. That preserves the strongest surviving insight so far: the non-PM opportunity is not to reward sharper beliefs, nor every elimination, nor even whichever eliminator arrived last-it is to finance **loss-bearing removal of uncertainty that is genuinely necessary to cross a public decision boundary in shared canonical state**. (ref: #r329, #r333, #r334, #r335)
 
 ### #r334 refinement - pay for pivotal action-set contraction, not every locally valid elimination
 
