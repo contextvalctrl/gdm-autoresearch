@@ -46,8 +46,59 @@
 - **#r330** - 2026-04-05T15:22Z - Added an uncertainty-compression correction: the strongest surviving non-PM demand object is not generic belief movement or perpetual state stewardship, but bonded rights to narrow decision-relevant uncertainty bands on named canonical facets. This sharpens the exchange object into calibrated uncertainty compression under liability, preserves the sparse defect-triggered architecture, and identifies calibration theater / unverifiable band semantics as the deepest new residual kill.
 - **#r331** - 2026-04-05T15:32Z - Added a threshold-certification correction: when free-form uncertainty-band semantics are too gameable, the stronger surviving product is bonded certification that a canonical facet lies in one of a small set of protocol-native decision regions. This replaces generic band-narrowing with liability-bearing threshold certification, sharpens partial-observation settlement around region breach rather than full point truth, and moves the deepest residual kill from calibration theater toward threshold-registry capture / boundary packing.
 
+- **#r332** - 2026-04-05T15:42Z - Added an elimination correction: even threshold certification can still overreward premature positive classification. The stronger surviving product is bonded elimination of inadmissible decision regions, with canonical state only collapsing to a single region when all rivals have been excluded or timeout forces a coarse fallback. This sharpens the primitive from positive class assertion into liability-bearing exclusion rights, preserves the non-PM architecture, and moves the deepest residual kill from threshold-registry capture toward elimination-ladder design / hidden region coupling.
+
 
 ### #r331 refinement - if band semantics are too soft, clear bonded threshold certification instead of free-form uncertainty compression
+
+### #r332 refinement - certify by excluding wrong decision regions before asserting the final right one
+
+#r331 correctly replaced soft interval rhetoric with bonded threshold certification on protocol-native decision regions. The next correction is that even region certification may still overpay for **premature positive classification**. A certifier who says "the facet is in region R2" is still making a stronger claim than many decision environments can justify quickly. Very often what high-information agents can defend first is not the exact right region, but that **some regions are no longer admissible**. If the market pays immediately for positive class assignment, it can still drift into disguised directional advocacy around the threshold surface. The stronger surviving product is therefore **bonded region elimination**: participants earn by ruling out inadmissible decision regions under liability, while the canonical facet collapses to a sharper class only when enough competing regions have been excluded. (#r332)
+
+This is a meaningful mechanism correction, not a semantic restatement. It says the live economic act should usually be:
+- not "install my preferred region"
+- but "strike region R_k from the currently admissible set because I am willing to post bond that this region should not remain decision-live"
+
+That keeps the market falsification-first even inside the threshold-certification family. Capital improves epistemics here because it finances **loss-bearing removal of unjustified decision options**, not just louder assertion of a preferred class. This is closer to the deepest non-PM thread insight: money should buy accountable collapse of ambiguity, and the safest first collapse move is often negative rather than positive. (#r332)
+
+The family triage after this correction is:
+
+1. **Positive threshold certification as the default product** - weakened, though still useful in narrow domains.
+   Strong when boundaries are clean and asymmetric false positives are tolerable. Weaker as a general base primitive because it still rewards early commitment to one winning bucket. (#r331, #r332)
+
+2. **Bonded uncertainty compression** - still viable where interval semantics are natural.
+   But if the protocol already has discrete action regions, interval language adds unnecessary slack. (#r330, #r331, #r332)
+
+3. **Defect-triggered bonded region elimination** - strongest surviving refinement.
+   Use #r329's sparse defect-ticket activation and #r331's protocol-native decision regions, but let the active market clear who may exclude currently admissible regions under bond. Canonical state sharpens only as elimination succeeds; if multiple regions remain live, the facet stays in a coarse ambiguity class. This is the cleanest surviving answer to how a knowledge market can be non-PM while remaining falsifiable. (#r332)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** a bonded right to eliminate a named decision region from the admissible set for a canonical facet over a bounded horizon.
+- **State model:** global state on a facet is now often `(admissible region set, eliminated regions, active coarse class)` rather than a single certified region. Updates are mainly set-subtraction events.
+- **Credibility model:** stake buys the right to exclude regions; stake burns if later evidence shows the excluded region should have remained live, or if the exclusion depended on hidden boundary assumptions not in the public tests.
+- **Market roles:** demanders pay because too many regions remain live for safe action; eliminators/knowers compete to strike regions under bond; challengers defend wrongly excluded regions or prove elimination overreach; restorers can re-open a region after bad exclusion.
+- **Settlement:** immediate service payment can fund the active exclusion window; delayed settlement scores whether the excluded region was in fact inadmissible relative to the prior ambiguity set. Under partial observability, the protocol settles first on whether the exclusion was warranted, not on whether the final surviving region was uniquely correct.
+
+**Why this is cleaner versus LMSR / orderbooks / batch auctions:**
+- LMSR/orderbooks/batch auctions still reward **directional movement toward a favored outcome or price**.
+- An elimination-style KM rewards **justified removal of still-live decision classes**.
+The economic win condition is not "I pushed mass onto region R2" but "I responsibly removed region R4 from the action-relevant possibility set, and I am liable if that exclusion was premature." That is a cleaner knowledge-transfer primitive in domains where falsification outruns full classification. (#r332)
+
+**Simplest viable mechanism sketch after #r332:**
+1. Register a canonical facet with a protocol-native set of decision regions plus a coarse fallback class representing unresolved ambiguity.
+2. A demander opens a defect/elimination ticket because the current admissible region set is too broad for a bounded action interface.
+3. Suppliers submit `(target region to eliminate, supporting evidence, bond, horizon)`.
+4. Protocol accepts only eliminations that satisfy public exclusion tests against the current admissible set; accepted eliminations remove that region for the active horizon.
+5. If only one strict region remains live, the facet can inherit that region's bounded action rights; otherwise it stays in the remaining coarse ambiguity class.
+6. Challengers may post evidence and bond to reopen a wrongly excluded region or prove the elimination overreached.
+7. On breach, the excluded region is restored to the admissible set and part of the eliminator's bond burns; later audit settles residual credibility on exclusion quality. (#r332)
+
+**Strongest new reason this idea fails:**
+The deepest residual kill becomes **elimination-ladder design / hidden region coupling**. If decision regions are not truly separable, actors will eliminate them one by one in a way that looks disciplined while silently depending on coupled assumptions across regions. Then the market appears conservative but still smuggles in a favored classification path through sequential exclusion. This is a sharper failure than #r331's generic boundary packing because it targets the exact place where a falsification-first discrete mechanism can still fake epistemic progress. (#r332)
+
+**Best surviving variant if even this correction is too ambitious:**
+Keep #r329's defect-triggered chassis and #r331's region registry, but restrict live trading to a small set of **protocol-native elimination surfaces** where exclusion tests are monotone and auditable. Use direct positive certification only when all but one region have already been excluded or when the ontology itself defines a uniquely checkable admissibility class. That preserves the strongest surviving insight so far: the non-PM opportunity is not to let capital pick the winning belief, but to finance **bounded, loss-bearing elimination of decision-relevant uncertainty from shared state**. (ref: #r329, #r331, #r332)
+
 
 #r330 correctly found the cleanest "knowledge" product so far: bonded narrowing of a decision-relevant uncertainty band on a named facet. The next correction is that even band compression may still leave too much semantic slack. A market participant can publish a formally narrower band that looks precise while still being operationally mushy, badly aligned to actual decision boundaries, or impossible to falsify quickly. If the thing being sold is truly decision-useful knowledge, the protocol should often stop one layer earlier and ask for a more discrete product: **certification that the canonical facet lies in one of a small set of protocol-native decision regions**. (#r331)
 
