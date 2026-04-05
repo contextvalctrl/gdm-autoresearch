@@ -37,6 +37,7 @@
 - **#r322** - 2026-04-05T14:02Z - Added the missing temporal-granularity correction: insured deviation authority should not be exercisable as an unmetered continuous right. The strongest surviving family now clears checkpoint-bounded decision authority, where deviation budget, activation, and rollback commitments are only sampled and settled at protocol-defined decision checkpoints. This sharpens the product into insured checkpoint authority rather than continuous discretion, aligns the family more cleanly with anti-front-running / batch-style clocks, and moves the deepest residual failure toward checkpoint gaming / off-checkpoint shadow execution.
 - **#r323** - 2026-04-05T14:12Z - Added the missing burst-sizing correction: checkpoint-bounded authority is still unsafe if a single checkpoint can consume arbitrarily large deviation capacity. The strongest surviving family now clears checkpoint-specific execution envelopes, where each checkpoint has a bounded notional/action burst cap and per-checkpoint recovery load estimate. This sharpens the product from generic checkpoint authority into insured checkpoint burst rights and moves the deepest residual failure toward burst-concentration gaming / hidden checkpoint clustering.
 - **#r324** - 2026-04-05T14:23Z - Added the missing composition-within-burst correction: checkpoint burst caps are still too weak if the holder can improvise arbitrary action mix inside the allowed burst. The strongest surviving family now clears template-bound checkpoint execution rights, where each exercised burst must follow a predeclared action composition / routing template with bounded substitution latitude. This sharpens the product from generic checkpoint burst rights into insured checkpoint execution recipes and moves the deepest residual failure toward template gaming / hidden micro-routing discretion.
+- **#r325** - 2026-04-05T14:32Z - Added the missing trigger-policy correction: even template-bound checkpoint recipes are too permissive if the holder can still choose when and under which observed subconditions to fire them. The strongest surviving family now clears state-conditioned trigger automata, where each insured checkpoint recipe must be attached to a predeclared trigger policy mapping observable state buckets to admissible execution templates. This sharpens the product from insured execution recipes into insured bounded response policies and moves the deepest residual failure toward trigger-grammar capture / observation-channel gaming.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The strongest surviving primitive is now **insured deviation authority from a protocol-native safe fallback policy**, attached to defended canonical state and bounded by public first-loss retention, a public scenario-basis exposure ledger across concurrently active deviations, **a separate activation meter on actually executed deviation flow, a public rollback / reversibility ladder for each activated deviation class, ex ante reservations on public recovery-plan paths required to unwind those deviations if challenged, and protocol-defined decision checkpoints at which that authority may actually be exercised and audited**. Not a probability share. Not belief inventory. Not a generic knowledge sale. Not even abstract action-class insurance in the first instance. The mechanism should clear how far a shared state facet may move downstream behavior away from a declared fallback rung, who is allowed to underwrite that deviation, what pooled excess-loss capacity stands behind it if the deviation proves unjustified, **which standardized stress factors / scenario buckets that deviation reserves**, **how much of that reserved authority is actually exercised in live downstream action flow**, **how quickly that exercised deviation can be forced back to fallback once challenged**, **which feasible bundles of restoration channels remain callable for that forced unwind at system level**, and **at which protocol checkpoints those deviations are legally sampled, committed, and reversible**. The scarce object is therefore not narrative approval and not full action-loss insurance; it is protocol-legible **deviation budget from a public fallback policy, measured on a scenario-basis vector, burned mainly by utilization rather than by dormant reservation alone, multiplied by rollback latency / reversibility burden, gated by contingent callable recovery-path options with declared substitution costs, and instantiated only through checkpoint-bounded decision acts rather than continuous free discretion**. #r318 added the correction that rollback labels are not enough when many revocations depend on the same repair rails; #r319 tightened that insight into a clearing rule that a deviation should not be sold as safely reversible unless the protocol has reserved some bounded share of the rollback machinery it would consume under breach. #r320 adds the further correction that one named rail is still too brittle: a believable unwind must usually be representable as a **public path bundle** with primary and fallback routes, otherwise the protocol either hardcodes fragile single-channel assumptions or lets actors pretend they have many exits when they really have one. #r322 adds the next correction: even a good path graph is still insufficient if authority may be used continuously between audits, because then true exposure depends on hidden intraperiod path decisions rather than legible protocol acts. #r323 adds the next correction: even checkpointed authority is too coarse unless each checkpoint also has a bounded execution envelope, because otherwise the protocol simply compresses continuous discretion into giant bursty decision moments. #r324 adds the next correction: even a bounded burst envelope is still too permissive if the holder can improvise arbitrary composition inside the burst. So the exercised object must now include a **template-bound execution recipe**: a predeclared action mix, routing logic, or transformation pattern, plus a bounded substitution menu for contingencies. The mechanism must therefore separate reservation capacity, activation capacity, rollback burden, recovery-channel capacity, path-substitution terms, **checkpoint timing, checkpoint burst size, and within-burst execution composition**, instead of pretending static authorization and live usage are the whole object. (ref: #r305, #r310, #r311, #r312, #r313, #r314, #r315, #r317, #r318, #r319, #r320, #r322, #r323, #r324)
@@ -28307,3 +28308,102 @@ not belief matching, but **pre-funded, contestable underwriting of bounded actio
 ting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
 state**. (ref: #r305, #r306, #r307)
 ting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
+
+### #r325 refinement - the mechanism should clear state-conditioned trigger automata, not free trigger discretion inside a checkpoint
+
+#r324 correctly constrained composition inside a checkpoint burst by requiring template-bound execution recipes. The next correction is that even a fixed recipe still leaves a large hidden degree of freedom if the holder can choose **when** within the checkpoint to fire it, or **which observed subcondition** inside the checkpoint justifies firing it. If trigger discretion remains open, the mechanism still quietly sells situational judgment rather than a bounded epistemic product. That is too close to discretionary governance with insurance attached. The stronger surviving family should therefore clear **state-conditioned trigger automata**. (#r325)
+
+The product is no longer just:
+- a bounded deviation right,
+- at a bounded checkpoint,
+- with a bounded burst size,
+- through a bounded execution template.
+
+It is now:
+- a bounded **response policy** mapping predeclared observable state buckets to a narrow set of admissible template executions.
+
+So the holder is not insured to "do something reasonable when the time comes." The holder is insured to execute a legible policy of the form:
+- if observed state is in bucket `B1`, template `T1` may fire up to envelope `E1`
+- if observed state is in bucket `B2`, template `T2` may fire up to envelope `E2`
+- otherwise default to fallback / no-act
+
+That is the cleanest next answer to the conserved-quantity question. What is being exchanged is no longer abstract slot authority, abstract decision warrant, abstract checkpoint burst right, or even an execution recipe in isolation. It is **insured authority to run a narrow trigger policy on canonical state at declared checkpoints**. Capital improves epistemics only if it underwrites not just what action mix is allowed, but also the limited observational conditions under which the action may be invoked. Otherwise template compliance can coexist with massive hidden timing and trigger discretion. (#r325)
+
+**Why this matters versus the current strongest family:**
+- #r322 killed continuous free discretion by introducing decision checkpoints.
+- #r323 killed checkpoint-level size arbitrariness by introducing burst envelopes.
+- #r324 killed within-burst composition arbitrariness by introducing execution templates.
+- #r325 kills the remaining **trigger arbitrariness**: the holder should not be able to wait for favorable microconditions or reinterpret noisy observations opportunistically while claiming they used an approved template.
+
+This sharpens the 10-part structure again.
+
+**1. Base primitive**
+What is exchanged is now best stated as:
+`insured checkpoint response policy on named observable state buckets`
+not merely
+`insured checkpoint execution recipe`.
+
+The scarce object is a bounded automaton: observable condition -> admissible template -> bounded execution envelope -> bounded rollback obligation. That is more precise than any earlier formulation and remains clearly non-PM because the mechanism is still not clearing directional inventory or price movement; it is clearing bounded machine-usable response authority under insurance. (#r325)
+
+**2. State model**
+The global state vector still consists of canonical slots/facets plus active deviation budgets, but each active warrant now also needs:
+- an **observation grammar**: which public inputs count as admissible trigger observations
+- a **bucket map**: how those observations are discretized into trigger states
+- a **trigger policy**: which execution template, if any, may fire in each bucket
+- a **default null action** for unmatched or ambiguous observations
+
+So state updates are no longer fully described by "template-tagged checkpoint execution." They are described by **triggered template executions**, where the protocol can later ask: was this burst fired under the observation bucket and trigger rule that was actually insured? A deviation that cannot specify a public observation grammar and trigger map should clear at a lower authority level or not clear at all. (#r325)
+
+**3. Credibility model**
+Capital now underwrites one more layer of boundedness: not just action composition, but **observation-conditioned invocation discipline**. Money improves epistemics only if actors lose capital for exploiting unpriced trigger discretion. A holder should not be able to claim they merely followed template `T1` if they were free to choose any favorable moment or any self-serving interpretation of the observed state to invoke it. So credibility must become partly a history of **correct trigger use under declared observation buckets**, not only a history of defended state or defended action templates. (#r325)
+
+**4. Market roles**
+The role split stays structurally the same, but authors/stewards are now really selling defended **response policies**, not isolated claims or recipes. Underwriters are not merely insuring state quality or even action recipes; they are insuring a narrow automaton linking canonical state observations to permitted execution. Refuters can now challenge not only state quality, warrant scope, utilization, rollback burden, burst concentration, or template compliance, but also **trigger misuse**: firing the right template under the wrong observed bucket, or defining buckets so loosely that nearly any market condition qualifies. (#r325)
+
+**5. Settlement model**
+Settlement should now distinguish one additional failure mode: **trigger breach**. A warrant may be economically wrong not because the recipe was invalid in the abstract, but because it was invoked under an observation state that did not justify using it. So later settlement should attribute losses among:
+- bad defended state
+- bad deviation sizing
+- bad rollback / recovery assumptions
+- bad template composition
+- **bad trigger policy or bad trigger invocation**
+
+This is important because it prevents the mechanism from blaming every failure on template design when the real issue was opportunistic firing. (#r325)
+
+**6. Attack surface**
+This moves the deepest residual attack one layer deeper:
+- **trigger-grammar capture** - insiders define observation buckets so vaguely that trigger discretion is effectively unconstrained
+- **observation-channel gaming** - actors manipulate or selectively report the public inputs that determine trigger state
+- **bucket boundary arbitrage** - small noisy changes around trigger thresholds create large insured action differences
+- **semantic trigger laundering** - the protocol thinks it insured a narrow automaton, but operators still retain broad interpretive judgment over what bucket the world is "really in"
+
+This supersedes pure template gaming as the next strongest kill. Even good templates remain hollow if the trigger surface is manipulable. (#r325)
+
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**
+The comparison sharpens again:
+- LMSR/orderbooks/batch auctions still clear exposure or belief movement,
+- this strongest KM family now clears **insured response policies** on shared state.
+
+It is better where downstream action can be expressed as a small policy grammar and where observation channels are public enough to bind trigger conditions. It is worse where the world is too ambiguous or too high-dimensional for a legible observation grammar, because then the mechanism again collapses into insured discretion. (#r325)
+
+**8. Simplest viable mechanism sketch**
+Add one more object to the current strongest sketch:
+1. register canonical slots, fallback ladder, deviation tranches, factor budgets, rollback ladders, recovery-path graph, checkpoints, burst envelopes, and execution templates
+2. for each active checkpoint template, also register a **trigger policy** over a small public observation grammar
+3. authority clears only if the template and its trigger map are both admissible
+4. exercise is valid only when the checkpoint's observed state lands in a bucket that authorizes that template
+5. challengers can dispute not only the burst or template, but the trigger classification itself
+6. later settlement updates credibility for state defense, template discipline, and trigger discipline separately
+
+That is the narrowest extension that removes the last major hidden discretion inside a checkpoint without collapsing into full algorithmic governance. (#r325)
+
+**9. Strongest reason this still fails**
+The strongest remaining kill is now: the mechanism may simply have pushed the problem into **observation and trigger ontology design**. If public observation channels are noisy, manipulable, or too semantically rich to discretize honestly, then trigger automata are theater. The protocol will look precise while still insuring hidden discretionary judgment. At that point capital does not improve epistemics; it launders policy discretion through a brittle observation grammar. (#r325)
+
+**10. Best surviving variant if this refinement is still wrong**
+If trigger-policy binding is too hard, the best surviving fallback is to stop one layer earlier:
+- keep checkpoint + burst + template constraints,
+- but reserve the full trigger-automaton design only for a tiny set of highly machine-observable domains,
+- and admit that more ambiguous domains should revert either to simpler insured stewardship or to conventional PM/orderbook/batch-auction discovery.
+
+That preserves the deepest surviving thread insight after #r325: the non-PM opportunity is strongest where capital can insure not just claims, not just states, and not just actions, but **bounded response policies from shared state to downstream execution**. (ref: #r322, #r323, #r324, #r325)
