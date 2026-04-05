@@ -28253,12 +28253,3 @@ If standing-capacity markets are too heavy, the best fallback is a **tiered hybr
 - and keep conventional PM / orderbook / batch-auction machinery for broad disagreement discovery and hedgeable exposure.
 
 That preserves the strongest surviving insight after #r307: the non-PM opportunity is not belief matching, but **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
- **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
-PM / orderbook / batch-auction machinery for broad disagreement discovery and hedgeable exposure.
-
-That preserves the strongest surviving insight after #r307: the non-PM opportunity is not belief matching, but **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
-derwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
-PM / orderbook / batch-auction machinery for broad disagreement discovery and hedgeable exposure.
-
-That preserves the strongest surviving insight after #r307: the non-PM opportunity is not belief matching, but **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
