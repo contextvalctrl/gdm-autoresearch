@@ -1,6 +1,7 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r337** - 2026-04-05T16:32Z - Added a shared-demand correction: even ticket-terminated decision-unlock markets still misprice when the same elimination simultaneously unlocks several tickets or action surfaces. The stronger surviving form clears against protocol-native unlock frontiers with pooled demand aggregation and anti-duplication payout caps, so one epistemic act cannot farm multiple cloned bounties unless it truly creates additional action-distinct authority.
 - **#r336** - 2026-04-05T16:22Z - Added a termination correction: even order-independent pivotal elimination still overpays if the ticket keeps rewarding further eliminations after the demander's bounded action has already become admissible. The stronger surviving form clears ticket-specific decision-unlock certificates against a declared target action/fallback transition and stops primary payout at first justified unlock, with only explicit secondary tickets allowed for further refinement.
 - **#r335** - 2026-04-05T16:12Z - Added an order-independence correction: pivotal-elimination rewards should not depend on arbitrary arrival order or "last cut" luck. The stronger surviving form pays against ex post minimal unlock sets / necessity structure for the action-boundary crossing, with a thin timing premium only for materially earlier boundary acceleration; otherwise the mechanism degenerates into last-mover jackpot gaming or early spam on prerequisite cuts.
 - **#r334** - 2026-04-05T16:02Z - Added a contribution-accounting correction: when multiple exclusions are jointly required to narrow the admissible action set, the KM should not pay each elimination independently. Payment should attach to boundary-crossing / pivotal contraction of the live action set, with residual credit apportioned against declared prerequisite structure; otherwise the mechanism overpays ontology-chopping and underprices true decision-unlocking information.
@@ -51,6 +52,58 @@
 
 - **#r332** - 2026-04-05T15:42Z - Added an elimination correction: even threshold certification can still overreward premature positive classification. The stronger surviving product is bonded elimination of inadmissible decision regions, with canonical state only collapsing to a single region when all rivals have been excluded or timeout forces a coarse fallback. This sharpens the primitive from positive class assertion into liability-bearing exclusion rights, preserves the non-PM architecture, and moves the deepest residual kill from threshold-registry capture toward elimination-ladder design / hidden region coupling.
 - **#r333** - 2026-04-05T15:52Z - Added an action-equivalence correction: elimination should only be paid when it changes the admissible downstream action set. This refines the strongest surviving family from generic region elimination into bonded removal of action-distinct possibilities, collapses ontology that is decision-equivalent, and moves the deepest residual kill from generic hidden coupling toward action-partition misdesign / latent action differences hidden inside supposedly equivalent regions.
+
+### #r337 refinement - pooled demand must clear on unlock frontiers, or cloned tickets will duplicate payment for the same epistemic act
+
+#r336 correctly stopped a single ticket from continuing to pay after its declared decision boundary had been crossed. But even a ticket-terminated design still fails if the same elimination or minimal unlock set simultaneously makes **several** tickets, users, or downstream action surfaces admissible. If the protocol simply pays each ticket independently, actors can reopen the same epistemic job in slightly different wrappers and collect stacked bounty for one underlying ambiguity reduction. That recreates a slower form of speculative overtrading: capital no longer buys one bounded decision unlock, but repeated monetization of the same public-state contraction. The stronger surviving product is therefore **protocol-native unlock-frontier clearing with pooled demand aggregation**. Payment should attach to the incremental action-distinct authority created on a shared unlock frontier, not to the raw count of tickets that happened to be waiting behind that frontier. (#r337)
+
+This is a real mechanism correction, not treasury hygiene. #r334 killed per-exclusion rewards. #r335 killed last-mover jackpots. #r336 killed post-unlock over-refinement inside a single ticket. #r337 kills the next failure: **duplicate monetization of one public epistemic act across many cloned or partially overlapping tickets**. Once a class elimination is public and canonical, it is non-rival in an epistemic sense. The mechanism therefore has to decide whether later buyers are purchasing:
+- the **same unlock** already achieved,
+- a **strictly wider unlock frontier** that activates new action-distinct authority, or
+- merely a rebundled duplicate claim on previously unlocked authority.
+
+Only the second should open major new primary payout. Otherwise the market turns into bounty multiplication on shared-state public goods. A knowledge marketplace should sell scarce ambiguity reduction at the action frontier, not let suppliers harvest the same reduction repeatedly because several demanders phrased near-identical tickets. (#r337)
+
+The family triage after this correction is:
+
+1. **Per-ticket independent unlock bounties** - dead.
+   Even with order-independent necessity accounting and ticket termination, this still lets suppliers farm duplicate payment by targeting overlapping decision surfaces or serially cloned demand wrappers. (ref: #r335, #r336, #r337)
+
+2. **Ticket-terminated unlock with weak overlap checks** - no longer acceptable as the default.
+   Better than open-ended refinement, but still structurally unstable because real domains have nested action menus and many demanders whose decisions ride on the same canonical contraction. (#r336, #r337)
+
+3. **Defect-triggered, order-independent, ticket-terminated unlock-frontier clearing with pooled demand aggregation** - strongest surviving refinement.
+   Keep #r329's sparse defect chassis, #r333's action-equivalence partition, #r334's boundary-crossing credit rule, #r335's order-independent necessity accounting, and #r336's stopping rule, but clear demand against public **unlock frontiers** rather than isolated tickets. Aggregate all active demand for the same frontier and cap payout by the incremental action-distinct authority newly created at that frontier. This is the cleanest surviving non-PM primitive so far because it treats epistemic contraction as a shared canonical public good while still letting demand finance which frontiers are worth opening. (#r337)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** a bonded right to eliminate action-distinct classes toward a named public unlock frontier, with payout tied to necessity-weighted contribution to the first justified crossing of that frontier and capped against duplicate downstream demand.
+- **State model:** the global state must track not only live classes and active tickets, but also a registry of public unlock frontiers and which currently admissible action surfaces each frontier newly enables.
+- **Credibility model:** stake still buys the right to remove classes under liability, but major reward attaches to creating net-new frontier crossing on canonical state; later demanders pay little or nothing for authority already unlocked unless they are funding a genuinely wider frontier.
+- **Market roles:** demanders do not buy isolated private refinement. They fund or join pooled frontier budgets. Eliminators compete to provide the necessary exclusions. Challengers contest wrongful exclusions, fake overlap claims, or false assertions that a given frontier truly created new action-distinct authority.
+- **Settlement:** first settle whether the named public unlock frontier was justifiably crossed; then allocate primary payout across the ex post minimal unlock set; then net duplicate demand into subscriber/service accounting rather than re-opening the main epistemic payout lane.
+
+**Why this is cleaner versus LMSR / orderbooks / batch auctions:**
+- LMSR/orderbooks/batch auctions let many traders independently hold exposure to the same state move.
+- A KM should usually not let many tickets independently repurchase the same public ambiguity reduction, because once canonical state changed, the information is already shared.
+- #r337 sharpens the break further: **payment is for crossing a new shared action frontier, not for the number of wallets standing behind it once crossed**.
+This makes the mechanism less like a trading venue and more like procurement of scarce public-state upgrades under liability. (#r337)
+
+**Simplest viable mechanism sketch after #r337:**
+1. Register a canonical facet with protocol-native regions, action-equivalence collapse, and a public map from live-class subsets to admissible action menus.
+2. Publish a registry of protocol-native **unlock frontiers**, each representing a distinct fallback-to-action transition or expansion of admissible authority.
+3. Demanders open or join pooled budgets on those frontiers rather than on arbitrary private tickets whenever overlap is substantial.
+4. Suppliers submit `(target class to eliminate, supporting evidence, bond, horizon)`.
+5. Protocol accepts only eliminations that satisfy public exclusion tests; accepted eliminations remove that class for the active horizon.
+6. When the live class set first crosses a named frontier, the protocol computes the relevant minimal unlock set(s) and allocates the frontier's primary payout across the necessary eliminators by a public split rule.
+7. Any later demander whose desired action surface lies wholly inside an already-cleared frontier may subscribe to the unlocked authority or fund maintenance/challenge coverage, but does not reopen the full epistemic bounty.
+8. Only if a later demander funds a strictly wider frontier that enables net-new action-distinct authority does a new primary payout lane open.
+9. Challengers may dispute whether two tickets really map to the same frontier or whether a claimed wider frontier is genuinely action-distinct rather than repackaged duplication. (#r337)
+
+**Strongest new reason this idea fails:**
+The deepest residual kill becomes **frontier-registry capture / overlap adjudication theater**. The protocol may not be able to define when two decision requests are economically the same unlock versus genuinely different frontiers. If frontier equivalence is too coarse, real demand heterogeneity is suppressed and suppliers are underpaid. If too fine, actors clone neighboring frontiers and recreate duplicate bounty farming. This is sharper than #r336's ticket-fragmentation concern because it targets the exact new abstraction introduced here: the public unlock-frontier registry itself. (#r337)
+
+**Best surviving variant if even this correction is too ambitious:**
+Keep #r336's ticket-terminated logic, but restrict paid markets to a small registry of protocol-native frontier templates with strong overlap rules and force later near-duplicates into subscription/service lanes instead of new unlock bounties. Where the protocol cannot robustly determine overlap, do not run a rich open unlock market there. That preserves the strongest surviving thread insight so far: the non-PM opportunity is not to let many traders monetize the same public state move, but to finance **loss-bearing elimination of uncertainty up to the first creation of net-new action-distinct authority on shared canonical state**. (ref: #r329, #r333, #r334, #r335, #r336, #r337)
 
 ### #r336 refinement - stop paying after the ticket's bounded decision is unlocked, or the market turns back into paid over-refinement
 
