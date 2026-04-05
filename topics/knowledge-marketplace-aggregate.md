@@ -119,11 +119,12 @@ So the non-PM contribution is not a better pricing rule; it is a different produ
 5. Protocol maintains a **scenario-basis reservation ledger** that caps total reservable deviation across named public stress factors rather than only with one aggregate number.
 6. Protocol also maintains an **activation ledger** with utilization weights, burst limits, metered execution quotas, and a rollback-class registry for each active deviation tranche.
 7. Protocol also maintains a **recovery-channel ledger** for the scarce rollback rails required to unwind active deviations: liquidity windows, operator attention, migration bandwidth, hedging capacity, or other named restoration channels.
-8. Authors/stewards compete to supply defended state that can justify reserving a given deviation tranche.
-9. If attached, the protocol allows the bounded departure from fallback to reserve capacity **only if local tranche capacity, every relevant shared stress-bucket budget, and enough recovery-channel capacity all remain inside policy**.
-10. Actual downstream use of that deviation consumes activation quota, utilization-weighted factor budget, rollback headroom, and contingent claim on named recovery rails; dormant reservations decay, expire, or pay carry cost so they cannot park scarce capacity indefinitely.
-11. Refuters can post evidence and bond to prove the live deviation should step down to a safer rung, or that recorded utilization / rollback class / recovery-channel declaration understates real operational dependence.
-12. On breach, the protocol forces the action flow down the public rollback ladder at the class-specific unwind rate and burns/queues against the reserved recovery channels before treating the deviation as safely extinguished.
+8. Each recovery-channel reservation must also carry a **public unwind-priority tier / preemption rule**, so simultaneous breaches know which deviations are forced back first and which may wait.
+9. Authors/stewards compete to supply defended state that can justify reserving a given deviation tranche.
+10. If attached, the protocol allows the bounded departure from fallback to reserve capacity **only if local tranche capacity, every relevant shared stress-bucket budget, enough recovery-channel capacity, and an admissible unwind seniority all remain inside policy**.
+11. Actual downstream use of that deviation consumes activation quota, utilization-weighted factor budget, rollback headroom, contingent claim on named recovery rails, and occupancy inside its declared unwind-priority tier; dormant reservations decay, expire, or pay carry cost so they cannot park scarce capacity indefinitely.
+12. Refuters can post evidence and bond to prove the live deviation should step down to a safer rung, or that recorded utilization / rollback class / recovery-channel declaration / seniority tier understates real operational dependence.
+13. On breach, the protocol forces the action flow down the public rollback ladder at the class-specific unwind rate and burns/queues against the reserved recovery channels **in declared seniority order** before treating the deviation as safely extinguished.
 13. Losses first hit the public retention layer, then only the excess **relative to the registered fallback rung, rollback schedule, and declared recovery-path capacity** hits the relevant pooled tranche, while author quality and underwriting quality are updated separately.
 14. Restorers later post fresh bond/capacity to re-extend deviation one rung at a time.
 15. Later truth/audit updates author quality, retention design quality, fallback-registry quality, tranche-pricing quality, **scenario-basis calibration quality, activation-meter quality, rollback-map quality, and recovery-channel classification quality**, with residual losses settled separately.
@@ -28278,3 +28279,6 @@ al, machine-enforced action classes,
 
 That preserves the strongest surviving insight after #r307: the non-PM opportunity is not belief matching, but **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
 not belief matching, but **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
+ting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
+not belief matching, but **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
+ting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
