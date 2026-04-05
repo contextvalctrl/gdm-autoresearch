@@ -41,6 +41,56 @@
 - **#r326** - 2026-04-05T14:42Z - Added the missing observation-policy correction: even trigger-bound response policies are still too permissive if the holder can choose, preprocess, delay, or selectively reveal the observations that feed those triggers. The strongest surviving family now clears insured closed-loop policies over protocol-declared observation bundles and sampling rules, which sharpens the product from bounded response policies into observation-locked decision automata and moves the deepest residual failure toward feature-space capture / sampling-policy gaming.
 - **#r327** - 2026-04-05T14:52Z - Added the missing inference-policy correction: even observation-locked triggers are still too permissive if the holder can silently change the model or estimator that maps those observations into the trigger state. The strongest surviving family now clears insured closed-loop policies over protocol-declared observation bundles, sampling rules, and frozen inference grammars / model versions, which sharpens the product from observation-locked automata into inference-locked decision automata and moves the deepest residual failure toward model-version laundering / hidden retuning.
 - **#r328** - 2026-04-05T15:02Z - Applied a scope correction: the mechanism should stop at insuring challengeable epistemic warranties on canonical state plus bounded decision warrants, and should not try to underwrite the entire closed-loop observation / inference / execution stack. Once the market tries to insure a full controller, it ceases to be a knowledge marketplace and becomes automation-governance theater. This supersedes the strongest reading of #r325-#r327, narrows the core product back to insured state authority with publicly declared action envelopes, and moves the deepest remaining kill from hidden model retuning toward ontology overload / action-surface capture.
+- **#r329** - 2026-04-05T15:12Z - Applied a market-activation correction: the strongest surviving family should not put every canonical slot under continuously monetized insured stewardship by default. Instead, the KM should be sparse and defect-triggered: default state remains passive/public, while capitalized market activity turns on only when someone escrows a bounded defect claim, challenge, or restoration request on a named slot/facet. This supersedes the most rent-heavy reading of #r295-#r328, keeps the non-PM primitive as bonded error-detection plus bounded correction rights rather than permanent paid incumbency, and moves the deepest remaining kill from pure ontology overload toward defect-taxonomy design / under-triggering of real state failures.
+
+### #r329 refinement - the KM should be sparse and defect-triggered, not a permanent rent market on every slot
+
+#r328 correctly stopped the mechanism from swallowing the full controller stack. The next correction is economic rather than control-theoretic: even a narrower design can still drift into overbuilt bureaucracy if **every canonical slot is continuously under paid insured stewardship by default**. That makes the market responsible for the whole live ontology all the time, which quietly reintroduces a heavy incumbency economy, permanent rent extraction, and specification overhead on coordinates that may not currently need active epistemic intervention. A real knowledge marketplace should probably activate only where there is a legible *state defect* or a live request for bounded restoration, not as a universal always-on lease layer. (#r329)
+
+The stronger surviving formulation is therefore:
+- canonical state is public and passively available by default
+- the market activates when an actor escrows a **defect ticket** on a named slot/facet/action-warrant surface
+- capital then clears who may defend, falsify, narrow, or restore that bounded surface under bond
+- once the defect resolves or the restoration window ends, the market lane can go dormant again
+
+This is a meaningful correction to the rent-heavy branch from #r295 onward. Continuous service rent made sense as one way to separate maintenance from truth-settlement, but taken too literally it turns the KM into a standing franchise market for ontology administration. That is one layer too broad. The stronger non-PM primitive is not "pay someone forever to own state authority." It is **pay to surface, defend, or repair bounded epistemic defects in shared state when those defects matter enough to finance explicit challenge.** Capital improves epistemics here because it funds costly error detection and bounded correction capacity, not because it permanently sponsors incumbents. (#r329)
+
+The cleanest family triage after this correction is:
+
+1. **Always-on insured slot stewardship** - weakened / no longer preferred.
+   Useful for a very small set of protocol-critical slots, but too broad as the default family. It creates rent-seeking around merely being the current authority-holder and pushes the mechanism toward ontology administration rather than knowledge transfer. (#r295-#r328, superseded in part by #r329)
+
+2. **Defect-ticketed warranty / falsification / restoration** - strongest surviving family.
+   The market object is a bounded defect surface: "this facet/action-warrant is not decision-safe under current canonical state." Actors post bond either to defend the incumbent, prove breach, or restore a narrower/higher authority tranche. Payment exists because a real defect ticket funded the lane. This stays non-PM because nothing here is tradable outcome inventory or generic price movement; the scarce object is bonded corrective jurisdiction over a named state failure. (#r329)
+
+3. **Conventional PM discovery plus tiny defect market wrapper** - best hybrid fallback.
+   Use PM/orderbook/batch mechanisms for broad disagreement discovery; use the defect-triggered KM only where canonical shared state drives real protocol permissions and needs explicit bounded repair. This remains the best fallback if even defect taxonomies are too brittle. (#r329)
+
+**Why this improves the answer to the conserved-quantity question:**
+The conserved quantity should not be imagined as generic stake, permanent authority, or even permanent credibility. The more precise scarce object is now **bonded defect-handling capacity**: how much bounded falsification/repair bandwidth the system can finance on named state surfaces at once without letting challenges become spam or incumbency become cartelized. That is much closer to a knowledge-transfer market than a standing lease economy. (#r329)
+
+**Implications for the 10-question frame:**
+- **Base primitive:** bounded defect ticket + bonded right to defend/falsify/restore, not perpetual slot rent.
+- **State model:** most slots sit in passive canonical mode; only ticketed surfaces enter active adversarial maintenance lanes.
+- **Credibility model:** capital earns standing by handling defect tickets correctly, not by continuously occupying office.
+- **Market roles:** demand comes from defect sponsors / subscribers who need a named uncertainty repaired; supply comes from defenders, refuters, and restorers.
+- **Settlement:** service payment should be front-loaded around active defect windows, with delayed truth settlement still handling long-horizon correctness.
+- **Attack surface:** shifts away from pure incumbency/rent Goodhart toward defect-taxonomy capture, under-reporting of real defects, and spammy low-value ticket creation.
+
+**Why this is cleaner versus LMSR/orderbooks/batch auctions:**
+- LMSR/orderbooks/batch auctions are always-on disagreement-clearing machines.
+- A defect-triggered KM is an **episodic epistemic intervention machine**.
+It clears when shared state is credibly alleged to be inadequate and someone is willing to pay for bounded adversarial repair. That is a clearer break from prediction-market logic than the broader rent-based stewardship picture, because the system is no longer trying to continuously monetize every coordinate of belief or authority. (#r329)
+
+**Strongest remaining kill after this correction:**
+The deepest residual failure is now **defect-taxonomy design**. If the protocol cannot define state defects/facets tightly enough, either:
+- real failures never get ticketed (under-triggering),
+- trivial failures flood the lane (over-triggering), or
+- actors learn to phrase political disagreements as pseudo-defects.
+Then the mechanism becomes a market in opening and defending tickets rather than a market in truth-improving repair. That is a better-framed kill than generic ontology overload, because it pinpoints exactly where the sparse design can still fail. (#r329)
+
+**Best surviving variant if this correction is still not enough:**
+Keep the KM only as a **high-threshold defect court** for a tiny registry of protocol-critical state surfaces. Everything else stays either passive canonical state, ordinary governance, or conventional PM discovery. That preserves the deepest surviving thread insight: the non-PM opportunity is not to price all beliefs differently, but to finance *bounded, adversarial, loss-bearing repair of shared state when a real defect matters enough to open a case*. (ref: #r299, #r300, #r301, #r305, #r328, #r329)
 
 ### #r328 refinement - stop at epistemic warranty; do not let the KM swallow the whole controller
 
