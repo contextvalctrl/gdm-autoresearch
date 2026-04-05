@@ -1,7 +1,61 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r338** - 2026-04-05T16:42Z - Added an anti-free-rider correction: even pooled unlock-frontier clearing underproduces if later beneficiaries can join only after the frontier is crossed and suppliers can wait for bounty thickening. The stronger surviving form uses ex ante frontier subscriptions / standing beneficiary rosters plus controlled retroactive cost-sharing, so payment attaches to precommitted demand for a shared unlock rather than to opportunistic post-unlock hitchhiking.
 - **#r337** - 2026-04-05T16:32Z - Added a shared-demand correction: even ticket-terminated decision-unlock markets still misprice when the same elimination simultaneously unlocks several tickets or action surfaces. The stronger surviving form clears against protocol-native unlock frontiers with pooled demand aggregation and anti-duplication payout caps, so one epistemic act cannot farm multiple cloned bounties unless it truly creates additional action-distinct authority.
+
+### #r338 refinement - pooled frontier clearing still fails unless the mechanism solves beneficiary free-riding and bounty-thickening delay
+
+#r337 correctly killed duplicate monetization of the same public epistemic act across cloned tickets by moving payment from isolated tickets to pooled **unlock frontiers**. But even frontier pooling still underproduces if beneficiaries can mostly wait until after the frontier is crossed and then consume the newly unlocked authority at low cost. In that world the knowledge good is still public while financing remains voluntary and ex ante. Early demanders subsidize everyone else, while suppliers learn to delay effort until enough bounty accumulates behind the frontier. The stronger surviving product is therefore **frontier clearing with precommitted beneficiary rosters / subscription rights and controlled retroactive cost-sharing**. Payment should attach mainly to demand that was committed before the shared unlock, with only a bounded late-join levy for beneficiaries who begin consuming the unlocked authority afterward. (#r338)
+
+This is a real mechanism correction, not treasury garnish. #r337 solved duplicate payout for the same epistemic contraction. #r338 solves the next failure: **public-good free-riding and strategic waiting on both sides of the frontier**. Once a frontier unlock is canonical, three economically distinct populations exist:
+- **precommitted beneficiaries** - actors who funded the frontier before crossing and should receive the main unlock rights / pricing advantage,
+- **late beneficiaries** - actors who begin consuming authority only after the frontier has been crossed and should pay some access levy but should not fully reopen the epistemic bounty,
+- **suppliers/eliminators** - actors who can choose whether to work now or wait for the frontier budget to thicken.
+
+A KM should therefore not only prevent duplicate payment for one unlock; it should also prevent the equilibrium where everyone waits for someone else to fund the frontier and suppliers wait for more subscribers before producing the same public contraction. Capital is supposed to accelerate credible information transfer, not create a market in waiting for public epistemic goods to become someone else’s problem. (#r338)
+
+The family triage after this correction is:
+
+1. **Open frontier pooling with purely voluntary ex post access** - dead.
+   Still underfunds because later users can free-ride on the same public unlock, while suppliers rationally wait for bounty thickening. (ref: #r337, #r338)
+
+2. **Pooled frontier budgets with no late-user levy** - no longer acceptable as the default.
+   Better than cloned-ticket bounty farming, but still structurally weak wherever unlocked authority is broadly reusable by many consumers or downstream action surfaces. (#r337, #r338)
+
+3. **Defect-triggered, order-independent, ticket-terminated unlock-frontier clearing with precommitted subscription rights and bounded retroactive cost-sharing** - strongest surviving refinement.
+   Keep #r329's sparse defect chassis, #r333's action-equivalence partition, #r334's boundary-crossing credit rule, #r335's order-independent necessity accounting, #r336's stopping rule, and #r337's pooled frontier clearing, but require frontiers to maintain a public beneficiary roster and a policy for late-join levies / access pricing. This is the cleanest surviving non-PM primitive so far because it treats the unlock as a shared public good while still solving who actually pays for producing it. (#r338)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** a bonded right to eliminate action-distinct classes toward a named public unlock frontier, with payout funded mainly by precommitted subscribers to that frontier and only secondarily by bounded retroactive charges on post-unlock consumers.
+- **State model:** the global state must now track not only live classes, action menus, and unlock frontiers, but also a beneficiary ledger showing who subscribed before crossing, what rights they earned, and how late beneficiaries are charged.
+- **Credibility model:** stake still buys the right to remove classes under liability, but epistemic payout now depends on causing a frontier crossing that had real committed demand behind it; credibility should not depend on waiting until a thick bounty pool forms from passive post-unlock users.
+- **Market roles:** demanders become frontier subscribers, not just ticket openers. Later consumers of unlocked authority may pay access levies or replenishment fees. Eliminators compete to provide the necessary exclusions. Challengers contest wrongful exclusions, fake frontier distinctions, or attempts by late users to evade cost-sharing.
+- **Settlement:** first settle whether the named public frontier was justifiably crossed; then allocate primary payout across the ex post minimal unlock set; then settle beneficiary accounting by giving precommitted subscribers the preferential economic treatment and charging only bounded late-join levies instead of reopening the core bounty.
+
+**Why this is cleaner versus LMSR / orderbooks / batch auctions:**
+- LMSR/orderbooks/batch auctions are happy to let many late traders buy exposure after seeing more order flow, because the product is still tradable inventory.
+- A KM unlock is a public epistemic upgrade whose value can be widely reused once canonical state changes.
+- #r338 sharpens the break further: **the mechanism must finance the shared unlock mainly from ex ante committed beneficiaries, not from naive hope that public-good production will self-fund after the fact**.
+This makes the mechanism less like a trading venue and more like subscription-backed procurement of bounded public-state upgrades under liability. (#r338)
+
+**Simplest viable mechanism sketch after #r338:**
+1. Register a canonical facet with protocol-native regions, action-equivalence collapse, and a public map from live-class subsets to admissible action menus.
+2. Publish a registry of protocol-native unlock frontiers, each representing a distinct fallback-to-action transition or expansion of admissible authority.
+3. Demanders subscribe to a frontier before crossing, escrowing funds and receiving a public beneficiary timestamp / tier.
+4. Suppliers submit `(target class to eliminate, supporting evidence, bond, horizon)` against those frontier budgets.
+5. Protocol accepts only eliminations that satisfy public exclusion tests; accepted eliminations remove that class for the active horizon.
+6. When the live class set first crosses a named frontier, the protocol computes the relevant minimal unlock set(s) and allocates the frontier's primary payout across the necessary eliminators by a public split rule.
+7. Precommitted subscribers receive the unlocked authority at the subscribed rate and priority.
+8. Later consumers whose desired action surface lies inside an already-cleared frontier do not reopen the core epistemic bounty, but may owe a bounded access levy, replenishment fee, or maintenance contribution into that frontier's post-crossing pool.
+9. Only if a later demander funds a strictly wider frontier that enables net-new action-distinct authority does a new primary payout lane open.
+10. Challengers may dispute frontier equivalence, beneficiary-status fraud, or evasion of late-user cost-sharing. (#r338)
+
+**Strongest new reason this idea fails:**
+The deepest residual kill becomes **beneficiary-registry capture / late-user taxation theater**. The protocol may not be able to define who truly benefited from a frontier unlock, when consumption began, or how large a retroactive levy is fair without recreating another layer of action-surface bureaucracy. If late-user charges are too weak, free-riding returns. If too strong, the KM becomes a toll system that suppresses beneficial reuse of public knowledge. This is sharper than #r337's frontier-overlap problem because it targets the new abstraction introduced here: the financing boundary between subscribers and later beneficiaries. (#r338)
+
+**Best surviving variant if even this correction is too ambitious:**
+Keep #r337's pooled frontier logic, but restrict paid markets to frontiers with a small, legible beneficiary set and require ex ante subscription for nearly all meaningful consumption of the unlocked authority. Where the protocol cannot tell who benefited or cannot meter post-unlock consumption cleanly, do not promise rich retroactive cost-sharing. That preserves the strongest surviving thread insight so far: the non-PM opportunity is not to let many traders profit from the same public state move, but to finance **loss-bearing elimination of uncertainty up to the first creation of net-new action-distinct authority on shared canonical state, with payment anchored in committed demand rather than post hoc public-good hitchhiking**. (ref: #r329, #r333, #r334, #r335, #r336, #r337, #r338)
 - **#r336** - 2026-04-05T16:22Z - Added a termination correction: even order-independent pivotal elimination still overpays if the ticket keeps rewarding further eliminations after the demander's bounded action has already become admissible. The stronger surviving form clears ticket-specific decision-unlock certificates against a declared target action/fallback transition and stops primary payout at first justified unlock, with only explicit secondary tickets allowed for further refinement.
 - **#r335** - 2026-04-05T16:12Z - Added an order-independence correction: pivotal-elimination rewards should not depend on arbitrary arrival order or "last cut" luck. The stronger surviving form pays against ex post minimal unlock sets / necessity structure for the action-boundary crossing, with a thin timing premium only for materially earlier boundary acceleration; otherwise the mechanism degenerates into last-mover jackpot gaming or early spam on prerequisite cuts.
 - **#r334** - 2026-04-05T16:02Z - Added a contribution-accounting correction: when multiple exclusions are jointly required to narrow the admissible action set, the KM should not pay each elimination independently. Payment should attach to boundary-crossing / pivotal contraction of the live action set, with residual credit apportioned against declared prerequisite structure; otherwise the mechanism overpays ontology-chopping and underprices true decision-unlocking information.
