@@ -1,6 +1,7 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r361** - 2026-04-05T20:32Z - Added a congestion correction: even liability-backed authority-transition markets fail unless authority/liability bandwidth is explicitly capacity-limited, locally exhaustible, and congestion-priced. Otherwise the same tranche can be over-issued as blanket assurance, and the mechanism collapses into underpriced warranty inventory rather than disciplined epistemic transfer.
 - **#r360** - 2026-04-05T20:22Z - Added a conserved-quantity correction: the KM should not be framed as generic ask/bid exchange of "knowledge" at all. Unless clearing attaches to scarce protocol-native authority/liability bandwidth on bounded state transitions, the mechanism collapses into assurance brokerage, consulting, or subsidized certification. The strongest surviving family therefore prices maintained decision-authority capacity under liability, not raw information flow.
 - **#r359** - 2026-04-05T20:12Z - Added an attribution correction: even attributable non-rentable retained-risk consumption fails if later loss cannot be decomposed into epistemic miss versus execution noise / world variance. The stronger surviving form must bind each authority tranche to a narrow action envelope plus a protocol-native error-attribution rule, so capital improves epistemics by disciplining decision quality rather than by randomly taxing outcomes.
 - **#r358** - 2026-04-05T20:02Z - Added an anti-rental correction: even retention-coupled authority consumption fails if consumer retention can be cheaply rented, rebated, sybilled, or passed through shell identities. The stronger surviving form must bind retained-risk to attributable, non-transferable consumption identity / action history, so capital improves epistemics through real demand-side discipline rather than cosmetic co-stake.
@@ -26,6 +27,58 @@
 - **#r337** - 2026-04-05T16:32Z - Added a shared-demand correction: even ticket-terminated decision-unlock markets still misprice when the same elimination simultaneously unlocks several tickets or action surfaces. The stronger surviving form clears against protocol-native unlock frontiers with pooled demand aggregation and anti-duplication payout caps, so one epistemic act cannot farm multiple cloned bounties unless it truly creates additional action-distinct authority.
 
 - **#r340** - 2026-04-05T17:12Z - Added a timeout/anti-stall correction: paired unlock and default-defense lanes still fail if defended no-unlock can persist indefinitely under weak observability. The stronger surviving form makes every default warranty explicitly perishable, with expiry, decay, and mandatory downgrade to a coarser safe state if neither side can justify authority by the deadline, so capital cannot simply fund epistemic gridlock.
+
+### #r361 refinement - even liability-backed authority-transition markets fail unless authority/liability bandwidth is explicitly capacity-limited, locally exhaustible, and congestion-priced, because uncapped authority turns back into blanket warranty inventory
+
+#r360 correctly identified the surviving conserved quantity: not generic knowledge, but scarce **authority/liability bandwidth** on bounded state transitions. But even that stronger formulation still fails if the protocol treats a tranche as if the same maintained authority can be consumed arbitrarily many times, by arbitrarily many downstream actors, at roughly flat marginal economics. Then the mechanism quietly recreates the wrong object again. It is no longer selling disciplined transfer of epistemic authority at the point of decision; it is selling an underpriced **blanket warranty surface**. The same bonded tranche can be invoked across too many concurrent calls, too much notional, too much correlated action mass, or too many decision contexts before challenge, refresh, and retained-risk layers can realistically absorb the load. In that world capital is not improving epistemics by rationing careful authority transfer; it is subsidizing over-issuance of a public assurance badge. The stronger surviving form is therefore **capacity-priced authority-transition underwriting**. Each authority tranche must expose not only bounded liability, challengeability, usage, retained demand-side risk, and error attribution, but also an explicit notion of finite service capacity: concurrency, notional, scope width, refresh bandwidth, or challenge-absorption budget that can be locally exhausted. Capital should pay for *scarce consumable authority* under congestion, not for apparently infinite permission cloned off one maintained coverage surface. (#r361)
+
+This is a real mechanism correction, not implementation garnish. #r356 already required economics to attach to actual authority consumption. #r357 required consumers to retain downside. #r359 required settlement to tax epistemic error rather than generic bad outcomes. #r360 identified the conserved quantity as authority/liability bandwidth on bounded state transitions. #r361 kills the next failure: **capacity illusion / warranty over-issuance**. A knowledge marketplace should now distinguish among:
+1. **authority existence** - a tranche is live in the public state machine,
+2. **authority consumption** - a downstream action invokes that tranche,
+3. **authority capacity** - how much invocation mass that tranche can safely support before its evidence, monitoring, challenge bandwidth, or retained-risk structure becomes diluted,
+4. **blanket assurance theater** - a tranche looks bounded in law but behaves economically like an infinitely reusable warranty badge.
+Only the first three belong in the mechanism. The fourth collapses the family into subsidized insurance inventory. If capacity is not explicit, suppliers and consumers will stretch every active tranche across wider action classes, larger size, more counterparties, and denser timing clusters than the maintained epistemic support can truly bear. Then the market stops pricing transfer from high-information to low-information zones and starts pricing who can warehouse the biggest assurance umbrella on thin real support. (#r361)
+
+The family triage after this correction is:
+
+1. **Liability-backed authority-transition markets with effectively uncapped tranche throughput** - dead.
+   Better than generic knowledge sale, but still unstable because one funded authority surface can be overconsumed until it behaves like blanket warranty inventory rather than scarce epistemic service. (#r356, #r357, #r360, #r361)
+
+2. **Usage-metered authority with soft or discretionary capacity review** - no longer preferred.
+   Better than flat uncapped usage, but still structurally weak because the protocol discovers overload only after the same authority has already been stretched across too much correlated demand. That reintroduces hidden insurance leverage and politically contested throttling. (#r349, #r356, #r360, #r361)
+
+3. **Defect-triggered, order-independent clearing of bounded authority transitions, where suppliers underwrite maintained coverage margin on public authority tranches and consumers pay to consume explicitly capacity-limited authority/liability bandwidth under retained, attributable, error-bounded liability** - strongest surviving refinement.
+   Keep #r348-#r360's surviving stack, but require every tranche to define local exhaustibility: maximum concurrent invocations, bounded notional per window, challenge-load budget, refresh cadence capacity, or some other protocol-native service-capacity unit that degrades as the tranche is consumed. Fresh payout should attach to maintaining and safely serving this scarce capacity under challenge, not to keeping a nominal authority badge live while the protocol silently assumes unlimited downstream throughput. (#r361)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** not generic authority, but a bonded contest to maintain and serve **finite units of authority/liability bandwidth** on named state transitions.
+- **State model:** the global state must now track not only tranche activation and coverage margin, but also a **capacity ledger**: available units, reserved units, consumed units, replenishment rate, overload state, and downgrade / throttle triggers when service capacity is exhausted.
+- **Credibility model:** capital becomes trustworthy only when it sits junior to wrongful authority expansion *and* to over-issuance of authority beyond declared capacity. Money should buy scarce epistemic service under explicit congestion, not a fiction of infinite certifiable throughput. (#r361)
+- **Market roles:** in addition to underwriters, challengers, and consumers, **capacity allocators / schedulers** become first-class because some epistemic work is deciding which requests can safely consume the tranche now versus queue, split, or downgrade.
+- **Settlement:** first settle whether the tranche exists and remains covered; then whether actual invocation stayed inside the action envelope; then whether it stayed inside the tranche's declared capacity envelope; and finally whether any miss came from epistemic shortfall, capacity overrun, or off-envelope execution noise. Payments should clear against maintained authority that was not only justified, but also not oversubscribed relative to its own declared ability to bear demand. (#r361)
+
+**Why this is better or worse than LMSR / orderbooks / batch auctions:**
+- **Better:** it directly prices a thing those mechanisms usually leave implicit - finite safe throughput of an authority surface, not just the fact that some belief or position exists.
+- **Better:** it prevents the KM from cheating by pretending one defended authority tranche can safely intermediate arbitrary downstream mass.
+- **Worse:** the protocol now has to specify capacity units and replenishment logic, which is hard and domain-specific.
+- **Worse:** if capacity units are fake proxies, the mechanism degenerates into queue bureaucracy or arbitrary throttling.
+So the edge remains real only where authority demand can be expressed in small, protocol-legible service units. (#r361)
+
+**Simplest viable mechanism sketch after #r361:**
+1. Define a tiny public state machine with named transition frontiers and explicit downgrade paths.
+2. For each frontier, define not just the authority tranche, coverage-margin rule, challenge surface, usage meter, retained-risk rule, and error-attribution envelope, but also a finite capacity budget per window.
+3. Let demand fund either `(a)` activation of a tranche or `(b)` reservation / consumption of capacity units on that tranche.
+4. Let suppliers post bond to underwrite both coverage margin and service-capacity maintenance for a bounded window.
+5. Let challengers earn by exposing not only undercoverage but also hidden overload or undeclared correlation in capacity use.
+6. Let consumers invoke the tranche only by attaching retained, attributable downside and by consuming explicit capacity units; if capacity is exhausted, the request must queue, split, downgrade, or pay sharply higher congestion pricing.
+7. Slash when the protocol served authority beyond declared capacity and later evidence shows that over-issuance diluted epistemic quality inside the tranche's scope.
+This is the narrowest form that preserves #r360's conserved quantity while preventing it from silently inflating into blanket warranty supply. (#r361)
+
+**Strongest new reason this idea fails:**
+The deepest remaining kill becomes **capacity-specification fiction**. Many epistemic services do not have natural local throughput units. If the protocol cannot define credible capacity budgets without arbitrary queue rules or fake service metrics, then congestion pricing becomes bureaucratic theater and the mechanism still collapses into insurance-like judgment calls. (#r361)
+
+**Best surviving variant if this correction is too ambitious:**
+Restrict the family to domains where authority consumption is naturally countable and overload is legible - settlement release, bounded API calls, delegated execution rights, admission gates, or narrow approval queues. There, the best surviving descendant of the raw idea is not a general market in knowledge or even generic authority. It is a **capacity-priced, liability-backed authority-transition market**. In broader domains with fuzzy service capacity, stop pretending the KM can clear a common object and fall back to governance, procurement, or conventional market microstructure. (ref: #r356, #r357, #r359, #r360, #r361)
 
 ### #r360 refinement - a "knowledge marketplace" is not a stable market primitive unless the conserved quantity is scarce authority/liability bandwidth on bounded state transitions, because generic bids and asks for knowledge collapse into assurance brokerage, consulting, or subsidized certification
 
