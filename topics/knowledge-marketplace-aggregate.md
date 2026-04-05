@@ -17,6 +17,7 @@
 - **#r300** - 2026-04-05T10:02Z - Split falsification from reconstruction completely: the strongest surviving non-PM family is now a three-stage mechanism where warranty writers defend canonical slots, refuters earn only for provable breach, and replacement is chosen in a separate constrained repair stage rather than bundled into the same market act. This kills the last “challenger smuggles in a preferred state” branch and surfaces ontology brittleness—the protocol may detect breach more reliably than it can synthesize the correct replacement—as the new deepest failure.
 - **#r301** - 2026-04-05T10:12Z - Refined the post-breach path again: when reconstruction is hard, the mechanism should prefer epistemic downgrade over forced synthesis. The strongest surviving family now treats breach as a trigger to move the slot into a narrowed / degraded safe state first, with full replacement deferred to a later stewardship competition. This kills the hidden “protocol must know the correct successor immediately” assumption and sharpens the best fallback into falsification + safe degradation, not falsification + instant rewrite.
 - **#r302** - 2026-04-05T10:22Z - Tightened the degrade-first path: breach should usually mint a scoped breach certificate and degrade only the falsified slice of a canonical slot, not collapse the entire slot into safe mode. The strongest surviving family is now warranty + falsification + scoped degradation + later restoration, which reduces the risk that the mechanism becomes high-integrity but low-utility by overusing whole-slot downgrades.
+- **#r303** - 2026-04-05T10:32Z - Refined the restoration leg: after scoped breach, re-authority should return in staged confidence tranches rather than a single jump back to full canonical status. This turns restoration into progressive re-certification of degraded facets, sharpens the conserved quantity into authority-level coverage, and identifies ratchet gaming / premature re-upgrade as the main new failure surface.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -510,6 +511,106 @@ If facet-level decomposition is too brittle, the best surviving fallback is a **
 - and continue sourcing eventual restoration from a separate mechanism when synthesis remains hard.
 
 That preserves the deepest surviving insight from #r299-#r302: the non-PM opportunity is not to trade beliefs, but to run a market for **capital-backed defense, falsification, and carefully bounded revocation of shared state authority**. (ref: #r299, #r300, #r301, #r302)
+
+### #r303 refinement - restoration should be progressive re-certification, not one-shot return to full authority
+
+#r302 correctly localized breach and degradation to the falsified facet set. The next refinement is that the restoration leg is still too binary if a degraded facet jumps directly from low-authority safe mode back to full canonical status. In many domains the protocol can establish **"some confidence has been re-earned"** well before it can justify **"full prior authority is restored."** If restoration is all-or-nothing, the mechanism either stays degraded too long or re-upgrades too aggressively. Both are bad. (#r303)
+
+The stronger formulation is therefore:
+- after a scoped breach, the protocol should restore authority in **staged confidence tranches**,
+- each tranche should correspond to a narrower adequacy claim on the degraded facet set,
+- and each higher tranche should require additional posted insurance plus stronger evidence than the last.
+
+This matters because it makes restoration monotone and capital-sensitive. The mechanism no longer asks a brittle question - "is the facet fully fixed yet?" - but a sequence of bounded questions: "is this facet now good enough to leave safe default, then good enough to regain medium confidence, then good enough to regain full canonical authority?" Capital improves epistemics here by underwriting each step of renewed precision separately. The conserved quantity is therefore not just authority over a slot or facet; it is **authority-level coverage on that facet**, with higher authority levels carrying higher insurance burden. (#r303)
+
+**1. Base primitive**  
+What is exchanged is now best stated as:
+`bounded warranty defense on named facets` + `bonded breach proof on those facets` + `staged re-certification rights on degraded facets`.
+
+This supersedes the coarser #r302 picture where restoration was a single later event. The protocol should not sell a binary promise of "fixed / not fixed." It should clear who can underwrite progressively stronger re-authorizations of the damaged slice. (#r303)
+
+**2. State model**  
+Each facet should now carry an authority ladder, for example:
+- `L0` = degraded safe default / null authority
+- `L1` = usable with wide interval or strict caveat
+- `L2` = medium-confidence operational authority
+- `L3` = full canonical authority
+
+The update rule becomes:
+1. facet is breached and degraded to the lowest admissible safe level
+2. restoration candidates may bid to move the facet one rung up the ladder
+3. each upward move has its own adequacy test, bond requirement, and challenge surface
+4. later truth can ratchet the facet further up or back down
+
+This is stronger than #r302 because the protocol no longer conflates "not fully broken" with "fully restored." The state machine can represent partial regained trust without pretending epistemic repair is finished. (#r303)
+
+**3. Credibility model**  
+Capital now maps to trust as **level-specific insurance**:
+- lower authority levels require smaller bond because they claim less precision
+- higher authority levels require larger bond because they reintroduce stronger decision-rights
+- a restorer's credibility should be tracked not only by facet, but by the highest authority level they have successfully defended over time
+
+This is a cleaner answer to why capital helps epistemics than generic restoration bonding. Money matters because each additional unit of claimed authority must be separately insured. A participant cannot cheaply jump from safe mode to full confidence on narrative alone. (#r303)
+
+**4. Market roles**  
+The roles remain the same as #r302 but restoration becomes more precise:
+- **assurance buyers / subscribers:** fund useful authority on important facets, not necessarily maximal authority at all times
+- **warranty writer / steward:** defends currently active authority levels under bond
+- **refuter:** earns only for proving an active warranty tranche false
+- **re-certifier / restorer:** competes to move degraded facets up the authority ladder one tranche at a time
+- **protocol / arbiter:** enforces ladder definitions, tranche-specific challenge rules, and monotone upgrades/downgrades
+
+This is closer to how a real knowledge service should work. The product is not raw truth and not raw replacement; it is calibrated usable authority over shared state. (#r303)
+
+**5. Settlement model**  
+Settlement should now distinguish:
+1. **service rent** for defending the currently active authority tranche
+2. **breach settlement** when a tranche is falsified
+3. **downgrade settlement** when a facet is moved to a safer lower tranche
+4. **re-certification settlement** whenever a candidate successfully upgrades the facet by one tranche
+5. **truth settlement** later for all defended tranches and upgrade acts
+
+Under partial observability this is especially useful. The protocol may be able to justify `L0 -> L1` quickly, while `L1 -> L3` requires much slower evidence accumulation. This prevents either permanent paralysis or reckless full restoration. (#r303)
+
+**6. Attack surface**  
+This refinement changes the main residual attacks again:
+- **ratchet gaming:** restorers may farm small low-value tranche upgrades to collect rent without delivering meaningful epistemic improvement
+- **premature re-upgrade:** coalitions may push facets back up the ladder before evidence really supports renewed authority
+- **ladder design capture:** whoever defines tranche boundaries controls the economics of restoration and may choose steps that are too fine or too coarse
+- **sticky mediocrity:** the mechanism may settle at intermediate authority levels because they are easier to defend than full restoration
+
+So the deepest new design burden is **choosing authority ladders whose intermediate levels are both decision-useful and hard to game**. If ladder design is poor, the system becomes a market in passing through bureaucratic confidence tiers rather than restoring truth-tracking state. (#r303)
+
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+This sharpens the comparison once more:
+- **LMSR:** capital continuously moves a belief vector
+- **orderbooks:** capital continuously transfers contingent exposure
+- **batch auctions:** clear that exposure on a fairer clock
+- **staged-certification KM:** capital defends, falsifies, degrades, and then progressively re-certifies authority on named slices of canonical state
+
+It is better when the key need is not a scalar forecast, but an auditable ladder of decision authority over a shared world-model. It is worse when users mostly want one clean tradable scalar, or when no sensible intermediate authority levels can be specified. (#r303)
+
+**8. Simplest viable mechanism sketch**  
+The narrowest strong version now looks like:
+
+1. Register canonical slot `s_i` with facet map, dependency map, and authority ladder for each facet.
+2. Install steward with tranche-specific rent and warranty bond.
+3. Allow challengers to post `(evidence, breach_bond, target_facets, target_tranche)`.
+4. If breach succeeds, protocol downgrades the minimal proven facet set to the next safe lower tranche.
+5. Restoration candidates may later post bond to upgrade one tranche at a time.
+6. Each tranche upgrade has its own adequacy test and later truth settlement.
+7. Long-run credibility updates at the facet × authority-level granularity. (#r303)
+
+**9. Strongest reason this still fails**  
+The strongest remaining kill is now: the protocol may become very good at managing authority ladders but still fail to align those ladders with actual decision quality. If intermediate tranches are poorly chosen, the mechanism becomes a market in bureaucratic re-certification states rather than a market in real epistemic recovery. That would be ontology theater one level deeper. (#r303)
+
+**10. Best surviving variant if this refinement is still wrong**  
+If staged re-certification is too complex, the best surviving fallback is a **two-level variant**:
+- keep only `safe degraded` and `full restored` for simple slots,
+- use multi-tranche restoration only where facet structure and authority gradients are explicit and economically important,
+- continue sourcing restoration candidates from a separate mechanism if synthesis remains hard.
+
+That preserves the deepest surviving insight from #r299-#r303: the non-PM opportunity is not belief trading, but a market for **capital-backed defense, falsification, degradation, and controlled re-authorizing of shared state authority**. (ref: #r299, #r300, #r301, #r302, #r303)
 
 ### #r299 refinement - the strongest surviving non-PM family is falsification-first epistemic insurance
 
