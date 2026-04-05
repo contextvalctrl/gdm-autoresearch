@@ -44,7 +44,60 @@
 - **#r329** - 2026-04-05T15:12Z - Applied a market-activation correction: the strongest surviving family should not put every canonical slot under continuously monetized insured stewardship by default. Instead, the KM should be sparse and defect-triggered: default state remains passive/public, while capitalized market activity turns on only when someone escrows a bounded defect claim, challenge, or restoration request on a named slot/facet. This supersedes the most rent-heavy reading of #r295-#r328, keeps the non-PM primitive as bonded error-detection plus bounded correction rights rather than permanent paid incumbency, and moves the deepest remaining kill from pure ontology overload toward defect-taxonomy design / under-triggering of real state failures.
 
 - **#r330** - 2026-04-05T15:22Z - Added an uncertainty-compression correction: the strongest surviving non-PM demand object is not generic belief movement or perpetual state stewardship, but bonded rights to narrow decision-relevant uncertainty bands on named canonical facets. This sharpens the exchange object into calibrated uncertainty compression under liability, preserves the sparse defect-triggered architecture, and identifies calibration theater / unverifiable band semantics as the deepest new residual kill.
+- **#r331** - 2026-04-05T15:32Z - Added a threshold-certification correction: when free-form uncertainty-band semantics are too gameable, the stronger surviving product is bonded certification that a canonical facet lies in one of a small set of protocol-native decision regions. This replaces generic band-narrowing with liability-bearing threshold certification, sharpens partial-observation settlement around region breach rather than full point truth, and moves the deepest residual kill from calibration theater toward threshold-registry capture / boundary packing.
 
+
+### #r331 refinement - if band semantics are too soft, clear bonded threshold certification instead of free-form uncertainty compression
+
+#r330 correctly found the cleanest "knowledge" product so far: bonded narrowing of a decision-relevant uncertainty band on a named facet. The next correction is that even band compression may still leave too much semantic slack. A market participant can publish a formally narrower band that looks precise while still being operationally mushy, badly aligned to actual decision boundaries, or impossible to falsify quickly. If the thing being sold is truly decision-useful knowledge, the protocol should often stop one layer earlier and ask for a more discrete product: **certification that the canonical facet lies in one of a small set of protocol-native decision regions**. (#r331)
+
+The stronger surviving formulation is therefore:
+- each named canonical facet has a public partition into a few action-relevant regions or threshold buckets, not an unconstrained continuous confidence language
+- a demander opens a lane because the current state is still in a coarse / unknown region that is too ambiguous for a bounded action interface
+- suppliers compete to **certify under bond** that the facet belongs to a stricter region, threshold side, or admissibility class for a declared horizon
+- challengers earn by proving the certified region was not warranted, or that the evidence was insufficient to exclude an adjacent risk region
+- on breach, the facet drops back to the coarser safe region or to explicit "undetermined" status rather than pretending to know the exact point value
+
+This is not a retreat into ordinary PM language. The product is still not directional outcome inventory. It is a **liability-bearing region certificate** on shared state. Capital improves epistemics here because it finances the right to collapse operational ambiguity only when someone is exposed for certifying the wrong decision region. That is cleaner than free-form interval rhetoric in any domain where actions are driven by thresholds, gates, or regime classes rather than exact scalar estimates. (#r331)
+
+The family triage after this correction is:
+
+1. **Point-state advocacy / update sale** - still dead.
+   Still collapses back into directional belief monetization. (#r330, #r331)
+
+2. **Defect-triggered bonded uncertainty compression** - still strong, but no longer the default endpoint.
+   Best where the protocol can define interval semantics and later calibration cleanly. Weak where "narrower" is too easy to fake. (#r330, #r331)
+
+3. **Defect-triggered bonded threshold certification** - strongest surviving product-level refinement.
+   Use #r329's sparse defect-ticket activation, but let the live market clear who may move a facet from an unknown/coarse region into a stricter decision region under bond. This is the cleanest surviving answer to what is exchanged in threshold-driven domains. (#r331)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** a bonded right to certify that a named canonical facet belongs to a protocol-native decision region for a bounded horizon.
+- **State model:** global state is often `(facet, certified region, authority tranche)` rather than `(facet, point estimate)`. Updates are frequently region refinements or reversion to coarser regions.
+- **Credibility model:** stake buys the right to exclude neighboring risk regions. Lose stake if later evidence or admissible challenge shows the certified region boundary was crossed, under-supported, or semantically misclassified.
+- **Market roles:** demanders pay because the current coarse region is too ambiguous for action; suppliers/knowers compete to certify a sharper region; challengers attack unjustified region collapse; restorers may later re-certify after downgrade.
+- **Settlement:** immediate service payment can fund the active certificate window; delayed settlement scores whether the certified region remained admissible relative to the prior coarse safe region. Under partial observability, the protocol settles first on region validity, not exact point truth.
+- **Attack surface:** the deepest risk is no longer generic calibration theater, but **threshold-registry capture / boundary packing**-actors shape region boundaries so certificates look strong while hiding real risk just outside the certified class.
+
+**Why this is cleaner versus LMSR / orderbooks / batch auctions:**
+- LMSR/orderbooks/batch auctions clear **who will carry directional exposure** and what that exposure should cost.
+- A threshold-certification KM clears **who is willing to underwrite that shared state has crossed a usable decision boundary**.
+The economic win condition is not "I moved the crowd estimate" but "I responsibly certified that this facet belongs in a stricter action class, and I am liable if that certification was premature." That is much closer to actual decision support than price formation in any threshold-governed environment. (#r331)
+
+**Simplest viable mechanism sketch after #r331:**
+1. Register a canonical facet with a protocol-native coarse region set and a smaller set of stricter decision regions tied to bounded action interfaces.
+2. A demander opens a defect/certification ticket because the current coarse region is too ambiguous for the action interface.
+3. Suppliers submit `(proposed certified region, supporting evidence, bond, horizon)`.
+4. Protocol installs the sharpest admissible region certificate that clears public tests and available bonded liability, or keeps `no_change / unresolved` if no region can be defended.
+5. During the active window, challengers may post evidence and bond to show the certified region was under-supported, boundary-violating, or semantically misclassified.
+6. On breach, the facet reverts to the prior coarser safe region or an explicit adjacent ambiguity class; part of the certifier's bond burns.
+7. Later audit settles residual bond and facet-specific credibility based on region validity and boundary discipline, not exact point closeness. (#r331)
+
+**Strongest new reason this idea fails:**
+The deepest residual kill becomes **threshold-registry capture / boundary packing**. If the protocol cannot define decision regions whose boundaries are stable, meaningful, and hard to game, actors will lobby for buckets that make certification easy but decision quality fake: thresholds chosen too wide, regime labels chosen too flattering, or adjacent regions defined so asymmetrically that crossing risk is hidden in the ontology. Then the market becomes a game in certifying favorable categories rather than transferring real knowledge. This is sharper than #r330's generic calibration-theater kill because it identifies the exact place where a more discrete mechanism can still become fake. (#r331)
+
+**Best surviving variant if even this correction is too ambitious:**
+Keep #r329's defect-triggered court structure, but limit the live product to a tiny registry of **protocol-native threshold surfaces** where region semantics are explicit and auditable-for example pass/fail admissibility classes, regime buckets, or interval ladders with public downgrade rules. Use free-form uncertainty compression only where continuous band semantics are actually defensible. That preserves the strongest surviving insight so far: the non-PM opportunity is not to trade beliefs better, but to finance **bounded, loss-bearing collapse of decision ambiguity where the shared state can be expressed as challengeable certified regions rather than speculative prices**. (ref: #r329, #r330, #r331)
 
 ### #r330 refinement - the cleanest “knowledge” product is bonded uncertainty compression on named facets
 
