@@ -16,6 +16,7 @@
 - **#r299** - 2026-04-05T09:52Z - Refined the family one step further from generic repair-option exercise into falsification-first epistemic insurance: the cleanest non-PM mechanism does not directly pay for proposing a new state, but for underwriting and then proving/refuting bounded state warranties on canonical slots. This sharpens the ask/bid split into warranty sellers vs assurance buyers, cleanly separates refutation from replacement, and identifies warranty-specification brittleness as the deepest remaining kill.
 - **#r300** - 2026-04-05T10:02Z - Split falsification from reconstruction completely: the strongest surviving non-PM family is now a three-stage mechanism where warranty writers defend canonical slots, refuters earn only for provable breach, and replacement is chosen in a separate constrained repair stage rather than bundled into the same market act. This kills the last “challenger smuggles in a preferred state” branch and surfaces ontology brittleness—the protocol may detect breach more reliably than it can synthesize the correct replacement—as the new deepest failure.
 - **#r301** - 2026-04-05T10:12Z - Refined the post-breach path again: when reconstruction is hard, the mechanism should prefer epistemic downgrade over forced synthesis. The strongest surviving family now treats breach as a trigger to move the slot into a narrowed / degraded safe state first, with full replacement deferred to a later stewardship competition. This kills the hidden “protocol must know the correct successor immediately” assumption and sharpens the best fallback into falsification + safe degradation, not falsification + instant rewrite.
+- **#r302** - 2026-04-05T10:22Z - Tightened the degrade-first path: breach should usually mint a scoped breach certificate and degrade only the falsified slice of a canonical slot, not collapse the entire slot into safe mode. The strongest surviving family is now warranty + falsification + scoped degradation + later restoration, which reduces the risk that the mechanism becomes high-integrity but low-utility by overusing whole-slot downgrades.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -406,6 +407,109 @@ If restoration remains the hard bottleneck, the best surviving fallback is a **s
 - preserving the principle that falsification economics should be separated not only from replacement choice, but also from replacement timing.
 
 This is the strongest surviving variant so far if the raw “knowledge marketplace” story is too ambitious. The real robust contribution is a market for **capital-backed removal of false precision from canonical state**, with reconstruction delegated to whatever mechanism is actually best at synthesis. (ref: #r300, #r301)
+
+### #r302 refinement - breach should be scoped to the falsified slice, not treated as an all-or-nothing slot failure
+
+#r301 correctly established that breach should first trigger epistemic downgrade rather than forced immediate synthesis. The next refinement is that even degrade-first can still be too coarse if breach automatically pushes an entire canonical slot into safe mode. Many useful state objects are composite: they contain several dimensions, assumptions, horizons, confidence bands, or linked subclaims. In those cases the protocol may be able to show that **one part of the slot is no longer defensible** without concluding that the whole slot should lose authority. If breach is whole-slot by default, the mechanism can become overly destructive and converge to a high-integrity but low-utility equilibrium. (#r302)
+
+The stronger formulation is therefore:
+- a warranty should be written over an explicit set of **state facets** or **subclaims** inside a slot,
+- a successful refuter should earn a **breach certificate** tied to the smallest falsified facet set,
+- and the first post-breach action should be **scoped degradation** of only the affected slice, with dependency-aware spillover only where the protocol has declared coupling in advance.
+
+This is important because it preserves the clean non-PM insight while reducing the bluntness of safe-mode transitions. Capital is still not buying belief inventory or outcome exposure. It is underwriting defendable authority on named pieces of canonical state, and spending bonded effort to revoke only the pieces shown unsafe. That makes the mechanism more plausible as a genuine epistemic maintenance system rather than a truth tribunal that repeatedly turns useful objects off. (#r302)
+
+**1. Base primitive**  
+What is exchanged is now best stated as:
+`bounded warranty defense on named state facets` and `bonded breach proof on those facets`,
+followed by
+`scoped degradation rights`,
+not necessarily whole-slot invalidation.
+
+This supersedes the coarser reading in #r301 where the main post-breach state transition was slot-level degradation. The real scarce thing is narrower: capital-backed authority over explicitly warranted slices of canonical state. (#r302)
+
+**2. State model**  
+Each canonical slot should now carry an internal structure:
+- facet set `F_i = {f_i1, f_i2, ...}`
+- declared dependency map `G_i` showing which facets are tightly coupled
+- facet-level adequacy bands / warranty conditions
+- facet-level degraded defaults
+
+The update rule becomes:
+1. steward defends slot facets under warranty
+2. refuter proves breach on one facet or a minimal coupled set
+3. protocol issues a breach certificate on that slice
+4. only the certified slice degrades immediately, unless declared dependencies force wider downgrade
+5. later restoration may occur at facet level or full-slot level depending on coupling
+
+This is sharper than #r301 because the mechanism can now say: "the forecast band is invalid" or "the confidence annotation is not defensible" without also saying "the entire slot must be blanked out." That is a materially better state machine for real knowledge systems. (#r302)
+
+**3. Credibility model**  
+Capital now maps to trust at facet granularity:
+- **facet warranty bond** - liability for defending a named slice too confidently
+- **facet breach bond** - liability for noisy or overbroad attack on that slice
+- **restoration bond** - liability for re-authorizing that slice later
+
+This matters because it fixes an inefficiency in the #r301 whole-slot model. If a steward loses all authority every time one subclaim breaks, rational stewards will publish overly coarse or overly conservative slots. Facet-level liability lets the protocol punish false precision where it actually occurred without forcing unnecessary global retreat. (#r302)
+
+**4. Market roles**  
+The roles are the same as in #r301 but more precisely scoped:
+- **assurance buyers / subscribers:** fund defended canonical slots and accept partial degradation when only some facets fail
+- **warranty writer / steward:** earns rent while defending the declared facet set
+- **refuter:** earns only for proving breach on a facet or minimal coupled set
+- **restoration candidate:** competes to re-authorize the degraded facet set after downgrade
+- **protocol / arbiter:** enforces facet boundaries, declared dependencies, and scoped transitions
+
+This is a stronger answer to the original knower/unknower intuition. The most valuable information transfer may be not "replace the whole state" but "precisely identify which part of the shared state lost warrant." (#r302)
+
+**5. Settlement model**  
+Settlement should now distinguish:
+1. **service rent** while the slot's warranted facets remain in force
+2. **breach settlement** when a facet-level challenge resolves
+3. **scoped degradation settlement** where only the affected slice loses authority immediately
+4. **restoration settlement** only when a later candidate successfully restores the degraded slice
+5. **truth settlement** later for all parties, potentially at facet level rather than whole-slot level
+
+Under partial observability this is stronger than #r301. The protocol may be able to establish that one component of the state is bad while the rest remains decision-useful. That reduces gratuitous downtime and avoids paying challengers for triggering unnecessarily broad invalidation. (#r302)
+
+**6. Attack surface**  
+This refinement changes the main residual attacks again:
+- **facet fragmentation:** stewards may over-fragment slots so that each breached component is tiny and the practical meaning of authority becomes opaque
+- **under-declared coupling:** stewards may hide real dependencies so a breach appears local when it should force broader downgrade
+- **overbroad breach claims:** refuters may package narrow failures as if they invalidate the whole slot to maximize bounty or disruption
+- **ontology complexity:** too much facet structure can make the mechanism unreadable and move power to whoever controls the decomposition
+
+So the deepest new design burden is **finding the right granularity of state decomposition**. Too coarse and the protocol over-degrades. Too fine and the mechanism becomes specification theater. (#r302)
+
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+This sharpens the comparison further:
+- **LMSR:** capital continuously moves a belief vector
+- **orderbooks:** capital continuously transfers contingent exposure
+- **batch auctions:** clear that same exposure on a fairer clock
+- **scoped-degradation KM:** capital defends and falsifies named slices of canonical state, with downgrade localized to the proven failure surface
+
+It is better when the product is a composite world-model and the protocol must preserve useful partial structure under uncertainty. It is worse when the state cannot be decomposed cleanly or when users mainly want a single scalar tradable signal. (#r302)
+
+**8. Simplest viable mechanism sketch**  
+The narrowest strong version now looks like:
+1. Register canonical slot `s_i` with facet set, declared dependency map, facet warranties, and facet degraded defaults.
+2. Install steward with slot rent and facet-linked warranty bond.
+3. Allow challengers to post `(evidence, breach_bond, target_facets)`.
+4. If breach fails, challenger loses bond/fee.
+5. If breach succeeds, protocol issues a breach certificate on the minimal proven facet set and degrades only that slice plus any pre-declared dependents.
+6. A later restoration lane re-authorizes that slice under separate bond.
+7. Later truth/audit settles steward, refuter, and restorer at the relevant facet granularity. (#r302)
+
+**9. Strongest reason this still fails**  
+The strongest remaining kill is now: the protocol may not be able to define a facet decomposition that is both legible and truth-tracking. If decomposition is wrong, scoped degradation either misses hidden coupling or explodes into unusable micro-governance. In that world the mechanism again becomes a market in ontology management rather than epistemic improvement. (#r302)
+
+**10. Best surviving variant if this refinement is still wrong**  
+If facet-level decomposition is too brittle, the best surviving fallback is a **two-tier architecture**:
+- keep whole-slot warranty + falsification + degradation for the small number of state objects that cannot be decomposed safely,
+- use scoped degradation only for slots with an explicit protocol-defined facet map,
+- and continue sourcing eventual restoration from a separate mechanism when synthesis remains hard.
+
+That preserves the deepest surviving insight from #r299-#r302: the non-PM opportunity is not to trade beliefs, but to run a market for **capital-backed defense, falsification, and carefully bounded revocation of shared state authority**. (ref: #r299, #r300, #r301, #r302)
 
 ### #r299 refinement - the strongest surviving non-PM family is falsification-first epistemic insurance
 
