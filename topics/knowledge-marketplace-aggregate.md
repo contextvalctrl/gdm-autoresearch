@@ -4,6 +4,7 @@
 - **#r2** - 2026-04-04T17:32Z - Paused MatchingEngine line and restarted knowledge-marketplace mechanism design thread. Reframed the primitive as capped, escrow-bonded credible-information transfer; added unresolved-truth settlement branch; performed 3-family viability triage.
 - **#r145** - 2026-04-05T08:02Z - Refined the family comparison: killed the naive bilateral “knower sells belief to unknower” framing, elevated state-update procurement as the strongest non-LMSR primitive, and clarified why the wrong conserved quantity collapses back into prediction-market behavior.
 - **#r146** - 2026-04-05T08:12Z - Tightened the primitive from generic update procurement to contested state-maintenance with explicit no-change/default outcome, separating payment for error reduction from payment for mere revision and identifying why unresolved loss functions collapse the design into governance theater.
+- **#r147** - 2026-04-05T08:22Z - Refined the family again: the strongest non-PM formulation is warranty-bearing state maintenance, where capital does not buy directional influence but temporarily underwrites a replaceable state installation; killed raw “knowledge sale” framing further and isolated the main failure as unverifiable decision-loss accounting.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -102,7 +103,60 @@ This matters because a true knowledge marketplace should conserve **error budget
 
 **Best surviving variant if that kill criterion binds:** use baseline-scored procurement only where loss and verification are sharply specifiable, and route everything else through a credibility-gated batch-auction / orderbook layer. In other words: direct knowledge-market for high-verifiability, baseline-measurable coordinates; trading market for ambiguous ones. The design boundary is observability and baseline measurability, not ideology. (ref: #r145, #r146)
 
-(ref: #r1, #r2, #r69, #r185, #r255)
+### #r147 refinement - what capital should buy is temporary warranty on a state installation, not "knowledge" itself
+
+#r145 and #r146 correctly moved the design away from bilateral belief exchange and toward procurement of baseline-relative state improvement. The next refinement is stricter: even "pay for improvement" is still slightly too soft unless the protocol specifies **what capital is actually underwriting during the period before truth arrives**. The clean answer is: capital buys a **temporary warranty-bearing state installation**. A claimant is not selling abstract knowledge; they are proposing that the protocol install a revised state object for some horizon, while posting bond that absorbs loss if the installation proves worse than the incumbent. (#r147)
+
+That changes the mechanism from a metaphorical knowledge bazaar into a concrete finite-state machine:
+- incumbent state `s_i^0` exists with an implied warranty level of zero new conviction
+- proposer submits candidate installation `s_i^1` with bond `k`
+- protocol either keeps `no_change` or installs `s_i^1` for horizon `H`
+- during `H`, downstream users may consume the installed state
+- at resolution or proxy audit, the installation is judged against the incumbent baseline and the promised warranty is either earned or burned
+
+This is the tightest answer so far to the conserved-quantity question. The scarce thing being allocated is **warranted authority to overwrite part of the global state for a bounded interval**. Capital improves epistemics only if it is the absorbent layer for bad overwrite decisions. If capital merely boosts voice, the design collapses back into rich-agent influence. If capital temporarily underwrites the right to install a state revision and to bear the downside of that revision, the mechanism remains genuinely non-LMSR. (#r147)
+
+**What exactly is exchanged now:**
+- demander does **not** buy a belief token
+- proposer does **not** sell a probability share
+- protocol clears a contract of the form: `install this state update under warranty until audit/resolution`
+
+So the exchange is best described as:
+`bounded state authority + loss-bearing warranty  <->  payment for decision-useful maintenance`
+
+That framing clarifies the market roles:
+- **Demanders / state consumers** pay for maintained state quality over horizon `H`
+- **Maintainers / knowers** compete for the right to install and warranty updates
+- **Challengers** are rival maintainers who can displace or dispute a live installation by posting superior warranty-backed evidence
+- **Protocol** is not a bookmaker; it is a scheduler of state-installation rights under bond
+
+**Why this is cleaner than raw procurement language:**
+Procurement suggests a one-shot purchase of a better estimate. But many valuable coordinates are not one-shot; they are perishable and need maintenance. The real non-PM primitive is therefore not "who can say something true?" but **"who should hold the temporary mandate to maintain this coordinate of the state vector, under replaceable bond?"** That is closer to a market for warranted maintenance rights than a market for predictions. (#r147)
+
+**Comparison sharpened versus LMSR / orderbooks / batch auctions:**
+- **LMSR:** buys movement in a shared price vector; no one explicitly warranties the state they moved it to.
+- **Orderbook:** clears opposing inventories over contingent claims; state changes are a byproduct of trade.
+- **Batch auction:** improves fairness of when inventory clears.
+- **Warranty-bearing KM:** clears who gets temporary authority to install and maintain a state estimate, while being financially on the hook if that installation underperforms the baseline.
+
+This is a deeper distinction than pricing rule or timing rule. It changes the object from *inventory* to *bounded state mandate*. (#r147)
+
+**Updated simplest viable mechanism sketch after #r147:**
+1. For coordinate `s_i`, protocol publishes incumbent state, admissible loss function `L_i`, maintenance horizon `H_i`, and budget `B_i`.
+2. Proposers submit `(candidate_state, bond, confidence, proof_policy)`.
+3. Protocol evaluates proposals against incumbent `s_i` and `no_change`.
+4. Best admissible proposal wins a temporary installation right for `H_i`; others expire or remain as challengers.
+5. During `H_i`, demanders consume the installed state; challengers may contest by posting a stronger bonded update.
+6. At audit / resolution, payout depends on realized improvement over the incumbent baseline during the installed interval, not merely end-state directional correctness.
+7. Bond is slashed for harmful overwrite, returned for good maintenance, and credibility updates only from verifiable maintenance performance. (#r147)
+
+**New strongest failure mode after this refinement:**
+The mechanism now depends not just on eventual truth, but on a usable estimate of **decision loss over an installation interval**. If the protocol cannot measure whether the installed state was actually better for decisions than the incumbent over horizon `H`, then "warranty" becomes empty rhetoric. In that case the system degenerates into governance assigning maintenance rights by narrative, which is worse than a simple market. This is slightly stronger than the #r146 failure statement: the hard part is not just verification of correctness, but verification of **bounded-interval decision quality**. (#r147)
+
+**Best surviving fallback if even warranty-bearing maintenance is too hard:**
+Keep the warranty concept but narrow it drastically. Use it only for coordinates where there is a clear baseline, a clear maintenance horizon, and an auditable loss function. Everything else should revert to a credibility-gated trading or batch-auction layer that admits the market is only pricing disagreement, not warranting state quality. The key boundary is now even sharper: **can this coordinate support temporary warranted installation, yes or no?** If not, do not pretend it is a knowledge market. (ref: #r145, #r146, #r147)
+
+(ref: #r1, #r2, #r69, #r145, #r146, #r147, #r185, #r255)
 
 ---
 # Knowledge Marketplace Mechanism - Aggregate Document
