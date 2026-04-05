@@ -2,23 +2,24 @@
 
 ## Run Log Addendum
 - **#r2** - 2026-04-04T17:32Z - Paused MatchingEngine line and restarted knowledge-marketplace mechanism design thread. Reframed the primitive as capped, escrow-bonded credible-information transfer; added unresolved-truth settlement branch; performed 3-family viability triage.
-- **#r145** - 2026-04-05T08:02Z - Refined the family comparison: killed the naive bilateral “knower sells belief to unknower” framing, elevated state-update procurement as the strongest non-LMSR primitive, and clarified why the wrong conserved quantity collapses back into prediction-market behavior.
+- **#r145** - 2026-04-05T08:02Z - Refined the family comparison: killed the naive bilateral "knower sells belief to unknower" framing, elevated state-update procurement as the strongest non-LMSR primitive, and clarified why the wrong conserved quantity collapses back into prediction-market behavior.
 - **#r146** - 2026-04-05T08:12Z - Tightened the primitive from generic update procurement to contested state-maintenance with explicit no-change/default outcome, separating payment for error reduction from payment for mere revision and identifying why unresolved loss functions collapse the design into governance theater.
-- **#r147** - 2026-04-05T08:22Z - Refined the family again: the strongest non-PM formulation is warranty-bearing state maintenance, where capital does not buy directional influence but temporarily underwrites a replaceable state installation; killed raw “knowledge sale” framing further and isolated the main failure as unverifiable decision-loss accounting.
-- **#r148** - 2026-04-05T08:32Z - Sharpened the mechanism around temporary state-authority under challenge; killed continuous bilateral “knowledge rights” as disguised inventory trading, retained baseline-relative authority procurement as the core, and promoted specification externality to the main residual failure.
-- **#r149** - 2026-04-05T08:42Z - Refined the direct family one step further from generic update procurement into challengeable maintenance coverage on a named state deficiency; separated install-rights from passive knowledge sale, added a standing demand-side coverage budget as the cleanest non-PM payment source, and identified unverifiable buyer-value attribution as the strongest remaining kill for any “knowledge transfer” formulation.
-- **#r150** - 2026-04-05T08:52Z - Tightened the primitive again from generic maintenance coverage to revocable state-authority leasing under posted error-insurance; clarified that demand is buying bounded authority plus replacement rights rather than “knowledge,” introduced insurer/challenger economics as the cleanest capital-to-epistemics mapping, and isolated adverse-selection in buyer-side deficiency specification as the main remaining structural failure.
+- **#r147** - 2026-04-05T08:22Z - Refined the family again: the strongest non-PM formulation is warranty-bearing state maintenance, where capital does not buy directional influence but temporarily underwrites a replaceable state installation; killed raw "knowledge sale" framing further and isolated the main failure as unverifiable decision-loss accounting.
+- **#r148** - 2026-04-05T08:32Z - Sharpened the mechanism around temporary state-authority under challenge; killed continuous bilateral "knowledge rights" as disguised inventory trading, retained baseline-relative authority procurement as the core, and promoted specification externality to the main residual failure.
+- **#r149** - 2026-04-05T08:42Z - Refined the direct family one step further from generic update procurement into challengeable maintenance coverage on a named state deficiency; separated install-rights from passive knowledge sale, added a standing demand-side coverage budget as the cleanest non-PM payment source, and identified unverifiable buyer-value attribution as the strongest remaining kill for any "knowledge transfer" formulation.
+- **#r150** - 2026-04-05T08:52Z - Tightened the primitive again from generic maintenance coverage to revocable state-authority leasing under posted error-insurance; clarified that demand is buying bounded authority plus replacement rights rather than "knowledge," introduced insurer/challenger economics as the cleanest capital-to-epistemics mapping, and isolated adverse-selection in buyer-side deficiency specification as the main remaining structural failure.
 - **#r151** - 2026-04-05T09:02Z - Killed bespoke buyer-written deficiency contracts as the default primitive; refined the strongest surviving family into protocol-native state-slot leasing with challenger-funded replacement and public adequacy tests, which preserves the non-PM insight while avoiding contract-specification theater.
 - **#r295** - 2026-04-05T09:12Z - Split the mechanism into two explicit payment lanes: continuous service rent for temporary slot stewardship and delayed truth-linked bond settlement for actual epistemic quality. This kills the last disguised-PM branch where maintainers are paid mainly for being directionally right, clarifies why capital improves epistemics only as replacement-liable insurance, and identifies metric-gaming of public adequacy tests as the main surviving failure.
 - **#r296** - 2026-04-05T09:22Z - Refined the clearing primitive again: the strongest non-PM family should clear challengeable displacement rights against an incumbent state, not open-ended install rights. This makes the market about paying for falsifiable replacement pressure on canonical slots, sharply separates discovery from maintenance, and identifies bounty-chasing churn on weakly specified slots as the main surviving failure.
-- **#r297** - 2026-04-05T09:32Z - Added a sharper mechanism split between discovery and adoption: raw evidence should not automatically move canonical state. The strongest surviving family now uses a two-stage path where challengers first earn bonded displacement rights by producing admissible evidence, and only then does the protocol decide whether canonical state should actually switch. This closes the last “pay for saying new things” drift, clarifies that the conserved quantity is contestable state authority rather than message flow, and identifies evidence-admission bottlenecks as the main surviving failure.
+- **#r297** - 2026-04-05T09:32Z - Added a sharper mechanism split between discovery and adoption: raw evidence should not automatically move canonical state. The strongest surviving family now uses a two-stage path where challengers first earn bonded displacement rights by producing admissible evidence, and only then does the protocol decide whether canonical state should actually switch. This closes the last "pay for saying new things" drift, clarifies that the conserved quantity is contestable state authority rather than message flow, and identifies evidence-admission bottlenecks as the main surviving failure.
 - **#r298** - 2026-04-05T09:42Z - Tightened the surviving family from generic contest rights into bonded repair options on canonical slots: capital should buy the right to force a bounded corrective action if the incumbent state is shown inadequate, not a generic right to speak, install, or trade belief. This makes the exchanged object an exercisable correction option rather than message flow, sharpens why capital improves epistemics only when it finances credible overwrite/repair capacity, and identifies option-exercise adjudication as the new deepest failure surface.
 - **#r299** - 2026-04-05T09:52Z - Refined the family one step further from generic repair-option exercise into falsification-first epistemic insurance: the cleanest non-PM mechanism does not directly pay for proposing a new state, but for underwriting and then proving/refuting bounded state warranties on canonical slots. This sharpens the ask/bid split into warranty sellers vs assurance buyers, cleanly separates refutation from replacement, and identifies warranty-specification brittleness as the deepest remaining kill.
-- **#r300** - 2026-04-05T10:02Z - Split falsification from reconstruction completely: the strongest surviving non-PM family is now a three-stage mechanism where warranty writers defend canonical slots, refuters earn only for provable breach, and replacement is chosen in a separate constrained repair stage rather than bundled into the same market act. This kills the last “challenger smuggles in a preferred state” branch and surfaces ontology brittleness—the protocol may detect breach more reliably than it can synthesize the correct replacement—as the new deepest failure.
-- **#r301** - 2026-04-05T10:12Z - Refined the post-breach path again: when reconstruction is hard, the mechanism should prefer epistemic downgrade over forced synthesis. The strongest surviving family now treats breach as a trigger to move the slot into a narrowed / degraded safe state first, with full replacement deferred to a later stewardship competition. This kills the hidden “protocol must know the correct successor immediately” assumption and sharpens the best fallback into falsification + safe degradation, not falsification + instant rewrite.
+- **#r300** - 2026-04-05T10:02Z - Split falsification from reconstruction completely: the strongest surviving non-PM family is now a three-stage mechanism where warranty writers defend canonical slots, refuters earn only for provable breach, and replacement is chosen in a separate constrained repair stage rather than bundled into the same market act. This kills the last "challenger smuggles in a preferred state" branch and surfaces ontology brittleness-the protocol may detect breach more reliably than it can synthesize the correct replacement-as the new deepest failure.
+- **#r301** - 2026-04-05T10:12Z - Refined the post-breach path again: when reconstruction is hard, the mechanism should prefer epistemic downgrade over forced synthesis. The strongest surviving family now treats breach as a trigger to move the slot into a narrowed / degraded safe state first, with full replacement deferred to a later stewardship competition. This kills the hidden "protocol must know the correct successor immediately" assumption and sharpens the best fallback into falsification + safe degradation, not falsification + instant rewrite.
 - **#r302** - 2026-04-05T10:22Z - Tightened the degrade-first path: breach should usually mint a scoped breach certificate and degrade only the falsified slice of a canonical slot, not collapse the entire slot into safe mode. The strongest surviving family is now warranty + falsification + scoped degradation + later restoration, which reduces the risk that the mechanism becomes high-integrity but low-utility by overusing whole-slot downgrades.
 - **#r303** - 2026-04-05T10:32Z - Refined the restoration leg: after scoped breach, re-authority should return in staged confidence tranches rather than a single jump back to full canonical status. This turns restoration into progressive re-certification of degraded facets, sharpens the conserved quantity into authority-level coverage, and identifies ratchet gaming / premature re-upgrade as the main new failure surface.
-- **#r304** - 2026-04-05T10:42Z - Added a stronger demand-side and truth-side correction: the mechanism should clear insured decision-authority on canonical state slots, not abstract “knowledge access,” and truth should settle only against pre-declared breach tests and authority tranches rather than holistic narrative correctness. This sharpens the conserved quantity into insured authority budget, kills the remaining “sell insights to buyers” branch as disguised consulting/PM language, and identifies authority-surface bureaucracy as the deepest remaining failure.
+- **#r304** - 2026-04-05T10:42Z - Added a stronger demand-side and truth-side correction: the mechanism should clear insured decision-authority on canonical state slots, not abstract "knowledge access," and truth should settle only against pre-declared breach tests and authority tranches rather than holistic narrative correctness. This sharpens the conserved quantity into insured authority budget, kills the remaining "sell insights to buyers" branch as disguised consulting/PM language, and identifies authority-surface bureaucracy as the deepest remaining failure.
+- **#r305** - 2026-04-05T10:52Z - Tightened the surviving family from slot-level insured authority into action-scoped decision warrants: the mechanism should not merely defend canonical state slots, but insure bounded rights to trigger named downstream action classes from those slots. This clarifies what demand is actually buying, sharpens settlement around pre-declared action predicates instead of narrative state quality, and identifies action-surface design overload as the new deepest kill.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -68,13 +69,13 @@ This shifts the core unit from *belief position* to **improvement contract on th
 
 **Three candidate mechanism families, now more crisply separated:**
 
-1. **Bilateral belief exchange** - weakest.  
+1. **Bilateral belief exchange** - weakest.
    Knower offers a claim, unknower pays for access, stake backs honesty. This is intuitively appealing but under pressure it drifts back toward a PM-with-fees: the object being sold is still a contested belief, and the payment logic is weak unless truth resolution is strong. Rejected as the primary formulation. (#r145)
 
-2. **State-update procurement auction** - strongest surviving direct family.  
+2. **State-update procurement auction** - strongest surviving direct family.
    Demand side escrows budget for improvement on coordinate `s_i`; supply side competes to submit update proposals with bonds; protocol installs the update that maximizes expected error reduction per unit of bonded risk. Settlement depends on realized or proxy-observed improvement. This is the cleanest answer to "why does capital improve epistemics?" because capital buys verified reduction in decision-relevant error. Kept as the best pure knowledge-market variant. (#r145)
 
-3. **Credibility-gated trading layer** - best hybrid if direct procurement is too brittle.  
+3. **Credibility-gated trading layer** - best hybrid if direct procurement is too brittle.
    Keep a clearing/trading mechanism for liquidity and external users, but only credibility-weighted, escrow-accountable actors can materially update the state input feeding that layer. This remains the strongest fallback when truth is too delayed or demand-side procurement is too thin (building on #r1 and #r2). (#r145)
 
 **Why procurement is the key distinction versus LMSR / orderbooks / batch auctions:**
@@ -128,7 +129,7 @@ That produces a cleaner mechanism decomposition:
 
 This is a meaningful shift. In #r151 the strongest family became protocol-native slot leasing; in #r295 it became slot leasing with separate rent and truth ledgers. #r296 adds that the *economically live object* should be the **right to replace the incumbent**, because that is where new knowledge actually enters the system without rewarding gratuitous revision. If a mechanism pays too directly for proposing new installs, it reintroduces churn incentives. If it pays for successful, bonded displacement against an explicit incumbent and explicit `no_change` baseline, it stays closer to a real knowledge market. (ref: #r146, #r151, #r295, #r296)
 
-**1. Base primitive**  
+**1. Base primitive**
 What is exchanged is now best stated as:
 `bonded displacement right on canonical slot s_i, against incumbent x_i^0`
 not merely
@@ -138,7 +139,7 @@ and not
 
 The incumbent already holds the slot. New information enters when a challenger spends capital to prove the incumbent should be displaced. So the primitive is less like open auctioned authorship and more like **contestable correction rights**. (#r296)
 
-**2. State model**  
+**2. State model**
 The global state vector remains protocol-defined slots, but the update rule sharpens to:
 1. maintain incumbent state `x_i^0`
 2. allow bonded challenger proposal `x_i^1`
@@ -147,7 +148,7 @@ The global state vector remains protocol-defined slots, but the update rule shar
 
 This means the state vector updates via **challenge-triggered replacement events**, not free-form update submission. The update rule is therefore anti-churn by construction: no displacement, no state change. (#r296)
 
-**3. Credibility model**  
+**3. Credibility model**
 Capital now maps to trust in a tighter way:
 - incumbent bond = liability for continuing to hold authority badly
 - challenger bond = liability for attempting unjustified replacement
@@ -155,7 +156,7 @@ Capital now maps to trust in a tighter way:
 
 So capital improves epistemics because it finances **falsification pressure** on the installed state. That is a better answer than generic "skin in the game": money matters because it makes both complacent incumbency and frivolous challenge expensive. (#r296)
 
-**4. Market roles**  
+**4. Market roles**
 The cleaner role map is:
 - **slot funders/subscribers:** pay for maintained access to a canonical slot
 - **incumbent steward:** earns service rent while holding the slot under bond
@@ -164,7 +165,7 @@ The cleaner role map is:
 
 This is more precise than knower/unknower language. The active knowledge-transfer edge is specifically challenger → shared state via justified displacement, not bilateral opinion sale. (#r296)
 
-**5. Settlement model**  
+**5. Settlement model**
 Settlement now has three distinct paths:
 1. **service settlement:** incumbent continues earning rent while not displaced
 2. **replacement settlement:** when a challenger wins, the incumbent loses authority and part of bond may burn immediately
@@ -172,7 +173,7 @@ Settlement now has three distinct paths:
 
 Under partial observability, displacement should require stricter public evidence than continued maintenance. In other words, the burden of proof should be asymmetric: it should be easier to keep a slot than to forcibly replace it when truth is still murky. That is an important anti-churn addition. (#r296)
 
-**6. Attack surface**  
+**6. Attack surface**
 The main surviving attacks change again:
 - **bounty-chasing churn:** challengers repeatedly force low-quality displacement attempts on weakly specified slots because the replacement game itself is lucrative
 - **incumbent entrenchment:** stewards raise challenge costs or procedural complexity to suppress justified replacement
@@ -181,7 +182,7 @@ The main surviving attacks change again:
 
 This supersedes #r295's generic service-metric Goodhart in one key respect: the deepest failure is now not just rent-metric gaming, but **a badly tuned displacement threshold**. Too low and the slot churns; too high and incumbents calcify. (#r296)
 
-**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**
 This is the sharpest surviving contrast so far:
 - **LMSR/orderbooks:** clear directional exposure to outcome resolution
 - **batch auctions:** clear that same exposure on a fairer clock
@@ -189,7 +190,7 @@ This is the sharpest surviving contrast so far:
 
 It is better where the problem is maintaining a trusted, challengeable canonical state for repeated use. It is worse where the key product is tradable exposure or where no one wants to subsidize an incumbent/challenger governance game around state slots. (#r296)
 
-**8. Simplest viable mechanism sketch**  
+**8. Simplest viable mechanism sketch**
 The narrowest surviving sketch is now:
 1. Register canonical slot `s_i` with incumbent state, service tests, and delayed truth policy.
 2. Subscribers fund incumbent rent and a challenger bounty pool.
@@ -201,10 +202,10 @@ The narrowest surviving sketch is now:
 
 This is cleaner than open bidding for install-rights because it makes revision contingent on beating a live baseline rather than merely offering a new state. (#r296)
 
-**9. Strongest reason this still fails**  
+**9. Strongest reason this still fails**
 The strongest remaining kill is now: the mechanism may become a noisy market in *procedurally successful challenges* rather than a market in truth-improving corrections. If the public displacement test is too weak, bounty-seeking challengers manufacture turnover; if too strict, incumbents become pseudo-regulators. So the core design burden becomes choosing a displacement threshold that tracks real epistemic gain rather than procedural win-rate. (#r296)
 
-**10. Best surviving variant if this refinement is still wrong**  
+**10. Best surviving variant if this refinement is still wrong**
 If explicit displacement markets are too gameable, the best surviving fallback is a **narrow challenge-bounty wrapper around conventional PM outputs**:
 - a standard PM/batch-auction layer continues to price disagreement
 - a small insured slot registry consumes those outputs as candidate evidence
@@ -227,23 +228,23 @@ This is more than process hygiene. It changes the exchanged object again:
 - the market between protocol and challengers clears **provable falsification**,
 - the post-breach repair step clears **reconstruction of canonical state** under separate rules.
 
-That is the cleanest answer yet to the prompt’s anti-LMSR constraint. Nothing here is an outcome share, an inventory transfer, or even an install-right sold directly against disagreement. Capital improves epistemics only because it finances two costly asymmetries: defending a warranty that can be broken, and spending bonded effort to break it. Replacement is downstream and conditional. (#r300)
+That is the cleanest answer yet to the prompt's anti-LMSR constraint. Nothing here is an outcome share, an inventory transfer, or even an install-right sold directly against disagreement. Capital improves epistemics only because it finances two costly asymmetries: defending a warranty that can be broken, and spending bonded effort to break it. Replacement is downstream and conditional. (#r300)
 
-**1. Base primitive**  
+**1. Base primitive**
 What is exchanged is now best stated as:
 `bounded warranty defense` and `bonded breach proof`,
 with repair/replacement handled separately after breach.
 
 This supersedes the weaker repair-option reading in #r298 and the still-installer-leaning branch in #r299. The live market is not fundamentally about who gets to write the next state. It is about who is willing to stand behind the current state, and who can prove that stance is no longer defensible. (#r300)
 
-**2. State model**  
+**2. State model**
 Each canonical slot now has two different transition types:
 - **breach transition:** `warranty valid -> warranty breached`
 - **repair transition:** `breached slot -> bounded corrective state`
 
 That means the global state vector is updated in two clocks, not one. A slot can become formally untrusted before the protocol knows what the correct replacement is. This is important because many real knowledge failures are easier to falsify than to fully reconstruct. The mechanism should be able to say "the incumbent state is not good enough" without pretending it already knows the uniquely correct successor. (#r300)
 
-**3. Credibility model**  
+**3. Credibility model**
 Capital now maps to trust through three distinct liabilities:
 - **warranty bond:** burns if a steward defended an inadequate slot
 - **breach bond:** burns if a challenger forces costly review without proving breach
@@ -251,7 +252,7 @@ Capital now maps to trust through three distinct liabilities:
 
 This is cleaner than previous formulations because it assigns downside to the exact epistemic act being performed. Defense, refutation, and reconstruction are different tasks and should not share a single undifferentiated bond. (#r300)
 
-**4. Market roles**  
+**4. Market roles**
 The cleanest role map is now:
 - **assurance buyers / subscribers:** fund defended canonical state
 - **warranty writer / steward:** earns rent while defending adequacy under bond
@@ -259,9 +260,9 @@ The cleanest role map is now:
 - **repair supplier:** competes to restore the slot only after breach is established
 - **protocol / arbiter:** decides breach and runs the bounded repair menu
 
-This is the sharpest version yet of the ask/bid split. The “high-information” side is not one monolithic knower class. It separates into defenders, breakers, and rebuilders. That is a stronger mechanism-design claim than the original bilateral metaphor. (#r300)
+This is the sharpest version yet of the ask/bid split. The "high-information" side is not one monolithic knower class. It separates into defenders, breakers, and rebuilders. That is a stronger mechanism-design claim than the original bilateral metaphor. (#r300)
 
-**5. Settlement model**  
+**5. Settlement model**
 Settlement should now be layered as:
 1. **service rent** while warranty stands
 2. **breach bounty / penalty** when challenge resolves
@@ -270,16 +271,16 @@ Settlement should now be layered as:
 
 Under partial observability this is especially useful. The protocol may credibly establish breach well before it can verify the best replacement. So breach can pay earlier than full reconstruction. This preserves falsification incentives without overpaying for premature certainty. (#r300)
 
-**6. Attack surface**  
+**6. Attack surface**
 The main surviving attacks now shift again:
 - **breach farming:** challengers optimize to find technically breaching conditions that do not matter much for downstream decisions
 - **repair capture:** once a breach is declared, insiders steer the repair menu toward a preferred replacement state or steward
 - **safe-default stagnation:** protocol overuses safe defaults after breach because replacement is harder to justify, degrading usefulness while preserving formal defensibility
 - **ontology brittleness:** the protocol can define what counts as breach more easily than it can define what good reconstruction looks like
 
-This last point is now the deepest kill. The system may be able to falsify bad states reliably but still fail to regenerate high-quality canonical state without slipping back into governance theater. That supersedes #r299’s warranty-specification brittleness with a sharper formulation: **breach ontology may be easier than reconstruction ontology**. (#r300)
+This last point is now the deepest kill. The system may be able to falsify bad states reliably but still fail to regenerate high-quality canonical state without slipping back into governance theater. That supersedes #r299's warranty-specification brittleness with a sharper formulation: **breach ontology may be easier than reconstruction ontology**. (#r300)
 
-**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**
 This is now the cleanest contrast so far:
 - **LMSR:** capital buys movement in a belief vector
 - **orderbooks:** capital buys contingent-claim inventory
@@ -288,7 +289,7 @@ This is now the cleanest contrast so far:
 
 It is better when the product is a maintained shared world-model and when falsification is easier than full continuous repricing. It is worse where users mainly want tradable exposure or where the protocol cannot define post-breach repair without heavy discretionary governance. (#r300)
 
-**8. Simplest viable mechanism sketch**  
+**8. Simplest viable mechanism sketch**
 The narrowest strong version now looks like:
 1. Register canonical slot `s_i` with adequacy band `A_i`, safe default, and repair menu.
 2. Install steward with warranty bond; subscribers fund rent.
@@ -298,16 +299,16 @@ The narrowest strong version now looks like:
 6. In `breached` mode, the protocol runs a constrained repair stage: choose safe default, patch, replacement state, or replacement steward under separate bond.
 7. Later truth/audit settles residual bonds and slot-specific credibility for all three roles: steward, refuter, repair supplier. (#r300)
 
-**9. Strongest reason this still fails**  
+**9. Strongest reason this still fails**
 The strongest remaining kill is now: the mechanism may be much better at detecting that canonical state is broken than at regenerating a replacement that is actually decision-useful. If so, the marketplace becomes excellent at de-authorizing bad state but mediocre at restoring good state. That leaves users with a sequence of breached slots and conservative defaults rather than a high-functioning knowledge market. (#r300)
 
-**10. Best surviving variant if this refinement is still wrong**  
+**10. Best surviving variant if this refinement is still wrong**
 If reconstruction remains too discretionary, the best surviving fallback is a **split architecture**:
 - keep the non-PM lane only for `warranty + falsification` on a tiny registry of protocol-critical slots,
 - and source replacement candidates from a separate mechanism such as slot leasing, expert committee selection, or even PM-derived evidence,
 - while preserving the principle that falsification economics and replacement economics should not be conflated.
 
-That preserves the deepest surviving insight of the thread: the real non-PM contribution is not “trading knowledge,” but **capital-backed defense and falsification of shared state authority**. (ref: #r298, #r299, #r300)
+That preserves the deepest surviving insight of the thread: the real non-PM contribution is not "trading knowledge," but **capital-backed defense and falsification of shared state authority**. (ref: #r298, #r299, #r300)
 
 ### #r301 refinement - after breach, degrade confidence first; do not force immediate state synthesis
 
@@ -318,18 +319,18 @@ The stronger formulation is therefore:
 - the default corrective act after a proven breach is to move the slot into a **safe degraded state** such as `{wider interval, lower confidence, stale flag, suspended authority, null/default}`
 - only after that downgrade should a separate competition determine who, if anyone, earns the right to restore a higher-authority replacement state
 
-This matters because it changes the meaning of the repair stage. Repair is not necessarily “write the next sharp estimate.” Repair may instead mean **reduce the protocol’s false precision**. That is a much cleaner non-PM primitive than any mechanism that tries to reward novelty immediately after falsification. Capital improves epistemics here because it finances the destruction of unjustified certainty before it finances the creation of new certainty. (#r301)
+This matters because it changes the meaning of the repair stage. Repair is not necessarily "write the next sharp estimate." Repair may instead mean **reduce the protocol's false precision**. That is a much cleaner non-PM primitive than any mechanism that tries to reward novelty immediately after falsification. Capital improves epistemics here because it finances the destruction of unjustified certainty before it finances the creation of new certainty. (#r301)
 
-**1. Base primitive**  
+**1. Base primitive**
 What is exchanged is best stated now as:
 `bounded warranty defense` and `bonded breach proof`,
 followed by
 `safe degradation right`,
 with high-authority replacement deferred.
 
-This supersedes the weaker implication in #r300 that breach necessarily flows into an immediate bounded reconstruction. The mechanism’s first duty after breach is to revoke over-claimed precision, not to guess the final successor. (#r301)
+This supersedes the weaker implication in #r300 that breach necessarily flows into an immediate bounded reconstruction. The mechanism's first duty after breach is to revoke over-claimed precision, not to guess the final successor. (#r301)
 
-**2. State model**  
+**2. State model**
 Each canonical slot now has three post-breach states rather than one:
 - `adequate` - active warranty holds
 - `breached-degraded` - the previous state is de-authorized and replaced by a safe low-confidence fallback
@@ -343,7 +344,7 @@ So the update rule becomes:
 
 This is sharper than #r300 because the protocol no longer pretends falsification and successful regeneration happen on the same epistemic clock. (#r301)
 
-**3. Credibility model**  
+**3. Credibility model**
 Capital now maps to three distinct epistemic acts:
 - **defense bond** - liability for defending false precision
 - **breach bond** - liability for noisy or unjustified attack
@@ -351,7 +352,7 @@ Capital now maps to three distinct epistemic acts:
 
 The new key point is that restoration should be priced as a stricter act than breach. It is easier to prove that an incumbent is too confident than to prove that a specific successor deserves fresh authority. The mechanism should therefore make **reconstruction more expensive and slower than falsification**, not symmetric with it. (#r301)
 
-**4. Market roles**  
+**4. Market roles**
 The role split becomes:
 - **assurance buyers / subscribers:** fund defended canonical state and tolerate temporary degradation when breach is proven
 - **warranty writer / steward:** earns rent while defending active adequacy
@@ -359,9 +360,9 @@ The role split becomes:
 - **restoration candidate / new steward:** competes only after degradation to earn the right to re-upgrade the slot
 - **protocol / arbiter:** manages downgrade first, restoration second
 
-This is a cleaner answer to the original asker/knower vs bidder/unknower picture. The most important market act may not be “deliver better knowledge,” but “remove false confidence from shared state quickly and safely.” (#r301)
+This is a cleaner answer to the original asker/knower vs bidder/unknower picture. The most important market act may not be "deliver better knowledge," but "remove false confidence from shared state quickly and safely." (#r301)
 
-**5. Settlement model**  
+**5. Settlement model**
 Settlement should now be layered as:
 1. **service rent** while warranty stands
 2. **breach settlement** when challenge resolves
@@ -369,18 +370,18 @@ Settlement should now be layered as:
 4. **restoration settlement** only when a later candidate successfully restores the slot
 5. **truth settlement** later for all parties
 
-Under partial observability this is especially strong. The protocol may be able to justify degradation long before it can justify a new sharp state. That gives it a principled middle state between “keep a bad state” and “force a speculative new one.” (#r301)
+Under partial observability this is especially strong. The protocol may be able to justify degradation long before it can justify a new sharp state. That gives it a principled middle state between "keep a bad state" and "force a speculative new one." (#r301)
 
-**6. Attack surface**  
+**6. Attack surface**
 This refinement changes the main residual attacks again:
 - **griefing into safe mode:** challengers may over-trigger degradations that are formally justified but operationally costly, reducing system usefulness without supplying better reconstruction
 - **permanent low-confidence equilibrium:** the protocol may become too willing to stay degraded because falsification is easier than restoration
 - **degradation gaming:** stewards may choose overly conservative initial states so breach is rare but utility is low
 - **restoration cartelization:** a small set of approved restorers may capture the post-breach upgrade lane
 
-This sharpens #r300’s ontology-brittleness point. The core residual failure is no longer just “reconstruction ontology is hard,” but “the system may become very good at tearing down certainty and too weak at rebuilding it.” (#r301)
+This sharpens #r300's ontology-brittleness point. The core residual failure is no longer just "reconstruction ontology is hard," but "the system may become very good at tearing down certainty and too weak at rebuilding it." (#r301)
 
-**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**
 This is now the clearest contrast:
 - **LMSR:** capital moves belief continuously
 - **orderbooks:** capital transfers exposure continuously
@@ -389,7 +390,7 @@ This is now the clearest contrast:
 
 It is better when false precision is the primary danger and when many important epistemic failures are detectable before they are fully repairable. It is worse when users need a continuously sharp state no matter what; then a degrade-first design may be too conservative or operationally frustrating. (#r301)
 
-**8. Simplest viable mechanism sketch**  
+**8. Simplest viable mechanism sketch**
 The narrowest strong version now looks like:
 1. Register canonical slot `s_i` with adequacy band, safe degraded fallback, and restoration policy.
 2. Install steward with warranty bond; subscribers fund rent.
@@ -399,16 +400,16 @@ The narrowest strong version now looks like:
 6. Only after degradation does the protocol open a restoration lane for a new bonded steward or replacement state.
 7. Later truth/audit settles residual bonds for steward, refuter, and restorer separately. (#r301)
 
-**9. Strongest reason this still fails**  
-The strongest remaining kill is now: the mechanism may converge to a high-integrity but low-utility equilibrium where bad state gets invalidated efficiently, yet high-quality replacement is too slow, too centralized, or too rare. In that world the protocol becomes excellent at saying “we no longer trust this slot” but weak at delivering decision-useful renewed state. (#r301)
+**9. Strongest reason this still fails**
+The strongest remaining kill is now: the mechanism may converge to a high-integrity but low-utility equilibrium where bad state gets invalidated efficiently, yet high-quality replacement is too slow, too centralized, or too rare. In that world the protocol becomes excellent at saying "we no longer trust this slot" but weak at delivering decision-useful renewed state. (#r301)
 
-**10. Best surviving variant if this refinement is still wrong**  
+**10. Best surviving variant if this refinement is still wrong**
 If restoration remains the hard bottleneck, the best surviving fallback is a **split architecture where the non-PM lane handles only warranty + falsification + safe degradation**, and a separate mechanism sources replacement candidates:
 - PM / batch-auction / expert committee / slot leasing can propose restored states,
 - but only after the non-PM lane has de-authorized the bad incumbent,
 - preserving the principle that falsification economics should be separated not only from replacement choice, but also from replacement timing.
 
-This is the strongest surviving variant so far if the raw “knowledge marketplace” story is too ambitious. The real robust contribution is a market for **capital-backed removal of false precision from canonical state**, with reconstruction delegated to whatever mechanism is actually best at synthesis. (ref: #r300, #r301)
+This is the strongest surviving variant so far if the raw "knowledge marketplace" story is too ambitious. The real robust contribution is a market for **capital-backed removal of false precision from canonical state**, with reconstruction delegated to whatever mechanism is actually best at synthesis. (ref: #r300, #r301)
 
 ### #r302 refinement - breach should be scoped to the falsified slice, not treated as an all-or-nothing slot failure
 
@@ -421,7 +422,7 @@ The stronger formulation is therefore:
 
 This is important because it preserves the clean non-PM insight while reducing the bluntness of safe-mode transitions. Capital is still not buying belief inventory or outcome exposure. It is underwriting defendable authority on named pieces of canonical state, and spending bonded effort to revoke only the pieces shown unsafe. That makes the mechanism more plausible as a genuine epistemic maintenance system rather than a truth tribunal that repeatedly turns useful objects off. (#r302)
 
-**1. Base primitive**  
+**1. Base primitive**
 What is exchanged is now best stated as:
 `bounded warranty defense on named state facets` and `bonded breach proof on those facets`,
 followed by
@@ -430,7 +431,7 @@ not necessarily whole-slot invalidation.
 
 This supersedes the coarser reading in #r301 where the main post-breach state transition was slot-level degradation. The real scarce thing is narrower: capital-backed authority over explicitly warranted slices of canonical state. (#r302)
 
-**2. State model**  
+**2. State model**
 Each canonical slot should now carry an internal structure:
 - facet set `F_i = {f_i1, f_i2, ...}`
 - declared dependency map `G_i` showing which facets are tightly coupled
@@ -446,7 +447,7 @@ The update rule becomes:
 
 This is sharper than #r301 because the mechanism can now say: "the forecast band is invalid" or "the confidence annotation is not defensible" without also saying "the entire slot must be blanked out." That is a materially better state machine for real knowledge systems. (#r302)
 
-**3. Credibility model**  
+**3. Credibility model**
 Capital now maps to trust at facet granularity:
 - **facet warranty bond** - liability for defending a named slice too confidently
 - **facet breach bond** - liability for noisy or overbroad attack on that slice
@@ -454,7 +455,7 @@ Capital now maps to trust at facet granularity:
 
 This matters because it fixes an inefficiency in the #r301 whole-slot model. If a steward loses all authority every time one subclaim breaks, rational stewards will publish overly coarse or overly conservative slots. Facet-level liability lets the protocol punish false precision where it actually occurred without forcing unnecessary global retreat. (#r302)
 
-**4. Market roles**  
+**4. Market roles**
 The roles are the same as in #r301 but more precisely scoped:
 - **assurance buyers / subscribers:** fund defended canonical slots and accept partial degradation when only some facets fail
 - **warranty writer / steward:** earns rent while defending the declared facet set
@@ -464,7 +465,7 @@ The roles are the same as in #r301 but more precisely scoped:
 
 This is a stronger answer to the original knower/unknower intuition. The most valuable information transfer may be not "replace the whole state" but "precisely identify which part of the shared state lost warrant." (#r302)
 
-**5. Settlement model**  
+**5. Settlement model**
 Settlement should now distinguish:
 1. **service rent** while the slot's warranted facets remain in force
 2. **breach settlement** when a facet-level challenge resolves
@@ -474,7 +475,7 @@ Settlement should now distinguish:
 
 Under partial observability this is stronger than #r301. The protocol may be able to establish that one component of the state is bad while the rest remains decision-useful. That reduces gratuitous downtime and avoids paying challengers for triggering unnecessarily broad invalidation. (#r302)
 
-**6. Attack surface**  
+**6. Attack surface**
 This refinement changes the main residual attacks again:
 - **facet fragmentation:** stewards may over-fragment slots so that each breached component is tiny and the practical meaning of authority becomes opaque
 - **under-declared coupling:** stewards may hide real dependencies so a breach appears local when it should force broader downgrade
@@ -483,7 +484,7 @@ This refinement changes the main residual attacks again:
 
 So the deepest new design burden is **finding the right granularity of state decomposition**. Too coarse and the protocol over-degrades. Too fine and the mechanism becomes specification theater. (#r302)
 
-**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**
 This sharpens the comparison further:
 - **LMSR:** capital continuously moves a belief vector
 - **orderbooks:** capital continuously transfers contingent exposure
@@ -492,7 +493,7 @@ This sharpens the comparison further:
 
 It is better when the product is a composite world-model and the protocol must preserve useful partial structure under uncertainty. It is worse when the state cannot be decomposed cleanly or when users mainly want a single scalar tradable signal. (#r302)
 
-**8. Simplest viable mechanism sketch**  
+**8. Simplest viable mechanism sketch**
 The narrowest strong version now looks like:
 1. Register canonical slot `s_i` with facet set, declared dependency map, facet warranties, and facet degraded defaults.
 2. Install steward with slot rent and facet-linked warranty bond.
@@ -502,10 +503,10 @@ The narrowest strong version now looks like:
 6. A later restoration lane re-authorizes that slice under separate bond.
 7. Later truth/audit settles steward, refuter, and restorer at the relevant facet granularity. (#r302)
 
-**9. Strongest reason this still fails**  
+**9. Strongest reason this still fails**
 The strongest remaining kill is now: the protocol may not be able to define a facet decomposition that is both legible and truth-tracking. If decomposition is wrong, scoped degradation either misses hidden coupling or explodes into unusable micro-governance. In that world the mechanism again becomes a market in ontology management rather than epistemic improvement. (#r302)
 
-**10. Best surviving variant if this refinement is still wrong**  
+**10. Best surviving variant if this refinement is still wrong**
 If facet-level decomposition is too brittle, the best surviving fallback is a **two-tier architecture**:
 - keep whole-slot warranty + falsification + degradation for the small number of state objects that cannot be decomposed safely,
 - use scoped degradation only for slots with an explicit protocol-defined facet map,
@@ -524,13 +525,13 @@ The stronger formulation is therefore:
 
 This matters because it makes restoration monotone and capital-sensitive. The mechanism no longer asks a brittle question - "is the facet fully fixed yet?" - but a sequence of bounded questions: "is this facet now good enough to leave safe default, then good enough to regain medium confidence, then good enough to regain full canonical authority?" Capital improves epistemics here by underwriting each step of renewed precision separately. The conserved quantity is therefore not just authority over a slot or facet; it is **authority-level coverage on that facet**, with higher authority levels carrying higher insurance burden. (#r303)
 
-**1. Base primitive**  
+**1. Base primitive**
 What is exchanged is now best stated as:
 `bounded warranty defense on named facets` + `bonded breach proof on those facets` + `staged re-certification rights on degraded facets`.
 
 This supersedes the coarser #r302 picture where restoration was a single later event. The protocol should not sell a binary promise of "fixed / not fixed." It should clear who can underwrite progressively stronger re-authorizations of the damaged slice. (#r303)
 
-**2. State model**  
+**2. State model**
 Each facet should now carry an authority ladder, for example:
 - `L0` = degraded safe default / null authority
 - `L1` = usable with wide interval or strict caveat
@@ -545,7 +546,7 @@ The update rule becomes:
 
 This is stronger than #r302 because the protocol no longer conflates "not fully broken" with "fully restored." The state machine can represent partial regained trust without pretending epistemic repair is finished. (#r303)
 
-**3. Credibility model**  
+**3. Credibility model**
 Capital now maps to trust as **level-specific insurance**:
 - lower authority levels require smaller bond because they claim less precision
 - higher authority levels require larger bond because they reintroduce stronger decision-rights
@@ -553,7 +554,7 @@ Capital now maps to trust as **level-specific insurance**:
 
 This is a cleaner answer to why capital helps epistemics than generic restoration bonding. Money matters because each additional unit of claimed authority must be separately insured. A participant cannot cheaply jump from safe mode to full confidence on narrative alone. (#r303)
 
-**4. Market roles**  
+**4. Market roles**
 The roles remain the same as #r302 but restoration becomes more precise:
 - **assurance buyers / subscribers:** fund useful authority on important facets, not necessarily maximal authority at all times
 - **warranty writer / steward:** defends currently active authority levels under bond
@@ -563,7 +564,7 @@ The roles remain the same as #r302 but restoration becomes more precise:
 
 This is closer to how a real knowledge service should work. The product is not raw truth and not raw replacement; it is calibrated usable authority over shared state. (#r303)
 
-**5. Settlement model**  
+**5. Settlement model**
 Settlement should now distinguish:
 1. **service rent** for defending the currently active authority tranche
 2. **breach settlement** when a tranche is falsified
@@ -573,7 +574,7 @@ Settlement should now distinguish:
 
 Under partial observability this is especially useful. The protocol may be able to justify `L0 -> L1` quickly, while `L1 -> L3` requires much slower evidence accumulation. This prevents either permanent paralysis or reckless full restoration. (#r303)
 
-**6. Attack surface**  
+**6. Attack surface**
 This refinement changes the main residual attacks again:
 - **ratchet gaming:** restorers may farm small low-value tranche upgrades to collect rent without delivering meaningful epistemic improvement
 - **premature re-upgrade:** coalitions may push facets back up the ladder before evidence really supports renewed authority
@@ -582,7 +583,7 @@ This refinement changes the main residual attacks again:
 
 So the deepest new design burden is **choosing authority ladders whose intermediate levels are both decision-useful and hard to game**. If ladder design is poor, the system becomes a market in passing through bureaucratic confidence tiers rather than restoring truth-tracking state. (#r303)
 
-**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**
 This sharpens the comparison once more:
 - **LMSR:** capital continuously moves a belief vector
 - **orderbooks:** capital continuously transfers contingent exposure
@@ -591,7 +592,7 @@ This sharpens the comparison once more:
 
 It is better when the key need is not a scalar forecast, but an auditable ladder of decision authority over a shared world-model. It is worse when users mostly want one clean tradable scalar, or when no sensible intermediate authority levels can be specified. (#r303)
 
-**8. Simplest viable mechanism sketch**  
+**8. Simplest viable mechanism sketch**
 The narrowest strong version now looks like:
 
 1. Register canonical slot `s_i` with facet map, dependency map, and authority ladder for each facet.
@@ -602,10 +603,10 @@ The narrowest strong version now looks like:
 6. Each tranche upgrade has its own adequacy test and later truth settlement.
 7. Long-run credibility updates at the facet × authority-level granularity. (#r303)
 
-**9. Strongest reason this still fails**  
+**9. Strongest reason this still fails**
 The strongest remaining kill is now: the protocol may become very good at managing authority ladders but still fail to align those ladders with actual decision quality. If intermediate tranches are poorly chosen, the mechanism becomes a market in bureaucratic re-certification states rather than a market in real epistemic recovery. That would be ontology theater one level deeper. (#r303)
 
-**10. Best surviving variant if this refinement is still wrong**  
+**10. Best surviving variant if this refinement is still wrong**
 If staged re-certification is too complex, the best surviving fallback is a **two-level variant**:
 - keep only `safe degraded` and `full restored` for simple slots,
 - use multi-tranche restoration only where facet structure and authority gradients are explicit and economically important,
@@ -627,16 +628,16 @@ This better matches the prompt's high-information to low-information transfer in
 
 **Candidate families after this refinement:**
 
-1. **Knowledge sale / bilateral belief transfer** - still dead.  
+1. **Knowledge sale / bilateral belief transfer** - still dead.
    Too symmetric, too message-centric, and it quietly reintroduces tradeable belief inventory. Rejected again. (#r299)
 
-2. **Repair-option market** - still viable, but too installer-centric as the default.  
+2. **Repair-option market** - still viable, but too installer-centric as the default.
    Useful as a bounded action layer after a slot has been shown deficient, but weak as the base primitive because it still makes "what should replace the incumbent?" the center of the market too early. (#r298, #r299)
 
-3. **Warranty + refutation market** - strongest surviving family.  
+3. **Warranty + refutation market** - strongest surviving family.
    Canonical slots are continuously insured under bond; challengers earn only by opening and winning falsification of that insured adequacy claim; repair/replacement is downstream from that falsification event. This is the cleanest surviving non-PM formulation because it pays for accountable maintenance and accountable refutation, not for belief inventory or novelty. (#r299)
 
-**1. Base primitive**  
+**1. Base primitive**
 What is exchanged is now best stated as:
 `bounded state warranty on canonical slot s_i, plus bonded right to refute that warranty`
 not merely
@@ -646,7 +647,7 @@ and not
 
 The primary object is the warranty itself: "the current state on `s_i` is inside tolerance ε over horizon H, subject to challenge." The secondary object is a bonded refutation right. Replacement matters only if the warranty fails. (#r299)
 
-**2. State model**  
+**2. State model**
 Each canonical slot now has:
 - incumbent state `x_i`
 - admissible error region / adequacy band `A_i`
@@ -662,14 +663,14 @@ So the update rule becomes:
 
 This is tighter than #r298 because it splits **warranty breach adjudication** from **repair action selection**. That reduces the risk that the market pays too directly for replacement proposals. (#r299)
 
-**3. Credibility model**  
+**3. Credibility model**
 Capital now maps to epistemics through two opposed insurance roles:
 - **warranty bond** = liability for defending a slot that later proves outside tolerance
 - **refutation bond** = liability for forcing review when the warranty was actually sound
 
 The clean answer to "why does money improve epistemics?" is now: money buys the ability to issue or break a bounded state warranty under downside. Not louder opinion. Not larger directional exposure. Capital is useful only because false defense and false challenge both burn it. (#r299)
 
-**4. Market roles**  
+**4. Market roles**
 The ask/bid split is cleaner if expressed as:
 - **assurance buyers / subscribers:** pay for continued defended adequacy of canonical slot `s_i`
 - **warranty writers / stewards:** collect service rent while underwriting the slot's adequacy under bond
@@ -678,7 +679,7 @@ The ask/bid split is cleaner if expressed as:
 
 This preserves the user's two-sided intuition but grounds it in state insurance, not bilateral opinion sale. The high-information zone is either selling defensible assurance or spending capital to puncture false assurance. The low-information zone is paying for reliable defended state. (#r299)
 
-**5. Settlement model**  
+**5. Settlement model**
 Settlement should now be understood in three layers:
 1. **service settlement** - warranty writer earns rent while the slot remains inside policy and survives challenge
 2. **breach settlement** - if a challenger proves warranty breach, part of warranty bond transfers immediately and the repair menu activates
@@ -686,7 +687,7 @@ Settlement should now be understood in three layers:
 
 Under partial observability, the protocol can often say "this warranty was credibly breached" earlier than it can say "this replacement was globally correct." That is useful: the system can reward genuine falsification pressure without paying directly for raw novelty. (#r299)
 
-**6. Attack surface**  
+**6. Attack surface**
 This refinement changes the main residual attacks again:
 - **warranty-spec gaming:** adequacy bands are written so loosely that warranty sellers farm rent with little real epistemic burden
 - **breach theater:** challengers optimize for procedural breach of the published warranty rather than actual truth improvement
@@ -695,7 +696,7 @@ This refinement changes the main residual attacks again:
 
 This supersedes #r298's generic exercise-condition concern. The deeper kill is now whether the protocol can define warranties whose breach genuinely tracks epistemic failure rather than formal noncompliance. (#r299)
 
-**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**
 This is the sharpest contrast so far:
 - **LMSR:** capital buys movement in a public belief vector
 - **orderbooks:** capital buys and sells contingent-claim inventory
@@ -704,7 +705,7 @@ This is the sharpest contrast so far:
 
 It is better where the product is a repeatedly consumed canonical world-model and the key economic need is trusted maintenance under challenge. It is worse where users mainly want tradable exposure, or where no one can write an adequacy warranty that is both public and decision-relevant. (#r299)
 
-**8. Simplest viable mechanism sketch**  
+**8. Simplest viable mechanism sketch**
 The narrowest strong mechanism is now:
 1. Register canonical slot `s_i` with incumbent state, adequacy band `A_i`, service rent, and delayed truth policy.
 2. Install a warranty writer / steward who posts bond and earns rent while the slot is in good standing.
@@ -716,16 +717,123 @@ The narrowest strong mechanism is now:
 
 This is cleaner than making replacement bids primary. The market first clears *whether the incumbent assurance survives*, then only secondarily *what corrective action follows*. (#r299)
 
-**9. Strongest reason this still fails**  
+**9. Strongest reason this still fails**
 The strongest remaining kill is now: the protocol may be unable to specify warranties that are simultaneously (a) public enough to adjudicate cheaply, (b) tight enough to mean something decision-relevant, and (c) robust enough to resist procedural breach-farming. If warranty design is weak, the whole mechanism becomes an insurance theater around underspecified slots. (#r299)
 
-**10. Best surviving variant if this refinement is still wrong**  
+**10. Best surviving variant if this refinement is still wrong**
 If general warranty markets are too brittle, the best fallback is a **narrow falsification layer on top of either slot leasing or PM discovery**:
 - keep only a tiny registry of protocol-critical slots with public warranties,
 - reward bonded refutation of those slots,
 - let PM / batch-auction machinery or ordinary slot stewardship handle broader discovery elsewhere.
 
-That preserves the deepest surviving insight of the thread: the non-PM contribution is not "knowledge trading" but **capital-backed, challengeable assurance on shared state**. (ref: #r295, #r296, #r297, #r298, #r299)
+That preserves the deepest surviving insight of the thread: the non-PM contribution is not “knowledge trading” but **capital-backed, challengeable assurance on shared state**. (ref: #r295, #r296, #r297, #r298, #r299)
+
+### #r305 refinement - the mechanism should insure bounded downstream decision warrants, not just abstract slot authority
+
+#r304 correctly tightened the non-PM family into insured decision-authority on canonical state slots with pre-declared breach tests and authority tranches. The next refinement is that even “decision-authority on a slot” is still one level too abstract. A slot matters only because some downstream action is permitted, blocked, routed, or sized from it. If the mechanism insures authority over the slot but does not bind that authority to a declared class of downstream actions, it drifts back toward state-maintenance theater: the protocol is paying to manage epistemic status labels without fully specifying what operational rights those labels unlock. (#r305)
+
+The stronger surviving formulation is therefore:
+- each canonical slot or facet should map to a small menu of **named downstream action classes**
+- each authority tranche should be interpreted as a **decision warrant**: a bounded right to permit a specific class of actions conditional on the slot remaining inside its warranty region
+- breach should revoke or narrow those action warrants first, with state degradation serving mainly as the machine-readable record of that revocation
+
+This is not a return to buyer-specific decision-loss accounting. The protocol still should not try to settle on bespoke private utility. Instead it should settle against **publicly declared action predicates** such as:
+- “this tranche authorizes automated routing to venue set V”
+- “this tranche authorizes clearing parameter range R”
+- “this tranche authorizes exposure cap E”
+- “this tranche authorizes canonical interface label L”
+
+That sharpens the family again. The product being sold is not knowledge, not belief, not raw state, and not even generic slot authority. It is **insured permission to let the shared state drive a bounded class of downstream decisions**. Capital improves epistemics only because someone is financially on the hook for having granted too much decision power to an inadequately defended state. (#r305)
+
+**1. Base primitive**  
+What is exchanged is now best stated as:
+`insured decision warrant on named action class a_k, backed by warranted facet authority on canonical state`
+not merely
+`insured authority on slot s_i`.
+
+This supersedes the weaker slot-centric reading in #r304. The true scarce object is not just authority to assert state; it is authority for that state to mechanically or institutionally drive downstream behavior. (#r305)
+
+**2. State model**  
+The global state vector remains canonical slots and facets, but each active authority tranche should now carry an explicit action map:
+- facet `f_ij`
+- authority level `L_m`
+- enabled action class set `A(f_ij, L_m)`
+- breach tests tied to those enabled actions
+
+The update rule therefore becomes:
+1. steward defends warranted facet authority
+2. that authority enables a bounded set of downstream actions
+3. breach falsifies the warrant and automatically shrinks the enabled action set
+4. restoration re-enables action classes tranche by tranche
+
+This is stronger than #r304 because the mechanism can now say not only “confidence in this facet has been downgraded” but also “therefore these exact operational permissions are revoked.” That closes the remaining gap between epistemic governance and actual mechanism output. (#r305)
+
+**3. Credibility model**  
+Capital now maps to trust as **action-coupled insurance**:
+- larger or more safety-critical action classes require larger insurance burden
+- low-stakes descriptive actions can sit on lower tranches with lower bond
+- a participant’s credibility should be tracked not just by slot/facet and authority level, but by which action classes they have historically defended correctly
+
+This is the cleanest answer yet to the prompt’s core demand question. Money helps because it insures the grant of operational rights, not because it symbolically endorses a statement. If an authority holder enabled an action class the state did not justify, their capital should absorb that mistake. (#r305)
+
+**4. Market roles**  
+The role map sharpens one more step:
+- **decision-warrant buyers / subscribers:** pay for specific bounded downstream permissions to remain live
+- **warranty writer / steward:** defends the state facets whose authority supports those permissions
+- **refuter:** earns by proving that a currently enabled action warrant is not defensible
+- **re-certifier / restorer:** earns by re-enabling revoked action classes under fresh bond
+- **protocol / arbiter:** defines the action map and enforces automatic warrant narrowing when breach is proven
+
+This makes the ask/bid picture cleaner than all earlier formulations. The low-information side is not buying “insight”; it is buying reliable permission to act from shared state. The high-information side is selling insured justification for that permission. (#r305)
+
+**5. Settlement model**  
+Settlement should now be read in action terms:
+1. **service rent** for defending currently active action warrants
+2. **breach settlement** when a refuter proves an enabled warrant should have been narrower or revoked
+3. **warrant downgrade settlement** where affected action classes shut off or narrow immediately
+4. **re-certification settlement** when a later candidate re-enables specific action classes
+5. **truth settlement** later for whether the earlier warrant grants, revocations, and restorations were substantively justified
+
+Under partial observability this is useful because the protocol can often determine that a certain action right is no longer defensible before it knows the fully correct replacement state. That keeps the degrade-first insight from #r301 while tying it directly to operational consequence. (#r305)
+
+**6. Attack surface**  
+This refinement changes the residual failure surface again:
+- **action-surface overload:** the protocol may define too many action classes, turning the mechanism into bureaucracy around permissions rather than epistemic maintenance
+- **misbound action maps:** the wrong actions may be tied to the wrong facets or authority levels, so revocation either overfires or underfires
+- **shadow-action leakage:** real downstream decisions may keep informally using degraded state even after the formal warrant is revoked
+- **criticality mispricing:** bond sizes may fail to reflect the true risk of an enabled action class, making some warrants underinsured
+
+This now supersedes #r304’s generic authority-surface bureaucracy with a sharper failure: **if the mechanism cannot bind state authority to the right bounded action classes, it remains descriptively elegant but operationally hollow.** (#r305)
+
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+This is now the cleanest surviving contrast:
+- **LMSR:** capital buys movement in a belief vector
+- **orderbooks:** capital buys contingent exposure
+- **batch auctions:** clear that same exposure on a fairer clock
+- **decision-warrant KM:** capital buys and insures bounded permission for canonical state to drive named downstream actions
+
+It is better when the product is not tradable exposure but auditable machine-usable permissioning on top of a shared world-model. It is worse when no bounded action menu exists or when most value still comes from external trading liquidity rather than internal decision rights. (#r305)
+
+**8. Simplest viable mechanism sketch**  
+The narrowest strong version now looks like:
+1. Register canonical slot with facet map, authority ladder, and action-class map.
+2. Install steward with bond sized to currently enabled action classes.
+3. Subscribers pay for specific action warrants to remain live.
+4. Refuter posts `(evidence, breach_bond, target_action_classes)`.
+5. If breach succeeds, the protocol revokes or narrows the smallest defensible action set and degrades the linked facet authority.
+6. Restoration candidates later post fresh bond to re-enable one action class set at a time.
+7. Later truth/audit settles whether the earlier action permissions and revocations were justified. (#r305)
+
+**9. Strongest reason this still fails**  
+The strongest remaining kill is now: the mechanism may require a richer and more stable action taxonomy than the domain can support. If action classes are badly chosen, continuously changing, or mostly informal, the protocol cannot cleanly insure them. Then the design again collapses into either hollow status labels or bespoke governance. (#r305)
+
+**10. Best surviving variant if this refinement is still wrong**  
+If full action-scoped decision warrants are too heavy, the best surviving fallback is a **two-layer architecture**:
+- keep the non-PM lane only for a small set of high-value, machine-enforced action warrants on protocol-critical state
+- let broader canonical state maintenance run on the #r304 slot/facet authority model without explicit action maps
+- and let standard PM / batch-auction machinery handle external disagreement and hedgeable exposure elsewhere
+
+That preserves the deepest surviving thread insight in its sharpest form: the non-PM opportunity is not to sell beliefs, but to run a market for **insured permissioning of downstream decisions from shared state**. (ref: #r301, #r303, #r304, #r305)
 
 ### #r298 refinement - the strongest non-PM form is a market in bonded repair options on canonical state
 
@@ -745,7 +853,7 @@ That gives a cleaner finite-state machine than the earlier contest framing:
 
 The key shift is that the mechanism need not treat every serious challenge as a binary steward-takeover contest. Some knowledge is corrective without implying full authority transfer. A repair-option framing lets the protocol express partial epistemic actions - patch, narrow confidence band, revert to safe default, swap steward, or leave unchanged - without pretending that every challenge is a buy/sell bet on a public belief object. (#r298)
 
-**1. Base primitive**  
+**1. Base primitive**
 What is exchanged is now best stated as:
 `bonded, exercisable repair option on canonical slot s_i`
 not merely
@@ -755,7 +863,7 @@ and not
 
 The holder does not own inventory on an outcome. The holder owns a capital-backed right to force a bounded corrective transition if admissibility and exercise conditions are met. That is the cleanest surviving non-PM primitive so far. (#r298)
 
-**2. State model**  
+**2. State model**
 The global state vector remains canonical slots, but each slot now has:
 - incumbent state
 - adequacy region / service policy
@@ -770,7 +878,7 @@ So the update rule becomes:
 
 This is stronger than raw displacement language because it keeps the state machine bounded. The market is not paying for arbitrary motion in the state vector; it is paying for **contingent corrective transitions against a pre-specified repair menu**. (#r298)
 
-**3. Credibility model**  
+**3. Credibility model**
 Capital improves epistemics only if it finances credible exercise of corrective power. The mapping is now:
 - **contest bond** = cost to make the protocol evaluate whether repair authority should go live
 - **exercise bond** = liability for actually invoking the corrective action
@@ -778,7 +886,7 @@ Capital improves epistemics only if it finances credible exercise of corrective 
 
 This is a cleaner answer than generic skin-in-the-game. Money matters because it underwrites the possibility of actually correcting shared state, with downside if that correction was unjustified. If capital only bought louder claims, the design would still be cosmetic. (#r298)
 
-**4. Market roles**  
+**4. Market roles**
 The role map sharpens again:
 - **slot subscribers / funders:** pay for a maintained canonical slot plus a live repair surface
 - **incumbent steward:** earns rent while keeping the slot inside its adequacy region
@@ -787,7 +895,7 @@ The role map sharpens again:
 
 This is more precise than knower/unknower and more precise than direct challenger/incumbent combat. The active market edge is now: who can credibly propose and underwrite a repair operation on shared state. (#r298)
 
-**5. Settlement model**  
+**5. Settlement model**
 Settlement now has four distinct layers:
 1. **service settlement** - incumbent earns while slot remains in tolerance
 2. **option-admission settlement** - challenger bond settles based on whether the challenge was serious enough to create a live repair option
@@ -796,7 +904,7 @@ Settlement now has four distinct layers:
 
 Under partial observability, the protocol can often say "this was worth opening as a repair option" well before it can say "the repair was definitely correct." That preserves a path to reward credible corrective pressure without paying directly for novelty or belief inventory. (#r298)
 
-**6. Attack surface**  
+**6. Attack surface**
 The main residual attacks change again:
 - **exercise gaming:** actors optimize to barely satisfy option-exercise conditions, then trigger low-value repairs
 - **menu capture:** bad slot design exposes the wrong repair menu, so the option surface itself is malformed
@@ -805,7 +913,7 @@ The main residual attacks change again:
 
 This supersedes #r297's generic hearing-market failure. The deeper failure is now whether the mechanism can define repair menus and exercise thresholds that track real epistemic improvement rather than procedural wins. (#r298)
 
-**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**
 This is the clearest remaining contrast:
 - **LMSR:** capital buys direct movement in a public belief vector
 - **orderbooks:** capital buys and sells contingent-claim inventory
@@ -814,7 +922,7 @@ This is the clearest remaining contrast:
 
 It is better when the product is a repeatedly consumed world-model that must stay challengeable and repairable. It is worse when users primarily want hedgeable exposure or when no public exercise conditions can be specified cleanly. (#r298)
 
-**8. Simplest viable mechanism sketch**  
+**8. Simplest viable mechanism sketch**
 The narrowest strong version is now:
 1. Register canonical slot `s_i` with incumbent state, adequacy test, repair menu, and delayed truth policy.
 2. Subscribers fund service rent plus a repair-option pool.
@@ -826,10 +934,10 @@ The narrowest strong version is now:
 
 This is cleaner than generic contest markets because it treats challenges as options on corrective action, not as blanket rights to rewrite state. (#r298)
 
-**9. Strongest reason this still fails**  
+**9. Strongest reason this still fails**
 The strongest remaining kill is now: the mechanism may become a market in *winning exercise rights* rather than a market in truth-improving repair. If exercise conditions or repair menus are underspecified, actors optimize for procedural exercisability, and capital buys leverage over bounded state transitions rather than actual epistemic gain. That would still be governance theater with market syntax. (#r298)
 
-**10. Best surviving variant if this refinement is still wrong**  
+**10. Best surviving variant if this refinement is still wrong**
 If general repair-option markets are too procedural, the best fallback is a **narrow insured repair-option layer only for a tiny registry of protocol-critical slots**, with ordinary PM or batch-auction machinery handling discovery elsewhere. That keeps the deepest surviving insight intact: the non-PM contribution is not "knowledge trading" but **bonded corrective capacity over shared state**. (ref: #r295, #r296, #r297, #r298)
 
 ### #r297 refinement - discovery and adoption must be separate, or the mechanism still pays too directly for novelty
@@ -840,9 +948,9 @@ The mechanism should therefore have two distinct transitions:
 1. **discovery:** a challenger posts bonded evidence that the incumbent state is inadequate
 2. **adoption:** the protocol decides whether that evidence is sufficient to transfer canonical authority or keep the incumbent / `no_change`
 
-This sounds subtle but it matters. In LMSR, orderbooks, and even many procurement framings, capital directly pushes the public state object. Here, capital should only buy the right to force a **contest** over authority. The canonical state changes only after the contest clears under public admissibility tests. That means the market is not clearing “who gets to move the estimate” but “who has earned a hearing strong enough to put incumbency at risk.” (#r297)
+This sounds subtle but it matters. In LMSR, orderbooks, and even many procurement framings, capital directly pushes the public state object. Here, capital should only buy the right to force a **contest** over authority. The canonical state changes only after the contest clears under public admissibility tests. That means the market is not clearing "who gets to move the estimate" but "who has earned a hearing strong enough to put incumbency at risk." (#r297)
 
-**1. Base primitive**  
+**1. Base primitive**
 What is exchanged is now best stated as:
 `bonded right to trigger admissible contest over slot s_i`
 not merely
@@ -850,7 +958,7 @@ not merely
 
 The distinction is that discovery pressure is valuable even when the challenger ultimately fails to displace the incumbent, because it forces the incumbent state to defend itself against evidence. So the market is best understood as clearing **contest rights over canonical state**, with replacement only as one possible outcome. (#r297)
 
-**2. State model**  
+**2. State model**
 The global state vector remains a set of canonical slots, but the update rule now has one extra gate:
 1. incumbent state `x_i^0` is live
 2. challenger submits bonded evidence package `e_i^1`
@@ -860,14 +968,14 @@ The global state vector remains a set of canonical slots, but the update rule no
 
 So state updates are no longer direct challenger writes. They are **adoption outcomes after evidence admission**. This is cleaner because it avoids paying simply for generating motion in the state vector. (#r297)
 
-**3. Credibility model**  
+**3. Credibility model**
 Capital now maps to epistemics in two layers:
 - **contest bond:** proves the challenger is willing to pay to have their evidence taken seriously
 - **authority bond:** applies only if the challenger actually wins adoption and becomes steward
 
 This is stronger than the #r296 single-bond framing. A failed challenger should lose enough to deter cheap noise, but not be treated the same as a bad adopted steward. Discovery liability and stewardship liability are different risks and should price differently. That is one of the cleanest remaining answers to why capital helps epistemics here: it buys costly access to the contest surface, not direct voice. (#r297)
 
-**4. Market roles**  
+**4. Market roles**
 The role map sharpens again:
 - **subscribers / slot funders:** pay for a maintained canonical slot and for a live contest surface around it
 - **incumbent steward:** earns service rent while holding authority under bond
@@ -876,25 +984,25 @@ The role map sharpens again:
 
 This is a better decomposition than treating challengers as direct replacement bidders. Sometimes the valuable act is surfacing high-quality contradictory evidence without actually taking over the slot. (#r297)
 
-**5. Settlement model**  
+**5. Settlement model**
 Settlement now has four layers rather than three:
 1. **service settlement:** incumbent keeps earning rent while installed
 2. **contest settlement:** challenger bond settles based on whether the evidence was admissible / non-frivolous
 3. **adoption settlement:** if contest succeeds, authority transfers and incumbent may lose bond immediately
 4. **truth settlement:** later audit decides whether incumbent retention or challenger adoption was actually correct
 
-This is especially important under partial observability. The protocol may be able to say “this evidence was serious enough to force review” long before it can say “the challenger was actually right.” That gives a path to reward epistemically useful contestation without collapsing back into raw belief trading. (#r297)
+This is especially important under partial observability. The protocol may be able to say "this evidence was serious enough to force review" long before it can say "the challenger was actually right." That gives a path to reward epistemically useful contestation without collapsing back into raw belief trading. (#r297)
 
-**6. Attack surface**  
+**6. Attack surface**
 The main surviving failure changes again:
 - **admission bottleneck capture:** whoever controls admissibility tests can suppress justified challenges or flood the system with low-value contests
 - **contest farming:** actors generate admissible-but-low-impact evidence to harvest contest rewards without materially improving truth quality
 - **incumbent procedural shielding:** stewards optimize around admission rules so that strong contrary evidence never reaches adoption stage
 - **arbiter drift:** the protocol becomes a gatekeeper of hearings rather than a market for truth-tracking state
 
-This supersedes #r296’s bounty-chasing churn as the deeper residual risk. The key design burden is now the **evidence-admission threshold**: too loose and contest spam dominates; too strict and incumbents calcify. (#r297)
+This supersedes #r296's bounty-chasing churn as the deeper residual risk. The key design burden is now the **evidence-admission threshold**: too loose and contest spam dominates; too strict and incumbents calcify. (#r297)
 
-**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**
 This is the sharpest surviving contrast so far:
 - **LMSR:** capital moves a public belief vector directly
 - **orderbooks:** capital transfers contingent-claim inventory directly
@@ -903,7 +1011,7 @@ This is the sharpest surviving contrast so far:
 
 It is better when the core product is a trusted, challengeable world-model used repeatedly by downstream agents. It is worse when users mainly want immediate exposure transfer or when no neutral admissibility layer can be specified. (#r297)
 
-**8. Simplest viable mechanism sketch**  
+**8. Simplest viable mechanism sketch**
 The narrowest surviving mechanism is now:
 1. Register canonical slot `s_i` with incumbent steward, service tests, admissibility tests, and delayed truth policy.
 2. Subscribers fund service rent plus a contest pool.
@@ -916,10 +1024,10 @@ The narrowest surviving mechanism is now:
 
 This is cleaner than direct displacement markets because it pays first for credible challenge pressure, then separately for deserved authority. (#r297)
 
-**9. Strongest reason this still fails**  
+**9. Strongest reason this still fails**
 The strongest remaining kill is now: the mechanism may end up being a market in *getting hearings* rather than a market in truth-improving state correction. If admissibility is hard to formalize, power moves to whoever defines contest entry, and capital starts buying procedural leverage rather than epistemic improvement. That would recreate governance theater under market language. (#r297)
 
-**10. Best surviving variant if this refinement is still wrong**  
+**10. Best surviving variant if this refinement is still wrong**
 If contest-rights markets are too procedural, the best fallback is to collapse discovery back into an ordinary PM / batch-auction discovery layer while keeping only a narrow insured adoption layer for a small number of protocol-critical slots. In other words:
 - let PM machinery discover disagreement
 - let insured slot governance decide adoption only for high-value canonical states
@@ -929,7 +1037,7 @@ That preserves the deepest surviving thread insight: capital should discipline a
 
 ### #r295 refinement - separate service rent from truth-settlement, or the design quietly becomes a weird prediction market
 
-#r145-#r151 correctly converged on protocol-native slot leasing with challenger-funded replacement. The next refinement is to split **what is paid continuously** from **what is earned only after truth or audit**. Without that split, the mechanism still risks collapsing back into prediction-market logic: the steward appears to be “paid for being right” on a state coordinate, which is just a disguised contingent claim with extra governance around it. The stronger non-PM design is:
+#r145-#r151 correctly converged on protocol-native slot leasing with challenger-funded replacement. The next refinement is to split **what is paid continuously** from **what is earned only after truth or audit**. Without that split, the mechanism still risks collapsing back into prediction-market logic: the steward appears to be "paid for being right" on a state coordinate, which is just a disguised contingent claim with extra governance around it. The stronger non-PM design is:
 
 - **continuous service rent** pays for holding replaceable responsibility over a canonical slot,
 - **bond settlement** pays or penalizes only after public truth, challenge, or audit reveals whether that responsibility was exercised well.
@@ -938,7 +1046,7 @@ That means the mechanism is not selling a prediction and not directly selling a 
 
 This sharpens the ten design questions.
 
-**1. Base primitive**  
+**1. Base primitive**
 What is being exchanged is now best stated as:
 `temporary stewardship lease on slot s_i  <->  service rent, plus separately posted error bond`
 not
@@ -946,7 +1054,7 @@ not
 
 That is a meaningful correction. If most expected return comes from terminal correctness payout, the design is still basically a prediction market with a stewardship wrapper. If most expected return during the slot horizon comes from service rent, while the bond only handles error accountability, then the primitive stays non-PM. (#r295)
 
-**2. State model**  
+**2. State model**
 Each canonical slot now has two parallel ledgers:
 - a **service ledger**: who currently holds the slot, what fee stream they are earning, whether the slot is fresh/challenge-clean/in-policy,
 - a **truth ledger**: what later evidence says about whether the installed state actually beat the incumbent or should have been displaced.
@@ -957,38 +1065,38 @@ Update events therefore have two different consequences:
 
 This is cleaner than the earlier formulations because it prevents one ambiguous metric from doing all the work. A useful mechanism should not try to make the same score simultaneously determine subscription rent, challenge eligibility, final truth accountability, and durable reputation. (#r295)
 
-**3. Credibility model**  
+**3. Credibility model**
 Capital improves epistemics only through the bond side, not through the rent side. Rent should be relatively flat conditional on holding the slot in good standing; bond exposure should scale with how much replaceable authority the steward has taken on. So the mapping becomes:
 - rent = payment for carrying accountable maintenance burden,
 - bond = posted error-insurance that gets burned when the steward should not have had that authority.
 
-This is the cleanest remaining answer to the prompt’s core question. Money helps not because it buys a louder opinion, and not because it creates speculative PnL. It helps because it insures the shared state against bad installs while compensating someone to do the maintenance work in the meantime. (#r295)
+This is the cleanest remaining answer to the prompt's core question. Money helps not because it buys a louder opinion, and not because it creates speculative PnL. It helps because it insures the shared state against bad installs while compensating someone to do the maintenance work in the meantime. (#r295)
 
-**4. Market roles**  
+**4. Market roles**
 The role split is now tighter:
 - **slot funders / subscribers** pay the service rent because they need the slot kept decision-usable,
 - **slot stewards** earn rent while installed and post bonds against bad stewardship,
-- **challengers** do not mainly bet against the steward; they spend capital to replace bad stewardship and capture part of the displaced steward’s bond or replacement fee,
+- **challengers** do not mainly bet against the steward; they spend capital to replace bad stewardship and capture part of the displaced steward's bond or replacement fee,
 - **protocol** clears the lease and later settles the bond.
 
 That is cleaner than "knower vs unknower" and also cleaner than pure procurement. This is a market in accountable stewardship rights, not a market in beliefs. (#r295)
 
-**5. Settlement model**  
+**5. Settlement model**
 Settlement must now be explicitly bifurcated:
 1. **service settlement** - continuous or epochal payment for maintaining the slot within public operating conditions (freshness, challenge responsiveness, schema conformance, survival of audits),
 2. **truth settlement** - delayed bond release/slash based on whether the installed state actually outperformed the incumbent or was correctly displaced.
 
 Under partial observability, service settlement can continue while truth settlement remains provisional. Durable credibility should come primarily from the truth ledger, not from merely farming service rent. This matters because otherwise a steward can optimize for passing public operating tests without improving actual epistemics. (#r295)
 
-**6. Attack surface**  
+**6. Attack surface**
 This refinement changes the main surviving attack. The deepest problem is no longer just buyer-side specification failure (#r150) or slot-spec design failure (#r151). It is now **metric capture across the service ledger**:
 - steward optimizes freshness and procedural challenge-defense while the substantive state drifts wrong,
-- protocol overpays for “healthy-looking” slots that are epistemically weak,
+- protocol overpays for "healthy-looking" slots that are epistemically weak,
 - challengers may game replaceability events without producing materially better truth performance.
 
 So the main risk becomes a classic Goodhart split: public adequacy tests determine rent, but truth quality is harder and slower to observe. If the rent ledger dominates economics, the mechanism becomes a market in test-passing stewardship rather than truth-tracking stewardship. (#r295)
 
-**7. Why better or worse than LMSR / orderbooks / batch auctions**  
+**7. Why better or worse than LMSR / orderbooks / batch auctions**
 This gives the sharpest surviving comparison so far:
 - **LMSR / orderbooks** mainly pay for taking directional exposure on outcomes,
 - **batch auctions** improve how that exposure clears,
@@ -996,7 +1104,7 @@ This gives the sharpest surviving comparison so far:
 
 It is better where the real problem is trusted, maintained state for repeated downstream use. It is worse where users mostly want hedgeable exposure and do not want to subsidize a standing maintenance layer. (#r295)
 
-**8. Simplest viable mechanism sketch**  
+**8. Simplest viable mechanism sketch**
 The narrowest strong version is now:
 1. Protocol registers canonical slot `s_i` with public operating tests and a delayed truth policy.
 2. Subscribers fund a rent stream for `s_i`.
@@ -1008,10 +1116,10 @@ The narrowest strong version is now:
 
 This is the first version that cleanly separates payment for doing the job from payment for having actually deserved the job. (#r295)
 
-**9. Strongest reason this still fails**  
+**9. Strongest reason this still fails**
 The strongest remaining kill is that the service ledger may become the real economy and the truth ledger may become too weak, too delayed, or too noisy to discipline it. Then agents rationally optimize the visible service metrics, rent extraction dominates, and the mechanism stops improving epistemics in the way it claims. In short: if delayed truth settlement is not economically strong enough, the rent layer Goodharts the market. (#r295)
 
-**10. Best surviving variant if this refinement is still wrong**  
+**10. Best surviving variant if this refinement is still wrong**
 If the service/truth split proves too gameable, the best surviving fallback is a **thin stewardship layer over a conventional PM core**:
 - PM or batch-auction machinery continues to discover contested prices,
 - only a small registry of protocol-critical slots uses insured stewardship leasing,
@@ -1075,7 +1183,7 @@ Keep the warranty concept but narrow it drastically. Use it only for coordinates
 
 ### #r148 refinement - clear temporary state-authority, not bilateral knowledge sale
 
-#r145-#r147 correctly converged on warranty-bearing state maintenance, but one ambiguity remained: the system can still quietly regress into a disguised orderbook if it is described as a bilateral flow where a “knower sells to an unknower.” That picture is still too person-to-person. The stronger formulation is **state-authority procurement against a standing baseline**: the protocol clears who gets temporary authority to overwrite a coordinate of the shared state, under bond and open challenge, while downstream users pay for access to the maintained state as a public or club good. (#r148)
+#r145-#r147 correctly converged on warranty-bearing state maintenance, but one ambiguity remained: the system can still quietly regress into a disguised orderbook if it is described as a bilateral flow where a "knower sells to an unknower." That picture is still too person-to-person. The stronger formulation is **state-authority procurement against a standing baseline**: the protocol clears who gets temporary authority to overwrite a coordinate of the shared state, under bond and open challenge, while downstream users pay for access to the maintained state as a public or club good. (#r148)
 
 That yields a cleaner decomposition of roles and payments:
 - **Maintainer / proposer:** competes for the right to install and defend a candidate state on coordinate `s_i`
@@ -1085,13 +1193,13 @@ That yields a cleaner decomposition of roles and payments:
 
 This matters because it kills a weak surviving family that still looked superficially attractive:
 
-1. **Continuous bilateral knowledge rights** - killed.  
-   If a “knower” can continuously sell update rights or transferable informational claims directly to buyers, then inventory, resale, and secondary positioning reappear. Even if the interface says “knowledge” instead of “shares,” the conserved quantity has slipped back toward tradeable belief inventory. That is just an orderbook with different nouns. (#r148)
+1. **Continuous bilateral knowledge rights** - killed.
+   If a "knower" can continuously sell update rights or transferable informational claims directly to buyers, then inventory, resale, and secondary positioning reappear. Even if the interface says "knowledge" instead of "shares," the conserved quantity has slipped back toward tradeable belief inventory. That is just an orderbook with different nouns. (#r148)
 
-2. **One-shot procurement of a better report** - weak but admissible as a narrow special case.  
+2. **One-shot procurement of a better report** - weak but admissible as a narrow special case.
    This works for static, low-maintenance coordinates, but it misses the core reason the family differs from prediction markets: the valuable object is usually not a one-off report, but accountable temporary maintenance of decision state over a horizon. Useful as a degenerate case, not as the canonical mechanism. (#r148)
 
-3. **Baseline-relative authority procurement with challengeable installation** - strongest surviving family.  
+3. **Baseline-relative authority procurement with challengeable installation** - strongest surviving family.
    Here capital does epistemic work because it underwrites temporary authority plus correction liability. A proposer is paid only if their installation beats the incumbent baseline or `no_change`, and challengers stay economically live throughout the service window. This remains the cleanest non-LMSR primitive. (#r148)
 
 **What is being exchanged, now stated as tightly as possible:**
@@ -1129,7 +1237,7 @@ A maintainer then competes to cover that deficiency by installing or defending a
 
 This sharpens several pieces of the mechanism.
 
-**1. Base primitive**  
+**1. Base primitive**
 What is exchanged is best described as:
 `coverage on a state deficiency  <->  bonded maintenance service`
 not
@@ -1139,7 +1247,7 @@ and not
 
 This is stronger than #r147's warranty-bearing installation language because it gives demand a cleaner object to buy: not a free-form update, but a bounded promise that some coordinate will be maintained within a named adequacy condition. (#r149)
 
-**2. State model**  
+**2. State model**
 The global state vector remains the same, but updates should now be interpreted as **coverage actions** against deficiency contracts. The update rule is no longer simply "best candidate overwrites incumbent." It is:
 - publish incumbent `s_i`
 - publish deficiency contract `D_i = (baseline, horizon, tolerance, audit rule, budget)`
@@ -1148,10 +1256,10 @@ The global state vector remains the same, but updates should now be interpreted 
 
 This pushes the mechanism away from generic revision incentives and toward explicit maintenance obligations. (#r149)
 
-**3. Credibility model**  
+**3. Credibility model**
 Capital converts to trust only when it is underwriting an identifiable failure mode. A large bond should not mean "this person is persuasive." It should mean "this person is financially exposed if the covered deficiency still materializes." That is the cleanest surviving answer so far to why money improves epistemics rather than merely reallocates PnL. (#r149)
 
-**4. Market roles and payment flow**  
+**4. Market roles and payment flow**
 The roles become more precise:
 - **Coverage buyer / demander:** funds the state-deficiency contract
 - **Maintainer:** installs/defends a covered state under bond
@@ -1162,16 +1270,16 @@ The strongest non-PM payment source is therefore not side-betting and not resale
 
 **5. Candidate family triage after #r149**
 
-1. **Generic knowledge sale** - killed.  
+1. **Generic knowledge sale** - killed.
    Still too metaphorical; cannot specify what service was delivered except via later truth, so it collapses back into reputation theater or prediction-market language.
 
-2. **One-shot state update procurement** - acceptable but too narrow.  
+2. **One-shot state update procurement** - acceptable but too narrow.
    Works where the problem is genuinely episodic, but misses the fact that many important coordinates are persistent maintenance problems.
 
-3. **Challengeable maintenance coverage market** - strongest surviving direct family.  
+3. **Challengeable maintenance coverage market** - strongest surviving direct family.
    Demand buys coverage against a named state deficiency; supply competes to install and defend the covered state under bond; challengers keep the lane live. This is the clearest non-LMSR primitive so far. (#r149)
 
-**6. Comparison sharpened vs LMSR / orderbooks / batch auctions**  
+**6. Comparison sharpened vs LMSR / orderbooks / batch auctions**
 The difference is now cleaner:
 - **LMSR:** clears cost to move a public price vector
 - **Orderbook:** clears inventory transfer over contingent claims
@@ -1180,14 +1288,14 @@ The difference is now cleaner:
 
 This is the strongest surviving answer to the prompt's core question. The protocol is not matching disagreement; it is allocating **bonded maintenance responsibility for epistemic state**. (#r149)
 
-**7. New strongest failure mode**  
+**7. New strongest failure mode**
 The main kill criterion is now slightly different from #r148's specification externality. Even if the deficiency can be named, the mechanism may still fail because the buyer often cannot verify that the maintained coordinate created enough value **for them** to justify payment. In other words: truth may be auditable while buyer-value attribution is not. If payment depends on unverifiable private decision value, the marketplace collapses into bespoke contracting and cannot scale as a public mechanism. (#r149)
 
 This suggests a sharper boundary:
 - the mechanism is viable where adequacy can be judged by public state-quality tests (freshness, tolerance band, challenge survival, eventual resolution)
 - it fails where payout requires proving that a specific buyer's downstream decision improved
 
-**8. Best surviving fallback if even #r149 is too ambitious**  
+**8. Best surviving fallback if even #r149 is too ambitious**
 Drop buyer-specific value entirely and keep only **public challenge-bounty maintenance**. Protocol or subscribers fund maintenance lanes for important coordinates; maintainers and challengers compete around public deficiency tests; no one tries to prove bespoke buyer benefit. That preserves the strongest mechanism insight while sacrificing the grander "knowledge marketplace" rhetoric. (ref: #r148, #r149)
 
 ### #r150 refinement - the cleanest non-PM primitive is revocable state-authority leasing under posted error-insurance
@@ -1209,13 +1317,13 @@ It is:
 
 This sharpens all ten questions in the prompt.
 
-**1. Base primitive**  
+**1. Base primitive**
 What is being exchanged is best stated as:
 `revocable state authority + posted error-insurance  <->  maintenance budget`
-not `knowledge  <->  payment`.  
+not `knowledge  <->  payment`.
 The mechanism is only genuinely non-LMSR if the asset is authority over state installation, not tradeable exposure to a future resolution. If the holder can profit merely from directional correctness without having held replaceable authority over the state, the design has slipped back toward prediction-market logic. (#r150)
 
-**2. State model**  
+**2. State model**
 The global state vector should now be thought of as a set of leased coordinates:
 - each coordinate has an incumbent installed state
 - each installed state has a current authority holder, insurance bond, and challenge queue
@@ -1230,15 +1338,15 @@ The update rule becomes:
 
 So the mechanism is closer to **contestable state maintenance franchise allocation** than to price discovery. (#r150)
 
-**3. Credibility model**  
-#r149 correctly said that stake should mean "financial exposure if the covered deficiency still materializes." The tighter version is: stake is not just credibility collateral; it is **error-insurance capital**.  
+**3. Credibility model**
+#r149 correctly said that stake should mean "financial exposure if the covered deficiency still materializes." The tighter version is: stake is not just credibility collateral; it is **error-insurance capital**.
 Capital improves epistemics only if it absorbs the downside of being the installed authority. That creates the cleanest answer yet to the question "why does money help?"
 - in LMSR/orderbooks, money buys influence over price or inventory
 - here, money buys *liability-bearing authority* and is burned when that authority was misallocated
 
 So the role of capital is not to vote. It is to insure the state against bad overwrites. (#r150)
 
-**4. Market roles**  
+**4. Market roles**
 The roles now become:
 - **Coverage buyer / state consumer:** funds a lane because a coordinate matters for decisions
 - **Authority-holder / maintainer:** leases the right to write and defend the coordinate under bond
@@ -1252,7 +1360,7 @@ This is cleaner than "askers/knowers vs bidders/unknowers" because it makes clea
 
 That payment graph is not bilateral belief matching. It is a **market for accountable state stewardship**. (#r150)
 
-**5. Settlement model**  
+**5. Settlement model**
 Settlement should now be interpreted in insurance terms:
 - if the installed authority-holder kept the coordinate within contract tolerance, they earn the service budget and recover bond
 - if a challenger proves superiority before final truth, the incumbent loses authority and may lose part of bond immediately
@@ -1269,14 +1377,14 @@ The prior manipulation list still stands, but the deeper structural attacks are 
 3. **Authority capture via replacement-friction** - if challenge rights are too weak or too slow, the mechanism becomes governance-protected incumbency rather than epistemic competition.
 4. **Oracle underdetermination** - if later truth does not distinguish incumbent from challenger quality, the insurance contract becomes ceremonial.
 
-**7. Why better or worse than LMSR / orderbooks / batch auctions**  
+**7. Why better or worse than LMSR / orderbooks / batch auctions**
 The clearest surviving comparison is now:
 - **LMSR:** clears price movement cost on a shared belief vector
 - **Orderbook:** clears transfer of contingent-claim inventory
 - **Batch auction:** clears the same inventory on a clock that reduces timing games
 - **Authority-leasing KM:** clears who gets insured, challengeable authority to write the shared world-model
 
-This is better when the core problem is not hedging or speculative price discovery, but **who should be trusted to maintain a decision-grade state under liability**.  
+This is better when the core problem is not hedging or speculative price discovery, but **who should be trusted to maintain a decision-grade state under liability**.
 It is worse when demand cannot specify deficiencies, when truth arrives too slowly, or when external liquidity/hedging is the main objective. In those domains, PM primitives remain cleaner. (#r150)
 
 **8. Simplest viable mechanism sketch after #r150**
@@ -1291,11 +1399,11 @@ The simplest surviving direct family is now:
 
 This is the narrowest mechanism that still deserves to be called a non-PM knowledge market. (#r150)
 
-**9. Strongest reason this still fails**  
-The raw idea fails if the buyer cannot write a good deficiency contract. More precisely: if the protocol cannot elicit a sufficiently objective tuple `(baseline, tolerance, horizon, audit rule)` from demand, then authority leasing becomes a market in contract gaming rather than epistemic improvement.  
+**9. Strongest reason this still fails**
+The raw idea fails if the buyer cannot write a good deficiency contract. More precisely: if the protocol cannot elicit a sufficiently objective tuple `(baseline, tolerance, horizon, audit rule)` from demand, then authority leasing becomes a market in contract gaming rather than epistemic improvement.
 That is stronger than simply saying "truth is hard". The failure can happen even when truth eventually exists, because the buyer bought the wrong service. (#r150)
 
-**10. Best surviving variant if this refinement is still wrong**  
+**10. Best surviving variant if this refinement is still wrong**
 If open-ended authority leasing is too brittle, the best surviving fallback is a **public insurer-of-last-resort challenge market**:
 - protocol/subscribers fund important coordinates
 - incumbents are default installed states
@@ -26711,7 +26819,7 @@ If truth is hard, keep state as a source-weighted posterior and reward claims th
 
 - **#r256** - 2026-04-04T17:42Z - Added explicit first-principles knowledge-market mechanism pass with all 10 required sections, candidate family triage, and invariant set #433-#436; contrasts preserved against LMSR, orderbooks, and batch.
 
-## #r257 Contributions — 2026-04-04T17:52Z
+## #r257 Contributions - 2026-04-04T17:52Z
 
 Continuation of the knowledge-market pressure-test with explicit answers to #r256 open questions and candidate-family replacement for low-observability coordinates.
 
@@ -26767,8 +26875,8 @@ That is, observability is a hard gating variable, not just a tuning knob. (#r257
 
 Net unresolved residue grows when truth is not available and cannot be scored. Single-bucket recycling creates hidden insolvency loops under query spikes. So residue is split:
 
-1. **Primary reserve (`R_prim`)** — solvency floor and insurance buffer.
-2. **Revalidation pool (`R_rev`)** — explicit deferred capital for future oracle-linked correction.
+1. **Primary reserve (`R_prim`)** - solvency floor and insurance buffer.
+2. **Revalidation pool (`R_rev`)** - explicit deferred capital for future oracle-linked correction.
 
 Settlement when no truth for a class in grace period:
 
@@ -26836,7 +26944,7 @@ The mechanism still fails if all three hold simultaneously: (i) low oracle obser
 
 ## Cumulative Invariants (#r257)
 
-**Invariant #437:** Concentration control enforced via `H(c,e)≤H_max(c)` with adaptive source penalty. Violations cause rejection/attenuation and `degraded` state. 
+**Invariant #437:** Concentration control enforced via `H(c,e)≤H_max(c)` with adaptive source penalty. Violations cause rejection/attenuation and `degraded` state.
 
 **Invariant #438:** Discovery payouts are admissible only under observability condition `λ_obs(c)≥λ_min`. If violated, class moves to Discovery+Holdover with reduced payout multipliers and reserve top-up; no full-discovery settlement terms are used.
 
@@ -26846,7 +26954,7 @@ The mechanism still fails if all three hold simultaneously: (i) low oracle obser
 
 ## Run Log Update
 
-- **#r257** — 2026-04-04T17:52Z — Added full pass on remaining #r256 open questions with quantitative gates: source-concentration floor, observability threshold with holdover mode, residue-split settlement, and capped rebase migration. Added failure boundary (low observability + low-source diversity + adversarial timing). Added Family D (Twin-Layer) as surviving architecture when discovery cannot stand alone. Invariants #437–#440 introduced.
+- **#r257** - 2026-04-04T17:52Z - Added full pass on remaining #r256 open questions with quantitative gates: source-concentration floor, observability threshold with holdover mode, residue-split settlement, and capped rebase migration. Added failure boundary (low observability + low-source diversity + adversarial timing). Added Family D (Twin-Layer) as surviving architecture when discovery cannot stand alone. Invariants #437-#440 introduced.
 
 ## Open Questions for #r258+
 
@@ -26854,9 +26962,9 @@ The mechanism still fails if all three hold simultaneously: (i) low oracle obser
 2. **What is the best concentration metric under non-linear source trees?** `H` works for flat source sets; if lineage graph is deep, should entropy/correlation-aware matrix measure replace Herfindahl.
 3. **How deep should `R_rev` reclaim queue be?** fixed epoch horizon vs evidence-quality based decay; impacts solvency smoothness vs information refresh.
 4. **Can migration include uncertainty transfer (`σ_mig`) explicitly?** Should destination track receive a calibrated uncertainty surcharge in `S_cred` immediately after migration.
-*Last updated: #r257 — 2026-04-04T17:52Z*
+*Last updated: #r257 - 2026-04-04T17:52Z*
 
-## #r258 Contributions — 2026-04-04T18:02Z
+## #r258 Contributions - 2026-04-04T18:02Z
 
 This run resolves the four open #r257/Open questions and replaces one brittle dial with measurable diagnostics.
 
@@ -26864,7 +26972,7 @@ This run resolves the four open #r257/Open questions and replaces one brittle di
 
 Use a dual threshold:
 
-1. **Family floor** `λ_floor^(k)` for each coordinate family `k` (binary/continuous/ordinal/boolean), set by governance once. This is not a “live knob” for governance capture control.
+1. **Family floor** `λ_floor^(k)` for each coordinate family `k` (binary/continuous/ordinal/boolean), set by governance once. This is not a "live knob" for governance capture control.
 2. **Adaptive factor** `g_obs` from online calibration diagnostics:
 
 `g_obs(c,t) = sigmoid( κ_mis(c,t) - κ* )`, where `κ_mis` is Bayesian misspecification score (e.g., rolling log-score gap vs held-out pseudo-truth and PIT uniformity residual).
@@ -26900,7 +27008,7 @@ Penalty rule:
 
 `w'_i = w_i / (1 + τ_c·(C-C_max)_+)`, where `τ_c` higher for low `λ_obs` and low `N_source`. If `C` stays above cap for `m_fail` consecutive epochs, epoch enters `state_quality=degraded` and discovery payout multipliers drop as in #r257.
 
-This metric generalizes to trees/graphs while preserving source-agnostic symmetry and is robust to collusive “many aliases” attacks if aliases stay correlated in `A`.
+This metric generalizes to trees/graphs while preserving source-agnostic symmetry and is robust to collusive "many aliases" attacks if aliases stay correlated in `A`.
 (ref: #r258)
 
 ### Q3 (How deep should R_rev reclaim queue be?) → Two-dimensional queue cap: temporal horizon + evidence value shelf
@@ -26913,7 +27021,7 @@ Replace fixed-depth queue with bounded stochastic horizon:
 
 Queue exit rule per claim token:
 
-1. If validated by new oracle evidence before `T_rev_max`: reclaim weight proportional to remaining `q_w` (fresh evidence gets higher reclaim). 
+1. If validated by new oracle evidence before `T_rev_max`: reclaim weight proportional to remaining `q_w` (fresh evidence gets higher reclaim).
 2. If reaches `T_rev_max`: unvalidated residue moved to reserve with no reclaim.
 
 This preserves solvency under spikes while preventing immortal unresolved tails from starving recent claimants.
@@ -26958,9 +27066,9 @@ Effect: short migration history cannot instantly transfer high credibility; it a
 
 ## Run Log Update
 
-- **#r258** — 2026-04-04T18:02Z — Resolved open #r258 questions with measurable, operational rules: adaptive `λ_min` via Bayesian misspecification, graph-aware concentration on correlated source trees, bounded `R_rev` queue depth/throughput with age decay, and explicit uncertainty surcharge in migration to prevent credibility teleportation. Added invariants #441–#444 and marked Family A viability as conditional.
+- **#r258** - 2026-04-04T18:02Z - Resolved open #r258 questions with measurable, operational rules: adaptive `λ_min` via Bayesian misspecification, graph-aware concentration on correlated source trees, bounded `R_rev` queue depth/throughput with age decay, and explicit uncertainty surcharge in migration to prevent credibility teleportation. Added invariants #441-#444 and marked Family A viability as conditional.
 
-## #r259 Contributions — 2026-04-04T18:12Z
+## #r259 Contributions - 2026-04-04T18:12Z
 
 Continuation from the 4 open questions in #r258 with explicit parameter surface, proof-of-noise handling, and governance-safe coupling constraints.
 
@@ -26989,7 +27097,7 @@ Roles unchanged, but settlement timing is now role-agnostic:
 - bidders pay for update-quality rights,
 - the settlement engine applies role payouts only after control-state admits normal mode.
 
-This blocks “claim then withdraw from holdover pool” patterns and makes both sides pay for state-risk transition costs when `C` or `ρ_obs` force a holdover. (#r259)
+This blocks "claim then withdraw from holdover pool" patterns and makes both sides pay for state-risk transition costs when `C` or `ρ_obs` force a holdover. (#r259)
 
 ## 5) Settlement model
 New explicit 4-state control transition (per class/epoch):
@@ -27101,7 +27209,7 @@ Define:
 - **Admissibility gate**: whether full discovery payout is allowed (`λ_obs`, concentration, `Kcap`, and `DD` all pass),
 - **Throughput gate**: how much unresolved residue can flow out (`q_rev_cap`) once in holdover.
 
-Separating gates prevents a known bug: making holdover “stricter” often starves reserve without actually reducing admissibility abuse. Now low observability/concentration only throttles throughput and/or reward multiplier, while admissibility remains explicit and auditable. (#r258 and #r259)
+Separating gates prevents a known bug: making holdover "stricter" often starves reserve without actually reducing admissibility abuse. Now low observability/concentration only throttles throughput and/or reward multiplier, while admissibility remains explicit and auditable. (#r258 and #r259)
 
 ---
 
@@ -27126,7 +27234,7 @@ Separating gates prevents a known bug: making holdover “stricter” often star
 
 ## Run Log Update
 
-- **#r259** — 2026-04-04T18:12Z — Resolved all 4 #r259 questions by coupling concentration and haircut parameters via a shared risk-utilization metric, making `q_rev_cap` state-dependent, replacing scalar migration uncertainty with coordinate-level posterior-noise surcharge, and adding replay-proof switching (hysteresis, dwell, oscillation penalties). Added invariants #445–#448 and retained Family D as the robust surviving architecture. 
+- **#r259** - 2026-04-04T18:12Z - Resolved all 4 #r259 questions by coupling concentration and haircut parameters via a shared risk-utilization metric, making `q_rev_cap` state-dependent, replacing scalar migration uncertainty with coordinate-level posterior-noise surcharge, and adding replay-proof switching (hysteresis, dwell, oscillation penalties). Added invariants #445-#448 and retained Family D as the robust surviving architecture.
 
 ## Open Questions for #r260+
 
@@ -27137,7 +27245,7 @@ Separating gates prevents a known bug: making holdover “stricter” often star
 
 *Last updated: #r260 - 2026-04-04T18:22Z*
 
-## #r260 Contributions — 2026-04-04T18:22Z
+## #r260 Contributions - 2026-04-04T18:22Z
 
 Closes all four #r260 questions with explicit coupling, auditability, and emergency-state semantics. This run keeps the three-tier framing (global budget, class controls, transition governance) while making it harder to game low-observability classes and preserving solvency-first behavior.
 
@@ -27160,7 +27268,7 @@ b) **Hard floor under stress:** if cluster utilization exceeds `U_cluster_max`, 
 
 c) **Spillover rule:** if any class reaches its reduced `q_rev_cap_t(c)` repeatedly for `H_cluster` epochs, emit `cluster_cap_pressure` EAT event and freeze new DISCOVERY claims on that class (T3 acceptance only for already-backed claims) until `U_cluster` is restored.
 
-This is a non-redistributive safety valve: it preserves each class’s solvency floor while preventing throughput cannibalization. No class can silently consume reserve throughput beyond its risk-allocated share.
+This is a non-redistributive safety valve: it preserves each class's solvency floor while preventing throughput cannibalization. No class can silently consume reserve throughput beyond its risk-allocated share.
 (ref: #r260)
 
 ### Q2 (Oscillation penalty lower bound) → Explicit payoff-dominance bound (`osc_penalty` per cycle) (#r260)
@@ -27252,9 +27360,9 @@ Family D remains the robust architecture, with these required hardening addition
 
 ## Run Log Update
 
-- **#r260** — 2026-04-04T18:22Z — Resolved all #r260 open questions by adding cluster-level control coupling, explicit oscillation penalty lower-bound logic, immutable schedule digest auditability, and sticky emergency override semantics. Added invariants #449-#452 and confirmed Family D as the surviving architecture.
+- **#r260** - 2026-04-04T18:22Z - Resolved all #r260 open questions by adding cluster-level control coupling, explicit oscillation penalty lower-bound logic, immutable schedule digest auditability, and sticky emergency override semantics. Added invariants #449-#452 and confirmed Family D as the surviving architecture.
 
-## #r261 Contributions — 2026-04-04T18:32Z
+## #r261 Contributions - 2026-04-04T18:32Z
 
 Closes all four #r261 questions with calibrated cluster sizing, post-emergency penalty dynamics, bounded-audit commitments, and a controlled liquidity-channel extension for Family D.
 
@@ -27372,7 +27480,7 @@ Family D remains the surviving architecture; this run tightens it into a 3-layer
 
 ## Run Log Update
 
-- **#r261** — 2026-04-04T18:32Z — Closed all #r261 open questions via covariance-aware cluster cap, sticky-decay penalty rules, two-layer audit commitment, and a constrained liquidity backstop interpretation compatible with Family D’s no-orderbook mandate. Added invariants #453–#456.
+- **#r261** - 2026-04-04T18:32Z - Closed all #r261 open questions via covariance-aware cluster cap, sticky-decay penalty rules, two-layer audit commitment, and a constrained liquidity backstop interpretation compatible with Family D's no-orderbook mandate. Added invariants #453-#456.
 
 ## Open Questions for #r262+
 
@@ -27382,7 +27490,7 @@ Family D remains the surviving architecture; this run tightens it into a 3-layer
 4. **Family D + migration:** when a coordinate migrates from Discovery→Validation, should cluster membership transfer (`w_c`, `Σ_res` history) be hard reset, smooth transfer, or weighted blend to avoid both discontinuity and exploitative membership gaming?
 
 *Last updated: #r261 - 2026-04-04T18:32Z*
-## #r262 Contributions — 2026-04-04T18:42Z
+## #r262 Contributions - 2026-04-04T18:42Z
 
 This run resolves the four #r262 open questions. It keeps the comparison goal explicit: **knowledge market as constrained information utility flow**, with no reversion to continuous pricing or matching. Families are re-scored accordingly.
 
@@ -27470,7 +27578,7 @@ Design law (#r262): migration transfers only partial cluster memory through boun
 - Family B/C remain rejected (redistribution-equivalent and single-source trust).
 - Family E (stochastic adjudication market) rejected because it reintroduces endogenous quote competition and breaks credibility-transfer primitive.
 
-(Ref: #r258–#r261 foundations; #r262 closes remaining #r262 governance/verification/transfer open questions.)
+(Ref: #r258-#r261 foundations; #r262 closes remaining #r262 governance/verification/transfer open questions.)
 
 ## Structural Synthesis: #r262
 
@@ -27493,9 +27601,9 @@ Design law (#r262): migration transfers only partial cluster memory through boun
 
 ## Run Log Update
 
-- **#r262** — 2026-04-04T18:42Z — Resolved all #r262 questions by formalizing hierarchical backstop allocation, bounded oscillation-penalty regime, logarithmic verifiability model, and bounded migration memory transfer with cooldown/anti-gaming. Re-confirmed Family D as the surviving mechanism. Added invariants #457–#460 and updated all prior Family-E/Family-A boundary conditions.
+- **#r262** - 2026-04-04T18:42Z - Resolved all #r262 questions by formalizing hierarchical backstop allocation, bounded oscillation-penalty regime, logarithmic verifiability model, and bounded migration memory transfer with cooldown/anti-gaming. Re-confirmed Family D as the surviving mechanism. Added invariants #457-#460 and updated all prior Family-E/Family-A boundary conditions.
 
-## #r263 Contributions — 2026-04-04T18:56Z
+## #r263 Contributions - 2026-04-04T18:56Z
 
 This run closes the four #r263 open questions by tightening dispute/finality mechanics, making backstop carry-forward safe, and adding first-order auto-control laws for `δ_decay` and migration anti-sybil. It also adds a direct 10-point comparison checkpoint against LMSR, orderbooks, and batch auctions while keeping Family D as the only viable non-matching mechanism family.
 
@@ -27509,7 +27617,7 @@ This run closes the four #r263 open questions by tightening dispute/finality mec
 2. The claim auto-counts only if either:
    - at least `m_g` distinct classes attest by `B_g`-bounded signatures, or
    - total bonded value ≥ `V_g` (global threshold).
-3. If quorum is met, protocol enters `appeal_verification` for `T_appeal` and pauses only the affected clusters’ `L_v` replenishment logic (all other lanes continue).
+3. If quorum is met, protocol enters `appeal_verification` for `T_appeal` and pauses only the affected clusters' `L_v` replenishment logic (all other lanes continue).
 4. Disputed classes replay only transition leaves inside `R_g` with fraud-proof commitments.
 5. If fraud is proven: disputed transition is marked `overturned`, and a `parameter_rollback`-style EAT event captures canonical state restoration.
 6. If unproven: appeal closes; claimers lose `B_g` to treasury and state remains final.
@@ -27599,7 +27707,7 @@ Optional bond hardening:
 5. **Settlement model:** truth updates reward truthful movers with reclaimed-capacity + bonus release; unresolved truth uses holdover/partial-credit by partial observability gates and class-level `q_rev_cap`.
 6. **Attack surface:** manipulation, bluffing, wash, collusion, oracle gaming remain, but the primitive attack changes from price shading to evidence-fabrication and migration gaming. New controls: activation ordering, anti-gaming migration decay, dual-finality, and oracle-noise-aware penalties.
 7. **Why better/worse than LMSR/orderbooks:** better at explicit information transfer (not bet matching), worse in governance complexity and state-verifiability burden. Better when low-liquidity/high-stakes claims require credibility proof over price efficiency.
-8. **Simplest viable sketch:** two lanes only — (`I`) state-claim lane (ask/bid as evidence transfer and fee-funded query lane) + (`II`) bounded reclaim-lane (`L_v_cluster`) for shortfall smoothing. No endogenous bid/ask matching.
+8. **Simplest viable sketch:** two lanes only - (`I`) state-claim lane (ask/bid as evidence transfer and fee-funded query lane) + (`II`) bounded reclaim-lane (`L_v_cluster`) for shortfall smoothing. No endogenous bid/ask matching.
 9. **Strongest failure risk:** if oracle confidence is misclassified in the same direction across clusters, credibility scores become endogenous noise and backstop can be exhausted by coordinated false uncertainty claims.
 10. **Best surviving variant if raw idea is wrong:** treat Family D as a **reputation-market** only: remove settlement bonuses for truth beyond partial observability bounds, retain only query+quality scoring + deterministic clamps; this keeps mechanism from collapsing into prediction pricing while preserving information utility.
 
@@ -27626,9 +27734,9 @@ Optional bond hardening:
 
 ## Run Log Update
 
-- **#r263** — 2026-04-04T18:56Z — Closed all #r263 questions by adding dual-finality drift appeals, capped one-epoch backstop carry, conservative noise-aware decay controls, and migration anti-sybil attenuation. Reframed Family D against LMSR/orderbook/batch-auction in the 10-point epistemic market comparison and retained non-matching viability. Added invariants #461–#464.
+- **#r263** - 2026-04-04T18:56Z - Closed all #r263 questions by adding dual-finality drift appeals, capped one-epoch backstop carry, conservative noise-aware decay controls, and migration anti-sybil attenuation. Reframed Family D against LMSR/orderbook/batch-auction in the 10-point epistemic market comparison and retained non-matching viability. Added invariants #461-#464.
 
-## #r264 Contributions — 2026-04-04T19:12Z
+## #r264 Contributions - 2026-04-04T19:12Z
 
 This run resolves the four #r264 open questions and adds a sharper boundary between dispute-cost design and solvency controls. It keeps Family D as the only structurally compliant non-matching architecture.
 
@@ -27699,7 +27807,7 @@ For epoch window `W_h` define migration count matrix `M_t` by source cluster i�
 `X_t = α_X · H(P_t_row) + (1-α_X) · H_col_entropy(P_t) + β_X · CYC_t`,
 
 where:
-- `H_row` = mean row-entropy (how spread each source’s migration destinations are),
+- `H_row` = mean row-entropy (how spread each source's migration destinations are),
 - `H_col_entropy` = column entropy (destination concentration from a few sources),
 - `CYC_t` = weighted 3-cycle mass / total migration mass,
 - low `X_t` flags coordinated loops or source concentration.
@@ -27739,7 +27847,7 @@ Automated policy:
 
 ## Run Log Update
 
-- **#r264** — 2026-04-04T19:12Z — Resolved open questions on fraud-proof cost, carry-forward state dependence, welfare-cap calibration, and migration-health observability. Added a sparse on-chain GLOBAL_DIVERGENCE proof lane, correlation-aware one-epoch carry with anti-hoarding ceiling, class-conditioned welfare bounds under global headroom, and periodic graph-score migration monitoring. Reaffirmed Family D as the viable mechanism family. Added invariants #465–#468.
+- **#r264** - 2026-04-04T19:12Z - Resolved open questions on fraud-proof cost, carry-forward state dependence, welfare-cap calibration, and migration-health observability. Added a sparse on-chain GLOBAL_DIVERGENCE proof lane, correlation-aware one-epoch carry with anti-hoarding ceiling, class-conditioned welfare bounds under global headroom, and periodic graph-score migration monitoring. Reaffirmed Family D as the viable mechanism family. Added invariants #465-#468.
 
 ## Open Questions for #r265+
 
@@ -27763,7 +27871,7 @@ That means the thing being sold is not message flow and not epistemic content in
 
 This sharpens the whole family again.
 
-**1. Base primitive**  
+**1. Base primitive**
 What is exchanged is best stated now as:
 `insured authority budget on named state facets and authority tranches`
 not
@@ -27771,7 +27879,7 @@ not
 
 A buyer is paying for a protocol-legible permission: a canonical slot may be treated as decision-usable up to level `L_k` until challenge, breach, downgrade, or expiry. A supplier is paid for underwriting that permission under bond. A refuter is paid for proving that some portion of the permission surface should be revoked. This is the cleanest non-PM primitive so far because the object is a bounded slice of *trusted actionability*, not a tradable opinion. (#r304)
 
-**2. State model**  
+**2. State model**
 The global state vector should now be read as:
 - value state: what the slot currently says
 - authority state: what level of actionability the protocol currently grants that slot
@@ -27781,9 +27889,9 @@ So each facet carries both `(x_i, L_i)`, not just `x_i`. The important update ev
 - restoration may move `L_i: L0 -> L1 -> L2` before any sharp value rewrite
 - some challenges should settle purely as authority reduction, not semantic replacement
 
-This is a better answer to the prompt’s "global state vector" question. The actual maintained object is not only a posterior or estimate. It is a **state-plus-authority pair**. The mechanism is valuable because downstream agents need to know not only *what the slot says* but *how much institutional weight it deserves right now*. (#r304)
+This is a better answer to the prompt's "global state vector" question. The actual maintained object is not only a posterior or estimate. It is a **state-plus-authority pair**. The mechanism is valuable because downstream agents need to know not only *what the slot says* but *how much institutional weight it deserves right now*. (#r304)
 
-**3. Credibility model**  
+**3. Credibility model**
 Capital-to-epistemics mapping is now even cleaner:
 - stake does **not** buy the right to be heard
 - stake does **not** mainly buy directional upside
@@ -27791,7 +27899,7 @@ Capital-to-epistemics mapping is now even cleaner:
 
 So credibility is best interpreted as **insurability of authority**, not generic reputation. The protocol should ask: how much authority budget has this actor successfully defended on similar facets at similar tranches? That is a sharper and less gameable concept than broad personal credibility. An actor may be trustworthy at `L1` on a class of slots and not yet at `L3`. (#r304)
 
-**4. Market roles**  
+**4. Market roles**
 The original knower/unknower framing can now be retired almost completely. The cleaner role split is:
 - **authority buyers / subscribers:** pay to keep specific slots decision-usable at target authority levels
 - **authority underwriters / stewards:** post insurance and defend those authority levels
@@ -27801,7 +27909,7 @@ The original knower/unknower framing can now be retired almost completely. The c
 
 This is still recognizably a knowledge-market family, but only because knowledge has been made protocol-legible as defended authority on shared state. If the mechanism cannot express authority levels, it is likely still just selling reports or moving prices. (#r304)
 
-**5. Settlement model**  
+**5. Settlement model**
 Truth settlement should also be tightened. The mechanism should not try to settle against broad narrative correctness of a whole slot. It should settle only against:
 - the pre-declared breach condition for an active authority tranche
 - the pre-declared adequacy test for a proposed upgrade
@@ -27809,16 +27917,16 @@ Truth settlement should also be tightened. The mechanism should not try to settl
 
 That means settlement is local, not holistic. A steward should lose bond for defending too much authority on a facet that failed its published test, not for failing to solve the entire world-model. A refuter should earn for proving that `L2` was unjustified, not for smuggling in a preferred replacement narrative. This keeps the mechanism falsification-first and prevents drift back toward broad discretionary truth tribunals. (#r304)
 
-**6. Attack surface**  
+**6. Attack surface**
 This refinement changes the deepest remaining failure again. The main risk is now:
 - **authority-surface bureaucracy:** the protocol may become very good at drawing, selling, and challenging authority tranches without those tranches tracking real decision quality
 - **ladder inflation:** too many tiny authority levels create bureaucratic monetization of micro-upgrades
 - **surface capture:** insiders define breach tests and tranche boundaries that are easy for them to defend and hard for outsiders to challenge
 - **semantic hollowing:** value state remains formally intact while authority mechanics become the real economy, turning the system into a market in compliance artifacts
 
-This is sharper than #r303’s generic ladder-design concern. The true structural kill is no longer just bad intermediate tranche design; it is the possibility that the mechanism becomes a market in **administering authority surfaces** rather than improving underlying epistemics. (#r304)
+This is sharper than #r303's generic ladder-design concern. The true structural kill is no longer just bad intermediate tranche design; it is the possibility that the mechanism becomes a market in **administering authority surfaces** rather than improving underlying epistemics. (#r304)
 
-**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**
 This is now the cleanest surviving comparison:
 - **LMSR:** prices cost to move a belief vector
 - **orderbooks:** transfer contingent exposure
@@ -27827,7 +27935,7 @@ This is now the cleanest surviving comparison:
 
 It is better where the core product is not tradable exposure but a shared, auditable, decision-bearing world-model. It is worse where users mainly want a scalar price or hedge instrument, because the whole authority-budget layer is overhead in those domains. (#r304)
 
-**8. Simplest viable mechanism sketch**  
+**8. Simplest viable mechanism sketch**
 The narrowest strong version now looks like:
 1. Register canonical slot `s_i` with facet map, dependency map, authority ladder, and tranche-specific breach tests.
 2. Subscribers fund target authority on selected facets.
@@ -27839,10 +27947,10 @@ The narrowest strong version now looks like:
 
 This is the simplest sketch that fully answers the conserved-quantity question: what is conserved is not belief inventory, but **insured authority capacity** on canonical state. (#r304)
 
-**9. Strongest reason this still fails**  
+**9. Strongest reason this still fails**
 The strongest remaining kill is now: the mechanism may successfully financialize authority administration without genuinely improving truth-tracking state. If authority levels, breach tests, and slot facets are easier to specify than actual epistemic quality, the system becomes a market in governable permissions rather than a market in knowledge transfer. In that world, capital improves compliance theater, not epistemics. (#r304)
 
-**10. Best surviving variant if this refinement is still wrong**  
+**10. Best surviving variant if this refinement is still wrong**
 If authority-budget markets are too bureaucratic, the best surviving fallback is a **minimal critical-slot architecture**:
 - apply warranty / falsification / downgrade / re-certification only to a tiny registry of protocol-critical state slots,
 - keep ladders shallow (often just `degraded` vs `full`),
