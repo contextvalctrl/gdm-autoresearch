@@ -1,7 +1,60 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r364** - 2026-04-05T21:04Z - Added a value-legibility correction: even state-coherent, priority-governed, capacity-priced authority/liability bandwidth fails unless demand is anchored to a public decision-loss functional. Otherwise bids measure budget and urgency, not the epistemic value of the requested state refinement, and the mechanism degenerates into a market for attention and access rents rather than credible information transfer.
 - **#r363** - 2026-04-05T20:54Z - Added a state-coherence correction: even priority-governed, capacity-priced authority/liability bandwidth fails unless every tranche clears against explicit global state-consistency constraints. Otherwise the mechanism sells locally defended authority slices that compose into a globally incoherent state vector, so capital prices fragmented permission rather than trustworthy system state.
+
+### #r364 refinement - even state-coherent authority-transition underwriting fails unless demand is expressed through a public decision-loss functional, because otherwise the mechanism cannot tell whether paid state refinement is epistemically valuable or merely expensive attention
+
+#r363 correctly forced the mechanism to respect the global state vector: locally defended tranches must compose into a coherent shared state. But even that stronger family still fails if the demand side is modeled as generic willingness to pay for a state update. A buyer can be sincere, well-capitalized, and attached to a coherent requested transition, yet the protocol still has no native way to distinguish `(a)` an update whose refinement materially reduces decision error for the shared system from `(b)` an update that is merely salient, prestigious, or urgent to a wealthy demander. Then the market does not clear valuable knowledge transfer. It clears expensive attention on the state coordinates that rich or anxious actors care about most. Capital is not improving epistemics if the demand signal contains no public representation of what error would be reduced, for whom, and relative to which action consequences. The stronger surviving form is therefore **decision-loss-anchored, state-coherent authority-transition underwriting**. Every bid for authority/liability bandwidth should attach to a public loss functional, action consequence map, or bounded value-of-information rule that says why refinement of this state coordinate matters. Capital should pay for reductions in decision-relevant uncertainty or misclassification cost, not merely for the right to ask loudly. (#r364)
+
+This is a real mechanism correction, not a UX detail. #r360 identified the conserved quantity as authority/liability bandwidth on bounded state transitions. #r361 forced it to be finite. #r362 forced scarce capacity through a priority grammar. #r363 forced composability into a coherent global state. #r364 kills the next failure: **value-opacity on the demand side**. A knowledge marketplace should now distinguish among:
+1. local tranche validity - the offered authority slice is covered and challengeable,
+2. global state coherence - simultaneous activations compose into an admissible shared state,
+3. demand-side consequence legibility - the bidder has declared what downstream action class, loss surface, or error reduction objective makes this refinement worth paying for,
+4. attention-rent bidding - capital simply amplifies whoever has the most budget, urgency, or prestige without revealing why the state refinement matters for shared decision quality.
+Only the first three belong in the mechanism. The fourth collapses the family into a market for queue pressure on shared cognition. If the protocol cannot tell what decision loss is being reduced, it cannot know whether capital is funding epistemic improvement or merely subsidizing loud demand. (#r364)
+
+The family triage after this correction is:
+
+1. State-coherent authority-transition markets with generic willingness-to-pay demand - dead.
+   Better than incoherent local permission markets, but still unstable because demand reveals intensity, not epistemic value. The mechanism cannot distinguish costly curiosity from genuinely decision-relevant refinement. (#r360, #r362, #r363, #r364)
+
+2. State-coherent authority tranches with ex post governance judgment about whether fulfilled requests were valuable - no longer preferred.
+   Better than raw price pressure, but still structurally weak because the protocol discovers value only after bandwidth has already been sold and consumed. That pushes the core question-why refinement mattered-back into discretionary review. (#r362, #r363, #r364)
+
+3. Defect-triggered, order-independent clearing of bounded authority transitions, where suppliers underwrite maintained coverage margin on public authority tranches and consumers pay to consume explicitly capacity-limited, priority-governed, state-coherent authority/liability bandwidth under a public decision-loss functional - strongest surviving refinement.
+   Keep #r360-#r363's surviving stack, but require every demand-side request to declare a compact public consequence map: target action class, admissible use, loss weights, harm budget, or value-of-information bracket that the refinement is meant to improve. Fresh payout should attach to maintaining and serving scarce authority bandwidth that is not only covered, bounded, properly prioritized, and globally composable, but also tied to a legible reduction in decision-relevant error. (#r364)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** not generic knowledge, not just authority, and not even just state-coherent authority bandwidth. The exchanged object is state-coherent authority/liability bandwidth on named transitions **plus a declared decision-loss context** that makes the refinement economically meaningful.
+- **State model:** the global state vector must now include not only state coordinates and coupling constraints, but also a consequence layer: which action classes consume which coordinates, what coarse loss buckets they map into, and what forms of refinement are admissible for each. Updates are not just attempts to move shared state; they are attempts to move shared state in ways that reduce declared downstream decision error.
+- **Credibility model:** capital becomes trustworthy only when it sits junior to wrongful local authority expansion, over-issuance, misallocation under congestion, incoherent composition, **and** false value claims about why the requested refinement mattered. Money should buy authority transfer that improves a declared decision surface, not just demand intensity. (#r364)
+- **Market roles:** in addition to underwriters, challengers, consumers, capacity allocators, priority governors, and state-coherence governors, **loss-function designers / consequence governors** become first-class because some epistemic work is specifying which decision costs the mechanism is actually allowed to optimize.
+- **Settlement:** first settle whether the tranche exists and remains covered; then whether capacity was available; then whether service respected priority; then whether invocation stayed inside the action envelope; then whether the resulting transition stayed globally coherent; and finally whether the claimed decision-loss context was valid for that invocation class. Payments should clear against maintained authority that was justified locally, composable globally, and connected to a real declared reduction in decision-relevant error-not merely to a bidder's willingness to pay. (#r364)
+
+**Why this is better or worse than LMSR / orderbooks / batch auctions:**
+- **Better:** it directly prices something those mechanisms usually leave implicit-why a state refinement matters for action quality-rather than assuming trade intensity or clearing prices automatically encode socially relevant information value.
+- **Better:** it gives the KM a principled answer to why capital should improve epistemics: bids are only legible when attached to an explicit error-reduction objective.
+- **Worse:** it introduces a value-language layer that can become politicized, gamed, or overfit.
+- **Worse:** if the loss functional is too rich, the mechanism turns into procurement of bespoke analytics under a thin market shell.
+So the edge remains real only where decision-loss classes can be represented by a tiny public grammar. (#r364)
+
+**Simplest viable mechanism sketch after #r364:**
+1. Define a tiny public state machine with named transition frontiers, finite capacity budgets, a small priority ladder, explicit cross-tranche coherence constraints, and a small menu of admissible decision-loss classes.
+2. For each tranche, define not just authority, coverage margin, challenge surface, usage meter, retained-risk rule, error-attribution envelope, capacity budget, reservation/preemption policy, and touched state coordinates, but also which decision-loss classes may legitimately request that tranche.
+3. Let demand fund either `(a)` activation of a tranche or `(b)` reservation / consumption of capacity units within a declared priority class **and** declared loss class, subject to real-time coherence checks and admissibility checks on the consequence map.
+4. Let suppliers post bond to underwrite both coverage margin and coherence-safe service for a bounded window.
+5. Let challengers earn by exposing not only undercoverage, overload, false priority claims, and hidden cross-tranche contradiction, but also false or strategically inflated loss-class declarations.
+6. Let consumers invoke the tranche only by attaching retained downside, consuming explicit capacity units, passing a coherence check, and staying inside the declared action/loss envelope. If the invocation would violate the admissible region or misstate its consequence class, it must queue, downgrade, preempt under rule, or fail.
+7. Slash when the protocol served authority that was locally allowed and globally coherent but attached to a false value declaration that distorted allocation away from genuinely decision-relevant demand.
+This is the narrowest form that preserves #r360's conserved quantity, #r361's finite capacity, #r362's priority discipline, #r363's state coherence, and prevents the KM from degenerating into budget-weighted demand for shared attention. (#r364)
+
+**Strongest new reason this idea fails:**
+The deepest remaining kill becomes **loss-function gaming / consequence-language capture**. Many domains do not admit a small, public, stable grammar for why a refinement matters. If every demander can strategically relabel requests as high-consequence or if the protocol must adjudicate bespoke value-of-information stories, then the mechanism collapses into governance, claims review, or elite access by another name. (#r364)
+
+**Best surviving variant if this correction is too ambitious:**
+Restrict the family to domains where consequence classes are genuinely sparse and mechanical-few action classes, bounded harm ladders, clear misclassification costs, or obvious value-of-information buckets. There, the best surviving descendant of the raw idea is not a general market in knowledge and not even just a market in authority. It is a **decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition market**. In broader domains where demand value cannot be represented by a tiny public loss grammar, stop pretending the mechanism clears epistemic value and fall back to governance, procurement, or standard market microstructure. (ref: #r360, #r361, #r362, #r363, #r364)
 
 ### #r363 refinement - even priority-governed capacity-priced authority-transition underwriting fails unless local tranche updates are constrained by a public state-coherence rule, because otherwise the mechanism funds incompatible local permissions that do not compose into a trustworthy global state
 
