@@ -107,11 +107,11 @@ The strongest surviving kill is now: **the mechanism may induce conservative gri
 
 ## 10. Best surviving variant if the raw idea is wrong
 The best fallback is now a **hybrid split architecture**:
-- keep this non-PM lane only for a small registry of protocol-critical decisions where there is a real protocol-native fallback policy and a small number of explicit deviation rungs,
-- use pooled underwriting only where risk classes are genuinely legible, fallback ladders are operationally credible, and deviation away from safety can be measured cleanly,
-- keep lower-stakes or hard-to-benchmark cases on a simpler self-insured stewardship model,
+- keep this non-PM lane only for a small registry of protocol-critical decisions where there is a real protocol-native fallback policy, a small number of explicit deviation rungs, **and weak enough interaction terms that a public error-budget ledger is credible**,
+- use pooled underwriting only where risk classes are genuinely legible, fallback ladders are operationally credible, and cumulative deviation away from safety can be measured cleanly,
+- keep lower-stakes or hard-to-compose cases on a simpler self-insured stewardship model,
 - and let conventional PM/orderbook/batch-auction machinery handle external disagreement, hedgeable exposure, and broad price discovery elsewhere.
-That preserves the deepest surviving insight: capital should improve epistemics by underwriting **bounded departure from conservative default policy**, not by merely buying louder influence over a belief vector. The new constraint is sharper than in #r311: if the domain lacks a credible fallback ladder or if useful action requires too much fluidity for insured deviation tranches, the raw knowledge-market idea should yield to simpler PM or governance machinery. (ref: #r305, #r310, #r311, #r312)
+That preserves the deepest surviving insight: capital should improve epistemics by underwriting **bounded departure from conservative default policy**, not by merely buying louder influence over a belief vector. The new constraint from #r313 is sharper than in #r312: if the domain cannot support a credible public ledger of cumulative error-budget spend, the raw knowledge-market idea should yield to simpler PM or governance machinery before interaction risk turns the insurance story into theater. (ref: #r305, #r310, #r311, #r312, #r313)
 
 ### Candidate families tested in this run
 - **A) direct knowledge-market**: kept as base, with unresolved-truth safety branch
@@ -28236,5 +28236,9 @@ If standing-capacity markets are too heavy, the best fallback is a **tiered hybr
 - keep standing reservations only for a tiny set of protocol-critical, machine-enforced action classes,
 - let smaller or lower-stakes warrants use the simpler #r306 model where underwriters attach more directly to specific warrants,
 - and keep conventional PM / orderbook / batch-auction machinery for broad disagreement discovery and hedgeable exposure.
+
+That preserves the strongest surviving insight after #r307: the non-PM opportunity is not belief matching, but **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
+ **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
+PM / orderbook / batch-auction machinery for broad disagreement discovery and hedgeable exposure.
 
 That preserves the strongest surviving insight after #r307: the non-PM opportunity is not belief matching, but **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
