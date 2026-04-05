@@ -1,6 +1,7 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r360** - 2026-04-05T20:22Z - Added a conserved-quantity correction: the KM should not be framed as generic ask/bid exchange of "knowledge" at all. Unless clearing attaches to scarce protocol-native authority/liability bandwidth on bounded state transitions, the mechanism collapses into assurance brokerage, consulting, or subsidized certification. The strongest surviving family therefore prices maintained decision-authority capacity under liability, not raw information flow.
 - **#r359** - 2026-04-05T20:12Z - Added an attribution correction: even attributable non-rentable retained-risk consumption fails if later loss cannot be decomposed into epistemic miss versus execution noise / world variance. The stronger surviving form must bind each authority tranche to a narrow action envelope plus a protocol-native error-attribution rule, so capital improves epistemics by disciplining decision quality rather than by randomly taxing outcomes.
 - **#r358** - 2026-04-05T20:02Z - Added an anti-rental correction: even retention-coupled authority consumption fails if consumer retention can be cheaply rented, rebated, sybilled, or passed through shell identities. The stronger surviving form must bind retained-risk to attributable, non-transferable consumption identity / action history, so capital improves epistemics through real demand-side discipline rather than cosmetic co-stake.
 - **#r357** - 2026-04-05T19:52Z - Added a consumer-discipline correction: even usage-coupled authority underwriting fails if consumers can invoke maintained authority with no retained downside, because the KM then sells cheap insured permission rather than careful knowledge transfer. The stronger surviving form must couple authority consumption to consumer-side retention / co-liability, so capital improves epistemics by disciplining demand as well as supply.
@@ -25,6 +26,53 @@
 - **#r337** - 2026-04-05T16:32Z - Added a shared-demand correction: even ticket-terminated decision-unlock markets still misprice when the same elimination simultaneously unlocks several tickets or action surfaces. The stronger surviving form clears against protocol-native unlock frontiers with pooled demand aggregation and anti-duplication payout caps, so one epistemic act cannot farm multiple cloned bounties unless it truly creates additional action-distinct authority.
 
 - **#r340** - 2026-04-05T17:12Z - Added a timeout/anti-stall correction: paired unlock and default-defense lanes still fail if defended no-unlock can persist indefinitely under weak observability. The stronger surviving form makes every default warranty explicitly perishable, with expiry, decay, and mandatory downgrade to a coarser safe state if neither side can justify authority by the deadline, so capital cannot simply fund epistemic gridlock.
+
+### #r360 refinement - a "knowledge marketplace" is not a stable market primitive unless the conserved quantity is scarce authority/liability bandwidth on bounded state transitions, because generic bids and asks for knowledge collapse into assurance brokerage, consulting, or subsidized certification
+
+The prompt's original framing still contains one hidden ambiguity: it speaks as if "asks" from knowers and "bids" from unknowers could themselves form a market object. But that is too loose. **Knowledge is not the conserved quantity.** If the protocol clears generic willingness to pay for being informed, or generic willingness to sell confidence, then the mechanism degenerates into one of three non-market forms: `(a)` bilateral consulting/procurement, because each demander's use case is bespoke; `(b)` certification/assurance brokerage, because suppliers are mostly selling reputational cover rather than state transitions; or `(c)` insurance-like warranty sale, because buyers mainly want someone to absorb downside if guidance was bad. None of those is a distinct common clearing object. The last several runs already pushed the mechanism away from belief trading and toward maintained public authority under challenge, usage, retained risk, attribution, and error-bounded liability. #r360 sharpens the punchline: the actual conserved quantity is **scarce authority/liability bandwidth for bounded state transitions in the global state vector**. Capital improves epistemics only when it buys the right to move some component of state from `untrusted / blocked / coarse-safe` to `trusted-enough / enabled / finer-grained` under publicly bounded liability for epistemic miss. (#r360)
+
+This kills a whole family of seductive but weak formulations. A market where knowers post asks to "sell updates" and unknowers post bids to "buy credibility" still sounds non-LMSR, but unless the protocol standardizes *what state transition becomes newly permissible* and *who bears bounded downside if that permission was not justified*, it is merely relabeling expert advice, oracle rental, or reputational staking. Money on the table then proves only appetite for exposure or marketing confidence-not that the mechanism has created a better epistemic transfer rule than a prediction market. By contrast, if each paid action corresponds to underwriting a bounded authority transition in a public state machine, then capital is doing real epistemic work: it is subordinated to whether the system should have allowed that transition at all, whether the relevant authority tranche stayed covered under challenge, and whether later error was attributable to epistemic shortfall inside the envelope. That is a different primitive from both LMSR belief aggregation and orderbook position exchange. (#r360)
+
+The family triage after this correction is:
+
+1. **Generic ask/bid market for updates, opinions, or "credible knowledge"** - dead.
+   Not a stable market object. Without a protocol-native authority transition, this collapses into bilateral advice sale, data brokerage, or reputational theater. Capital does not know what conserved quantity it is underwriting. (#r344, #r356, #r359, #r360)
+
+2. **Protocol market for maintained certification/assurance with downstream liability left broad or implicit** - no longer preferred.
+   Better than raw advice sale, but still unstable because the object being sold is mostly standing reassurance rather than scarce state-transition capacity. This recreates subsidy for prestige surfaces and blurred outcome insurance. (#r356, #r357, #r359, #r360)
+
+3. **Defect-triggered, order-independent clearing of bounded authority transitions, where suppliers underwrite maintained coverage margin on public authority tranches and consumers pay to consume scarce transition capacity under retained, attributable, error-bounded liability** - strongest surviving family.
+   Keep the surviving stack from #r348-#r359, but restate its core cleanly: the market does **not** clear knowledge, proof, or reputation directly. It clears the maintenance and consumption of bounded authority/liability bandwidth on named state transitions in the protocol's public state machine. Fresh payout should attach only when capital helps the system safely cross, maintain, refresh, or consume one of those transitions under public challenge and narrow epistemic liability. (#r360)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** not "information" and not "belief." The exchanged object is bounded **decision-authority capacity**: the right, under liability, to move some state component across a named transition frontier.
+- **State model:** the global state vector matters only insofar as some coordinates have protocol-native transition grammar: `blocked -> provisional`, `provisional -> enabled`, `enabled -> settlement-grade`, `coarse -> refined`, etc. Updates are not free-floating claims; they are attempts to justify a state transition.
+- **Credibility model:** capital becomes trustworthy only by sitting junior to wrongful authority expansion or undercoverage of an already-active authority tranche. Money proves conviction because it is exposed to whether the transition should have been allowed, not because someone sounded confident.
+- **Market roles:** the real split is not just knower vs asker. It is `(a)` authority underwriters/maintainers, `(b)` challengers/falsifiers, `(c)` consumers who invoke transition capacity under retained risk, and `(d)` governors of envelope, attribution, and observability rules. "Knower" and "unknower" are too vague to be market roles.
+- **Settlement:** first settle whether evidence/certificates justify the transition; then whether maintenance obligations stayed above coverage floor; then whether consumption stayed inside the action envelope; then whether any realized miss was epistemic and in-scope. The market closes on justified authority transfer, not on generic information purchase. (#r360)
+
+**Why this is better or worse than LMSR / orderbooks / batch auctions:**
+- **Better:** it directly prices the thing LMSR and orderbooks treat only indirectly-the liability-bearing right to act on a state update-rather than pricing side bets or inventory exchange around beliefs.
+- **Better:** it can, in principle, pay for maintenance of public epistemic infrastructure between resolution events instead of relying on constant speculative flow.
+- **Worse:** it is much harder to standardize, because the protocol must define transition grammar, authority envelopes, and liability attribution explicitly.
+- **Worse:** if those objects are not narrow and mechanical, the mechanism collapses into governance, insurance, or consulting faster than LMSR collapses.
+So the edge is real only in domains where authority transitions are compact, repeated, and publicly enumerable. (#r360)
+
+**Simplest viable mechanism sketch after #r360:**
+1. Define a tiny public state machine for one domain, with 3-5 named transition frontiers and explicit downgrade paths.
+2. For each frontier, define the authority tranche, coverage-margin rule, challenge surface, usage meter, retained-risk rule, and error-attribution envelope.
+3. Let demand fund either `(a)` initial activation of a frontier or `(b)` ongoing consumption of already-active authority capacity.
+4. Let suppliers post bond to underwrite the tranche's coverage margin for a bounded window.
+5. Let challengers earn from exposing undercoverage or stale authority.
+6. Let consumers invoke the tranche only by attaching retained, attributable downside.
+7. Slash only for epistemic miss inside the named transition envelope; otherwise downgrade or throttle rather than blur into broad outcome insurance.
+This is the narrowest form that still deserves to be called a new mechanism family rather than a renamed prediction market. (#r360)
+
+**Strongest new reason this idea fails:**
+The deepest remaining kill becomes **transition-grammar scarcity**. Most domains do not have a compact, protocol-native set of bounded authority transitions. If the state machine is not naturally small and public, the mechanism has no common object to clear and reverts to bespoke expert intermediation. That is the real limit of the family. (#r360)
+
+**Best surviving variant if the raw knowledge-marketplace idea is wrong:**
+Abandon the language of generic knowledge bids/asks entirely. Keep only the narrow variant: a market for underwriting and challenging **specific public decision rights** or **state-transition approvals** with explicit expiry, coverage margin, challenge rights, retained consumption risk, and epistemic error attribution. In other words, the best surviving descendant of the raw idea is not a general knowledge marketplace; it is a **liability-backed authority-transition market**. That is the version most clearly distinct from LMSR, orderbooks, and batch auctions, and the one most likely to preserve a crisp conserved quantity. (ref: #r356, #r357, #r358, #r359, #r360)
 
 ### #r359 refinement - even attributable non-rentable retention fails unless outcome shortfall is attributable to epistemic error rather than generic bad outcomes, because otherwise the KM becomes noisy outcome insurance rather than disciplined knowledge transfer
 
