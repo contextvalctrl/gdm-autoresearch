@@ -7,6 +7,7 @@
 - **#r147** - 2026-04-05T08:22Z - Refined the family again: the strongest non-PM formulation is warranty-bearing state maintenance, where capital does not buy directional influence but temporarily underwrites a replaceable state installation; killed raw “knowledge sale” framing further and isolated the main failure as unverifiable decision-loss accounting.
 - **#r148** - 2026-04-05T08:32Z - Sharpened the mechanism around temporary state-authority under challenge; killed continuous bilateral “knowledge rights” as disguised inventory trading, retained baseline-relative authority procurement as the core, and promoted specification externality to the main residual failure.
 - **#r149** - 2026-04-05T08:42Z - Refined the direct family one step further from generic update procurement into challengeable maintenance coverage on a named state deficiency; separated install-rights from passive knowledge sale, added a standing demand-side coverage budget as the cleanest non-PM payment source, and identified unverifiable buyer-value attribution as the strongest remaining kill for any “knowledge transfer” formulation.
+- **#r150** - 2026-04-05T08:52Z - Tightened the primitive again from generic maintenance coverage to revocable state-authority leasing under posted error-insurance; clarified that demand is buying bounded authority plus replacement rights rather than “knowledge,” introduced insurer/challenger economics as the cleanest capital-to-epistemics mapping, and isolated adverse-selection in buyer-side deficiency specification as the main remaining structural failure.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -275,7 +276,121 @@ This suggests a sharper boundary:
 **8. Best surviving fallback if even #r149 is too ambitious**  
 Drop buyer-specific value entirely and keep only **public challenge-bounty maintenance**. Protocol or subscribers fund maintenance lanes for important coordinates; maintainers and challengers compete around public deficiency tests; no one tries to prove bespoke buyer benefit. That preserves the strongest mechanism insight while sacrificing the grander "knowledge marketplace" rhetoric. (ref: #r148, #r149)
 
-(ref: #r1, #r2, #r69, #r145, #r146, #r147, #r148, #r149, #r185, #r255)
+### #r150 refinement - the cleanest non-PM primitive is revocable state-authority leasing under posted error-insurance
+
+#r145-#r149 correctly moved the thread away from bilateral belief exchange and toward challengeable maintenance coverage on named state deficiencies. The next refinement is that even "coverage" still leaves one ambiguity: is the buyer purchasing an informational good, or allocating a temporary right to control the shared state? The stronger answer is the latter.
+
+The clean formulation is:
+**the mechanism leases revocable write-authority over a coordinate of the shared state vector, backed by posted error-insurance.** (#r150)
+
+That means the contract being cleared is not:
+- `belief against belief`
+- `knowledge for money`
+- `report for fee`
+
+It is:
+- `temporary right to write and defend coordinate s_i`
+- with `mandatory replacement rights for challengers`
+- and `insured downside if the installed state is later shown inferior to the incumbent or a challenger`
+
+This sharpens all ten questions in the prompt.
+
+**1. Base primitive**  
+What is being exchanged is best stated as:
+`revocable state authority + posted error-insurance  <->  maintenance budget`
+not `knowledge  <->  payment`.  
+The mechanism is only genuinely non-LMSR if the asset is authority over state installation, not tradeable exposure to a future resolution. If the holder can profit merely from directional correctness without having held replaceable authority over the state, the design has slipped back toward prediction-market logic. (#r150)
+
+**2. State model**  
+The global state vector should now be thought of as a set of leased coordinates:
+- each coordinate has an incumbent installed state
+- each installed state has a current authority holder, insurance bond, and challenge queue
+- updates are not just observations; they are **state replacement events**
+
+The update rule becomes:
+1. publish deficiency contract on `s_i`
+2. admit bids for insured authority over `s_i`
+3. install the best admissible authority-holder or retain `no_change`
+4. allow challenge-driven replacement during the service window
+5. settle authority-holder and challengers against later truth / audit
+
+So the mechanism is closer to **contestable state maintenance franchise allocation** than to price discovery. (#r150)
+
+**3. Credibility model**  
+#r149 correctly said that stake should mean "financial exposure if the covered deficiency still materializes." The tighter version is: stake is not just credibility collateral; it is **error-insurance capital**.  
+Capital improves epistemics only if it absorbs the downside of being the installed authority. That creates the cleanest answer yet to the question "why does money help?"
+- in LMSR/orderbooks, money buys influence over price or inventory
+- here, money buys *liability-bearing authority* and is burned when that authority was misallocated
+
+So the role of capital is not to vote. It is to insure the state against bad overwrites. (#r150)
+
+**4. Market roles**  
+The roles now become:
+- **Coverage buyer / state consumer:** funds a lane because a coordinate matters for decisions
+- **Authority-holder / maintainer:** leases the right to write and defend the coordinate under bond
+- **Challenger / replacement bidder:** can displace the authority-holder by posting superior insured authority
+- **Protocol:** enforces authority assignment, replacement rights, and settlement
+
+This is cleaner than "askers/knowers vs bidders/unknowers" because it makes clear who pays whom:
+- buyers pay for maintained decision-grade state
+- authority-holders get paid for holding insured responsibility
+- challengers get paid for proving the current authority-holder is inadequate
+
+That payment graph is not bilateral belief matching. It is a **market for accountable state stewardship**. (#r150)
+
+**5. Settlement model**  
+Settlement should now be interpreted in insurance terms:
+- if the installed authority-holder kept the coordinate within contract tolerance, they earn the service budget and recover bond
+- if a challenger proves superiority before final truth, the incumbent loses authority and may lose part of bond immediately
+- on final truth or audit, remaining bond and service payments settle against realized baseline-relative quality
+- under partial observability, only publicly auditable service metrics (freshness, challenge survival, later correction rate, bounded error tests) may release durable credibility
+
+This reinforces a critical rule: unresolved claims may justify temporary authority, but they cannot mint permanent epistemic capital unless later audited. (#r150)
+
+**6. Attack surface - strongest surviving attacks after #r150**
+The prior manipulation list still stands, but the deeper structural attacks are now clearer:
+
+1. **Adverse-selection in deficiency contracts** - buyers may be bad at specifying what defect they actually need covered. Then the mechanism selects for sellers who are good at winning underspecified authority leases, not reducing error. This supersedes generic specification externality as the main structural kill. (#r150)
+2. **Insurance laundering** - colluding actors may rotate authority and challenge one another to manufacture "insured credibility" without meaningful state improvement. Needs challenger independence checks and baseline-relative scoring.
+3. **Authority capture via replacement-friction** - if challenge rights are too weak or too slow, the mechanism becomes governance-protected incumbency rather than epistemic competition.
+4. **Oracle underdetermination** - if later truth does not distinguish incumbent from challenger quality, the insurance contract becomes ceremonial.
+
+**7. Why better or worse than LMSR / orderbooks / batch auctions**  
+The clearest surviving comparison is now:
+- **LMSR:** clears price movement cost on a shared belief vector
+- **Orderbook:** clears transfer of contingent-claim inventory
+- **Batch auction:** clears the same inventory on a clock that reduces timing games
+- **Authority-leasing KM:** clears who gets insured, challengeable authority to write the shared world-model
+
+This is better when the core problem is not hedging or speculative price discovery, but **who should be trusted to maintain a decision-grade state under liability**.  
+It is worse when demand cannot specify deficiencies, when truth arrives too slowly, or when external liquidity/hedging is the main objective. In those domains, PM primitives remain cleaner. (#r150)
+
+**8. Simplest viable mechanism sketch after #r150**
+The simplest surviving direct family is now:
+1. Buyer posts deficiency contract `D_i = (baseline, tolerance, horizon, audit rule, budget)`
+2. Maintainers bid `(candidate_state, insurance_bond, service_fee)`
+3. Protocol compares bids to incumbent and `no_change`
+4. Winner receives temporary write-authority on `s_i`
+5. Challengers may post superior bonded replacement during horizon `H`
+6. Fee stream accrues while the authority-holder remains installed
+7. Final settlement pays for maintained adequacy, not for directional correctness alone
+
+This is the narrowest mechanism that still deserves to be called a non-PM knowledge market. (#r150)
+
+**9. Strongest reason this still fails**  
+The raw idea fails if the buyer cannot write a good deficiency contract. More precisely: if the protocol cannot elicit a sufficiently objective tuple `(baseline, tolerance, horizon, audit rule)` from demand, then authority leasing becomes a market in contract gaming rather than epistemic improvement.  
+That is stronger than simply saying "truth is hard". The failure can happen even when truth eventually exists, because the buyer bought the wrong service. (#r150)
+
+**10. Best surviving variant if this refinement is still wrong**  
+If open-ended authority leasing is too brittle, the best surviving fallback is a **public insurer-of-last-resort challenge market**:
+- protocol/subscribers fund important coordinates
+- incumbents are default installed states
+- maintainers only earn by displacing incumbents or defending them under public challenge tests
+- no buyer-specific contracting is needed beyond selecting which coordinates deserve funded challenge lanes
+
+That retains the strongest insight from #r145-#r150: capital should underwrite correction liability on the shared state, not just side-bets on crowd belief. (ref: #r148, #r149, #r150)
+
+(ref: #r1, #r2, #r69, #r145, #r146, #r147, #r148, #r149, #r150, #r185, #r255)
 
 ---
 # Knowledge Marketplace Mechanism - Aggregate Document
