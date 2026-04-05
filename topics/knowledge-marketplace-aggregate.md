@@ -1,6 +1,7 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r346** - 2026-04-05T18:02Z - Added a tenure correction: even a public authority lattice still fails as a market object if authority is sold as durable standing rights rather than time-bounded maintained coverage. The stronger surviving form clears only expiring authority-tenure slices that must be refreshed under continuing liability, so capital pays for maintained epistemic coverage instead of accumulating permanent rights inventory.
 - **#r345** - 2026-04-05T17:52Z - Added an authority-lattice correction: even protocol-native authority quanta are not a stable market object if they are just a flat registry of bespoke unlock rights. The stronger surviving form requires a public monotone authority lattice with refinement/containment rules, so closure can activate standardized tranches of shared authority without exploding back into rights-fragmentation and overlap theater.
 - **#r344** - 2026-04-05T17:42Z - Added a demand-standardization correction: even dependency-typed closure certificates fail as a market primitive if demand remains counterparty-specific and utility-specific. The stronger surviving form must clear only against protocol-native authority quanta / standard unlock rights with a public value grammar; otherwise the mechanism collapses into bespoke consulting, procurement, or bilateral sale of proof rather than a real market.
 - **#r343** - 2026-04-05T17:32Z - Added a compositional-dependence correction: even certificate-based closure clearing fails if separately minted certificates can be combined as if independent when they share hidden assumptions, evidence lineage, or common-mode fragility. The stronger surviving form requires dependency-typed certificates and bundle-level admissibility / haircut rules, so capital pays for net-new jointly reliable closure rather than for assembling a brittle stack of individually valid but non-composable proof assets.
@@ -11,6 +12,58 @@
 - **#r337** - 2026-04-05T16:32Z - Added a shared-demand correction: even ticket-terminated decision-unlock markets still misprice when the same elimination simultaneously unlocks several tickets or action surfaces. The stronger surviving form clears against protocol-native unlock frontiers with pooled demand aggregation and anti-duplication payout caps, so one epistemic act cannot farm multiple cloned bounties unless it truly creates additional action-distinct authority.
 
 - **#r340** - 2026-04-05T17:12Z - Added a timeout/anti-stall correction: paired unlock and default-defense lanes still fail if defended no-unlock can persist indefinitely under weak observability. The stronger surviving form makes every default warranty explicitly perishable, with expiry, decay, and mandatory downgrade to a coarser safe state if neither side can justify authority by the deadline, so capital cannot simply fund epistemic gridlock.
+
+### #r346 refinement - even a public authority lattice still fails unless the traded object is expiring authority tenure, because durable rights turn the KM back into inventory accumulation
+
+#r345 correctly fixed rights fragmentation by requiring protocol-native authority quanta to live in a public monotone lattice. But even that stronger form still fails if crossing a frontier is treated as minting a durable standing right that can then be held, warehoused, resold, or politically defended as an asset in its own right. Then the mechanism quietly drifts back toward inventory logic: capital is no longer mainly paying for credible information transfer or maintained epistemic coverage; it is paying to accumulate and protect a stock of authority claims. The stronger surviving form is therefore **tenure-based authority clearing**. Every authority tranche in the public lattice should clear as an expiring, refresh-requiring coverage slice rather than as a permanent right. Capital should pay for justified maintenance of public authority over a bounded horizon, with renewal always exposed to fresh challenge, decay, and evidentiary refresh. (#r346)
+
+This is a real mechanism correction, not a generic expiry footnote. #r340 already made defended default perishable. #r342 made proof objects refreshable rather than infinitely reusable. #r345 made authority demand standardized in a monotone lattice. #r346 kills the next failure: **durable-right inventory accumulation on top of the lattice itself**. A knowledge marketplace should distinguish among:
+1. **certificate object** - the public proof / closure asset,
+2. **authority tranche** - the standardized lattice node the certificate can activate,
+3. **authority tenure** - the bounded time/horizon slice for which that tranche is actually live without refresh,
+4. **durable residual claim** - a would-be permanent property-like right over that tranche.
+Only the third belongs in the core market. The fourth recreates the wrong primitive. If actors can buy and warehouse enduring authority claims, the KM stops financing ongoing credible maintenance of shared state and starts financing positional ownership of rights inventory. That collapses the family back toward a slower, more bureaucratic version of orderbook inventory rather than a true epistemic transfer mechanism. (#r346)
+
+The family triage after this correction is:
+
+1. **Certificate-based closure against durable authority rights** - dead.
+   Better than bespoke proof sales, but still unstable because authority becomes a stock to accumulate, defend, and trade rather than maintained coverage justified by continuing evidence. (#r342, #r345, #r346)
+
+2. **Authority-lattice clearing with ad hoc expiry layered on top** - no longer preferred.
+   Better than permanent rights, but still structurally weak if expiry is not first-class in the traded object and settlement logic. Then actors will still talk and behave as though the market clears rights inventory with occasional refresh fees. (#r340, #r345, #r346)
+
+3. **Defect-triggered, order-independent unlock-frontier clearing with paired perishable warranties, shared evidentiary closure rules, dependency-typed certificates, protocol-native authority quanta, a public monotone authority lattice, and expiring authority-tenure slices as the only market-clearing object** - strongest surviving refinement.
+   Keep #r329's sparse defect chassis, #r333's action-equivalence discipline, #r334's boundary-crossing credit rule, #r335's order-independent necessity accounting, #r336's stopping rule, #r337's pooled frontier clearing, #r338's beneficiary ledger, #r339's paired warranty logic, #r340's expiry/decay rule, #r341's closure lattice, #r342's certificate graph, #r343's dependency-aware bundle admissibility, #r344's authority-standardized demand object, and #r345's public authority lattice, but require the actual thing buyers fund and suppliers maintain to be a **time-bounded tenure slice** of a lattice tranche. Fresh payout should attach to first activation, justified refresh, or valid extension/refinement of authority tenure-not to indefinite possession of a supposedly permanent right. (#r346)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** a bonded contest to create, refresh, extend, or validly compose closure certificates that activate a named authority tranche for a bounded tenure, not a sale of durable rights inventory.
+- **State model:** the global state must now track not only certificates, frontiers, bundles, dependencies, beneficiary ledgers, warranties, authority quanta, and the authority partial order, but also **tenure horizons / decay clocks** on each active tranche instance.
+- **Credibility model:** capital converts into trust only when stake stands behind authority that remains live because it is continuously defendable, not because it was once minted and then inertially owned. Money should buy exposure to whether a tranche deserved to stay active through its tenure, not ownership of a permanent epistemic asset. (#r346)
+- **Market roles:** suppliers still produce / refresh / extend certificates; dependency challengers still police proof composition; default-defenders still underwrite conservative fallback; subscribers still fund desired frontiers; authority buyers still fund standardized rights; lattice governors still police overlap; but now **maintainers / refreshers of authority tenure** become first-class because epistemic work includes keeping an authority slice justified over time rather than merely winning one activation event.
+- **Settlement:** first evaluate whether evidence mints, refreshes, or extends certificates; then whether the dependency-aware bundle clears the frontier; then whether that frontier activates, refines, or renews a named authority tranche in the public lattice for the next tenure window. Payments should clear against the tranche-tenure transition itself, with expiry, downgrade, and renewal handled inside the same public discipline rather than as an afterthought. (#r346)
+
+**Why this is cleaner versus LMSR / orderbooks / batch auctions:**
+- LMSR, orderbooks, and batch auctions are comfortable treating the traded object as durable inventory that can persist until someone else takes the other side.
+- #r345 already forced the buy-side object into standardized authority under a public lattice.
+- #r346 adds the next break: even lattice authority is still the wrong primitive if it behaves like durable inventory. The scarce object is instead **maintained tenure on public authority**, which naturally decays unless renewed by continuing evidence and liability.
+- That keeps capital tied to ongoing epistemic maintenance rather than turning the protocol into a warehouse of rights claims. (#r346)
+
+**Simplest viable mechanism sketch after #r346:**
+1. Register a canonical facet with protocol-native regions, action-equivalence collapse, named unlock frontiers, paired default warranties, closure lattices, certificate schema, dependency tags, a public authority lattice, and standard tenure windows for each lattice tranche.
+2. Each lattice node must specify not only what public right becomes active there and how it relates to neighboring nodes, but also the allowed tenure horizons, decay path, and refresh conditions for that tranche.
+3. Demanders subscribe to tranche-tenure windows / frontiers ex ante, not to vague knowledge value, not to bespoke right labels, and not to perpetual authority.
+4. Suppliers submit evidence moves under bond that may mint, refresh, or extend certificates.
+5. Protocol records certificates plus dependence metadata and applies public bundle-admissibility haircuts as in #r343.
+6. If the admissible certificate bundle clears a frontier, the protocol checks which authority-lattice node is activated or refined and for what tenure horizon.
+7. Primary payout clears only for the highest net-new or validly renewed tranche-tenure transition justified by that crossing; contained lower-right demand is satisfied by lattice inheritance and time inheritance rather than paid again.
+8. At tenure expiry, authority decays, downgrades, or reopens to challenge unless refreshed under the public closure rule.
+9. Challengers may dispute not only fake novelty, stale reuse, false diversification, bespoke entitlement smuggling, or duplicate rights labeling, but also attempts to treat expired or weakly refreshed authority as if it were still a live market-clearing tranche. (#r346)
+
+**Strongest new reason this idea fails:**
+The deepest residual kill becomes **tenure-design overload / refresh bureaucracy**. If tenure windows are too short, the mechanism degenerates into constant re-certification tolling and administrative churn. If too long, durable-right inventory sneaks back in and incumbents regain quasi-permanent authority. This is sharper than #r345's lattice-design problem because it attacks the new abstraction directly: whether maintained authority can be time-sliced tightly enough to preserve epistemic discipline without making the system unusably procedural. (#r346)
+
+**Best surviving variant if even this correction is too ambitious:**
+Keep #r345's authority-lattice logic, but restrict the live market to a very small ladder of protocol-native authority tranches with explicit standard tenure windows and coarse renewal points-for example `temporary coarse safe access -> bounded provisional access -> time-limited settlement entitlement -> review-gated wider execution right`. Where the protocol cannot define simple tenure discipline, do not force that authority into the common market; handle it as governance, procurement, or institutional mandate instead. That preserves the strongest surviving thread insight so far: the non-PM opportunity is not to let money buy custom proof, reusable proof assets, a flat menu of rights, or even a public authority lattice as durable inventory, but to finance **loss-bearing creation, maintenance, conservative composition, and time-bounded activation of reusable proof objects that justify temporary public authority under paired liability, explicit expiry, and common-mode discipline**. (ref: #r340, #r342, #r345, #r346)
 
 ### #r345 refinement - standardized authority quanta still fail unless they live in a monotone authority lattice, because a flat registry of rights fragments back into bespoke overlap theater
 
