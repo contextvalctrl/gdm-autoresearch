@@ -22,34 +22,35 @@
 - **#r305** - 2026-04-05T10:52Z - Tightened the surviving family from slot-level insured authority into action-scoped decision warrants: the mechanism should not merely defend canonical state slots, but insure bounded rights to trigger named downstream action classes from those slots. This clarifies what demand is actually buying, sharpens settlement around pre-declared action predicates instead of narrative state quality, and identifies action-surface design overload as the new deepest kill.
 - **#r306** - 2026-04-05T11:02Z - Split epistemic authorship from capital underwriting: the strongest surviving family should not make the same actor both propose state and insure its downstream warrants. Instead, stewards/authors supply defended state updates while separate underwriters price and absorb warrant risk. This sharpens the conserved quantity into scarce insured loss capacity rather than generic stake, explains more cleanly why capital improves epistemics, and identifies insurer cartelization / correlated-underwriting failure as the new deepest residual risk.
 - **#r307** - 2026-04-05T11:12Z - Refined the underwriting side further: the mechanism should clear standing capacity reservations on named decision-warrant classes, not ad hoc one-off insurance signatures on each state claim. Authors compete to attach defended state to pre-funded underwriting capacity; underwriters are paid for carrying revocable loss capacity, not for improvising after seeing narratives. This sharpens the conserved quantity into reserved insured action-capacity, makes the non-PM comparison cleaner against LMSR/orderbooks/batch auctions, and identifies underwriter cherry-picking / capacity starvation as the new deepest residual kill.
+- **#r308** - 2026-04-05T11:22Z - Refined the capacity layer again: the protocol should clear standardized pooled warrant-capacity tranches with mandatory mutualization inside each action class, not purely bespoke insurer-to-claim matching. This keeps the non-PM product as insured decision capacity, but reduces insurer veto power over individual authors, makes pricing attach to public risk buckets rather than narratives, and identifies common-mode tranche misclassification / pooled-tail blowups as the new deepest residual risk.
 
 ## 1. Base primitive - what exactly is being exchanged?
-The strongest surviving primitive is **reserved insured decision capacity on named action classes, attached to defended canonical state**. Not a probability share. Not belief inventory. Not a generic knowledge sale. The mechanism clears who may let a shared state facet drive action `a_k`, and whose balance sheet is reserved to absorb loss if that warrant was too broad or wrongly defended. (ref: #r305, #r306, #r307)
+The strongest surviving primitive is **standardized pooled insured decision capacity on named action classes, attached to defended canonical state**. Not a probability share. Not belief inventory. Not a generic knowledge sale. The mechanism clears how much tranche capacity exists for letting a shared state facet drive action `a_k`, and which defended state is allowed to consume that public risk bucket. The scarce object is therefore no longer bespoke insurer approval of a narrative, but protocol-legible loss-bearing capacity inside a named warrant class. (ref: #r305, #r306, #r307, #r308)
 
 ## 2. State model - what is the "global state vector" and how is it updated?
-The global state remains a protocol-native vector of canonical slots/facets, but each active authority tranche now maps to an explicit action-class set and an underwriting-capacity reservation. State updates are therefore **not** raw message inserts. The update path is:
+The global state remains a protocol-native vector of canonical slots/facets, but each active authority tranche now maps to an explicit action-class set and to a **standardized pooled underwriting bucket** rather than a one-off insurer signature. State updates are therefore **not** raw message inserts. The update path is:
 1. steward/author proposes or defends a facet state,
-2. pre-funded underwriting capacity attaches to the relevant action warrant class,
-3. the protocol activates, narrows, downgrades, or revokes that warrant based on public breach tests,
+2. that state attempts to attach to available capacity in the relevant public warrant tranche,
+3. the protocol activates, narrows, downgrades, or revokes the warrant based on public breach tests,
 4. restoration re-certifies the degraded facet and re-enables action classes tranche by tranche.
-A slot can lose decision authority before the protocol knows the final replacement state; degrade-first remains core. (ref: #r301, #r303, #r305, #r306, #r307)
+A slot can lose decision authority before the protocol knows the final replacement state; degrade-first remains core. The added refinement is that attachment should clear against a public capacity pool, so authors compete on admissible state quality within a risk bucket instead of bargaining narrative-by-narrative with insurers. (ref: #r301, #r303, #r305, #r306, #r307, #r308)
 
 ## 3. Credibility model - how does capital stake convert into trustworthy information?
 Capital improves epistemics only when it becomes **loss-bearing insured capacity**, not louder voice. The clean split is:
 - authors/stewards earn epistemic standing by defending state quality,
-- underwriters earn underwriting standing by correctly reserving and pricing loss capacity on action warrants,
+- underwriters earn underwriting standing by correctly capitalizing and pricing pooled loss capacity on public action-warrant classes,
 - refuters earn only for proving active warranty/breach predicates false.
-Trust therefore comes from two linked but separate records: truth-tracking authorship and disciplined underwriting. A wealthy author without underwriting support should not gain broad authority; an underwriter should not be able to mint truth on capital alone. (ref: #r299, #r305, #r306, #r307)
+Trust therefore comes from two linked but separate records: truth-tracking authorship and disciplined pooled underwriting. A wealthy author without capacity support should not gain broad authority; an underwriter should not be able to mint truth on capital alone; and a single insurer should not have unchecked veto power over which authors are heard inside a class. The pool/bucket design exists precisely to keep capital tied to class risk, not author favoritism. (ref: #r299, #r305, #r306, #r307, #r308)
 
 ## 4. Market roles - what are askers/knowers, bidders/unknowers, and who pays whom?
 The bilateral story is now cleaner if expressed as operational roles:
 - **decision-warrant buyers / subscribers** pay to keep specific bounded action classes live,
 - **authors / stewards** propose and defend the state facets those actions rely on,
-- **underwriters** reserve insured loss capacity against those action classes,
+- **underwriters** capitalize pooled loss tranches for those action classes,
 - **refuters / challengers** earn by proving the active warrant should be narrowed or revoked,
 - **restorers / re-certifiers** earn by re-enabling degraded action classes under fresh bond/capacity,
-- **protocol** defines slots, breach predicates, authority ladders, and settlement.
-So the low-information side is not buying beliefs; it is buying reliable permission to act from shared state. The high-information side is not just talking; it is coupling defended state with reserved loss-bearing capacity. (ref: #r305, #r306, #r307)
+- **protocol** defines slots, breach predicates, authority ladders, tranche structure, and settlement.
+So the low-information side is not buying beliefs; it is buying reliable permission to act from shared state. The high-information side is not just talking; it is coupling defended state with access to reserved loss-bearing capacity. The new refinement is that authors should attach to standardized public tranches rather than needing bespoke insurer sponsorship claim by claim. (ref: #r305, #r306, #r307, #r308)
 
 ## 5. Settlement model - what happens when truth resolves, and what if truth is only partially observed?
 Settlement is layered:
@@ -58,48 +59,48 @@ Settlement is layered:
 3. **degradation settlement** - affected facets fall to safer authority tranches or scoped degraded defaults,
 4. **re-certification settlement** - later candidates earn for restoring authority one tranche at a time,
 5. **truth settlement** - longer-horizon audit finalizes whether the prior grants, revocations, and restorations were substantively justified.
-Under partial observability, the protocol should settle only against pre-declared breach tests and authority tranches, not narrative "who was right overall" judgments. (ref: #r300, #r301, #r303, #r304, #r307)
+Under partial observability, the protocol should settle only against pre-declared breach tests and authority tranches, not narrative "who was right overall" judgments. The pooled-tranche refinement means tail losses should hit the relevant action-class bucket first and only then flow to participant-specific quality ledgers, preserving the distinction between class risk and author skill. (ref: #r300, #r301, #r303, #r304, #r307, #r308)
 
 ## 6. Attack surface - manipulation, bluffing, sybil, wash credibility, collusion, cheap talk, oracle gaming
 The deepest remaining attacks are now mechanism-specific:
-- **underwriter cherry-picking** - insurers reserve capacity only for easy, low-risk warrants, starving exactly the hard-but-important epistemic surfaces,
-- **capacity starvation / cartelization** - a concentrated underwriting layer can ration action rights regardless of information quality,
-- **common-mode underwriting failure** - many warrants look separately safe but blow up together under the same hidden shock,
-- **author-underwriter collusion** - favored authors receive cheap capacity while outsiders are excluded,
+- **common-mode tranche misclassification** - the protocol defines risk buckets too coarsely or too optimistically, so pooled capacity looks diversified until one hidden factor blows through the whole class,
+- **pooled-tail blowups** - mutualization absorbs small idiosyncratic errors well but fails catastrophically under correlated shocks,
+- **author-underwriter collusion through tranche design** - insiders shape bucket boundaries or attachment rules to favor certain state suppliers,
 - **test-surface gaming** - actors optimize to public breach predicates rather than actual decision quality,
 - **shadow-action leakage** - revoked warrants remain informally used downstream.
-This supersedes the older generic cheap-talk framing. The mechanism now lives or dies on whether reserved loss capacity remains contestable, diverse, and genuinely coupled to decision risk. (ref: #r305, #r306, #r307)
+This supersedes #r307's underwriter cherry-picking / capacity-starvation kill as the main residual risk. The pooled design cures too much insurer discretion, but it makes ontology and correlation management much more central. The mechanism now lives or dies on whether public risk classes are diverse enough to prevent cartel veto, yet coherent enough not to mutualize hidden common shocks. (ref: #r305, #r306, #r307, #r308)
 
 ## 7. Why this is better or worse than LMSR/orderbooks/batch auctions?
 The sharpest comparison now is:
 - **LMSR** clears the cost to move a public belief vector,
 - **orderbooks** clear transfers of contingent-claim inventory,
 - **batch auctions** clear that same inventory on a fairer clock,
-- **this KM family** clears reserved insured capacity for canonical state to drive bounded downstream actions.
-So the non-PM contribution is not a better pricing rule; it is a different product. This family is better where the core problem is maintaining auditable machine-usable decision authority on top of shared state. It is worse where users mainly want hedgeable exposure, deep external liquidity, or domains whose action classes cannot be standardized and insured cleanly. (ref: #r151, #r305, #r306, #r307)
+- **this KM family** clears pooled insured capacity for canonical state to drive bounded downstream actions.
+So the non-PM contribution is not a better pricing rule; it is a different product. This family is better where the core problem is maintaining auditable machine-usable decision authority on top of shared state and where insurer discretion itself would otherwise become the bottleneck. It is worse where users mainly want hedgeable exposure, deep external liquidity, or domains whose action classes cannot be standardized and bucketed cleanly enough for pooled underwriting. (ref: #r151, #r305, #r306, #r307, #r308)
 
 ## 8. Simplest viable mechanism sketch
-1. Register a canonical slot/facet with authority ladder, breach predicates, degraded defaults, and named action classes.
+1. Register a canonical slot/facet with authority ladder, breach predicates, degraded defaults, named action classes, and tranche definitions.
 2. Subscribers fund a standing budget for those action warrants.
-3. Underwriters reserve tranche-specific loss capacity on each named action class.
-4. Authors/stewards compete to supply defended state that can attach to that reserved capacity.
+3. Underwriters capitalize public tranche-specific loss pools on each named action class.
+4. Authors/stewards compete to supply defended state that can attach to available capacity in those pools.
 5. If attached, the warrant goes live and the action class is enabled.
 6. Refuters can post evidence and bond to prove the active warrant should narrow or shut off.
 7. On successful breach, the protocol revokes the smallest defensible action set and degrades the linked facet authority.
-8. Restorers later post fresh bond/capacity to re-enable action classes one tranche at a time.
-9. Later truth/audit updates author quality, underwriting quality, and residual losses separately.
-This is the narrowest non-PM sketch that still preserves the split between epistemic authorship and insured action-capacity. (ref: #r303, #r305, #r306, #r307)
+8. Losses first hit the relevant pooled tranche, while author quality and underwriting quality are updated separately.
+9. Restorers later post fresh bond/capacity to re-enable action classes one tranche at a time.
+10. Later truth/audit updates author quality, tranche-pricing quality, and residual losses separately.
+This is the narrowest non-PM sketch that still preserves the split between epistemic authorship and insured action-capacity while avoiding claim-by-claim insurer veto over authorship. (ref: #r303, #r305, #r306, #r307, #r308)
 
 ## 9. Strongest reason this idea fails
-The strongest surviving kill is now: **the mechanism may become a market in scarce insurance paper rather than a market in epistemic improvement**. If underwriters can cherry-pick, cartelize capacity, or avoid exactly the action classes where new knowledge matters most, then authorship quality stops being decisive. The design would merely move the centralization problem from price impact to capacity allocation. That is structural, not a tuning bug. (#r306, #r307)
+The strongest surviving kill is now: **the mechanism may require a public risk taxonomy that is good enough to pool underwriting without smearing together hidden common-mode risk**. If tranche design is bad, the system either reverts to insurer discretion (if buckets are too narrow) or suffers catastrophic pooled-tail failures and mispriced authority (if buckets are too broad). In that world the design does not become a market in epistemic improvement; it becomes a brittle market in ontology-dependent insurance buckets. That is structural, not a tuning bug. (#r307, #r308)
 
 ## 10. Best surviving variant if the raw idea is wrong
 The best fallback is now a **hybrid split architecture**:
-- keep this non-PM lane only for a small registry of protocol-critical, machine-enforced decision warrants with standardized action classes,
-- use separate underwriters only where downstream loss really justifies the complexity,
-- keep lower-stakes internal warrants on a simpler self-insured stewardship model,
+- keep this non-PM lane only for a small registry of protocol-critical, machine-enforced decision warrants with standardized action classes and tractable pooled risk buckets,
+- use pooled underwriting only where risk classes are genuinely legible,
+- keep lower-stakes or hard-to-bucket warrants on a simpler self-insured stewardship model,
 - and let conventional PM/orderbook/batch-auction machinery handle external disagreement, hedgeable exposure, and broad price discovery elsewhere.
-That preserves the deepest surviving insight: capital should improve epistemics by underwriting bounded decision rights from shared state, not by merely buying louder influence over a belief vector. (ref: #r305, #r306, #r307)
+That preserves the deepest surviving insight: capital should improve epistemics by underwriting bounded decision rights from shared state, not by merely buying louder influence over a belief vector. The new constraint is that pooled underwriting is only worth doing when the action-class ontology is stable enough to mutualize risk without hiding it. (ref: #r305, #r306, #r307, #r308)
 
 ### Candidate families tested in this run
 - **A) direct knowledge-market**: kept as base, with unresolved-truth safety branch
