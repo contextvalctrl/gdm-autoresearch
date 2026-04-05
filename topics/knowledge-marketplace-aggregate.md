@@ -1,8 +1,56 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r339** - 2026-04-05T16:52Z - Added a demand-bias correction: even subscription-backed unlock frontiers become preference markets if only would-be beneficiaries fund the unlock side. The stronger surviving form pairs every paid frontier with a bonded default-defense / no-unlock lane, so capital must defeat an explicit conservative warranty before authority changes and money measures willingness to bear epistemic liability, not just eagerness to see a favored unlock.
 - **#r338** - 2026-04-05T16:42Z - Added an anti-free-rider correction: even pooled unlock-frontier clearing underproduces if later beneficiaries can join only after the frontier is crossed and suppliers can wait for bounty thickening. The stronger surviving form uses ex ante frontier subscriptions / standing beneficiary rosters plus controlled retroactive cost-sharing, so payment attaches to precommitted demand for a shared unlock rather than to opportunistic post-unlock hitchhiking.
 - **#r337** - 2026-04-05T16:32Z - Added a shared-demand correction: even ticket-terminated decision-unlock markets still misprice when the same elimination simultaneously unlocks several tickets or action surfaces. The stronger surviving form clears against protocol-native unlock frontiers with pooled demand aggregation and anti-duplication payout caps, so one epistemic act cannot farm multiple cloned bounties unless it truly creates additional action-distinct authority.
+
+### #r339 refinement - subscription-backed unlocks still fail unless paid frontiers also fund a defended no-unlock/default state
+
+#r338 correctly solved the financing side of a public epistemic good by requiring precommitted subscribers and bounded late-user cost-sharing. But even that stronger form still fails if the only capitalized lane is the **unlock** lane. Then the mechanism quietly becomes a market in how badly beneficiaries want a frontier crossed, not a market in whether shared state should actually move. Demanders who want action authority can subsidize supplier effort toward the unlock, while the conservative/default side is left as an unpriced passive baseline. In domains with partial observability or costly truth, that creates a sponsor-capture problem: money no longer measures accountable information transfer; it measures appetite for a preferred state transition. The stronger surviving product is therefore **frontier clearing with paired default-defense / no-unlock warranties**. Every paid frontier should have both an unlock budget and a bonded lane that defends the incumbent fallback / unresolved state until admissible evidence defeats it. (#r339)
+
+This is a real mechanism correction, not a semantic return to two-sided trading. The point is not to let traders buy opposite directional exposure. The point is to stop the unlock frontier from inheriting a hidden asymmetry where one side is paid to move state and the other side is merely presumed. A KM should not say, "if enough buyers want this authority, pay suppliers to unlock it." It should say, "the current fallback is an actively defended warranty, and authority changes only when bonded eliminations/refutations defeat that warranty under public tests." Capital is supposed to convert into trustworthy information by **bearing liability on both state transition and state retention**, not by financing only the desired transition. (#r339)
+
+The family triage after this correction is:
+
+1. **Subscription-backed unlock frontier with passive default baseline** - dead.
+   Still lets motivated beneficiaries subsidize a preferred unlock while treating non-movement as a free residual state rather than an explicitly defended epistemic position. (#r338, #r339)
+
+2. **Unlock-frontier subscriptions plus ad hoc challenge after crossing** - no longer acceptable as the default.
+   Better than purely one-sided bounty finance, but still biases the mechanism toward state movement because the unlock side gets organized ex ante funding while the default side only reacts later. (#r338, #r339)
+
+3. **Defect-triggered, order-independent unlock-frontier clearing with precommitted subscribers, bounded late-user cost-sharing, and paired default-defense warranties** - strongest surviving refinement.
+   Keep #r329's sparse defect chassis, #r333's action-equivalence partition, #r334's boundary-crossing credit rule, #r335's order-independent necessity accounting, #r336's stopping rule, #r337's pooled frontier clearing, and #r338's beneficiary ledger, but require every frontier to maintain an explicit defended fallback/no-unlock lane with its own bonded defenders and breach conditions. This is the cleanest surviving non-PM primitive so far because it keeps the object as a bounded public-state upgrade while preventing demand from degenerating into directional sponsor pressure. (#r339)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** a bonded contest over whether a named public unlock frontier should defeat the currently defended fallback / unresolved state, with payout to necessary eliminators only when the default warranty is actually breached.
+- **State model:** the global state must now track not only live classes, action menus, unlock frontiers, and beneficiary ledgers, but also a paired warranty status for each frontier's incumbent fallback / no-unlock condition.
+- **Credibility model:** stake converts into trust only when capital is exposed on both sides of the epistemic boundary: defenders lose for wrongly blocking justified unlocks, eliminators lose for prematurely breaching the defended default. Money should price liability for state retention as well as for state change. (#r339)
+- **Market roles:** demanders/subscribers fund the frontier they care about, but default-defenders/warranty writers are also explicitly paid to hold the conservative state under bond; eliminators/refuters earn only by proving that the defended default should give way; challengers can also attack fake default defenses that merely stall justified unlocks.
+- **Settlement:** first settle whether the incumbent fallback/no-unlock warranty was justifiably breached; then allocate the frontier's primary payout across the ex post minimal unlock set; then settle subscriber and late-user accounting. Without breach of the defended default, there is no frontier payout. (#r339)
+
+**Why this is cleaner versus LMSR / orderbooks / batch auctions:**
+- LMSR/orderbooks/batch auctions naturally symmetrize disagreement through opposite inventory positions, but the object is still directional exposure.
+- #r339 preserves the non-PM object-a bounded authority unlock on shared canonical state-but reintroduces the missing symmetry at the level of **liability**, not tradable shares.
+- The mechanism should not ask, "what odds clear between yes and no?" It should ask, "what bonded evidence is sufficient to defeat the explicitly defended conservative state?" That is a sharper break from PM logic than one-sided unlock procurement. (#r339)
+
+**Simplest viable mechanism sketch after #r339:**
+1. Register a canonical facet with protocol-native regions, action-equivalence collapse, a public map from live-class subsets to admissible action menus, and a named fallback / unresolved state for each unlock frontier.
+2. For each frontier, open two protocol-native lanes: `(a) unlock subscriber budget + eliminator bounty pool` and `(b) fallback/default defense budget + warranty bond pool`.
+3. Demanders subscribe ex ante to the frontier they want unlocked and receive beneficiary status if the frontier is later crossed.
+4. Default-defenders/warranty writers post bond to keep the fallback/no-unlock state in force for the horizon and earn carry while it stands.
+5. Suppliers/eliminators submit `(target class to eliminate, supporting evidence, bond, horizon)` against the unlock lane, but their economic reward is conditional on breaching the defended default, not merely on producing locally plausible eliminations.
+6. Protocol accepts only eliminations that satisfy public exclusion tests; accepted eliminations remove that class for the active horizon.
+7. When the live class set first defeats the defended fallback and crosses the named frontier, the protocol computes the relevant minimal unlock set(s), allocates the frontier's primary payout across the necessary eliminators, and applies losses to default-defenders whose warranty was wrongly maintained.
+8. If the frontier is not justifiably crossed before expiry, unlock subscribers do not receive the authority, eliminators lose or decay bond/carry, and default-defenders keep their service economics.
+9. Late users may still owe bounded access levies after a successful crossing as in #r338, but they do not reopen the core payout lane.
+10. Challengers may dispute wrongful default defense, fake breach, beneficiary-status fraud, or evasion of late-user cost-sharing. (#r339)
+
+**Strongest new reason this idea fails:**
+The deepest residual kill becomes **politicized default-defense / symmetric-liability theater**. Once both unlock and no-unlock lanes are capitalized, the mechanism may recreate a softer version of two-sided politics: factions subsidize both defense and breach around salient frontiers, not to improve epistemics but to preserve or accelerate a preferred authority state. If public tests are weak, the protocol merely adds a bonded conservative lobby next to a bonded activist lobby. This is sharper than #r338's beneficiary-ledger problem because it targets the new correction directly: whether explicit default defense clarifies epistemic liability or just finances institutionalized stalling. (#r339)
+
+**Best surviving variant if even this correction is too ambitious:**
+Keep #r338's subscription-backed frontier procurement, but restrict paid markets to domains where the fallback/no-unlock state is already protocol-native, clearly testable, and conservative enough that explicit defense can be mostly mechanical rather than political. Where default defense cannot be specified cleanly, do not run a rich paid unlock market there. That preserves the strongest surviving thread insight so far: the non-PM opportunity is not to let money pull shared state toward whichever frontier beneficiaries prefer, but to finance **loss-bearing defeat of an explicitly defended conservative state up to the first creation of net-new action-distinct authority on canonical shared state**. (ref: #r329, #r333, #r334, #r335, #r336, #r337, #r338, #r339)
 
 ### #r338 refinement - pooled frontier clearing still fails unless the mechanism solves beneficiary free-riding and bounty-thickening delay
 
