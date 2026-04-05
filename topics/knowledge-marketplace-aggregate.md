@@ -8,6 +8,7 @@
 - **#r148** - 2026-04-05T08:32Z - Sharpened the mechanism around temporary state-authority under challenge; killed continuous bilateral “knowledge rights” as disguised inventory trading, retained baseline-relative authority procurement as the core, and promoted specification externality to the main residual failure.
 - **#r149** - 2026-04-05T08:42Z - Refined the direct family one step further from generic update procurement into challengeable maintenance coverage on a named state deficiency; separated install-rights from passive knowledge sale, added a standing demand-side coverage budget as the cleanest non-PM payment source, and identified unverifiable buyer-value attribution as the strongest remaining kill for any “knowledge transfer” formulation.
 - **#r150** - 2026-04-05T08:52Z - Tightened the primitive again from generic maintenance coverage to revocable state-authority leasing under posted error-insurance; clarified that demand is buying bounded authority plus replacement rights rather than “knowledge,” introduced insurer/challenger economics as the cleanest capital-to-epistemics mapping, and isolated adverse-selection in buyer-side deficiency specification as the main remaining structural failure.
+- **#r151** - 2026-04-05T09:02Z - Killed bespoke buyer-written deficiency contracts as the default primitive; refined the strongest surviving family into protocol-native state-slot leasing with challenger-funded replacement and public adequacy tests, which preserves the non-PM insight while avoiding contract-specification theater.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -390,7 +391,109 @@ If open-ended authority leasing is too brittle, the best surviving fallback is a
 
 That retains the strongest insight from #r145-#r150: capital should underwrite correction liability on the shared state, not just side-bets on crowd belief. (ref: #r148, #r149, #r150)
 
-(ref: #r1, #r2, #r69, #r145, #r146, #r147, #r148, #r149, #r150, #r185, #r255)
+### #r151 refinement - the mechanism should lease protocol-native state slots, not custom buyer-written deficiency contracts
+
+#r150 isolated the main surviving structural kill: if buyers must specify `(baseline, tolerance, horizon, audit rule)` well enough for an open market in insured state authority, the mechanism may simply become a market for winning underspecified contracts. That means the strongest direct family still has too much bespoke procurement logic on the demand side. The next refinement is to remove most of that burden from buyers entirely. (#r151)
+
+The stronger formulation is:
+**the protocol itself defines canonical state slots and public adequacy tests, and the market clears who gets temporary insured authority over each slot.**
+
+So instead of:
+- buyer writes a custom deficiency contract
+- maintainer bids to cover that bespoke deficiency
+
+the mechanism becomes:
+- protocol defines slot `s_i` with canonical baseline, tolerance band, freshness rule, and challenge test
+- subscribers / users fund the slot's maintenance lane
+- maintainers compete to hold the leased slot under posted error-insurance
+- challengers earn by replacing bad slot-holders or proving the slot should revert to `no_change`
+
+This is a meaningful design change, not just interface polish. It eliminates the worst source of adverse selection identified in #r150: the buyer no longer needs to perfectly articulate the defect. The protocol standardizes the object being maintained, so the market is no longer matching around bespoke epistemic service contracts; it is allocating **insured stewardship of canonical state coordinates**. (#r151)
+
+**1. Base primitive - sharper again**
+What is exchanged is best described as:
+`temporary insured stewardship of protocol-defined state slot s_i`
+not
+`payment for a buyer-authored informational service contract`
+
+That is cleaner because the object is now protocol-legible and contestable by third parties. A slot has one incumbent, one bond, one public test surface, and one replacement process. If the object is not standard enough to be a slot, it likely is not mature enough for this mechanism family. (#r151)
+
+**2. State model**
+The global state vector remains `S = {s_i}`, but each `s_i` should now be treated as a **governed slot with canonical scoring metadata**:
+- state schema
+- allowed update form
+- freshness / staleness rule
+- public challenge conditions
+- admissible `no_change` default
+- settlement path for full / partial / unresolved truth
+
+Updates are no longer free-form revisions or buyer-specific deliverables. They are **slot replacement events** against a standing public spec. This is closer to contestable cache maintenance or replaceable oracle stewardship than to a market in custom reports. (#r151)
+
+**3. Credibility model**
+Capital improves epistemics only when it is posted as **replacement-liable insurance** on a standardized slot. The clean mapping is now:
+- bond buys temporary write authority on the slot
+- bond is burned if later evidence or a challenger shows the slot-holder underperformed the canonical baseline
+- challenger bond plus evidence gives a live path to correction before final truth
+
+So credibility is no longer a generic personal trait or a buyer-specific promise. It is **slot-specific insurability**: how much replacement-liable authority the mechanism is willing to lease to you on this coordinate, given your track record on similar slots. (#r151)
+
+**4. Market roles**
+The earlier `askers/knowers` and `bidders/unknowers` language now becomes cleaner if re-expressed as:
+- **slot funders / subscribers:** pay to keep slot `s_i` decision-usable
+- **slot holders / maintainers:** lease insured authority over `s_i`
+- **challengers / replacement bidders:** can displace the holder by posting better insured stewardship
+- **protocol:** defines slot standards, enforces replacement rights, and settles performance
+
+This preserves the knowledge-market intuition while dropping the weakest bilateral metaphor. No one is literally buying "knowledge" from another trader. They are funding a market in accountable state maintenance over named coordinates. (#r151)
+
+**5. Settlement model**
+Settlement should now separate three layers:
+1. **in-horizon service settlement** - did the slot remain fresh / internally consistent / survive challenge?
+2. **replacement settlement** - if a challenger displaced the holder, how much of incumbent bond burns immediately?
+3. **truth settlement** - when external truth arrives, how much of remaining bond and credibility survives?
+
+This is better than a single final-resolution model because it lets the mechanism pay for maintaining useful state even when terminal truth is delayed, while still reserving durable credibility updates for auditable outcomes. It also makes partial observability more workable: service metrics can settle continuously, truth metrics settle later. (#r151)
+
+**6. Attack surface - revised strongest attacks**
+#r150's adverse-selection point is partially solved, but the attack surface changes:
+1. **slot-governance capture** - if protocol governance defines bad slots or bad adequacy tests, the market optimizes the wrong object.
+2. **incumbency hardening** - slot holders may use complexity or challenge friction to entrench themselves.
+3. **spec overfitting** - maintainers optimize to the public test rather than actual decision quality.
+4. **replacement collusion** - fake challenger turnover can manufacture an appearance of contestability.
+
+This is still better than bespoke buyer contracts, but it means the real epistemic risk moves upward into **slot design quality**. (#r151)
+
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**
+This clarifies the comparison further:
+- **LMSR / orderbooks:** clear exposure transfer on disputed outcomes
+- **batch auctions:** clear the same exposure on a clock
+- **slot-leasing KM:** clears insured stewardship over protocol-defined state coordinates
+
+It is better when the task is maintaining a trusted world-model for downstream decisions and there is repeat demand for the same coordinates. It is worse when the coordinates cannot be standardized into canonical slots, or when users mainly need hedgeable exposure rather than maintained state. (#r151)
+
+**8. Simplest viable mechanism sketch after #r151**
+The strongest surviving simple sketch is now:
+1. Protocol registers a canonical slot `s_i` with public adequacy tests and default `no_change` state.
+2. Subscribers fund the slot's service budget.
+3. Maintainers bid `(candidate_state, insurance_bond, fee_rate)` for temporary authority over `s_i`.
+4. Protocol installs the lowest-cost admissible insured steward or retains incumbent / `no_change`.
+5. Challengers may replace the steward by posting better bonded evidence during the service window.
+6. Fees stream while installed; partial bond burns on failed challenge defense; final truth updates residual bond and long-run credibility.
+
+This is the narrowest design that still feels meaningfully non-PM and avoids collapsing into bespoke procurement. (#r151)
+
+**9. Strongest reason this still fails**
+The strongest remaining failure is now more precise than #r150: not "buyers cannot specify deficiencies," but **the protocol may be unable to define canonical slots whose public adequacy tests genuinely track decision quality**. If slot tests are weak, the market produces insured test-passing rather than insured truth-tracking. The failure moved from private contract specification to public ontology/specification failure. (#r151)
+
+**10. Best surviving variant if even this is wrong**
+If canonical slot design is still too brittle, the best surviving fallback is a **public challenge-bounty layer over a conventional trading / batch-auction core**:
+- market prices still come from a standard PM primitive
+- a separate insured-maintenance lane governs only a small set of protocol-critical state inputs
+- capital in that lane buys challengeable stewardship, not directional exposure
+
+So the best surviving architecture is likely hybrid: use knowledge-market machinery only for a narrow registry of canonical state slots, and let ordinary trading mechanisms handle the rest. That keeps the deepest surviving insight while admitting that most of reality may be too messy for a pure knowledge marketplace. (ref: #r149, #r150, #r151)
+
+(ref: #r1, #r2, #r69, #r145, #r146, #r147, #r148, #r149, #r150, #r151, #r185, #r255)
 
 ---
 # Knowledge Marketplace Mechanism - Aggregate Document
