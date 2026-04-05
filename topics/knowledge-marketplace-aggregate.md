@@ -2,6 +2,7 @@
 
 ## Run Log Addendum
 - **#r2** - 2026-04-04T17:32Z - Paused MatchingEngine line and restarted knowledge-marketplace mechanism design thread. Reframed the primitive as capped, escrow-bonded credible-information transfer; added unresolved-truth settlement branch; performed 3-family viability triage.
+- **#r145** - 2026-04-05T08:02Z - Refined the family comparison: killed the naive bilateral “knower sells belief to unknower” framing, elevated state-update procurement as the strongest non-LMSR primitive, and clarified why the wrong conserved quantity collapses back into prediction-market behavior.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -38,7 +39,47 @@ Keep **credibility-gated continuous price layer** as companion: traditional orde
 - **B) credibility-gated orderbook**: kept as robust production companion
 - **C) reputation-only auctions**: rejected (identity inflation, no downside)
 
-(ref: #r1, #r185, #r255)
+### #r145 refinement - the strongest non-LMSR family is procurement, not bilateral belief exchange
+
+The earlier "asker/knower sells to bidder/unknower" language is directionally useful but still too close to a prediction market if interpreted literally. If both sides are mainly trading *belief* about the same shared state, the mechanism quietly reverts to familiar PM logic: someone pushes a public state estimate, others pay or fade it, and capital mostly reallocates PnL. That fails the design test. Capital must improve epistemics by financing **state improvement**, not by repricing a crowd belief object. (#r145)
+
+**Refined primitive:** what is exchanged is not a probability share and not mere access to someone else's opinion. It is an **escrowed state-update service**:
+- a demander posts a state deficiency: "current state on variable `i` is not good enough for decision use"
+- a supplier posts a candidate update plus bond
+- the mechanism pays for verified reduction in state error, not for directional agreement
+
+This shifts the core unit from *belief position* to **improvement contract on the global state vector**. The relevant conserved quantity is therefore not inventory, shares, or even raw credibility; it is better understood as **error budget / warranted epistemic debt** to be retired by validated updates (extending #r69). If the mechanism cannot point to a state-error reduction rule, it is only renaming prediction-market matching. (#r145)
+
+**Three candidate mechanism families, now more crisply separated:**
+
+1. **Bilateral belief exchange** - weakest.  
+   Knower offers a claim, unknower pays for access, stake backs honesty. This is intuitively appealing but under pressure it drifts back toward a PM-with-fees: the object being sold is still a contested belief, and the payment logic is weak unless truth resolution is strong. Rejected as the primary formulation. (#r145)
+
+2. **State-update procurement auction** - strongest surviving direct family.  
+   Demand side escrows budget for improvement on coordinate `s_i`; supply side competes to submit update proposals with bonds; protocol installs the update that maximizes expected error reduction per unit of bonded risk. Settlement depends on realized or proxy-observed improvement. This is the cleanest answer to "why does capital improve epistemics?" because capital buys verified reduction in decision-relevant error. Kept as the best pure knowledge-market variant. (#r145)
+
+3. **Credibility-gated trading layer** - best hybrid if direct procurement is too brittle.  
+   Keep a clearing/trading mechanism for liquidity and external users, but only credibility-weighted, escrow-accountable actors can materially update the state input feeding that layer. This remains the strongest fallback when truth is too delayed or demand-side procurement is too thin (building on #r1 and #r2). (#r145)
+
+**Why procurement is the key distinction versus LMSR / orderbooks / batch auctions:**
+- **LMSR** rewards movement in a public price vector; information quality is inferred from willingness to move price.
+- **Orderbooks** reward matching willingness to buy/sell contingent claims.
+- **Batch auctions** improve fairness of clearing, not the primitive being cleared.
+- **Procurement KM** rewards demonstrated improvement in a state estimator under bond. The mechanism clears *who gets to update the state and earn from improving it*, not *who buys the other side of an outcome share*. (#r145)
+
+**Simplest viable sketch, updated:**
+1. Demanders post a bounded budget `B_i` for improving coordinate `s_i` subject to a scoring policy.
+2. Suppliers submit `(candidate_update, bond, proof_policy, confidence)` during an epoch.
+3. Mechanism computes a capped provisional score `Delta_i_hat = expected error reduction` relative to current state and installs the best admissible update or top-K blend.
+4. Users consume the updated state.
+5. On resolution or proxy observation, supplier is paid from `B_i` in proportion to realized improvement; bond is returned/slashed based on overclaim vs realized improvement.
+6. Unused budget rolls or expires; unresolved cases cannot mint durable credibility from non-observable improvement. (#r145)
+
+**Strongest reason even procurement may fail:** the buyer of epistemic improvement often cannot specify the loss function tightly enough. If "improvement" is not objectively measurable, the system collapses into governance-mediated grantmaking or reputation theater. This is the deepest surviving objection and should be treated as the true kill criterion for the whole family. (#r145)
+
+**Best surviving variant if that kill criterion binds:** use procurement only where loss and verification are sharply specifiable, and route everything else through a credibility-gated batch-auction / orderbook layer. In other words: direct knowledge-market for high-verifiability coordinates; trading market for ambiguous ones. The design boundary is observability, not ideology. (#r145)
+
+(ref: #r1, #r2, #r69, #r185, #r255)
 
 ---
 # Knowledge Marketplace Mechanism - Aggregate Document
