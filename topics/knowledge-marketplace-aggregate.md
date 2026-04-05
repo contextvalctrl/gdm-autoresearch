@@ -1,6 +1,7 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r334** - 2026-04-05T16:02Z - Added a contribution-accounting correction: when multiple exclusions are jointly required to narrow the admissible action set, the KM should not pay each elimination independently. Payment should attach to boundary-crossing / pivotal contraction of the live action set, with residual credit apportioned against declared prerequisite structure; otherwise the mechanism overpays ontology-chopping and underprices true decision-unlocking information.
 - **#r2** - 2026-04-04T17:32Z - Paused MatchingEngine line and restarted knowledge-marketplace mechanism design thread. Reframed the primitive as capped, escrow-bonded credible-information transfer; added unresolved-truth settlement branch; performed 3-family viability triage.
 - **#r145** - 2026-04-05T08:02Z - Refined the family comparison: killed the naive bilateral "knower sells belief to unknower" framing, elevated state-update procurement as the strongest non-LMSR primitive, and clarified why the wrong conserved quantity collapses back into prediction-market behavior.
 - **#r146** - 2026-04-05T08:12Z - Tightened the primitive from generic update procurement to contested state-maintenance with explicit no-change/default outcome, separating payment for error reduction from payment for mere revision and identifying why unresolved loss functions collapse the design into governance theater.
@@ -48,6 +49,59 @@
 
 - **#r332** - 2026-04-05T15:42Z - Added an elimination correction: even threshold certification can still overreward premature positive classification. The stronger surviving product is bonded elimination of inadmissible decision regions, with canonical state only collapsing to a single region when all rivals have been excluded or timeout forces a coarse fallback. This sharpens the primitive from positive class assertion into liability-bearing exclusion rights, preserves the non-PM architecture, and moves the deepest residual kill from threshold-registry capture toward elimination-ladder design / hidden region coupling.
 - **#r333** - 2026-04-05T15:52Z - Added an action-equivalence correction: elimination should only be paid when it changes the admissible downstream action set. This refines the strongest surviving family from generic region elimination into bonded removal of action-distinct possibilities, collapses ontology that is decision-equivalent, and moves the deepest residual kill from generic hidden coupling toward action-partition misdesign / latent action differences hidden inside supposedly equivalent regions.
+
+### #r334 refinement - pay for pivotal action-set contraction, not every locally valid elimination
+
+#r333 correctly made the mechanism pay only for eliminating **action-distinct** uncertainty. The next correction is about **how contribution is credited** once several action-distinct regions remain live at the same time. In many cases, no single elimination is decision-sufficient on its own. Action class `A*` only becomes admissible after a *set* of incompatible regions has been removed, and several eliminators may contribute different pieces of that contraction. If the protocol pays each exclusion independently at face value, it overpays ontology-chopping, creates bounty races to remove easy but non-pivotal classes, and still may under-incentivize the final hard exclusion that actually crosses the action boundary. The stronger surviving product is therefore **bonded pivotal elimination**: suppliers are paid mainly when their exclusion is part of a boundary-crossing contraction that changes the live admissible action set, with residual credit apportioned by a public prerequisite structure rather than by raw count of excluded labels. (#r334)
+
+This is a real mechanism correction, not accounting garnish. #r333 established that the market should ignore eliminations that do not change the downstream action menu. #r334 adds that even among action-relevant eliminations, the protocol should distinguish:
+- **locally valid exclusion** - region/class removal is individually defensible,
+- **boundary-relevant exclusion** - removal is part of the minimal set needed to change which actions are admissible,
+- **pivotal exclusion** - this removal causes or materially enables the actual transition to a narrower action set.
+
+The KM should pay heavily for the last category, lightly or not at all for the first, and only secondarily for the middle via explicit shared-credit rules. Otherwise the system becomes a game of harvesting serial elimination fees on prerequisite cuts that look informative but do not yet transfer decision-useful knowledge. The market is supposed to finance *usable ambiguity reduction*, not every semantically tidy subtraction. (#r334)
+
+The family triage after this correction is:
+
+1. **Positive region certification** - even weaker.
+   Still overcommits too early and still obscures contribution accounting when many latent rival regions must be excluded before certification is decision-safe. (#r331, #r332, #r333, #r334)
+
+2. **Generic action-distinct elimination with per-exclusion payout** - no longer acceptable as the default.
+   Better than ontology collapse, but still structurally overpays decomposable elimination paths and invites bounty farming on easy prerequisites. (#r333, #r334)
+
+3. **Defect-triggered bonded pivotal elimination on action-distinct classes** - strongest surviving refinement.
+   Use #r329's sparse defect chassis, #r331's protocol-native region registry, #r332's falsification-first elimination logic, and #r333's action-equivalence partition, but settle payment mainly on *pivotal contraction events* where the live admissible action set actually narrows. This is the cleanest surviving non-PM primitive so far in threshold-governed domains with conjunctive uncertainty reduction. (#r334)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** a bonded right to eliminate a named action-distinct class *subject to a public contribution graph* that specifies which combinations of eliminations unlock narrower action rights.
+- **State model:** global state on a facet is not just `(live classes, eliminated classes)` but also a public **boundary map** from subsets of live classes to admissible action sets. Updates matter economically only when set subtraction crosses one of those public boundaries.
+- **Credibility model:** stake buys the right to remove a class under liability, but payment is weighted by whether the removal was boundary-crossing / pivotal rather than merely locally correct. Wrong elimination still burns stake; correct but non-pivotal elimination may earn little.
+- **Market roles:** demanders pay because the current live uncertainty set still blocks a desired bounded action menu; eliminators compete to strike classes under bond; challengers defend wrongly excluded classes or attack fake prerequisite structure; the protocol must publish how shared credit works when several eliminations jointly unlock the action menu.
+- **Settlement:** immediate service payment should attach primarily when an elimination changes the admissible action set, not each time a class disappears. Under partial observability, the protocol should settle first on whether the action menu was justifiably narrowed and second on how much each accepted eliminator contributed to that narrowing.
+
+**Why this is cleaner versus LMSR / orderbooks / batch auctions:**
+- LMSR/orderbooks/batch auctions still reward **movement of belief mass / inventory**.
+- #r333 moved the KM to **action-relevant elimination**.
+- #r334 sharpens it again to **pivotal action unlocking**.
+The economic win condition is no longer merely "I ruled out region R4" or even "I eliminated an action-distinct class." It is: "I removed uncertainty in a way that crossed a public decision boundary, and I am liable if that crossing was premature." That is more tightly aligned with actual knowledge transfer than any per-message, per-label, or per-elimination payment rule. (#r334)
+
+**Simplest viable mechanism sketch after #r334:**
+1. Register a canonical facet with protocol-native decision regions and an explicit map from regions to admissible action classes.
+2. Collapse action-equivalent regions into market-facing uncertainty classes as in #r333.
+3. Publish a **boundary / prerequisite graph** stating which live class combinations block or permit each bounded downstream action menu.
+4. A demander opens a defect/elimination ticket because the current live class set keeps the desired action menu blocked.
+5. Suppliers submit `(target class to eliminate, supporting evidence, bond, horizon)`.
+6. Protocol accepts only eliminations that satisfy public exclusion tests; accepted eliminations remove that class for the active horizon.
+7. Payment triggers mainly when the updated live class set crosses a published action boundary and the admissible action menu contracts or expands accordingly.
+8. If multiple accepted eliminations jointly caused the crossing, payout is split by a simple public contribution rule keyed to the prerequisite graph (for example: pivotal-first priority, then residual shared-credit across jointly necessary eliminators).
+9. Challengers may reopen a wrongly excluded class or prove that the published prerequisite graph hid a latent action dependency.
+10. On breach, the excluded class is restored and part of the eliminator's bond burns; later audit updates boundary-specific credibility based on whether the action-boundary crossing was actually warranted. (#r334)
+
+**Strongest new reason this idea fails:**
+The deepest residual kill becomes **contribution-graph capture / pivotality theater**. If the protocol cannot specify which combinations of live classes really matter for action admissibility, actors will manipulate decomposition and prerequisite structure to make themselves look pivotal, hide joint dependence, or farm payment on serial eliminations whose true marginal contribution was tiny. This is sharper than #r333's generic action-partition misdesign because it targets the exact new abstraction introduced by the correction: the mapping from eliminated uncertainty to marginal decision unlock. (#r334)
+
+**Best surviving variant if even this correction is too ambitious:**
+Keep #r329's defect-triggered chassis and #r333's action-distinct elimination logic, but pay only on a tiny registry of **single-boundary cases** where one clearly declared elimination event directly changes the admissible action menu. Multi-step or highly conjunctive elimination problems should stay outside the paid market unless the protocol can publish a robust prerequisite graph. That preserves the strongest surviving insight so far: the non-PM opportunity is not to reward sharper beliefs in general, nor even every action-relevant exclusion, but to finance **bounded, loss-bearing elimination of uncertainty that actually crosses a public decision boundary in shared canonical state**. (ref: #r329, #r331, #r332, #r333, #r334)
 
 ### #r333 refinement - pay for eliminating action-distinct uncertainty, not ontology collapse that leaves the action set unchanged
 
