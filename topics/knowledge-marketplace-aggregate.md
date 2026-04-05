@@ -18,6 +18,7 @@
 - **#r301** - 2026-04-05T10:12Z - Refined the post-breach path again: when reconstruction is hard, the mechanism should prefer epistemic downgrade over forced synthesis. The strongest surviving family now treats breach as a trigger to move the slot into a narrowed / degraded safe state first, with full replacement deferred to a later stewardship competition. This kills the hidden “protocol must know the correct successor immediately” assumption and sharpens the best fallback into falsification + safe degradation, not falsification + instant rewrite.
 - **#r302** - 2026-04-05T10:22Z - Tightened the degrade-first path: breach should usually mint a scoped breach certificate and degrade only the falsified slice of a canonical slot, not collapse the entire slot into safe mode. The strongest surviving family is now warranty + falsification + scoped degradation + later restoration, which reduces the risk that the mechanism becomes high-integrity but low-utility by overusing whole-slot downgrades.
 - **#r303** - 2026-04-05T10:32Z - Refined the restoration leg: after scoped breach, re-authority should return in staged confidence tranches rather than a single jump back to full canonical status. This turns restoration into progressive re-certification of degraded facets, sharpens the conserved quantity into authority-level coverage, and identifies ratchet gaming / premature re-upgrade as the main new failure surface.
+- **#r304** - 2026-04-05T10:42Z - Added a stronger demand-side and truth-side correction: the mechanism should clear insured decision-authority on canonical state slots, not abstract “knowledge access,” and truth should settle only against pre-declared breach tests and authority tranches rather than holistic narrative correctness. This sharpens the conserved quantity into insured authority budget, kills the remaining “sell insights to buyers” branch as disguised consulting/PM language, and identifies authority-surface bureaucracy as the deepest remaining failure.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -27748,3 +27749,104 @@ Automated policy:
 4. **Migration score explainability:** do we need counterfactual decomposition of `X_t` (`source entropy`, `destination entropy`, cycle term) in EAT so participants can see why a class moved into anti-sybil hard mode?
 
 *Last updated: #r264 - 2026-04-04T19:12Z*
+
+### #r304 refinement - demand is buying insured decision-authority, not abstract knowledge access
+
+#r299-#r303 correctly converged on warranty / falsification / scoped degradation / staged re-certification. The next correction is on the demand side. The mechanism should stop being described as buyers purchasing "credible updates" or "knowledge access" at all. That language still leaves a hidden escape hatch back into either consulting-style information sale or a disguised prediction market where someone pays for better beliefs. The stronger formulation is:
+
+**demand buys insured decision-authority over canonical state slots, and supply competes to underwrite that authority under falsifiable warranties.** (#r304)
+
+That means the thing being sold is not message flow and not epistemic content in the abstract. What buyers actually need is the right to *act on* shared state with some bounded level of protocol-recognized trust. So the clean product is not "tell me something true" but:
+- "keep this slot authorized at authority level `L_k` under posted insurance"
+- "let challengers cheaply revoke only the authority that has actually become indefensible"
+- "restore authority only in bounded tranches that are separately insured"
+
+This sharpens the whole family again.
+
+**1. Base primitive**  
+What is exchanged is best stated now as:
+`insured authority budget on named state facets and authority tranches`
+not
+`knowledge`, `belief`, `insight`, or even generic `state update`.
+
+A buyer is paying for a protocol-legible permission: a canonical slot may be treated as decision-usable up to level `L_k` until challenge, breach, downgrade, or expiry. A supplier is paid for underwriting that permission under bond. A refuter is paid for proving that some portion of the permission surface should be revoked. This is the cleanest non-PM primitive so far because the object is a bounded slice of *trusted actionability*, not a tradable opinion. (#r304)
+
+**2. State model**  
+The global state vector should now be read as:
+- value state: what the slot currently says
+- authority state: what level of actionability the protocol currently grants that slot
+
+So each facet carries both `(x_i, L_i)`, not just `x_i`. The important update events are therefore authority transitions as much as value transitions:
+- breach may leave the value mostly intact while downgrading `L_i`
+- restoration may move `L_i: L0 -> L1 -> L2` before any sharp value rewrite
+- some challenges should settle purely as authority reduction, not semantic replacement
+
+This is a better answer to the prompt’s "global state vector" question. The actual maintained object is not only a posterior or estimate. It is a **state-plus-authority pair**. The mechanism is valuable because downstream agents need to know not only *what the slot says* but *how much institutional weight it deserves right now*. (#r304)
+
+**3. Credibility model**  
+Capital-to-epistemics mapping is now even cleaner:
+- stake does **not** buy the right to be heard
+- stake does **not** mainly buy directional upside
+- stake buys the right to insure a particular authority level on a slot
+
+So credibility is best interpreted as **insurability of authority**, not generic reputation. The protocol should ask: how much authority budget has this actor successfully defended on similar facets at similar tranches? That is a sharper and less gameable concept than broad personal credibility. An actor may be trustworthy at `L1` on a class of slots and not yet at `L3`. (#r304)
+
+**4. Market roles**  
+The original knower/unknower framing can now be retired almost completely. The cleaner role split is:
+- **authority buyers / subscribers:** pay to keep specific slots decision-usable at target authority levels
+- **authority underwriters / stewards:** post insurance and defend those authority levels
+- **refuters:** post bond to prove an active authority tranche is too strong
+- **re-certifiers:** post stronger insurance to re-upgrade an already downgraded tranche
+- **protocol:** defines slot ontology, authority ladders, breach tests, and settlement clocks
+
+This is still recognizably a knowledge-market family, but only because knowledge has been made protocol-legible as defended authority on shared state. If the mechanism cannot express authority levels, it is likely still just selling reports or moving prices. (#r304)
+
+**5. Settlement model**  
+Truth settlement should also be tightened. The mechanism should not try to settle against broad narrative correctness of a whole slot. It should settle only against:
+- the pre-declared breach condition for an active authority tranche
+- the pre-declared adequacy test for a proposed upgrade
+- the specific facet and authority level actually underwritten
+
+That means settlement is local, not holistic. A steward should lose bond for defending too much authority on a facet that failed its published test, not for failing to solve the entire world-model. A refuter should earn for proving that `L2` was unjustified, not for smuggling in a preferred replacement narrative. This keeps the mechanism falsification-first and prevents drift back toward broad discretionary truth tribunals. (#r304)
+
+**6. Attack surface**  
+This refinement changes the deepest remaining failure again. The main risk is now:
+- **authority-surface bureaucracy:** the protocol may become very good at drawing, selling, and challenging authority tranches without those tranches tracking real decision quality
+- **ladder inflation:** too many tiny authority levels create bureaucratic monetization of micro-upgrades
+- **surface capture:** insiders define breach tests and tranche boundaries that are easy for them to defend and hard for outsiders to challenge
+- **semantic hollowing:** value state remains formally intact while authority mechanics become the real economy, turning the system into a market in compliance artifacts
+
+This is sharper than #r303’s generic ladder-design concern. The true structural kill is no longer just bad intermediate tranche design; it is the possibility that the mechanism becomes a market in **administering authority surfaces** rather than improving underlying epistemics. (#r304)
+
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+This is now the cleanest surviving comparison:
+- **LMSR:** prices cost to move a belief vector
+- **orderbooks:** transfer contingent exposure
+- **batch auctions:** clear that exposure more fairly
+- **authority-budget KM:** clears who may insure, lose, revoke, and restore bounded authority over canonical state
+
+It is better where the core product is not tradable exposure but a shared, auditable, decision-bearing world-model. It is worse where users mainly want a scalar price or hedge instrument, because the whole authority-budget layer is overhead in those domains. (#r304)
+
+**8. Simplest viable mechanism sketch**  
+The narrowest strong version now looks like:
+1. Register canonical slot `s_i` with facet map, dependency map, authority ladder, and tranche-specific breach tests.
+2. Subscribers fund target authority on selected facets.
+3. Steward posts insurance to hold each active tranche and earns rent while it stands.
+4. Challenger posts `(evidence, breach_bond, target_facet, target_tranche)`.
+5. If breach succeeds, the minimal proven tranche is downgraded and steward bond settles locally.
+6. Re-certifiers may later post stronger insurance to restore one tranche at a time.
+7. Long-run credibility updates at the facet × authority-level granularity.
+
+This is the simplest sketch that fully answers the conserved-quantity question: what is conserved is not belief inventory, but **insured authority capacity** on canonical state. (#r304)
+
+**9. Strongest reason this still fails**  
+The strongest remaining kill is now: the mechanism may successfully financialize authority administration without genuinely improving truth-tracking state. If authority levels, breach tests, and slot facets are easier to specify than actual epistemic quality, the system becomes a market in governable permissions rather than a market in knowledge transfer. In that world, capital improves compliance theater, not epistemics. (#r304)
+
+**10. Best surviving variant if this refinement is still wrong**  
+If authority-budget markets are too bureaucratic, the best surviving fallback is a **minimal critical-slot architecture**:
+- apply warranty / falsification / downgrade / re-certification only to a tiny registry of protocol-critical state slots,
+- keep ladders shallow (often just `degraded` vs `full`),
+- let ordinary PM / batch-auction / external evidence mechanisms supply broader discovery elsewhere,
+- preserve the key insight that the non-PM contribution is accountable authority management on shared state, not generalized knowledge sale.
+
+That is the strongest surviving version if the raw "knowledge marketplace" story remains too expansive. The robust core is now narrow and crisp: **a market in insured, challengeable decision-authority on canonical state.** (ref: #r299, #r300, #r301, #r302, #r303, #r304)
