@@ -11,6 +11,7 @@
 - **#r151** - 2026-04-05T09:02Z - Killed bespoke buyer-written deficiency contracts as the default primitive; refined the strongest surviving family into protocol-native state-slot leasing with challenger-funded replacement and public adequacy tests, which preserves the non-PM insight while avoiding contract-specification theater.
 - **#r295** - 2026-04-05T09:12Z - Split the mechanism into two explicit payment lanes: continuous service rent for temporary slot stewardship and delayed truth-linked bond settlement for actual epistemic quality. This kills the last disguised-PM branch where maintainers are paid mainly for being directionally right, clarifies why capital improves epistemics only as replacement-liable insurance, and identifies metric-gaming of public adequacy tests as the main surviving failure.
 - **#r296** - 2026-04-05T09:22Z - Refined the clearing primitive again: the strongest non-PM family should clear challengeable displacement rights against an incumbent state, not open-ended install rights. This makes the market about paying for falsifiable replacement pressure on canonical slots, sharply separates discovery from maintenance, and identifies bounty-chasing churn on weakly specified slots as the main surviving failure.
+- **#r297** - 2026-04-05T09:32Z - Added a sharper mechanism split between discovery and adoption: raw evidence should not automatically move canonical state. The strongest surviving family now uses a two-stage path where challengers first earn bonded displacement rights by producing admissible evidence, and only then does the protocol decide whether canonical state should actually switch. This closes the last “pay for saying new things” drift, clarifies that the conserved quantity is contestable state authority rather than message flow, and identifies evidence-admission bottlenecks as the main surviving failure.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -204,6 +205,101 @@ If explicit displacement markets are too gameable, the best surviving fallback i
 - service rent stays thin; most economics stay in the PM core
 
 That preserves the deepest surviving insight of the whole thread: capital should buy accountable correction rights on shared state, not just speculative inventory over crowd belief. (ref: #r151, #r295, #r296)
+
+### #r297 refinement - discovery and adoption must be separate, or the mechanism still pays too directly for novelty
+
+#r296 correctly made the economically live object the bonded right to displace an incumbent state. The next refinement is that even displacement rights are still slightly too compressed if the same act both (a) introduces evidence and (b) automatically rewrites canonical state. That leaves a residual failure mode where the market is still rewarding *successful novelty injection* rather than *justified authority transfer*. The stronger non-PM formulation separates those steps.
+
+The mechanism should therefore have two distinct transitions:
+1. **discovery:** a challenger posts bonded evidence that the incumbent state is inadequate
+2. **adoption:** the protocol decides whether that evidence is sufficient to transfer canonical authority or keep the incumbent / `no_change`
+
+This sounds subtle but it matters. In LMSR, orderbooks, and even many procurement framings, capital directly pushes the public state object. Here, capital should only buy the right to force a **contest** over authority. The canonical state changes only after the contest clears under public admissibility tests. That means the market is not clearing “who gets to move the estimate” but “who has earned a hearing strong enough to put incumbency at risk.” (#r297)
+
+**1. Base primitive**  
+What is exchanged is now best stated as:
+`bonded right to trigger admissible contest over slot s_i`
+not merely
+`bonded right to replace incumbent x_i^0`.
+
+The distinction is that discovery pressure is valuable even when the challenger ultimately fails to displace the incumbent, because it forces the incumbent state to defend itself against evidence. So the market is best understood as clearing **contest rights over canonical state**, with replacement only as one possible outcome. (#r297)
+
+**2. State model**  
+The global state vector remains a set of canonical slots, but the update rule now has one extra gate:
+1. incumbent state `x_i^0` is live
+2. challenger submits bonded evidence package `e_i^1`
+3. protocol tests whether `e_i^1` is admissible for contest
+4. only if admissible does the mechanism run displacement evaluation among `(incumbent defense, challenger replacement, no_change)`
+5. canonical state changes only if challenger clears the adoption threshold
+
+So state updates are no longer direct challenger writes. They are **adoption outcomes after evidence admission**. This is cleaner because it avoids paying simply for generating motion in the state vector. (#r297)
+
+**3. Credibility model**  
+Capital now maps to epistemics in two layers:
+- **contest bond:** proves the challenger is willing to pay to have their evidence taken seriously
+- **authority bond:** applies only if the challenger actually wins adoption and becomes steward
+
+This is stronger than the #r296 single-bond framing. A failed challenger should lose enough to deter cheap noise, but not be treated the same as a bad adopted steward. Discovery liability and stewardship liability are different risks and should price differently. That is one of the cleanest remaining answers to why capital helps epistemics here: it buys costly access to the contest surface, not direct voice. (#r297)
+
+**4. Market roles**  
+The role map sharpens again:
+- **subscribers / slot funders:** pay for a maintained canonical slot and for a live contest surface around it
+- **incumbent steward:** earns service rent while holding authority under bond
+- **challenger / discoverer:** pays contest bond to place admissible evidence against the incumbent
+- **adoption arbiter / protocol:** determines whether the evidence is strong enough to open a live replacement contest and, if so, whether adoption occurs
+
+This is a better decomposition than treating challengers as direct replacement bidders. Sometimes the valuable act is surfacing high-quality contradictory evidence without actually taking over the slot. (#r297)
+
+**5. Settlement model**  
+Settlement now has four layers rather than three:
+1. **service settlement:** incumbent keeps earning rent while installed
+2. **contest settlement:** challenger bond settles based on whether the evidence was admissible / non-frivolous
+3. **adoption settlement:** if contest succeeds, authority transfers and incumbent may lose bond immediately
+4. **truth settlement:** later audit decides whether incumbent retention or challenger adoption was actually correct
+
+This is especially important under partial observability. The protocol may be able to say “this evidence was serious enough to force review” long before it can say “the challenger was actually right.” That gives a path to reward epistemically useful contestation without collapsing back into raw belief trading. (#r297)
+
+**6. Attack surface**  
+The main surviving failure changes again:
+- **admission bottleneck capture:** whoever controls admissibility tests can suppress justified challenges or flood the system with low-value contests
+- **contest farming:** actors generate admissible-but-low-impact evidence to harvest contest rewards without materially improving truth quality
+- **incumbent procedural shielding:** stewards optimize around admission rules so that strong contrary evidence never reaches adoption stage
+- **arbiter drift:** the protocol becomes a gatekeeper of hearings rather than a market for truth-tracking state
+
+This supersedes #r296’s bounty-chasing churn as the deeper residual risk. The key design burden is now the **evidence-admission threshold**: too loose and contest spam dominates; too strict and incumbents calcify. (#r297)
+
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+This is the sharpest surviving contrast so far:
+- **LMSR:** capital moves a public belief vector directly
+- **orderbooks:** capital transfers contingent-claim inventory directly
+- **batch auctions:** clear that same inventory on a fairer clock
+- **contest-rights KM:** capital buys the right to force accountable review of canonical state, with adoption only after admissibility and displacement tests
+
+It is better when the core product is a trusted, challengeable world-model used repeatedly by downstream agents. It is worse when users mainly want immediate exposure transfer or when no neutral admissibility layer can be specified. (#r297)
+
+**8. Simplest viable mechanism sketch**  
+The narrowest surviving mechanism is now:
+1. Register canonical slot `s_i` with incumbent steward, service tests, admissibility tests, and delayed truth policy.
+2. Subscribers fund service rent plus a contest pool.
+3. Incumbent posts stewardship bond and earns rent while installed.
+4. Challenger posts `(evidence_package, contest_bond)`.
+5. Protocol tests admissibility. If inadmissible, challenger loses fee/bond and no contest opens.
+6. If admissible, protocol compares `(incumbent defense, challenger replacement, no_change)`.
+7. If challenger clears adoption threshold, steward is displaced and posts authority bond.
+8. Later truth/audit settles residual incumbent/challenger authority bonds and slot-specific credibility.
+
+This is cleaner than direct displacement markets because it pays first for credible challenge pressure, then separately for deserved authority. (#r297)
+
+**9. Strongest reason this still fails**  
+The strongest remaining kill is now: the mechanism may end up being a market in *getting hearings* rather than a market in truth-improving state correction. If admissibility is hard to formalize, power moves to whoever defines contest entry, and capital starts buying procedural leverage rather than epistemic improvement. That would recreate governance theater under market language. (#r297)
+
+**10. Best surviving variant if this refinement is still wrong**  
+If contest-rights markets are too procedural, the best fallback is to collapse discovery back into an ordinary PM / batch-auction discovery layer while keeping only a narrow insured adoption layer for a small number of protocol-critical slots. In other words:
+- let PM machinery discover disagreement
+- let insured slot governance decide adoption only for high-value canonical states
+- do not try to build a general market in hearings
+
+That preserves the deepest surviving thread insight: capital should discipline authority over shared state, not merely reward speculative belief movement. (ref: #r151, #r295, #r296, #r297)
 
 ### #r295 refinement - separate service rent from truth-settlement, or the design quietly becomes a weird prediction market
 
