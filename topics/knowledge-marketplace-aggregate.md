@@ -12,6 +12,7 @@
 - **#r295** - 2026-04-05T09:12Z - Split the mechanism into two explicit payment lanes: continuous service rent for temporary slot stewardship and delayed truth-linked bond settlement for actual epistemic quality. This kills the last disguised-PM branch where maintainers are paid mainly for being directionally right, clarifies why capital improves epistemics only as replacement-liable insurance, and identifies metric-gaming of public adequacy tests as the main surviving failure.
 - **#r296** - 2026-04-05T09:22Z - Refined the clearing primitive again: the strongest non-PM family should clear challengeable displacement rights against an incumbent state, not open-ended install rights. This makes the market about paying for falsifiable replacement pressure on canonical slots, sharply separates discovery from maintenance, and identifies bounty-chasing churn on weakly specified slots as the main surviving failure.
 - **#r297** - 2026-04-05T09:32Z - Added a sharper mechanism split between discovery and adoption: raw evidence should not automatically move canonical state. The strongest surviving family now uses a two-stage path where challengers first earn bonded displacement rights by producing admissible evidence, and only then does the protocol decide whether canonical state should actually switch. This closes the last “pay for saying new things” drift, clarifies that the conserved quantity is contestable state authority rather than message flow, and identifies evidence-admission bottlenecks as the main surviving failure.
+- **#r298** - 2026-04-05T09:42Z - Tightened the surviving family from generic contest rights into bonded repair options on canonical slots: capital should buy the right to force a bounded corrective action if the incumbent state is shown inadequate, not a generic right to speak, install, or trade belief. This makes the exchanged object an exercisable correction option rather than message flow, sharpens why capital improves epistemics only when it finances credible overwrite/repair capacity, and identifies option-exercise adjudication as the new deepest failure surface.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -205,6 +206,111 @@ If explicit displacement markets are too gameable, the best surviving fallback i
 - service rent stays thin; most economics stay in the PM core
 
 That preserves the deepest surviving insight of the whole thread: capital should buy accountable correction rights on shared state, not just speculative inventory over crowd belief. (ref: #r151, #r295, #r296)
+
+### #r298 refinement - the strongest non-PM form is a market in bonded repair options on canonical state
+
+#r297 correctly separated discovery from adoption. The next refinement is that even a "bonded right to trigger admissible contest" remains slightly too procedural and still leaves a fuzzy question: what exactly does the challenger earn if the contest is valid? The tighter answer is not "voice," not generic install rights, and not a sale of belief. The challenger is earning a **bonded repair option** on a canonical state slot. That option is exercisable only if public evidence shows the incumbent slot is outside its admissible adequacy region. (#r298)
+
+This matters because it finally pins down the exchange object in a way that does not collapse back into prediction-market language:
+- the mechanism is **not** clearing directional exposure,
+- it is **not** clearing generic authorship of a new estimate,
+- it is clearing who has paid enough bonded capital to hold an **exercisable right to repair or replace a deficient canonical state**.
+
+That gives a cleaner finite-state machine than the earlier contest framing:
+1. canonical slot `s_i` has incumbent state `x_i^0` and adequacy region `A_i`
+2. challenger posts `(evidence, contest_bond, proposed_repair)`
+3. protocol decides whether evidence makes a **repair option** live
+4. if live, the option may be exercised into one of a bounded set of actions: `{no_change, patch incumbent, replace steward, replace state}`
+5. later truth/audit settles whether the exercise was warranted and how much bond survives
+
+The key shift is that the mechanism need not treat every serious challenge as a binary steward-takeover contest. Some knowledge is corrective without implying full authority transfer. A repair-option framing lets the protocol express partial epistemic actions - patch, narrow confidence band, revert to safe default, swap steward, or leave unchanged - without pretending that every challenge is a buy/sell bet on a public belief object. (#r298)
+
+**1. Base primitive**  
+What is exchanged is now best stated as:
+`bonded, exercisable repair option on canonical slot s_i`
+not merely
+`contest right`
+and not
+`temporary belief sale`.
+
+The holder does not own inventory on an outcome. The holder owns a capital-backed right to force a bounded corrective transition if admissibility and exercise conditions are met. That is the cleanest surviving non-PM primitive so far. (#r298)
+
+**2. State model**  
+The global state vector remains canonical slots, but each slot now has:
+- incumbent state
+- adequacy region / service policy
+- repair menu
+- exercise conditions
+- delayed truth settlement
+
+So the update rule becomes:
+- evidence may create a live repair option,
+- exercise may trigger a bounded state transition,
+- truth later settles whether the exercised transition actually improved epistemic quality.
+
+This is stronger than raw displacement language because it keeps the state machine bounded. The market is not paying for arbitrary motion in the state vector; it is paying for **contingent corrective transitions against a pre-specified repair menu**. (#r298)
+
+**3. Credibility model**  
+Capital improves epistemics only if it finances credible exercise of corrective power. The mapping is now:
+- **contest bond** = cost to make the protocol evaluate whether repair authority should go live
+- **exercise bond** = liability for actually invoking the corrective action
+- **steward bond** = liability for continuing to hold a deficient slot uncorrected
+
+This is a cleaner answer than generic skin-in-the-game. Money matters because it underwrites the possibility of actually correcting shared state, with downside if that correction was unjustified. If capital only bought louder claims, the design would still be cosmetic. (#r298)
+
+**4. Market roles**  
+The role map sharpens again:
+- **slot subscribers / funders:** pay for a maintained canonical slot plus a live repair surface
+- **incumbent steward:** earns rent while keeping the slot inside its adequacy region
+- **repair proposer / challenger:** posts bond to make a bounded corrective option live
+- **protocol / arbiter:** decides admission, exercise, and later truth settlement
+
+This is more precise than knower/unknower and more precise than direct challenger/incumbent combat. The active market edge is now: who can credibly propose and underwrite a repair operation on shared state. (#r298)
+
+**5. Settlement model**  
+Settlement now has four distinct layers:
+1. **service settlement** - incumbent earns while slot remains in tolerance
+2. **option-admission settlement** - challenger bond settles based on whether the challenge was serious enough to create a live repair option
+3. **option-exercise settlement** - if exercised, immediate bond transfers occur depending on the repair action invoked
+4. **truth settlement** - later audit decides whether the exercised repair was actually justified
+
+Under partial observability, the protocol can often say "this was worth opening as a repair option" well before it can say "the repair was definitely correct." That preserves a path to reward credible corrective pressure without paying directly for novelty or belief inventory. (#r298)
+
+**6. Attack surface**  
+The main residual attacks change again:
+- **exercise gaming:** actors optimize to barely satisfy option-exercise conditions, then trigger low-value repairs
+- **menu capture:** bad slot design exposes the wrong repair menu, so the option surface itself is malformed
+- **repair churn:** repeated low-impact patching creates procedural activity without real epistemic gain
+- **arbiter leverage:** whoever defines exercise conditions effectively controls the market's real payoff surface
+
+This supersedes #r297's generic hearing-market failure. The deeper failure is now whether the mechanism can define repair menus and exercise thresholds that track real epistemic improvement rather than procedural wins. (#r298)
+
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+This is the clearest remaining contrast:
+- **LMSR:** capital buys direct movement in a public belief vector
+- **orderbooks:** capital buys and sells contingent-claim inventory
+- **batch auctions:** clear that same inventory on a fairer clock
+- **repair-option KM:** capital buys the right to trigger bounded corrective transitions on canonical state, under bond
+
+It is better when the product is a repeatedly consumed world-model that must stay challengeable and repairable. It is worse when users primarily want hedgeable exposure or when no public exercise conditions can be specified cleanly. (#r298)
+
+**8. Simplest viable mechanism sketch**  
+The narrowest strong version is now:
+1. Register canonical slot `s_i` with incumbent state, adequacy test, repair menu, and delayed truth policy.
+2. Subscribers fund service rent plus a repair-option pool.
+3. Incumbent posts stewardship bond and earns rent while installed.
+4. Challenger posts `(evidence_package, contest_bond, proposed_repair)`.
+5. Protocol decides whether a live repair option exists.
+6. If yes, one bounded action from the repair menu is exercised: `no_change`, `patch`, `replace_state`, or `replace_steward`.
+7. Immediate bond flows handle the exercised transition; later truth/audit settles residual bonds and slot credibility.
+
+This is cleaner than generic contest markets because it treats challenges as options on corrective action, not as blanket rights to rewrite state. (#r298)
+
+**9. Strongest reason this still fails**  
+The strongest remaining kill is now: the mechanism may become a market in *winning exercise rights* rather than a market in truth-improving repair. If exercise conditions or repair menus are underspecified, actors optimize for procedural exercisability, and capital buys leverage over bounded state transitions rather than actual epistemic gain. That would still be governance theater with market syntax. (#r298)
+
+**10. Best surviving variant if this refinement is still wrong**  
+If general repair-option markets are too procedural, the best fallback is a **narrow insured repair-option layer only for a tiny registry of protocol-critical slots**, with ordinary PM or batch-auction machinery handling discovery elsewhere. That keeps the deepest surviving insight intact: the non-PM contribution is not "knowledge trading" but **bonded corrective capacity over shared state**. (ref: #r295, #r296, #r297, #r298)
 
 ### #r297 refinement - discovery and adoption must be separate, or the mechanism still pays too directly for novelty
 
