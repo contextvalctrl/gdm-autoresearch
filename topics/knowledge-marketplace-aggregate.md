@@ -3,6 +3,7 @@
 ## Run Log Addendum
 - **#r2** - 2026-04-04T17:32Z - Paused MatchingEngine line and restarted knowledge-marketplace mechanism design thread. Reframed the primitive as capped, escrow-bonded credible-information transfer; added unresolved-truth settlement branch; performed 3-family viability triage.
 - **#r145** - 2026-04-05T08:02Z - Refined the family comparison: killed the naive bilateral “knower sells belief to unknower” framing, elevated state-update procurement as the strongest non-LMSR primitive, and clarified why the wrong conserved quantity collapses back into prediction-market behavior.
+- **#r146** - 2026-04-05T08:12Z - Tightened the primitive from generic update procurement to contested state-maintenance with explicit no-change/default outcome, separating payment for error reduction from payment for mere revision and identifying why unresolved loss functions collapse the design into governance theater.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -75,9 +76,31 @@ This shifts the core unit from *belief position* to **improvement contract on th
 5. On resolution or proxy observation, supplier is paid from `B_i` in proportion to realized improvement; bond is returned/slashed based on overclaim vs realized improvement.
 6. Unused budget rolls or expires; unresolved cases cannot mint durable credibility from non-observable improvement. (#r145)
 
-**Strongest reason even procurement may fail:** the buyer of epistemic improvement often cannot specify the loss function tightly enough. If "improvement" is not objectively measurable, the system collapses into governance-mediated grantmaking or reputation theater. This is the deepest surviving objection and should be treated as the true kill criterion for the whole family. (#r145)
+**#r146 refinement - the mechanism must buy *state maintenance*, not merely *state change***
 
-**Best surviving variant if that kill criterion binds:** use procurement only where loss and verification are sharply specifiable, and route everything else through a credibility-gated batch-auction / orderbook layer. In other words: direct knowledge-market for high-verifiability coordinates; trading market for ambiguous ones. The design boundary is observability, not ideology. (#r145)
+#r145 correctly moved the design away from bilateral belief exchange and toward procurement of state improvement. The next correction is that even "pay for updates" is too loose. A good mechanism cannot systematically reward *revision*; it must reward **decision-relevant reduction in expected state error relative to the standing baseline, including the case where the correct action is no update at all**. Otherwise agents are paid for touching the vector, not for improving it, and the system degenerates into churn farming. (#r146)
+
+That yields a sharper primitive:
+- demand side does **not** ask, "who has a new belief?"
+- it asks, "is the current state on coordinate `s_i` good enough, and if not, who can improve it under bond?"
+- supply side competes against both each other **and the incumbent state**
+- the null outcome (`no_change`) must always be admissible and often should win
+
+This matters because a true knowledge marketplace should conserve **error budget against a baseline**, not activity. A claimant should be paid only for positive marginal epistemic value over the installed state. If the installed state is already good, the efficient market outcome is zero trade / zero update / no payout. That is a direct break from PM-style machinery, where activity itself often generates spread, fees, or informational movement. (#r146)
+
+**Updated simplest viable mechanism sketch (surviving direct family):**
+1. For coordinate `s_i`, a demander posts budget `B_i`, validation policy `V_i`, and loss function `L_i` relative to the current installed state.
+2. Suppliers submit `(candidate_update, bond, confidence, proof_policy)`.
+3. Protocol evaluates each proposal against the incumbent state and an explicit `no_change` option.
+4. Only proposals with positive expected marginal error reduction over `no_change` may install.
+5. On truth resolution or proxy observation, payout = bounded share of *realized improvement over incumbent baseline*; overclaiming or harmful revisions slash bond.
+6. If realized improvement is non-verifiable, no durable credibility is minted and budget should revert or remain unspent. (#r146)
+
+**New attack distinction:** without an explicit incumbent baseline and `no_change` branch, adversaries can farm revision rewards by manufacturing volatility, repeatedly restating obvious truths, or laundering minor restatements into paid "updates." The fix is not cosmetic; baseline-relative scoring is the core anti-churn defense. (#r146)
+
+**Strongest reason even procurement may fail:** the buyer of epistemic improvement often cannot specify the loss function tightly enough. More precisely after #r146: if the protocol cannot define (a) the incumbent baseline, (b) the measurable marginal improvement over that baseline, and (c) the admissible `no_change` outcome, then the mechanism collapses into governance-mediated grantmaking or reputation theater. This remains the deepest kill criterion for the family. (ref: #r145, #r146)
+
+**Best surviving variant if that kill criterion binds:** use baseline-scored procurement only where loss and verification are sharply specifiable, and route everything else through a credibility-gated batch-auction / orderbook layer. In other words: direct knowledge-market for high-verifiability, baseline-measurable coordinates; trading market for ambiguous ones. The design boundary is observability and baseline measurability, not ideology. (ref: #r145, #r146)
 
 (ref: #r1, #r2, #r69, #r185, #r255)
 
