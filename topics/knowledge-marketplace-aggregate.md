@@ -5,6 +5,7 @@
 - **#r145** - 2026-04-05T08:02Z - Refined the family comparison: killed the naive bilateral “knower sells belief to unknower” framing, elevated state-update procurement as the strongest non-LMSR primitive, and clarified why the wrong conserved quantity collapses back into prediction-market behavior.
 - **#r146** - 2026-04-05T08:12Z - Tightened the primitive from generic update procurement to contested state-maintenance with explicit no-change/default outcome, separating payment for error reduction from payment for mere revision and identifying why unresolved loss functions collapse the design into governance theater.
 - **#r147** - 2026-04-05T08:22Z - Refined the family again: the strongest non-PM formulation is warranty-bearing state maintenance, where capital does not buy directional influence but temporarily underwrites a replaceable state installation; killed raw “knowledge sale” framing further and isolated the main failure as unverifiable decision-loss accounting.
+- **#r148** - 2026-04-05T08:32Z - Sharpened the mechanism around temporary state-authority under challenge; killed continuous bilateral “knowledge rights” as disguised inventory trading, retained baseline-relative authority procurement as the core, and promoted specification externality to the main residual failure.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -155,6 +156,45 @@ The mechanism now depends not just on eventual truth, but on a usable estimate o
 
 **Best surviving fallback if even warranty-bearing maintenance is too hard:**
 Keep the warranty concept but narrow it drastically. Use it only for coordinates where there is a clear baseline, a clear maintenance horizon, and an auditable loss function. Everything else should revert to a credibility-gated trading or batch-auction layer that admits the market is only pricing disagreement, not warranting state quality. The key boundary is now even sharper: **can this coordinate support temporary warranted installation, yes or no?** If not, do not pretend it is a knowledge market. (ref: #r145, #r146, #r147)
+
+### #r148 refinement - clear temporary state-authority, not bilateral knowledge sale
+
+#r145-#r147 correctly converged on warranty-bearing state maintenance, but one ambiguity remained: the system can still quietly regress into a disguised orderbook if it is described as a bilateral flow where a “knower sells to an unknower.” That picture is still too person-to-person. The stronger formulation is **state-authority procurement against a standing baseline**: the protocol clears who gets temporary authority to overwrite a coordinate of the shared state, under bond and open challenge, while downstream users pay for access to the maintained state as a public or club good. (#r148)
+
+That yields a cleaner decomposition of roles and payments:
+- **Maintainer / proposer:** competes for the right to install and defend a candidate state on coordinate `s_i`
+- **Challenger / rival maintainer:** can displace a live installation by posting a superior bonded replacement
+- **State consumers:** pay for dependable access to the maintained state or for a bounded update service
+- **Protocol:** routes budget, enforces challenge rights, and settles bonds against later truth or audit
+
+This matters because it kills a weak surviving family that still looked superficially attractive:
+
+1. **Continuous bilateral knowledge rights** - killed.  
+   If a “knower” can continuously sell update rights or transferable informational claims directly to buyers, then inventory, resale, and secondary positioning reappear. Even if the interface says “knowledge” instead of “shares,” the conserved quantity has slipped back toward tradeable belief inventory. That is just an orderbook with different nouns. (#r148)
+
+2. **One-shot procurement of a better report** - weak but admissible as a narrow special case.  
+   This works for static, low-maintenance coordinates, but it misses the core reason the family differs from prediction markets: the valuable object is usually not a one-off report, but accountable temporary maintenance of decision state over a horizon. Useful as a degenerate case, not as the canonical mechanism. (#r148)
+
+3. **Baseline-relative authority procurement with challengeable installation** - strongest surviving family.  
+   Here capital does epistemic work because it underwrites temporary authority plus correction liability. A proposer is paid only if their installation beats the incumbent baseline or `no_change`, and challengers stay economically live throughout the service window. This remains the cleanest non-LMSR primitive. (#r148)
+
+**What is being exchanged, now stated as tightly as possible:**
+`temporary authority to maintain coordinate s_i under bonded replaceability`
+not
+`a transferable right to be paid for holding a belief about s_i`
+
+**Why this is better than LMSR / orderbooks / batch auctions in the clearest surviving sense:**
+- LMSR and orderbooks mainly monetize *who will hold directional inventory against future resolution*
+- batch auctions improve the fairness of *when that inventory clears*
+- this family monetizes *who should be trusted to temporarily write and defend part of the shared world-model*
+
+So the key differentiator is not just scoring rule or timing rule. It is the **allocation of temporary state authority under challenge**. If that authority is absent, the design is not a knowledge marketplace; it is just a prediction venue with elaborate metadata. (#r148)
+
+**New strongest residual failure after this refinement:**
+The hard problem is increasingly not truth resolution alone, but **specification externality**: the demander often cannot cleanly specify the coordinate, baseline, horizon, and loss rubric they actually need. If demand cannot write a good contract for the state deficiency, then the mechanism selects for people who are good at winning underspecified authority auctions, not people who are good at reducing epistemic error. This is a deeper failure than simple oracle delay and should now be treated as the main surviving design kill. (#r148)
+
+**Best surviving variant if that kill binds:**
+Narrow the mechanism one step further into a **challenge-bounty maintenance market**. Instead of open-ended procurement of new installs, the protocol starts from a default baseline and mostly pays challengers for demonstrating that the incumbent state is deficient and replacing it with a better bonded version. That reduces the burden on demand-side specification: buyers fund the maintenance lane and challenge rights, while proposers compete against a concrete incumbent rather than an underspecified request. This is the strongest fallback if fully specified authority procurement proves too brittle. (ref: #r146, #r147, #r148)
 
 (ref: #r1, #r2, #r69, #r145, #r146, #r147, #r185, #r255)
 
