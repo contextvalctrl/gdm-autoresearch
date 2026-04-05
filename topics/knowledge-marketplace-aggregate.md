@@ -47,7 +47,57 @@
 - **#r331** - 2026-04-05T15:32Z - Added a threshold-certification correction: when free-form uncertainty-band semantics are too gameable, the stronger surviving product is bonded certification that a canonical facet lies in one of a small set of protocol-native decision regions. This replaces generic band-narrowing with liability-bearing threshold certification, sharpens partial-observation settlement around region breach rather than full point truth, and moves the deepest residual kill from calibration theater toward threshold-registry capture / boundary packing.
 
 - **#r332** - 2026-04-05T15:42Z - Added an elimination correction: even threshold certification can still overreward premature positive classification. The stronger surviving product is bonded elimination of inadmissible decision regions, with canonical state only collapsing to a single region when all rivals have been excluded or timeout forces a coarse fallback. This sharpens the primitive from positive class assertion into liability-bearing exclusion rights, preserves the non-PM architecture, and moves the deepest residual kill from threshold-registry capture toward elimination-ladder design / hidden region coupling.
+- **#r333** - 2026-04-05T15:52Z - Added an action-equivalence correction: elimination should only be paid when it changes the admissible downstream action set. This refines the strongest surviving family from generic region elimination into bonded removal of action-distinct possibilities, collapses ontology that is decision-equivalent, and moves the deepest residual kill from generic hidden coupling toward action-partition misdesign / latent action differences hidden inside supposedly equivalent regions.
 
+### #r333 refinement - pay for eliminating action-distinct uncertainty, not ontology collapse that leaves the action set unchanged
+
+#r332 correctly made the mechanism falsification-first inside the threshold family by paying for elimination of inadmissible decision regions rather than for premature positive classification. The next correction is that even region elimination is still too ontology-heavy if the protocol pays for ruling out distinctions that do **not** change what actions remain admissible. A genuine knowledge marketplace should not reward arbitrary sharpening of labels; it should reward **removal of decision-relevant ambiguity**. If eliminating region `R3` leaves the same downstream action menu live as before, then the system may have learned something ontologically, but it has not yet transferred the kind of knowledge the market should finance. The stronger surviving product is therefore **bonded elimination of action-distinct regions only**. (#r333)
+
+This is a real mechanism correction, not just vocabulary tightening. It says the protocol should first quotient the region space by downstream action equivalence:
+- if two regions imply the same admissible action set, they belong to the same live uncertainty class for market purposes
+- suppliers earn only for excluding a region or class that would otherwise keep a different action path live
+- finer collapse inside an action-equivalent class can be tracked descriptively, but should not clear primary market rewards
+
+That keeps the mechanism from drifting into ontology speculation. Capital improves epistemics here because it finances **action-relevant contraction of the possibility set**, not merely narrower classification for its own sake. This is the cleanest surviving answer so far to the prompt's core question: why does capital improve epistemics rather than just reallocate prestige? Because payment attaches only to ambiguity reduction that changes the safely justifiable downstream decision surface. (#r333)
+
+The family triage after this correction is:
+
+1. **Positive region certification** - further weakened.
+   Still overcommits too early and still risks paying for distinctions without operational consequence. (#r331, #r332, #r333)
+
+2. **Generic bonded region elimination** - still viable, but no longer the best default.
+   Better than positive certification, but still too easy to overfit ontology and earn for collapsing labels that do not move the action boundary. (#r332, #r333)
+
+3. **Defect-triggered bonded elimination of action-distinct regions** - strongest surviving refinement.
+   Use #r329's sparse defect chassis, #r331's protocol-native region registry, and #r332's falsification-first elimination logic, but only pay for removing regions that keep materially different downstream action classes alive. Canonical state sharpens economically only when the admissible action set contracts. This is the cleanest surviving non-PM primitive in threshold-governed domains. (#r333)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** a bonded right to eliminate a named action-distinct region from the admissible set for a canonical facet over a bounded horizon.
+- **State model:** global state on a facet is best represented as `(admissible action-equivalence classes, eliminated classes, active coarse class)` rather than as a fine-grained ontology by default. Updates are mainly set-subtraction events on the action-relevant partition.
+- **Credibility model:** stake buys the right to remove a region that would otherwise justify a different action surface. Stake burns if later evidence shows the removed region should have remained live or if the claimant hid a latent action difference inside an allegedly equivalent class.
+- **Market roles:** demanders pay because too many action-distinct possibilities remain live for safe bounded action; eliminators compete to strike those possibilities under bond; challengers defend wrongly excluded action classes or prove that a claimed equivalence partition is fake.
+- **Settlement:** immediate service payment funds the active elimination window; delayed settlement scores whether the excluded action-distinct possibility was in fact inadmissible. Under partial observability, the mechanism settles first on whether the action set was justifiably narrowed, not on whether the final remaining ontology was uniquely correct.
+
+**Why this is cleaner versus LMSR / orderbooks / batch auctions:**
+- LMSR/orderbooks/batch auctions still reward **movement of belief mass or inventory toward favored outcomes**.
+- This corrected KM rewards **loss-bearing contraction of the live action set**.
+The economic win condition is not "I pushed probability toward region R2" and not even simply "I ruled out R4." It is "I responsibly removed an action-distinct possibility from the set the protocol had to respect, and I am liable if that removal was premature." That is a cleaner knowledge-transfer primitive than either pricing disagreement or collapsing ontology for its own sake. (#r333)
+
+**Simplest viable mechanism sketch after #r333:**
+1. Register a canonical facet with protocol-native decision regions and an explicit map from those regions to admissible action classes.
+2. Collapse regions that imply the same action menu into a shared market-facing uncertainty class.
+3. A demander opens a defect/elimination ticket because the current action-distinct uncertainty set is too broad for a bounded action interface.
+4. Suppliers submit `(target action-distinct class to eliminate, supporting evidence, bond, horizon)`.
+5. Protocol accepts only eliminations that satisfy public exclusion tests against the current live action-distinct set; accepted eliminations remove that class for the active horizon.
+6. If elimination contracts the admissible action set enough, the linked action interface narrows accordingly; otherwise the facet remains in its current coarse safe mode.
+7. Challengers may post evidence and bond to reopen a wrongly excluded class or prove that the published action-equivalence partition hid a material downstream difference.
+8. On breach, the excluded class is restored to the live admissible set and part of the eliminator's bond burns; later audit settles residual credibility on action-relevant elimination quality. (#r333)
+
+**Strongest new reason this idea fails:**
+The deepest residual kill becomes **action-partition misdesign / latent action differences**. If the protocol collapses regions into allegedly equivalent classes too aggressively, actors will hide important downstream consequences inside the equivalence map, earn for eliminating a class that looked decision-redundant, and only later reveal that the removed region should have preserved a different action. This is sharper than #r332's generic hidden region coupling because it targets the exact abstraction layer introduced by the correction: the action-equivalence partition itself may be fake, stale, or politically captured. (#r333)
+
+**Best surviving variant if even this correction is too ambitious:**
+Keep #r329's defect-triggered chassis and #r332's elimination-first logic, but restrict the market to a tiny registry of **protocol-native action partitions** where region-to-action mapping is monotone, auditable, and relatively stable. Let finer ontological refinement live outside the paid market unless and until it changes the admissible action menu. That preserves the strongest surviving insight so far: the non-PM opportunity is not to reward sharper beliefs in general, but to finance **bounded, loss-bearing elimination of action-relevant uncertainty from shared canonical state**. (ref: #r329, #r331, #r332, #r333)
 
 ### #r331 refinement - if band semantics are too soft, clear bonded threshold certification instead of free-form uncertainty compression
 
