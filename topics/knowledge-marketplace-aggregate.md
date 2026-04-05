@@ -6,6 +6,7 @@
 - **#r146** - 2026-04-05T08:12Z - Tightened the primitive from generic update procurement to contested state-maintenance with explicit no-change/default outcome, separating payment for error reduction from payment for mere revision and identifying why unresolved loss functions collapse the design into governance theater.
 - **#r147** - 2026-04-05T08:22Z - Refined the family again: the strongest non-PM formulation is warranty-bearing state maintenance, where capital does not buy directional influence but temporarily underwrites a replaceable state installation; killed raw “knowledge sale” framing further and isolated the main failure as unverifiable decision-loss accounting.
 - **#r148** - 2026-04-05T08:32Z - Sharpened the mechanism around temporary state-authority under challenge; killed continuous bilateral “knowledge rights” as disguised inventory trading, retained baseline-relative authority procurement as the core, and promoted specification externality to the main residual failure.
+- **#r149** - 2026-04-05T08:42Z - Refined the direct family one step further from generic update procurement into challengeable maintenance coverage on a named state deficiency; separated install-rights from passive knowledge sale, added a standing demand-side coverage budget as the cleanest non-PM payment source, and identified unverifiable buyer-value attribution as the strongest remaining kill for any “knowledge transfer” formulation.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -196,7 +197,85 @@ The hard problem is increasingly not truth resolution alone, but **specification
 **Best surviving variant if that kill binds:**
 Narrow the mechanism one step further into a **challenge-bounty maintenance market**. Instead of open-ended procurement of new installs, the protocol starts from a default baseline and mostly pays challengers for demonstrating that the incumbent state is deficient and replacing it with a better bonded version. That reduces the burden on demand-side specification: buyers fund the maintenance lane and challenge rights, while proposers compete against a concrete incumbent rather than an underspecified request. This is the strongest fallback if fully specified authority procurement proves too brittle. (ref: #r146, #r147, #r148)
 
-(ref: #r1, #r2, #r69, #r145, #r146, #r147, #r185, #r255)
+### #r149 refinement - demand should buy maintenance coverage on a named state deficiency, not generic "knowledge"
+
+#r145-#r148 correctly killed bilateral belief exchange and converged on temporary state authority under bond. The next refinement is that even "procurement of a better update" is still too broad unless the **buyer-side contract** is made more concrete. The cleanest non-PM formulation is not "pay me for information" and not even "pay me for a better state." It is:
+
+**pay for challengeable maintenance coverage on a named state deficiency**. (#r149)
+
+That means the demander is not buying a transferable informational object. They are posting budget against a specific maintenance failure mode in the shared state, for example:
+- `s_i may be stale beyond horizon H`
+- `s_j is likely wrong by more than tolerance ε`
+- `link(A,B) lacks enough bonded defense against challenge`
+
+A maintainer then competes to cover that deficiency by installing or defending a candidate state under bond. Capital earns only if the maintainer either:
+1. keeps the coordinate inside the contracted tolerance band for the covered horizon, or
+2. proves the incumbent deficiency diagnosis was wrong and that `no_change` was in fact sufficient.
+
+This sharpens several pieces of the mechanism.
+
+**1. Base primitive**  
+What is exchanged is best described as:
+`coverage on a state deficiency  <->  bonded maintenance service`
+not
+`knowledge  <->  money`
+and not
+`belief inventory  <->  opposite-side inventory`
+
+This is stronger than #r147's warranty-bearing installation language because it gives demand a cleaner object to buy: not a free-form update, but a bounded promise that some coordinate will be maintained within a named adequacy condition. (#r149)
+
+**2. State model**  
+The global state vector remains the same, but updates should now be interpreted as **coverage actions** against deficiency contracts. The update rule is no longer simply "best candidate overwrites incumbent." It is:
+- publish incumbent `s_i`
+- publish deficiency contract `D_i = (baseline, horizon, tolerance, audit rule, budget)`
+- admit bids from maintainers who post `(candidate_state, bond, coverage_terms)`
+- install the lowest-cost admissible coverage satisfying `D_i`, with `no_change` as an admissible zero-install solution
+
+This pushes the mechanism away from generic revision incentives and toward explicit maintenance obligations. (#r149)
+
+**3. Credibility model**  
+Capital converts to trust only when it is underwriting an identifiable failure mode. A large bond should not mean "this person is persuasive." It should mean "this person is financially exposed if the covered deficiency still materializes." That is the cleanest surviving answer so far to why money improves epistemics rather than merely reallocates PnL. (#r149)
+
+**4. Market roles and payment flow**  
+The roles become more precise:
+- **Coverage buyer / demander:** funds the state-deficiency contract
+- **Maintainer:** installs/defends a covered state under bond
+- **Challenger:** earns by demonstrating that the maintainer failed the contract or that a superior covered state exists
+- **State consumer:** may be the same as the buyer, or may pay subscription/query fees into the same maintenance lane
+
+The strongest non-PM payment source is therefore not side-betting and not resale. It is a **standing coverage budget** for coordinates that matter. That budget can be replenished by direct buyers, subscriptions, or protocol-level allocation. This is cleaner than the earlier loose "unknower pays for updates" language because it explains who is paying even when no one wants a one-shot report: they are paying to keep an important coordinate decision-usable. (#r149)
+
+**5. Candidate family triage after #r149**
+
+1. **Generic knowledge sale** - killed.  
+   Still too metaphorical; cannot specify what service was delivered except via later truth, so it collapses back into reputation theater or prediction-market language.
+
+2. **One-shot state update procurement** - acceptable but too narrow.  
+   Works where the problem is genuinely episodic, but misses the fact that many important coordinates are persistent maintenance problems.
+
+3. **Challengeable maintenance coverage market** - strongest surviving direct family.  
+   Demand buys coverage against a named state deficiency; supply competes to install and defend the covered state under bond; challengers keep the lane live. This is the clearest non-LMSR primitive so far. (#r149)
+
+**6. Comparison sharpened vs LMSR / orderbooks / batch auctions**  
+The difference is now cleaner:
+- **LMSR:** clears cost to move a public price vector
+- **Orderbook:** clears inventory transfer over contingent claims
+- **Batch auction:** clears the same inventory at discrete times with fairer timing
+- **Coverage KM:** clears who will be paid to keep part of the shared world-model within a contracted adequacy band, while bearing downside if that coverage fails
+
+This is the strongest surviving answer to the prompt's core question. The protocol is not matching disagreement; it is allocating **bonded maintenance responsibility for epistemic state**. (#r149)
+
+**7. New strongest failure mode**  
+The main kill criterion is now slightly different from #r148's specification externality. Even if the deficiency can be named, the mechanism may still fail because the buyer often cannot verify that the maintained coordinate created enough value **for them** to justify payment. In other words: truth may be auditable while buyer-value attribution is not. If payment depends on unverifiable private decision value, the marketplace collapses into bespoke contracting and cannot scale as a public mechanism. (#r149)
+
+This suggests a sharper boundary:
+- the mechanism is viable where adequacy can be judged by public state-quality tests (freshness, tolerance band, challenge survival, eventual resolution)
+- it fails where payout requires proving that a specific buyer's downstream decision improved
+
+**8. Best surviving fallback if even #r149 is too ambitious**  
+Drop buyer-specific value entirely and keep only **public challenge-bounty maintenance**. Protocol or subscribers fund maintenance lanes for important coordinates; maintainers and challengers compete around public deficiency tests; no one tries to prove bespoke buyer benefit. That preserves the strongest mechanism insight while sacrificing the grander "knowledge marketplace" rhetoric. (ref: #r148, #r149)
+
+(ref: #r1, #r2, #r69, #r145, #r146, #r147, #r148, #r149, #r185, #r255)
 
 ---
 # Knowledge Marketplace Mechanism - Aggregate Document
