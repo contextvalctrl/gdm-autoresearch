@@ -1,6 +1,7 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r336** - 2026-04-05T16:22Z - Added a termination correction: even order-independent pivotal elimination still overpays if the ticket keeps rewarding further eliminations after the demander's bounded action has already become admissible. The stronger surviving form clears ticket-specific decision-unlock certificates against a declared target action/fallback transition and stops primary payout at first justified unlock, with only explicit secondary tickets allowed for further refinement.
 - **#r335** - 2026-04-05T16:12Z - Added an order-independence correction: pivotal-elimination rewards should not depend on arbitrary arrival order or "last cut" luck. The stronger surviving form pays against ex post minimal unlock sets / necessity structure for the action-boundary crossing, with a thin timing premium only for materially earlier boundary acceleration; otherwise the mechanism degenerates into last-mover jackpot gaming or early spam on prerequisite cuts.
 - **#r334** - 2026-04-05T16:02Z - Added a contribution-accounting correction: when multiple exclusions are jointly required to narrow the admissible action set, the KM should not pay each elimination independently. Payment should attach to boundary-crossing / pivotal contraction of the live action set, with residual credit apportioned against declared prerequisite structure; otherwise the mechanism overpays ontology-chopping and underprices true decision-unlocking information.
 - **#r2** - 2026-04-04T17:32Z - Paused MatchingEngine line and restarted knowledge-marketplace mechanism design thread. Reframed the primitive as capped, escrow-bonded credible-information transfer; added unresolved-truth settlement branch; performed 3-family viability triage.
@@ -50,6 +51,60 @@
 
 - **#r332** - 2026-04-05T15:42Z - Added an elimination correction: even threshold certification can still overreward premature positive classification. The stronger surviving product is bonded elimination of inadmissible decision regions, with canonical state only collapsing to a single region when all rivals have been excluded or timeout forces a coarse fallback. This sharpens the primitive from positive class assertion into liability-bearing exclusion rights, preserves the non-PM architecture, and moves the deepest residual kill from threshold-registry capture toward elimination-ladder design / hidden region coupling.
 - **#r333** - 2026-04-05T15:52Z - Added an action-equivalence correction: elimination should only be paid when it changes the admissible downstream action set. This refines the strongest surviving family from generic region elimination into bonded removal of action-distinct possibilities, collapses ontology that is decision-equivalent, and moves the deepest residual kill from generic hidden coupling toward action-partition misdesign / latent action differences hidden inside supposedly equivalent regions.
+
+### #r336 refinement - stop paying after the ticket's bounded decision is unlocked, or the market turns back into paid over-refinement
+
+#r335 correctly fixed order dependence by paying against ex post necessity rather than raw arrival order. But even an order-independent necessity rule still overpays if a live defect ticket keeps rewarding additional eliminations after the demander's bounded action problem has already been solved. Once the declared action/fallback boundary has been crossed, further sharpening may be descriptively interesting yet no longer the same purchased epistemic service. If the mechanism continues paying inside the same ticket for post-unlock refinements, it drifts back into monetizing ontology collapse and surplus precision rather than bounded knowledge transfer. The stronger surviving product is therefore **ticket-specific decision-unlock certification**: each paid lane must name the exact fallback-to-action transition it is trying to unlock, and the primary payout ends at the first justified crossing of that declared boundary. Any later refinement needs a new ticket, a new budget, or a lower-priority secondary payout lane. (#r336)
+
+This is a real mechanism correction, not just demand-side bookkeeping. #r334 killed generic per-exclusion rewards. #r335 killed last-mover jackpots. #r336 kills the next failure: **over-refinement farming after the decision is already usable**. A knowledge marketplace should sell enough ambiguity reduction to justify a bounded action, not an unbounded stream of extra eliminations just because more eliminations are possible. The protocol should therefore distinguish among:
+- **pre-unlock elimination** - removal needed to reach the declared action/fallback transition,
+- **unlock event** - first justified crossing where the requested bounded action becomes admissible relative to fallback,
+- **post-unlock refinement** - additional elimination that may improve comfort or future optionality but is not part of the original paid decision-unlock service.
+
+The KM should pay mainly for the first two, and only pay the third if a new explicit procurement surface exists. Otherwise the market recreates the PM failure mode in slower motion: capital no longer buys a bounded transfer of decision-useful knowledge, it buys continued movement of a shared uncertainty object after the economically relevant question was already answered. (#r336)
+
+The family triage after this correction is:
+
+1. **Open-ended elimination market** - dead.
+   Even with action-equivalence collapse and order-independent pivotal credit, it still invites endless paid refinement after the demander's actual decision need has been met. (ref: #r333, #r334, #r335, #r336)
+
+2. **Boundary-crossing elimination without ticket termination** - no longer acceptable as the default.
+   Better than per-exclusion and better than last-mover payout, but still structurally overpays once one funded decision boundary has already been crossed. (#r334, #r335, #r336)
+
+3. **Defect-triggered, order-independent, ticket-terminated pivotal elimination on action-distinct classes** - strongest surviving refinement.
+   Keep #r329's sparse defect chassis, #r333's action-equivalence partition, #r334's boundary-crossing credit rule, and #r335's order-independent necessity accounting, but require each paid lane to specify a target fallback-to-action transition and stop primary payout at the first justified unlock of that transition. This is the cleanest surviving non-PM primitive so far because it makes the purchased object a bounded decision unlock rather than open-ended sharpening of shared ontology. (#r336)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** a bonded right to eliminate action-distinct classes toward a declared ticket-specific decision unlock, with payment tied to necessity-weighted contribution up to the first justified unlock event.
+- **State model:** the global state must track not only live classes and necessity structure, but also active tickets with explicit `(current fallback, requested action menu, unlock predicate, expiry)` fields.
+- **Credibility model:** stake still buys the right to remove classes under liability, but primary reward depends on helping cross the declared unlock boundary before expiry; credibility should not keep compounding inside the same ticket once the action is already justified.
+- **Market roles:** demanders do not buy generic refinement; they escrow for one bounded action unlock. Eliminators compete to provide the necessary exclusions. Challengers contest wrongful exclusions, fake necessity claims, or false assertions that the requested action was really unlocked.
+- **Settlement:** first settle whether the declared action/fallback transition was justifiably crossed within the ticket horizon; then allocate primary payout across the ex post minimal unlock set; then close the ticket's main payout lane. Further refinement is out of scope unless separately commissioned.
+
+**Why this is cleaner versus LMSR / orderbooks / batch auctions:**
+- LMSR/orderbooks/batch auctions monetize continued movement in a price or inventory object.
+- #r334 moved the KM to pivotal action unlocking.
+- #r335 made that unlocking order-independent.
+- #r336 adds the missing stopping rule: **the paid object is one bounded decision unlock, not continuous refinement after use becomes possible**.
+This is a sharper break from PM logic because the mechanism now has a natural completion condition. The win condition is not that uncertainty keeps shrinking. It is that a declared fallback-constrained action becomes responsibly usable, after which the original epistemic contract is complete. (#r336)
+
+**Simplest viable mechanism sketch after #r336:**
+1. Register a canonical facet with protocol-native regions, action-equivalence collapse, and a public map from live-class subsets to admissible action menus.
+2. Publish a public necessity representation for relevant action-boundary crossings.
+3. A demander opens a **decision-unlock ticket** specifying `(target action menu, current fallback menu, horizon, bounty, unlock predicate)`.
+4. Suppliers submit `(target class to eliminate, supporting evidence, bond, horizon)`.
+5. Protocol accepts only eliminations that satisfy public exclusion tests; accepted eliminations remove that class for the active horizon.
+6. When the live class set first crosses the ticket's declared unlock predicate, the protocol computes the relevant minimal unlock set(s) and allocates the ticket's primary payout across the necessary eliminators by a public split rule.
+7. The ticket's main payout lane then closes. Additional eliminations may still update canonical state, but they do not earn from that ticket unless the ticket explicitly reserved a tiny secondary refinement budget.
+8. Challengers may reopen wrongly excluded classes or dispute whether the unlock predicate was actually satisfied.
+9. On breach, the excluded class is restored and part of the eliminator's bond burns; if the ticket's claimed unlock was false, primary payout can be clawed back from the unlock-set recipients. (#r336)
+
+**Strongest new reason this idea fails:**
+The deepest residual kill becomes **ticket fragmentation / unlock-target gaming**. Actors may slice one genuine decision problem into many tiny sequential tickets to recreate open-ended refinement rents, or choose artificially easy unlock predicates that pay before the real operational decision is actually safe. This is sharper than #r335's necessity-graph problem because it targets the new stopping-rule abstraction directly: who defines when the purchased epistemic service is complete? (#r336)
+
+**Best surviving variant if even this correction is too ambitious:**
+Keep #r329's defect-triggered chassis and #r335's order-independent pivotal elimination logic, but restrict paid tickets to a small registry of protocol-native action transitions with standard unlock predicates and standard ticket templates. Where a domain cannot define a clean completion condition, do not run an open paid elimination market there. That preserves the strongest surviving thread insight so far: the non-PM opportunity is not to reward sharper beliefs, every exclusion, or even every necessary exclusion. It is to finance **loss-bearing removal of uncertainty up to the point where a specific bounded decision can responsibly depart from fallback in shared canonical state**. (ref: #r329, #r333, #r334, #r335, #r336)
+
 
 ### #r335 refinement - make pivotal credit order-independent, or the mechanism becomes a last-mover jackpot
 
