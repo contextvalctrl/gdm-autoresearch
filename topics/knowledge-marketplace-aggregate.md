@@ -9,6 +9,7 @@
 - **#r149** - 2026-04-05T08:42Z - Refined the direct family one step further from generic update procurement into challengeable maintenance coverage on a named state deficiency; separated install-rights from passive knowledge sale, added a standing demand-side coverage budget as the cleanest non-PM payment source, and identified unverifiable buyer-value attribution as the strongest remaining kill for any “knowledge transfer” formulation.
 - **#r150** - 2026-04-05T08:52Z - Tightened the primitive again from generic maintenance coverage to revocable state-authority leasing under posted error-insurance; clarified that demand is buying bounded authority plus replacement rights rather than “knowledge,” introduced insurer/challenger economics as the cleanest capital-to-epistemics mapping, and isolated adverse-selection in buyer-side deficiency specification as the main remaining structural failure.
 - **#r151** - 2026-04-05T09:02Z - Killed bespoke buyer-written deficiency contracts as the default primitive; refined the strongest surviving family into protocol-native state-slot leasing with challenger-funded replacement and public adequacy tests, which preserves the non-PM insight while avoiding contract-specification theater.
+- **#r295** - 2026-04-05T09:12Z - Split the mechanism into two explicit payment lanes: continuous service rent for temporary slot stewardship and delayed truth-linked bond settlement for actual epistemic quality. This kills the last disguised-PM branch where maintainers are paid mainly for being directionally right, clarifies why capital improves epistemics only as replacement-liable insurance, and identifies metric-gaming of public adequacy tests as the main surviving failure.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -106,6 +107,99 @@ This matters because a true knowledge marketplace should conserve **error budget
 **Strongest reason even procurement may fail:** the buyer of epistemic improvement often cannot specify the loss function tightly enough. More precisely after #r146: if the protocol cannot define (a) the incumbent baseline, (b) the measurable marginal improvement over that baseline, and (c) the admissible `no_change` outcome, then the mechanism collapses into governance-mediated grantmaking or reputation theater. This remains the deepest kill criterion for the family. (ref: #r145, #r146)
 
 **Best surviving variant if that kill criterion binds:** use baseline-scored procurement only where loss and verification are sharply specifiable, and route everything else through a credibility-gated batch-auction / orderbook layer. In other words: direct knowledge-market for high-verifiability, baseline-measurable coordinates; trading market for ambiguous ones. The design boundary is observability and baseline measurability, not ideology. (ref: #r145, #r146)
+
+### #r295 refinement - separate service rent from truth-settlement, or the design quietly becomes a weird prediction market
+
+#r145-#r151 correctly converged on protocol-native slot leasing with challenger-funded replacement. The next refinement is to split **what is paid continuously** from **what is earned only after truth or audit**. Without that split, the mechanism still risks collapsing back into prediction-market logic: the steward appears to be “paid for being right” on a state coordinate, which is just a disguised contingent claim with extra governance around it. The stronger non-PM design is:
+
+- **continuous service rent** pays for holding replaceable responsibility over a canonical slot,
+- **bond settlement** pays or penalizes only after public truth, challenge, or audit reveals whether that responsibility was exercised well.
+
+That means the mechanism is not selling a prediction and not directly selling a one-shot update. It is leasing **temporary epistemic stewardship**. The steward earns rent for maintaining the slot in good standing, but does not earn directional upside merely because reality later moved toward their installed value. The bond is there to absorb bad stewardship, not to create a speculative long/short position. (#r295)
+
+This sharpens the ten design questions.
+
+**1. Base primitive**  
+What is being exchanged is now best stated as:
+`temporary stewardship lease on slot s_i  <->  service rent, plus separately posted error bond`
+not
+`claim correctness  <->  payout`.
+
+That is a meaningful correction. If most expected return comes from terminal correctness payout, the design is still basically a prediction market with a stewardship wrapper. If most expected return during the slot horizon comes from service rent, while the bond only handles error accountability, then the primitive stays non-PM. (#r295)
+
+**2. State model**  
+Each canonical slot now has two parallel ledgers:
+- a **service ledger**: who currently holds the slot, what fee stream they are earning, whether the slot is fresh/challenge-clean/in-policy,
+- a **truth ledger**: what later evidence says about whether the installed state actually beat the incumbent or should have been displaced.
+
+Update events therefore have two different consequences:
+- replacement changes the service ledger immediately,
+- truth resolution changes bond settlement and long-run credibility later.
+
+This is cleaner than the earlier formulations because it prevents one ambiguous metric from doing all the work. A useful mechanism should not try to make the same score simultaneously determine subscription rent, challenge eligibility, final truth accountability, and durable reputation. (#r295)
+
+**3. Credibility model**  
+Capital improves epistemics only through the bond side, not through the rent side. Rent should be relatively flat conditional on holding the slot in good standing; bond exposure should scale with how much replaceable authority the steward has taken on. So the mapping becomes:
+- rent = payment for carrying accountable maintenance burden,
+- bond = posted error-insurance that gets burned when the steward should not have had that authority.
+
+This is the cleanest remaining answer to the prompt’s core question. Money helps not because it buys a louder opinion, and not because it creates speculative PnL. It helps because it insures the shared state against bad installs while compensating someone to do the maintenance work in the meantime. (#r295)
+
+**4. Market roles**  
+The role split is now tighter:
+- **slot funders / subscribers** pay the service rent because they need the slot kept decision-usable,
+- **slot stewards** earn rent while installed and post bonds against bad stewardship,
+- **challengers** do not mainly bet against the steward; they spend capital to replace bad stewardship and capture part of the displaced steward’s bond or replacement fee,
+- **protocol** clears the lease and later settles the bond.
+
+That is cleaner than "knower vs unknower" and also cleaner than pure procurement. This is a market in accountable stewardship rights, not a market in beliefs. (#r295)
+
+**5. Settlement model**  
+Settlement must now be explicitly bifurcated:
+1. **service settlement** - continuous or epochal payment for maintaining the slot within public operating conditions (freshness, challenge responsiveness, schema conformance, survival of audits),
+2. **truth settlement** - delayed bond release/slash based on whether the installed state actually outperformed the incumbent or was correctly displaced.
+
+Under partial observability, service settlement can continue while truth settlement remains provisional. Durable credibility should come primarily from the truth ledger, not from merely farming service rent. This matters because otherwise a steward can optimize for passing public operating tests without improving actual epistemics. (#r295)
+
+**6. Attack surface**  
+This refinement changes the main surviving attack. The deepest problem is no longer just buyer-side specification failure (#r150) or slot-spec design failure (#r151). It is now **metric capture across the service ledger**:
+- steward optimizes freshness and procedural challenge-defense while the substantive state drifts wrong,
+- protocol overpays for “healthy-looking” slots that are epistemically weak,
+- challengers may game replaceability events without producing materially better truth performance.
+
+So the main risk becomes a classic Goodhart split: public adequacy tests determine rent, but truth quality is harder and slower to observe. If the rent ledger dominates economics, the mechanism becomes a market in test-passing stewardship rather than truth-tracking stewardship. (#r295)
+
+**7. Why better or worse than LMSR / orderbooks / batch auctions**  
+This gives the sharpest surviving comparison so far:
+- **LMSR / orderbooks** mainly pay for taking directional exposure on outcomes,
+- **batch auctions** improve how that exposure clears,
+- **slot-stewardship KM** pays ongoing rent for maintaining a public state object and only uses capital bonds to discipline misinstallation.
+
+It is better where the real problem is trusted, maintained state for repeated downstream use. It is worse where users mostly want hedgeable exposure and do not want to subsidize a standing maintenance layer. (#r295)
+
+**8. Simplest viable mechanism sketch**  
+The narrowest strong version is now:
+1. Protocol registers canonical slot `s_i` with public operating tests and a delayed truth policy.
+2. Subscribers fund a rent stream for `s_i`.
+3. Stewards bid `(candidate_state, bond, rent_rate)` for temporary install-rights.
+4. Lowest-cost admissible steward wins and begins earning rent.
+5. Challengers can displace the steward by posting superior bonded evidence.
+6. Epoch by epoch, service rent continues while the slot remains in good standing.
+7. On later truth/audit, bond settles versus incumbent baseline and long-run credibility updates.
+
+This is the first version that cleanly separates payment for doing the job from payment for having actually deserved the job. (#r295)
+
+**9. Strongest reason this still fails**  
+The strongest remaining kill is that the service ledger may become the real economy and the truth ledger may become too weak, too delayed, or too noisy to discipline it. Then agents rationally optimize the visible service metrics, rent extraction dominates, and the mechanism stops improving epistemics in the way it claims. In short: if delayed truth settlement is not economically strong enough, the rent layer Goodharts the market. (#r295)
+
+**10. Best surviving variant if this refinement is still wrong**  
+If the service/truth split proves too gameable, the best surviving fallback is a **thin stewardship layer over a conventional PM core**:
+- PM or batch-auction machinery continues to discover contested prices,
+- only a small registry of protocol-critical slots uses insured stewardship leasing,
+- stewardship rent is tightly bounded and secondary,
+- final economic weight still comes from later truth/accountability rather than service fees.
+
+That preserves the deepest surviving insight from #r145-#r151 - capital should buy accountable state maintenance, not just belief inventory - while avoiding a full economy built on easily-gamed service metrics. (ref: #r145, #r147, #r150, #r151, #r295)
 
 ### #r147 refinement - what capital should buy is temporary warranty on a state installation, not "knowledge" itself
 
