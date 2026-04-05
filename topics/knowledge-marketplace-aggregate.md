@@ -1,10 +1,76 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r380** - 2026-04-06T00:02Z - Added an ontology-stability correction: even incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless artifact schemas, coordinate identities, and split/merge migrations are themselves lock-disciplined and liability-bearing. Otherwise suppliers can rename, refactor, split, or repackage state coordinates to reset inherited frontiers and re-monetize already-paid contraction through ontology churn.
 - **#r379** - 2026-04-05T23:34Z - Added an incremental-novelty correction: even provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless every composite artifact is scored against a canonical inherited frontier so only net-new contraction is payable. Otherwise the same epistemic improvement can be repackaged and monetized repeatedly through wrapper stacks, and the mechanism degenerates into novelty laundering.
 - **#r378** - 2026-04-05T23:24Z - Added a provenance-liability correction: even spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless reused public-state artifacts carry lineage-linked residual liability and payout inheritance. Otherwise contributors can launder weak claims through downstream composites, sever blame from influence, and turn the commons into accountability-free knowledge stacking.
 - **#r377** - 2026-04-05T23:14Z - Added a demand-internalization correction: even minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless the mechanism internalizes public-state spillovers across beneficiaries. Otherwise the best reusable updates are systematically underfunded by any single demander and the system collapses toward underprovision, private side-deals, or advisory capture.
 - **#r376** - 2026-04-05T23:12Z - Added a minimal-disclosure correction: even public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless every paid state update has a protocol-native minimal sufficient disclosure rule. Otherwise the mechanism collapses either into opaque expert authority that cannot be challenged or into source-leaking publication that destroys the supplier’s incentive to contribute.
+
+### #r380 refinement - even incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting fails unless coordinate schemas, identity mappings, and split/merge migrations are ontology-stable and liability-bearing, because otherwise actors can evade inherited-frontier subtraction by changing the vocabulary rather than improving the state
+
+#r379 correctly killed wrapper novelty by requiring derivatives to declare parents and be paid only for contraction beyond the canonical inherited frontier. But even that stronger family still fails if the protocol treats coordinate naming, schema design, and decomposition changes as costless metadata rather than market-governed state transitions. Once payout is novelty-subtracted against declared parents, the obvious evasion path is to re-express the same epistemic content under a slightly different coordinate partition, rename a tranche, split one coordinate into three, merge three into one, or migrate to a "v2" schema whose inherited frontier is not cleanly bound to the prior one. If schema churn can reset lineage or weaken subtraction, then capital does not improve epistemics by funding fresh contraction. It funds **ontology arbitrage**: suppliers get paid again for old state merely because they changed the representational boundary. The stronger surviving form is therefore **ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting**. Payment should attach only where coordinate identity, admissible split/merge rules, schema-version migration, and inherited-frontier carryover are themselves locked enough that representational edits cannot masquerade as discovery. (#r380)
+
+This is a real mechanism correction, not a data-model nicety. #r378 killed provenance severance. #r379 killed wrapper resale of inherited contraction. #r380 kills the next failure: **ontology churn / schema-reset laundering**. A knowledge marketplace should now distinguish among:
+1. local tranche validity,
+2. global state coherence,
+3. demand-side consequence legibility,
+4. marginal state improvement,
+5. timeliness of transfer,
+6. calibration of residual uncertainty,
+7. staged resolvability,
+8. diagnostic contribution,
+9. observability surface maintenance,
+10. decision-pivot effect,
+11. decision-contract lock,
+12. baseline sensing obligation,
+13. implementation commitment,
+14. public-state accretion,
+15. minimal sufficient disclosure,
+16. spillover internalization,
+17. provenance-linked liability,
+18. canonical inherited frontier,
+19. incremental novelty discipline,
+20. ontology stability - coordinate identity, schema version, split/merge rules, and migration operators are themselves public, typed, challengeable, and slow-moving enough that inherited frontiers survive representation changes,
+21. ontology laundering - actors reset novelty scoring by renaming, repartitioning, retyping, or version-bumping state coordinates without commensurate fresh contraction.
+Only the first twenty belong in the mechanism. The twenty-first collapses the family into a market where public knowledge can be re-sold every time someone redraws the map. If the protocol cannot preserve frontier inheritance across schema changes, novelty subtraction is not robust. (#r380)
+
+The family triage after this correction is:
+
+1. Incremental-novelty-disciplined lineage systems with flexible ad hoc schema evolution - dead.
+   Better than gross-wrapper resale, but still unstable because the cheapest way to create "new" contribution is often to mutate the coordinate system until old parents no longer bind. (#r379, #r380)
+
+2. Ontology-governed systems where migrations exist but are informal, discretionary, or weakly challengeable - also weak.
+   Better than unconstrained relabeling, but still structurally weak because the exact seam that determines payout inheritance and novelty subtraction sits inside schema politics rather than a compact public migration grammar. (#r379, #r380)
+
+3. Strongest surviving family: **ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition markets**.
+   Keep #r360-#r379's surviving stack, but require every artifact and derivative to bind to a stable coordinate ID and schema version, and require every split, merge, deprecation, or re-typing event to publish a migration operator stating what prior frontier is inherited, what uncertainty is preserved, what liability survives, and what portion of any future payout remains novelty-ineligible because it is representational carryover rather than fresh contraction. (#r380)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** not just reusable, lineage-bound, novelty-subtracted authority transfer. The exchanged object is **ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivoting, observability-backed diagnostic staged-resolvable calibrated timely marginal contraction of admissible state under liability**.
+- **State model:** the global state vector must now carry an **ontology/migration layer**: stable coordinate IDs, schema versions, parent-child mappings, split/merge operators, deprecation flags, supersession graphs, migration hashes, and inherited-frontier carryover rules. (#r380)
+- **Credibility model:** capital becomes trustworthy only when it is junior not just to wrong claims and wrapper resale, but also to representational churn that would let actors claim discovery by moving boundaries. Money should buy fresh contraction on a state space whose identity is stable enough that progress cannot be faked by redescription. (#r380)
+- **Market roles:** along with lineage custodians and novelty auditors, **ontology custodians / migration adjudicators** become first-class because some of the highest-stakes economic questions are now whether a split, merge, or rename preserved inherited frontier or attempted to reset it. (#r380)
+- **Settlement:** in addition to all prior criteria, the mechanism must settle whether a schema migration was valid, whether an artifact omitted required parent mappings during a split/merge, whether an apparent novelty gain was merely coordinate refactoring, and how inherited liability and novelty exclusion carry through ontology updates. (#r380)
+
+**Why this is better or worse than LMSR / orderbooks / batch auctions:**
+- **Better:** it confronts a knowledge-market-specific pathology those mechanisms mostly sidestep: in reusable state systems, representation changes are themselves economically strategic.
+- **Better:** it sharpens why capital improves epistemics: capital should reward contraction of reality, not contraction of notation.
+- **Worse:** it adds a semantic migration layer. If coordinate identity and migration cannot be encoded compactly, the mechanism becomes ontology governance with a market attached.
+So the edge remains real only where schema evolution can be governed by a small typed migration grammar rather than open-ended conceptual rewriting. (#r380)
+
+**Simplest viable mechanism sketch after #r380:**
+1. Add stable coordinate IDs and schema-version hashes to the public state machine.
+2. Treat split, merge, rename, re-typing, and deprecation events as first-class market actions with their own bonds, challenge windows, and inherited-frontier carry rules.
+3. Forbid fresh discovery-grade payout on migrated artifacts until the protocol computes how much prior frontier, liability, uncertainty, and payout inheritance carries into the new representation.
+4. Route purely representational improvements into a low-ceiling schema-maintenance bucket unless they unlock genuinely new admissible contraction unavailable under the old grammar.
+5. Let challengers earn by proving that a claimed innovation was only ontology churn, omitted parent carryover, or novelty laundering through schema migration. (#r380)
+
+**Strongest new reason this idea fails:**
+The deepest remaining kill becomes **ontology-governance overload**. If valuable domains require frequent, judgment-heavy redefinition of coordinates, then locking schema identity enough to stop novelty laundering may suffocate useful evolution, while loosening it reopens resale of old contraction as new. (#r380)
+
+**Best surviving variant if this correction is too ambitious:**
+Restrict the family to domains with slow-moving ontologies, few split/merge events, and compact migration rules. There, the best surviving descendant is not a general market in knowledge but an **ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition market**. In fast-moving domains where the ontology itself is the main locus of innovation, stop pretending novelty subtraction can stay mechanical and treat the work as governed model-building or schema design, not a reusable knowledge market. (ref: #r379, #r380)
 
 ### #r379 refinement - even provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting fails unless every derivative artifact is scored against a canonical inherited frontier so only net-new contraction is payable, because otherwise the same epistemic improvement can be wrapped, recomposed, and resold multiple times as fake novelty
 
