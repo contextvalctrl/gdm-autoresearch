@@ -43,6 +43,60 @@
 - **#r328** - 2026-04-05T15:02Z - Applied a scope correction: the mechanism should stop at insuring challengeable epistemic warranties on canonical state plus bounded decision warrants, and should not try to underwrite the entire closed-loop observation / inference / execution stack. Once the market tries to insure a full controller, it ceases to be a knowledge marketplace and becomes automation-governance theater. This supersedes the strongest reading of #r325-#r327, narrows the core product back to insured state authority with publicly declared action envelopes, and moves the deepest remaining kill from hidden model retuning toward ontology overload / action-surface capture.
 - **#r329** - 2026-04-05T15:12Z - Applied a market-activation correction: the strongest surviving family should not put every canonical slot under continuously monetized insured stewardship by default. Instead, the KM should be sparse and defect-triggered: default state remains passive/public, while capitalized market activity turns on only when someone escrows a bounded defect claim, challenge, or restoration request on a named slot/facet. This supersedes the most rent-heavy reading of #r295-#r328, keeps the non-PM primitive as bonded error-detection plus bounded correction rights rather than permanent paid incumbency, and moves the deepest remaining kill from pure ontology overload toward defect-taxonomy design / under-triggering of real state failures.
 
+- **#r330** - 2026-04-05T15:22Z - Added an uncertainty-compression correction: the strongest surviving non-PM demand object is not generic belief movement or perpetual state stewardship, but bonded rights to narrow decision-relevant uncertainty bands on named canonical facets. This sharpens the exchange object into calibrated uncertainty compression under liability, preserves the sparse defect-triggered architecture, and identifies calibration theater / unverifiable band semantics as the deepest new residual kill.
+
+
+### #r330 refinement - the cleanest “knowledge” product is bonded uncertainty compression on named facets
+
+#r329 correctly made the KM sparse and defect-triggered. The next correction is about **what demand should buy once a lane is opened**. Even a good defect ticket can still be too installer-centric if the economic object is phrased as “replace this state” or “defend this slot.” In many decision settings, what the low-information side actually wants is not a new point estimate or a permanent steward; it wants a **tighter, decision-safe uncertainty band** on a named facet of canonical state. That is closer to a real knowledge marketplace than either belief trading or generic slot administration. (#r330)
+
+The stronger surviving formulation is therefore:
+- canonical state facets carry a public current admissible band / confidence region / categorical ambiguity set
+- a demander opens a lane because the current band is too wide for some bounded action interface
+- suppliers compete to **narrow that band under bond** for a declared horizon
+- challengers earn by proving the narrowed band was unjustifiably tight, miscalibrated, or semantically wrong
+- if breach occurs, the protocol widens back toward the prior safe band or degrades to a coarser ambiguity class
+
+This is a meaningful refinement because it restores the “knowledge transfer” intuition without collapsing into PM language. The thing being sold is not outcome inventory, not crowd-belief movement, and not generic authority. It is **calibrated uncertainty compression**: the right to replace a wide public ignorance region with a narrower defended one, while bearing downside if that compression was not warranted. Capital improves epistemics here because it buys the removal of unjustified uncertainty only when someone is liable for overcompression. (#r330)
+
+The family triage after this correction is:
+
+1. **Point-state advocacy / update sale** - still dead.
+   Too easy to drift back into “pay me because my directional estimate is right,” which is just renamed prediction-market logic. (#r330)
+
+2. **Defect-ticketed warranty / falsification / restoration** - still strong as the institutional chassis.
+   This remains the best process architecture for when and how the KM activates. But by itself it under-specifies what epistemic good is being purchased once the lane opens. (#r329, #r330)
+
+3. **Defect-triggered bonded uncertainty compression** - strongest surviving product-level refinement.
+   Use the #r329 sparse case-opening logic, but let the live market clear who may narrow the public uncertainty band on a named facet and bounded action surface. This is the cleanest surviving answer to “what exactly is exchanged?” because it makes the epistemic product a reduction in admissible ambiguity, not generic authority or revision. (#r330)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** a bonded right to compress a public uncertainty band on a named canonical facet for a bounded decision interface.
+- **State model:** global state is not just point values or slot labels; it is `(facet, admissible band, authority tranche)`, and updates often mean narrowing or widening the band rather than swapping one point for another.
+- **Credibility model:** stake buys the right to claim tighter calibration than the current safe band. Lose the stake if realized evidence, admissible challenge, or later audit shows the band was too narrow or semantically mis-specified.
+- **Market roles:** demanders pay because a current ambiguity band is too wide for action; suppliers/knowers compete to underwrite a narrower band; challengers attack unjustified compression; restorers may later re-tighten after a widening event.
+- **Settlement:** immediate service payment can fund the active narrowed band window, while delayed settlement scores calibration, coverage, and decision-safety relative to the prior safe band. Under partial observability, the mechanism should settle first on whether the narrowed band remained admissible, not on whether the supplier guessed the exact point truth.
+
+**Why this is cleaner versus LMSR / orderbooks / batch auctions:**
+- LMSR/orderbooks/batch auctions clear **who is willing to hold directional exposure**.
+- A compression-style KM clears **who is willing to stand behind a tighter public ambiguity set**.
+The economic win condition is not “I moved the crowd estimate toward truth” but “I responsibly reduced the uncertainty the shared state must carry, and I am liable if I compressed it too far.” That is a more direct epistemic service than repricing belief inventory. (#r330)
+
+**Simplest viable mechanism sketch after #r330:**
+1. Register a canonical facet with a protocol-native safe band / ambiguity class and the bounded action interfaces that depend on it.
+2. A demander opens a defect/compression ticket because the current band is too wide for that action interface.
+3. Suppliers submit `(proposed narrower band, supporting evidence, bond, horizon)` against the current safe band.
+4. Protocol installs the narrowest admissible band that clears public tests and available bonded liability, or keeps `no_change` if no compression is justified.
+5. During the active window, challengers may post evidence and bond to prove the narrowed band is under-covered, miscalibrated, or semantically malformed.
+6. On breach, the facet widens to the prior safe band or the next coarser admissible class; part of the compressor’s bond burns.
+7. Later audit settles residual bond and facet-specific calibration reputation based on realized coverage / calibration quality, not just directional closeness. (#r330)
+
+**Strongest new reason this idea fails:**
+The deepest residual kill becomes **calibration theater / band semantics failure**. If the protocol cannot define what it means for a band to be well-calibrated, decision-relevant, and semantically stable, actors will game width instead of truth: publish bands that are formally narrow but operationally meaningless, exploit hidden correlations not represented in the band object, or choose ambiguity classes whose language flatters precision without carrying real decision content. Then the market becomes a game in selling cosmetically narrow confidence rather than real knowledge transfer. That is a sharper failure than generic ontology overload because it points to the exact place where a “knowledge marketplace” can fake epistemic improvement. (#r330)
+
+**Best surviving variant if even this correction is too ambitious:**
+Keep #r329’s defect-triggered court structure, but restrict the live product to a tiny registry of **protocol-native uncertainty surfaces** where band semantics are explicit and auditable-for example interval bounds, confidence tranches, or categorical ambiguity classes with clear downgrade rules. Everything else should stay passive, governance-owned, or handled by conventional PM discovery. That preserves the strongest surviving thread insight: the non-PM opportunity is not to trade beliefs better, but to finance **bounded, loss-bearing reduction of public uncertainty where a narrower shared state is genuinely decision-useful**. (ref: #r299, #r301, #r303, #r329, #r330)
+
 ### #r329 refinement - the KM should be sparse and defect-triggered, not a permanent rent market on every slot
 
 #r328 correctly stopped the mechanism from swallowing the full controller stack. The next correction is economic rather than control-theoretic: even a narrower design can still drift into overbuilt bureaucracy if **every canonical slot is continuously under paid insured stewardship by default**. That makes the market responsible for the whole live ontology all the time, which quietly reintroduces a heavy incumbency economy, permanent rent extraction, and specification overhead on coordinates that may not currently need active epistemic intervention. A real knowledge marketplace should probably activate only where there is a legible *state defect* or a live request for bounded restoration, not as a universal always-on lease layer. (#r329)
