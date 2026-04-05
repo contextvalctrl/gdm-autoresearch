@@ -21,36 +21,85 @@
 - **#r304** - 2026-04-05T10:42Z - Added a stronger demand-side and truth-side correction: the mechanism should clear insured decision-authority on canonical state slots, not abstract "knowledge access," and truth should settle only against pre-declared breach tests and authority tranches rather than holistic narrative correctness. This sharpens the conserved quantity into insured authority budget, kills the remaining "sell insights to buyers" branch as disguised consulting/PM language, and identifies authority-surface bureaucracy as the deepest remaining failure.
 - **#r305** - 2026-04-05T10:52Z - Tightened the surviving family from slot-level insured authority into action-scoped decision warrants: the mechanism should not merely defend canonical state slots, but insure bounded rights to trigger named downstream action classes from those slots. This clarifies what demand is actually buying, sharpens settlement around pre-declared action predicates instead of narrative state quality, and identifies action-surface design overload as the new deepest kill.
 - **#r306** - 2026-04-05T11:02Z - Split epistemic authorship from capital underwriting: the strongest surviving family should not make the same actor both propose state and insure its downstream warrants. Instead, stewards/authors supply defended state updates while separate underwriters price and absorb warrant risk. This sharpens the conserved quantity into scarce insured loss capacity rather than generic stake, explains more cleanly why capital improves epistemics, and identifies insurer cartelization / correlated-underwriting failure as the new deepest residual risk.
+- **#r307** - 2026-04-05T11:12Z - Refined the underwriting side further: the mechanism should clear standing capacity reservations on named decision-warrant classes, not ad hoc one-off insurance signatures on each state claim. Authors compete to attach defended state to pre-funded underwriting capacity; underwriters are paid for carrying revocable loss capacity, not for improvising after seeing narratives. This sharpens the conserved quantity into reserved insured action-capacity, makes the non-PM comparison cleaner against LMSR/orderbooks/batch auctions, and identifies underwriter cherry-picking / capacity starvation as the new deepest residual kill.
 
 ## 1. Base primitive - what exactly is being exchanged?
-The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
+The strongest surviving primitive is **reserved insured decision capacity on named action classes, attached to defended canonical state**. Not a probability share. Not belief inventory. Not a generic knowledge sale. The mechanism clears who may let a shared state facet drive action `a_k`, and whose balance sheet is reserved to absorb loss if that warrant was too broad or wrongly defended. (ref: #r305, #r306, #r307)
 
-## 2. State model - what is the global state vector and update rule?
-Global state is still `S = {s_i}` (domain posterior/interval objects), but `S` now updates by **bounded fusion of claims** into epoch batches, then **oracle correction** with confidence weighting. One epoch's claims cannot instantly retune the same-epoch payout; state-influencing updates and query settlement are separated by the mechanism clock.
+## 2. State model - what is the "global state vector" and how is it updated?
+The global state remains a protocol-native vector of canonical slots/facets, but each active authority tranche now maps to an explicit action-class set and an underwriting-capacity reservation. State updates are therefore **not** raw message inserts. The update path is:
+1. steward/author proposes or defends a facet state,
+2. pre-funded underwriting capacity attaches to the relevant action warrant class,
+3. the protocol activates, narrows, downgrades, or revokes that warrant based on public breach tests,
+4. restoration re-certifies the degraded facet and re-enables action classes tranche by tranche.
+A slot can lose decision authority before the protocol knows the final replacement state; degrade-first remains core. (ref: #r301, #r303, #r305, #r306, #r307)
 
-## 3. Credibility model - how does stake convert into trust?
-Stake becomes *weight* only through: (a) bounded function of escrow, (b) prior calibration, (c) recent consistency, (d) anti-correlation/identity penalties. The key conversion is loss: miscalibration destroys escrow and reduces future weight, so cheap lying is no longer affordable.
+## 3. Credibility model - how does capital stake convert into trustworthy information?
+Capital improves epistemics only when it becomes **loss-bearing insured capacity**, not louder voice. The clean split is:
+- authors/stewards earn epistemic standing by defending state quality,
+- underwriters earn underwriting standing by correctly reserving and pricing loss capacity on action warrants,
+- refuters earn only for proving active warranty/breach predicates false.
+Trust therefore comes from two linked but separate records: truth-tracking authorship and disciplined underwriting. A wealthy author without underwriting support should not gain broad authority; an underwriter should not be able to mint truth on capital alone. (ref: #r299, #r305, #r306, #r307)
 
-## 4. Market roles - askers/knowers vs bidders/unknowers?
-**Askers/knowers** post claims and back them with escrow. **Bidders/unknowers** buy access to state updates (not hedge positions). Payment flows from bidder pool to validated claimers; oracle is a separate truth-lane, and protocol collects only predefined fees.
+## 4. Market roles - what are askers/knowers, bidders/unknowers, and who pays whom?
+The bilateral story is now cleaner if expressed as operational roles:
+- **decision-warrant buyers / subscribers** pay to keep specific bounded action classes live,
+- **authors / stewards** propose and defend the state facets those actions rely on,
+- **underwriters** reserve insured loss capacity against those action classes,
+- **refuters / challengers** earn by proving the active warrant should be narrowed or revoked,
+- **restorers / re-certifiers** earn by re-enabling degraded action classes under fresh bond/capacity,
+- **protocol** defines slots, breach predicates, authority ladders, and settlement.
+So the low-information side is not buying beliefs; it is buying reliable permission to act from shared state. The high-information side is not just talking; it is coupling defended state with reserved loss-bearing capacity. (ref: #r305, #r306, #r307)
 
-## 5. Settlement - full truth vs partial truth?
-If truth resolves: apply bounded proper scoring and release/forfeit escrow proportionally. If partially observed: score on observed functionals first, defer unresolved components with haircut. If unresolved indefinitely: unlock principal minus fixed protocol fee; do not mint future credibility from unresolved evidence.
+## 5. Settlement model - what happens when truth resolves, and what if truth is only partially observed?
+Settlement is layered:
+1. **capacity/service settlement** - underwriters and stewards are paid for carrying active, challengeable warranted authority,
+2. **breach settlement** - if a refuter proves a warrant overbroad, the action set narrows immediately and preliminary losses/bond burns can occur,
+3. **degradation settlement** - affected facets fall to safer authority tranches or scoped degraded defaults,
+4. **re-certification settlement** - later candidates earn for restoring authority one tranche at a time,
+5. **truth settlement** - longer-horizon audit finalizes whether the prior grants, revocations, and restorations were substantively justified.
+Under partial observability, the protocol should settle only against pre-declared breach tests and authority tranches, not narrative "who was right overall" judgments. (ref: #r300, #r301, #r303, #r304, #r307)
 
-## 6. Attack surface
-Retained: bluffing, Sybil, wash trades, collusion, oracle gaming, cheap talk, and free-riding. Hardenings: commit-reveal windows, cluster penalties, cap on correlation-based boost, challenge/dispute, and explicit unresolved-claim branch. New correction: unresolved branch cannot silently reward credibility.
+## 6. Attack surface - manipulation, bluffing, sybil, wash credibility, collusion, cheap talk, oracle gaming
+The deepest remaining attacks are now mechanism-specific:
+- **underwriter cherry-picking** - insurers reserve capacity only for easy, low-risk warrants, starving exactly the hard-but-important epistemic surfaces,
+- **capacity starvation / cartelization** - a concentrated underwriting layer can ration action rights regardless of information quality,
+- **common-mode underwriting failure** - many warrants look separately safe but blow up together under the same hidden shock,
+- **author-underwriter collusion** - favored authors receive cheap capacity while outsiders are excluded,
+- **test-surface gaming** - actors optimize to public breach predicates rather than actual decision quality,
+- **shadow-action leakage** - revoked warrants remain informally used downstream.
+This supersedes the older generic cheap-talk framing. The mechanism now lives or dies on whether reserved loss capacity remains contestable, diverse, and genuinely coupled to decision risk. (ref: #r305, #r306, #r307)
 
-## 7. Why better/worse than LMSR/orderbooks/batch auctions?
-Better than LMSR/orderbooks when truth quality matters more than immediacy and depth is thin: influence tied to calibration, not raw buy-side power. Worse in hard-observability domains and early bootstrap (needs resolved truth and query willingness).
+## 7. Why this is better or worse than LMSR/orderbooks/batch auctions?
+The sharpest comparison now is:
+- **LMSR** clears the cost to move a public belief vector,
+- **orderbooks** clear transfers of contingent-claim inventory,
+- **batch auctions** clear that same inventory on a fairer clock,
+- **this KM family** clears reserved insured capacity for canonical state to drive bounded downstream actions.
+So the non-PM contribution is not a better pricing rule; it is a different product. This family is better where the core problem is maintaining auditable machine-usable decision authority on top of shared state. It is worse where users mainly want hedgeable exposure, deep external liquidity, or domains whose action classes cannot be standardized and insured cleanly. (ref: #r151, #r305, #r306, #r307)
 
 ## 8. Simplest viable mechanism sketch
-(1) claim-commit epoch: knower locks escrow and submits claim signal. (2) reveal & fuse epoch: bounded credibility-weighted update to `S` and Merkle commitment. (3) query epoch: unknowers buy authenticated state snapshots. (4) resolve epoch: score claims, pay/penalize escrow, update `cred`. Optional fallback query fee split by freshness.
+1. Register a canonical slot/facet with authority ladder, breach predicates, degraded defaults, and named action classes.
+2. Subscribers fund a standing budget for those action warrants.
+3. Underwriters reserve tranche-specific loss capacity on each named action class.
+4. Authors/stewards compete to supply defended state that can attach to that reserved capacity.
+5. If attached, the warrant goes live and the action class is enabled.
+6. Refuters can post evidence and bond to prove the active warrant should narrow or shut off.
+7. On successful breach, the protocol revokes the smallest defensible action set and degrades the linked facet authority.
+8. Restorers later post fresh bond/capacity to re-enable action classes one tranche at a time.
+9. Later truth/audit updates author quality, underwriting quality, and residual losses separately.
+This is the narrowest non-PM sketch that still preserves the split between epistemic authorship and insured action-capacity. (ref: #r303, #r305, #r306, #r307)
 
-## 9. Strongest failure mode
-If no reliable resolving process, the system becomes costly signaling and the "credibility" metric becomes manipulable narrative rank. This is structural, not implementation-only.
+## 9. Strongest reason this idea fails
+The strongest surviving kill is now: **the mechanism may become a market in scarce insurance paper rather than a market in epistemic improvement**. If underwriters can cherry-pick, cartelize capacity, or avoid exactly the action classes where new knowledge matters most, then authorship quality stops being decisive. The design would merely move the centralization problem from price impact to capacity allocation. That is structural, not a tuning bug. (#r306, #r307)
 
-## 10. Best surviving variant if raw idea fails
-Keep **credibility-gated continuous price layer** as companion: traditional orderbook/batch matching for liquidity and derivatives use, but order and quote impact must be capped by credibility and bounded escrow-backed accountability. Direct marketplace survives only where truth can be observed/reconciled.
+## 10. Best surviving variant if the raw idea is wrong
+The best fallback is now a **hybrid split architecture**:
+- keep this non-PM lane only for a small registry of protocol-critical, machine-enforced decision warrants with standardized action classes,
+- use separate underwriters only where downstream loss really justifies the complexity,
+- keep lower-stakes internal warrants on a simpler self-insured stewardship model,
+- and let conventional PM/orderbook/batch-auction machinery handle external disagreement, hedgeable exposure, and broad price discovery elsewhere.
+That preserves the deepest surviving insight: capital should improve epistemics by underwriting bounded decision rights from shared state, not by merely buying louder influence over a belief vector. (ref: #r305, #r306, #r307)
 
 ### Candidate families tested in this run
 - **A) direct knowledge-market**: kept as base, with unresolved-truth safety branch
@@ -28071,3 +28120,109 @@ If a separate underwriting layer is too heavy, the best surviving fallback is a 
 - and keep lower-stakes warrants on the simpler #r305 self-insured action-warrant model.
 
 That preserves the deepest surviving insight while avoiding full insurer-market complexity: the non-PM opportunity is not belief trading, but **capital-backed permissioning of downstream action from shared state, ideally with a clean split between epistemic authorship and loss-bearing capacity**. (ref: #r304, #r305, #r306)
+
+### #r307 refinement - underwriting should clear standing capacity reservations, not ad hoc signatures on narratives
+
+#r306 correctly separated epistemic authorship from capital underwriting. The next refinement is that the underwriting side is still too discretionary if each action warrant becomes live only when an insurer decides, case by case, whether to sign a specific author's narrative at the moment of activation. That leaves too much room for hidden favoritism, after-the-fact cherry-picking, and underwriter discretion to become the real gate. The stronger formulation is that the mechanism should clear **standing capacity reservations on named decision-warrant classes** first, and only then let authors compete to attach defended state to that reserved capacity. (#r307)
+
+This is more than market plumbing. It clarifies what the capital side is actually supplying:
+- not raw approval of a specific statement,
+- not ex post blessing of whichever author looks persuasive,
+- but **revocable loss-bearing capacity on a standardized action surface**.
+
+That pushes the family one step further away from PM logic. In LMSR/orderbooks/batch auctions, capital directly clears exposure. Here, capital should first clear **how much insured action-capacity exists for action class `a_k` at authority tranche `L_m`**, and only then can epistemic suppliers compete to occupy it. If underwriting is purely ad hoc, the mechanism risks becoming a private-dealer market in discretionary insurance signatures rather than a public market in accountable knowledge transfer. (#r307)
+
+**1. Base primitive**
+What is exchanged is now best stated as:
+`reserved insured action-capacity on named warrant class (a_k, L_m), later attachable to defended canonical state`
+not merely
+`insurance attached to a specific author's warrant at the moment they appear`.
+
+This supersedes the looser #r306 reading in which underwriting was correctly separated from authorship but still implicitly quote-by-quote. The scarce thing is not just willingness to insure a message. It is reserved balance-sheet room for a standardized downstream permission class. (#r307)
+
+**2. State model**
+Each active facet / authority tranche should now reference two linked objects:
+- a defended state object supplied by an author/steward,
+- a capacity reservation supplied by one or more underwriters for the relevant action class.
+
+The update rule therefore sharpens to:
+1. protocol defines slot/facet, authority ladder, and named action classes
+2. underwriters pre-commit capacity to those action classes under public loss predicates
+3. authors compete to attach defended state to available capacity
+4. only attached state can activate the warrant
+5. breach revokes the warrant and frees or burns capacity depending on fault
+6. restoration later reattaches fresh state to fresh or surviving capacity
+
+This is stronger than #r306 because it turns underwriting into a protocol legible state variable rather than an opaque bilateral side-deal. (#r307)
+
+**3. Credibility model**
+Capital now maps to epistemics through **capacity reservation quality**, not just willingness to self-insure or selectively back favored authors. Underwriters should build track record on:
+- loss pricing by action class,
+- availability when difficult but worthwhile warrants need capacity,
+- diversification against common-mode breach,
+- behavior under stress (did they disappear when hard decisions arrived?).
+
+This sharpens the answer to the core question again. Money improves epistemics only when it creates reliable, contestable availability of insured action-capacity. If the underwriting layer only appears after narratives are already selected, capital is once again mostly filtering social trust rather than improving the mechanism's public reliability. (#r307)
+
+**4. Market roles**
+The role split becomes:
+- **subscribers / demand side:** fund standing warrant classes that matter operationally
+- **underwriters:** reserve capacity on those warrant classes in advance
+- **authors / stewards:** compete to fill that reserved capacity with defended state
+- **refuters:** earn by proving an attached warrant should be narrowed or revoked
+- **restorers:** compete to refill freed/degraded capacity after breach
+- **protocol:** matches reserved capacity with defended state and enforces the attachment rules
+
+This is a better answer to the original high-information / low-information metaphor. Information does not flow bilaterally from knower to buyer. Instead, high-information suppliers compete for scarce insured action-capacity funded by the low-information side because the low-information side wants reliable permission to act. (#r307)
+
+**5. Settlement model**
+Settlement should now distinguish:
+1. **capacity reservation rent** - underwriters earn for making tranche-specific capacity available even before a specific author occupies it
+2. **attachment/service rent** - authors/stewards earn while their defended state is actively using that capacity
+3. **breach settlement** - if a warrant is overbroad, capacity is burned or repriced and the attached author's warrant is revoked/narrowed
+4. **restoration settlement** - fresh capacity/state pairings can later restore the action class
+5. **truth settlement** - long-run audit finalizes whether the reservation, attachment, revocation, and restoration were substantively justified
+
+This is important because it prevents underwriters from being paid only for easy ex post selection. They must be economically present before the protocol knows which author/state will ultimately deserve the slot. (#r307)
+
+**6. Attack surface**
+This refinement changes the residual failure surface again:
+- **underwriter cherry-picking:** underwriters reserve only easy capacity classes, leaving hard but important actions unfunded
+- **capacity starvation:** the market may produce too little reserved loss capacity on exactly the classes where epistemic improvement is needed most
+- **reservation spoofing:** underwriters post capacity they later try to withdraw or strategically avoid attaching when controversy appears
+- **dealer capture:** a small insurer set effectively controls which authors can ever go live because they own most capacity on key action classes
+- **empty-capacity equilibrium:** lots of reserved paper exists, but authors cannot meet the attachment standard, so the mechanism becomes idle bureaucracy
+
+This supersedes #r306's generic cartelization concern with a sharper one: the deepest risk is not only insurer concentration, but **mismatch between where capacity is reserved and where truth-improving state actually needs to go live**. (#r307)
+
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**
+This sharpens the comparison one more step:
+- **LMSR:** capital continuously moves a belief vector
+- **orderbooks:** capital continuously transfers contingent exposure
+- **batch auctions:** clear that same exposure on a fairer clock
+- **capacity-reservation KM:** capital reserves loss-bearing room for bounded downstream permissions, and epistemic suppliers compete to occupy that room with defended canonical state
+
+It is better when the problem is not exposure transfer but reliable, budgeted permissioning of action from shared state. It is worse when underwriting demand is too thin, when action classes cannot be standardized, or when private-dealer insurance dynamics overwhelm the truth-maintenance goal. (#r307)
+
+**8. Simplest viable mechanism sketch**
+The narrowest strong version now looks like:
+1. Register canonical slot/facet with authority ladder and named action classes.
+2. Subscribers fund standing budgets for those action classes.
+3. Underwriters reserve tranche-specific capacity against public breach predicates.
+4. Authors submit defended state proposals that can attach only to already reserved capacity.
+5. Attached proposals activate warrants and earn service rent while in force.
+6. Refuters can post evidence and bond to narrow or revoke active warrants.
+7. Successful breach burns/reprices capacity and degrades the linked facet authority.
+8. Restoration later reuses surviving capacity or clears fresh reserved capacity before reactivation.
+9. Long-run truth updates author scores and underwriting scores separately. (#r307)
+
+**9. Strongest reason this still fails**
+The strongest remaining kill is now: the mechanism may become a market in scarce underwriting reservations rather than a market in epistemic improvement. If the hard problem becomes "who controls capacity on key action classes?" then the system has only relocated the bottleneck from price setters to insurance dealers. That would still violate the spirit of the original prompt. (#r307)
+
+**10. Best surviving variant if this refinement is still wrong**
+If standing-capacity markets are too heavy, the best fallback is a **tiered hybrid**:
+- keep standing reservations only for a tiny set of protocol-critical, machine-enforced action classes,
+- let smaller or lower-stakes warrants use the simpler #r306 model where underwriters attach more directly to specific warrants,
+- and keep conventional PM / orderbook / batch-auction machinery for broad disagreement discovery and hedgeable exposure.
+
+That preserves the strongest surviving insight after #r307: the non-PM opportunity is not belief matching, but **pre-funded, contestable underwriting of bounded action rights from shared state**. (ref: #r305, #r306, #r307)
