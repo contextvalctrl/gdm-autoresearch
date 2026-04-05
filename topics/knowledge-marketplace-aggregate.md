@@ -13,6 +13,7 @@
 - **#r296** - 2026-04-05T09:22Z - Refined the clearing primitive again: the strongest non-PM family should clear challengeable displacement rights against an incumbent state, not open-ended install rights. This makes the market about paying for falsifiable replacement pressure on canonical slots, sharply separates discovery from maintenance, and identifies bounty-chasing churn on weakly specified slots as the main surviving failure.
 - **#r297** - 2026-04-05T09:32Z - Added a sharper mechanism split between discovery and adoption: raw evidence should not automatically move canonical state. The strongest surviving family now uses a two-stage path where challengers first earn bonded displacement rights by producing admissible evidence, and only then does the protocol decide whether canonical state should actually switch. This closes the last “pay for saying new things” drift, clarifies that the conserved quantity is contestable state authority rather than message flow, and identifies evidence-admission bottlenecks as the main surviving failure.
 - **#r298** - 2026-04-05T09:42Z - Tightened the surviving family from generic contest rights into bonded repair options on canonical slots: capital should buy the right to force a bounded corrective action if the incumbent state is shown inadequate, not a generic right to speak, install, or trade belief. This makes the exchanged object an exercisable correction option rather than message flow, sharpens why capital improves epistemics only when it finances credible overwrite/repair capacity, and identifies option-exercise adjudication as the new deepest failure surface.
+- **#r299** - 2026-04-05T09:52Z - Refined the family one step further from generic repair-option exercise into falsification-first epistemic insurance: the cleanest non-PM mechanism does not directly pay for proposing a new state, but for underwriting and then proving/refuting bounded state warranties on canonical slots. This sharpens the ask/bid split into warranty sellers vs assurance buyers, cleanly separates refutation from replacement, and identifies warranty-specification brittleness as the deepest remaining kill.
 
 ## 1. Base primitive - what exactly is being exchanged?
 The exchange unit is a **forfeitable epistemic claim contract**: a claim statement + distributional form + proof-policy + committed escrow. Not a side-bet. Not a probability share. Counterparty is uncertainty itself, priced via bounded access demand.
@@ -206,6 +207,120 @@ If explicit displacement markets are too gameable, the best surviving fallback i
 - service rent stays thin; most economics stay in the PM core
 
 That preserves the deepest surviving insight of the whole thread: capital should buy accountable correction rights on shared state, not just speculative inventory over crowd belief. (ref: #r151, #r295, #r296)
+
+### #r299 refinement - the strongest surviving non-PM family is falsification-first epistemic insurance
+
+#r298 correctly tightened the object into a bonded repair option on a canonical slot. The next refinement is that even a repair-option framing still risks overpaying for *proposed replacement* rather than for *demonstrated inadequacy of the incumbent*. The cleaner non-PM formulation is therefore more asymmetric:
+
+- the protocol should pay continuous rent for a bounded **state warranty** on a canonical slot,
+- and it should pay episodic bounty only for **successful falsification / justified refutation** of that warranty,
+- with replacement as a secondary consequence rather than the primary traded object.
+
+That is a meaningful shift. It means the live market is not fundamentally "who gets to install a new state?" It is "who is willing to insure that the current canonical state remains inside an admissible error region, and who is willing to spend bonded capital proving that warranty is false?" (#r299)
+
+This better matches the prompt's high-information to low-information transfer intuition without collapsing into an orderbook or LMSR. The low-information side is not buying a belief token. It is buying **assurance that a shared state slot is being credibly defended and remains challengeable**. The high-information side does not mainly monetize voice; it monetizes either (a) selling defensible warranty capacity on the slot, or (b) earning bounty by falsifying a bad warranty. Capital improves epistemics only because it underwrites a claim that can be broken. (#r299)
+
+**Candidate families after this refinement:**
+
+1. **Knowledge sale / bilateral belief transfer** - still dead.  
+   Too symmetric, too message-centric, and it quietly reintroduces tradeable belief inventory. Rejected again. (#r299)
+
+2. **Repair-option market** - still viable, but too installer-centric as the default.  
+   Useful as a bounded action layer after a slot has been shown deficient, but weak as the base primitive because it still makes "what should replace the incumbent?" the center of the market too early. (#r298, #r299)
+
+3. **Warranty + refutation market** - strongest surviving family.  
+   Canonical slots are continuously insured under bond; challengers earn only by opening and winning falsification of that insured adequacy claim; repair/replacement is downstream from that falsification event. This is the cleanest surviving non-PM formulation because it pays for accountable maintenance and accountable refutation, not for belief inventory or novelty. (#r299)
+
+**1. Base primitive**  
+What is exchanged is now best stated as:
+`bounded state warranty on canonical slot s_i, plus bonded right to refute that warranty`
+not merely
+`repair option`
+and not
+`new estimate of s_i`.
+
+The primary object is the warranty itself: "the current state on `s_i` is inside tolerance ε over horizon H, subject to challenge." The secondary object is a bonded refutation right. Replacement matters only if the warranty fails. (#r299)
+
+**2. State model**  
+Each canonical slot now has:
+- incumbent state `x_i`
+- admissible error region / adequacy band `A_i`
+- warranty holder bond
+- refutation entry condition
+- repair menu used only after warranty breach is established
+
+So the update rule becomes:
+1. maintain incumbent state under active warranty
+2. allow challengers to submit bonded refutation evidence
+3. decide whether the warranty has been breached
+4. only then invoke bounded corrective action: `{no_change, patch, replace_state, replace_steward}`
+
+This is tighter than #r298 because it splits **warranty breach adjudication** from **repair action selection**. That reduces the risk that the market pays too directly for replacement proposals. (#r299)
+
+**3. Credibility model**  
+Capital now maps to epistemics through two opposed insurance roles:
+- **warranty bond** = liability for defending a slot that later proves outside tolerance
+- **refutation bond** = liability for forcing review when the warranty was actually sound
+
+The clean answer to "why does money improve epistemics?" is now: money buys the ability to issue or break a bounded state warranty under downside. Not louder opinion. Not larger directional exposure. Capital is useful only because false defense and false challenge both burn it. (#r299)
+
+**4. Market roles**  
+The ask/bid split is cleaner if expressed as:
+- **assurance buyers / subscribers:** pay for continued defended adequacy of canonical slot `s_i`
+- **warranty writers / stewards:** collect service rent while underwriting the slot's adequacy under bond
+- **refuters / challengers:** post bond to prove the warranty is false and earn breach bounty if successful
+- **protocol / arbiter:** determines breach, triggers repair menu, and later settles truth-linked residual bonds
+
+This preserves the user's two-sided intuition but grounds it in state insurance, not bilateral opinion sale. The high-information zone is either selling defensible assurance or spending capital to puncture false assurance. The low-information zone is paying for reliable defended state. (#r299)
+
+**5. Settlement model**  
+Settlement should now be understood in three layers:
+1. **service settlement** - warranty writer earns rent while the slot remains inside policy and survives challenge
+2. **breach settlement** - if a challenger proves warranty breach, part of warranty bond transfers immediately and the repair menu activates
+3. **truth settlement** - later audit decides whether the breach decision and resulting repair action were substantively correct
+
+Under partial observability, the protocol can often say "this warranty was credibly breached" earlier than it can say "this replacement was globally correct." That is useful: the system can reward genuine falsification pressure without paying directly for raw novelty. (#r299)
+
+**6. Attack surface**  
+This refinement changes the main residual attacks again:
+- **warranty-spec gaming:** adequacy bands are written so loosely that warranty sellers farm rent with little real epistemic burden
+- **breach theater:** challengers optimize for procedural breach of the published warranty rather than actual truth improvement
+- **safe-but-useless slots:** canonical state remains formally inside tolerance while being too coarse to matter for real decisions
+- **arbiter capture:** whoever defines warranty scope effectively defines the economic meaning of knowledge quality
+
+This supersedes #r298's generic exercise-condition concern. The deeper kill is now whether the protocol can define warranties whose breach genuinely tracks epistemic failure rather than formal noncompliance. (#r299)
+
+**7. Why this is better or worse than LMSR / orderbooks / batch auctions**  
+This is the sharpest contrast so far:
+- **LMSR:** capital buys movement in a public belief vector
+- **orderbooks:** capital buys and sells contingent-claim inventory
+- **batch auctions:** clear that same inventory on a fairer clock
+- **warranty/refutation KM:** capital underwrites defended adequacy of canonical state and finances falsification of bad adequacy claims
+
+It is better where the product is a repeatedly consumed canonical world-model and the key economic need is trusted maintenance under challenge. It is worse where users mainly want tradable exposure, or where no one can write an adequacy warranty that is both public and decision-relevant. (#r299)
+
+**8. Simplest viable mechanism sketch**  
+The narrowest strong mechanism is now:
+1. Register canonical slot `s_i` with incumbent state, adequacy band `A_i`, service rent, and delayed truth policy.
+2. Install a warranty writer / steward who posts bond and earns rent while the slot is in good standing.
+3. Allow challengers to post `(evidence_package, refutation_bond)` against the active warranty.
+4. Protocol decides whether the warranty is breached.
+5. If not breached, challenger loses bond/fee.
+6. If breached, part of warranty bond transfers, and only then does the protocol invoke a bounded repair action: patch, replace state, replace steward, or revert to safe default.
+7. Later truth/audit settles residual bonds and slot-specific credibility.
+
+This is cleaner than making replacement bids primary. The market first clears *whether the incumbent assurance survives*, then only secondarily *what corrective action follows*. (#r299)
+
+**9. Strongest reason this still fails**  
+The strongest remaining kill is now: the protocol may be unable to specify warranties that are simultaneously (a) public enough to adjudicate cheaply, (b) tight enough to mean something decision-relevant, and (c) robust enough to resist procedural breach-farming. If warranty design is weak, the whole mechanism becomes an insurance theater around underspecified slots. (#r299)
+
+**10. Best surviving variant if this refinement is still wrong**  
+If general warranty markets are too brittle, the best fallback is a **narrow falsification layer on top of either slot leasing or PM discovery**:
+- keep only a tiny registry of protocol-critical slots with public warranties,
+- reward bonded refutation of those slots,
+- let PM / batch-auction machinery or ordinary slot stewardship handle broader discovery elsewhere.
+
+That preserves the deepest surviving insight of the thread: the non-PM contribution is not "knowledge trading" but **capital-backed, challengeable assurance on shared state**. (ref: #r295, #r296, #r297, #r298, #r299)
 
 ### #r298 refinement - the strongest non-PM form is a market in bonded repair options on canonical state
 
