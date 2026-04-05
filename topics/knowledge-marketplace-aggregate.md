@@ -1,12 +1,65 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r342** - 2026-04-05T17:22Z - Added a proof-reuse correction: even evidentiary-closure clearing still overpays if the same admissible proof can be resold across time or neighboring frontiers. The stronger surviving form mints protocol-native closure certificates / exclusion assets once, routes later frontier settlement through those certificates, and pays fresh primary bounty only for net-new closure, refresh, or extension beyond already-certified evidence.
 - **#r341** - 2026-04-05T17:12Z - Added a resolution-discipline correction: even perishable paired default defense still fails if frontier breach is judged against open-ended narrative truth. The stronger surviving form settles only against protocol-native evidentiary closure operators that can justify unlock, continuation, or downgrade on the same admissibility lattice, so capital pays for producing decisive public exclusion/entitlement evidence rather than for winning rhetorical truth contests.
 - **#r339** - 2026-04-05T16:52Z - Added a demand-bias correction: even subscription-backed unlock frontiers become preference markets if only would-be beneficiaries fund the unlock side. The stronger surviving form pairs every paid frontier with a bonded default-defense / no-unlock lane, so capital must defeat an explicit conservative warranty before authority changes and money measures willingness to bear epistemic liability, not just eagerness to see a favored unlock.
 - **#r338** - 2026-04-05T16:42Z - Added an anti-free-rider correction: even pooled unlock-frontier clearing underproduces if later beneficiaries can join only after the frontier is crossed and suppliers can wait for bounty thickening. The stronger surviving form uses ex ante frontier subscriptions / standing beneficiary rosters plus controlled retroactive cost-sharing, so payment attaches to precommitted demand for a shared unlock rather than to opportunistic post-unlock hitchhiking.
 - **#r337** - 2026-04-05T16:32Z - Added a shared-demand correction: even ticket-terminated decision-unlock markets still misprice when the same elimination simultaneously unlocks several tickets or action surfaces. The stronger surviving form clears against protocol-native unlock frontiers with pooled demand aggregation and anti-duplication payout caps, so one epistemic act cannot farm multiple cloned bounties unless it truly creates additional action-distinct authority.
 
 - **#r340** - 2026-04-05T17:12Z - Added a timeout/anti-stall correction: paired unlock and default-defense lanes still fail if defended no-unlock can persist indefinitely under weak observability. The stronger surviving form makes every default warranty explicitly perishable, with expiry, decay, and mandatory downgrade to a coarser safe state if neither side can justify authority by the deadline, so capital cannot simply fund epistemic gridlock.
+
+### #r342 refinement - evidentiary closure still fails unless public proof objects are first-class and cannot be resold as fresh closure each time
+
+#r341 correctly fixed the resolution-discipline problem by requiring every unlock, continuation, and downgrade dispute to settle against a common evidentiary-closure operator. But even that stronger form still fails if the same admissible evidence can be sold over and over as if it were new epistemic work each time a neighboring frontier, later subscriber cohort, or downstream action surface wants to rely on it. Then the mechanism recreates a slower form of inventory trading: the scarce object is no longer net-new closure on shared uncertainty, but repeated monetization of already-public proof. That collapses the KM back toward resale of informational inventory rather than funded transfer from high-information zones to low-information zones. The stronger surviving form is therefore **certificate-based closure clearing**. The protocol should mint first-class public closure certificates / exclusion assets when admissible evidence actually closes some part of the lattice, and later frontier settlement should route through those certificates. Fresh primary bounty should attach only to net-new closure, refresh of expiring certificates, or extension beyond the already-certified boundary. (#r342)
+
+This is a real mechanism correction, not document hygiene. #r337 already killed duplicate payout across simultaneously overlapping tickets. #r342 kills the next failure: **temporal and downstream resale of the same closure proof**. Once a proof has already produced a protocol-native exclusion certificate, later users are not buying the same epistemic act again. They are buying one of three different things:
+1. **certificate reuse** - consume authority already justified by an existing public proof object,
+2. **certificate refresh** - re-establish a decayed / expired certificate for a new horizon,
+3. **certificate extension** - push the boundary beyond the currently certified closure set.
+Only the second and third should open meaningful new primary payout. Otherwise the mechanism turns into a market for repeatedly packaging the same public evidence as if each downstream demander had funded a distinct information transfer. A knowledge marketplace should monetize the first creation of public closure, plus its genuine maintenance or widening-not endless replay value on already-certified proof. (#r342)
+
+The family triage after this correction is:
+
+1. **Evidentiary-closure frontiers without first-class proof objects** - dead.
+   Better than narrative adjudication, but still lets suppliers repeatedly resell already-admissible evidence as "new closure" across time or adjacent frontiers. (#r337, #r341, #r342)
+
+2. **Frontier-native closure with ad hoc overlap checks but no certificate graph** - no longer preferred.
+   Better than raw resale, but still structurally weak because the protocol cannot cleanly tell whether a new claim created net-new closure or merely rewrapped existing admissible proof. (#r337, #r341, #r342)
+
+3. **Defect-triggered, order-independent unlock-frontier clearing with paired perishable warranties, shared evidentiary closure rules, and a certificate graph for reusable proof assets** - strongest surviving refinement.
+   Keep #r329's sparse defect chassis, #r333's action-equivalence partition, #r334's boundary-crossing credit rule, #r335's order-independent necessity accounting, #r336's stopping rule, #r337's pooled frontier clearing, #r338's beneficiary ledger, #r339's paired warranty logic, #r340's expiry/decay rule, and #r341's closure lattice, but require the protocol to mint public proof/certificate objects whenever admissible evidence closes a named uncertainty slice. Frontier settlement should then pay primarily for new certificate creation, certificate refresh after decay, or certified extension into wider authority-not for repeated rhetorical resale of an already-public proof asset. (#r342)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** a bonded contest to create, refresh, or extend a protocol-native closure certificate on a named public uncertainty frontier.
+- **State model:** the global state must now track not only live classes, action menus, frontiers, beneficiary ledgers, paired warranty status, horizons, decay schedules, downgrade targets, and closure lattices, but also a **certificate graph** showing which admissible proofs have already closed which uncertainty slices and which frontiers inherit authority from them.
+- **Credibility model:** capital converts into trust only when stake is subordinated to a public closure rule **and** paid mainly for first creation or justified maintenance of public proof objects. Money should buy exposure to whether a new certificate was warranted, not repeated resale margin on certificates the protocol already minted. (#r342)
+- **Market roles:** demanders/subscribers fund desired frontiers; default-defenders still bond conservative fallback; eliminators/proof-submitters still try to breach it; but now certificate maintainers / refreshers matter because some epistemic work is no longer proving from scratch but sustaining the validity horizon of existing proof objects.
+- **Settlement:** first evaluate whether submitted evidence creates a new certificate, refreshes an expiring one, or extends an existing certificate graph to a wider frontier. New-certificate and extension events can earn primary payout; pure reuse should clear through service/access accounting instead. (#r342)
+
+**Why this is cleaner versus LMSR / orderbooks / batch auctions:**
+- LMSR, orderbooks, and batch auctions are comfortable with repeated inventory turnover on the same underlying state move.
+- #r341 already changed the object from directional exposure to closure capacity.
+- #r342 sharpens the break again: even closure capacity should not behave like reusable speculative inventory. The scarce object is **first-class public proof creation and maintenance**, not the right to keep selling the same proof to whoever arrives later.
+- That is a different conserved quantity than tradable belief exposure or repeated ticket inventory. It is closer to a proof-maintenance ledger for shared state authority. (#r342)
+
+**Simplest viable mechanism sketch after #r342:**
+1. Register a canonical facet with protocol-native regions, action-equivalence collapse, public action maps, a named fallback/unresolved state for each unlock frontier, an explicit closure lattice for `continue / breach / downgrade`, and a certificate schema defining what proof objects can be minted.
+2. For each frontier, open paired unlock/default lanes with explicit horizon and decay schedule as in #r340-#r341.
+3. Demanders subscribe ex ante to frontiers they want unlocked and receive beneficiary status if the frontier is later crossed.
+4. Suppliers submit evidence moves under bond, but accepted moves now either `(a)` mint a new exclusion / entitlement certificate, `(b)` refresh an expiring certificate for a new horizon, or `(c)` extend an existing certificate graph to a wider boundary.
+5. Protocol accepts only evidence moves that satisfy public admissibility tests and records resulting certificate objects in the shared state.
+6. Frontier closure checks consume the certificate graph rather than naively treating each new demander as opening a fresh proof contest from zero.
+7. If a frontier is crossed only because already-minted certificates were sufficient, later demand mainly clears through beneficiary/service accounting, not a reopened primary epistemic bounty.
+8. If new evidence widens the certified closure set or revalidates an expired certificate, that fresh marginal work may earn bounded payout by a public split rule.
+9. At expiry, certificates decay or downgrade according to the same closure lattice and horizon policy, so refresh work is economically distinct from mere historical authorship.
+10. Challengers may dispute fake novelty claims, wrongful certificate reuse, stale-certificate reliance, or attempts to double-sell one proof asset across neighboring frontiers without real extension. (#r342)
+
+**Strongest new reason this idea fails:**
+The deepest residual kill becomes **certificate-graph bureaucracy / proof-asset ontology capture**. If the protocol cannot define when two admissible proofs are substantively the same certificate, when refresh is truly distinct from extension, or how far downstream authority inheritance should propagate, actors will game novelty claims and the system will drown in proof-lineage disputes. This is sharper than #r341's closure-lattice capture because it targets the exact new abstraction introduced here: whether reusable public proof objects can be formalized without turning the KM into a bureaucratic certificate registry. (#r342)
+
+**Best surviving variant if even this correction is too ambitious:**
+Keep #r341's evidentiary-closure logic, but restrict paid frontiers to a small set of domains where the protocol can publish a compact certificate schema and robust overlap/refresh rules-for example monotone eliminations, threshold attestations, and scheduled re-certification windows. Where proof objects cannot be made first-class, do not promise rich repeated paid closure there. That preserves the strongest surviving thread insight so far: the non-PM opportunity is not to let money move belief, nor merely to pay for closure stories, but to finance **loss-bearing creation and bounded maintenance of reusable public proof objects that close named canonical uncertainty frontiers under paired liability, explicit expiry, and automatic downgrade when closure cannot be renewed**. (ref: #r337, #r339, #r340, #r341, #r342)
 
 ### #r341 refinement - perishable default defense still fails unless unlock, continuation, and downgrade all settle on the same protocol-native evidentiary closure rule
 
