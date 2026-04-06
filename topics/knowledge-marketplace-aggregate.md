@@ -1,9 +1,88 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r386** - 2026-04-06T00:44Z - Added an action-leverage correction: even anti-holdup complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless payout and liability are indexed to the induced action leverage and rollback cost of the state update. Otherwise suppliers can monetize claims that trigger large, hard-to-reverse control moves while posting liability that is tiny relative to downstream damage.
 - **#r385** - 2026-04-06T00:34Z - Added an anti-holdup correction: even complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless indispensable complements can be provisionally reserved and progressively priced before the bundle is nearly complete. Otherwise late-stage complement owners can wait, observe assembly progress, and extract most of the surplus through epistemic hold-up.
 - **#r384** - 2026-04-06T00:24Z - Added a complement-assembly correction: even inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless the protocol can score bundle-complete state contraction and route payout across complementary contributors. Otherwise only the visible last-mile integrator gets paid, precursor fragments are underfunded, and the market selects for presentable synthesis over real distributed knowledge production.
 - **#r383** - 2026-04-06T00:15Z - Added an inevitability-subtraction correction: even demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless payout is scored against a declared baseline arrival process for the same state contraction. Otherwise suppliers can monetize tiny lead-time on knowledge that was about to become available anyway, and capital buys temporal skimming rather than real epistemic transfer.
+
+### #r386 refinement - even anti-holdup complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting fails unless payout and posted downside are indexed to induced action leverage and rollback cost, because otherwise the mechanism over-rewards state updates that can trigger large irreversible control moves with too little supplier skin in the game
+
+#r385 correctly killed ex post complement hold-up by forcing likely indispensable complements to reserve and price themselves before bundle completion is obvious. But even that stronger family still fails if the protocol scores epistemic contribution mainly by state contraction and decision pivot while leaving a separate hidden variable underpriced: **how much real-world control the update unlocks, and how reversible the induced move is if the update later degrades**. Two updates can produce the same nominal contraction and the same decision pivot, yet differ radically in downstream leverage. One might only reorder a monitoring queue for an hour; another might trigger capital deployment, irreversible legal disclosure, or shutdown of an operating system that is costly to restart. If both clear against similar payout and similar bond sizing, suppliers are pushed toward **high-leverage epistemic overreach**: packaging updates that barely clear the evidentiary threshold but can move large control surfaces whose rollback cost far exceeds posted downside. In that world capital is not improving epistemics through credibility transfer. It is renting under-collateralized control authority. The stronger surviving form is therefore **action-leverage-indexed anti-holdup complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting**. Payment should attach not just to how much admissible state moved, but to how much control leverage the state movement was allowed to exercise and what rollback budget or residual-loss envelope the supplier actually underwrote. (#r386)
+
+This is a real mechanism correction, not just risk management garnish. #r374 forced implementation commitment so paid updates had to govern action rather than paper posture. #r371 forced decision-pivot scoring so operationally inert truth would not be overpaid. #r385 forced complement reservation so assembly bargaining power could not be extracted at the edge of completion. #r386 kills the next failure: **under-collateralized action leverage**. A knowledge marketplace should now distinguish among:
+1. local tranche validity,
+2. global state coherence,
+3. demand-side consequence legibility,
+4. marginal state improvement,
+5. timeliness of transfer,
+6. calibration of residual uncertainty,
+7. staged resolvability,
+8. diagnostic contribution,
+9. observability surface maintenance,
+10. decision-pivot effect,
+11. decision-contract lock,
+12. baseline sensing obligation,
+13. implementation commitment,
+14. public-state accretion,
+15. minimal sufficient disclosure,
+16. spillover internalization,
+17. provenance-linked liability,
+18. canonical inherited frontier,
+19. incremental novelty discipline,
+20. ontology stability,
+21. transportability scope,
+22. transfer map,
+23. canonical demand partition,
+24. overlap subtraction,
+25. baseline arrival process,
+26. inevitability subtraction,
+27. complement assembly graph,
+28. assembly payout routing,
+29. provisional complement reservation,
+30. progressive complement pricing,
+31. action leverage index - each admissible update carries a typed measure of what control surfaces it can move, how much resource or policy mass it can reallocate, and what downstream loss can be induced before later correction,
+32. rollback cost envelope - each induced action class carries a public estimate or bound on reversibility, recovery latency, and residual damage if the update later proves overstated,
+33. leverage-aligned bonding - payout ceilings, bond floors, clawback paths, and maturity release must scale with action leverage and rollback cost rather than only with apparent informational novelty,
+34. under-collateralized action leverage - suppliers collect for triggering large, sticky, or irreversible control moves while exposing only small downside if the underlying epistemic transfer later fails.
+Only the first thirty-three belong in the mechanism. The thirty-fourth collapses the family into a market where the highest-return strategy is not to deliver the most reliable knowledge, but to attach marginal evidence to the most levered action surface. If liability does not scale with induced control, capital funds epistemic gear ratios rather than trustworthy transfer. (#r386)
+
+The family triage after this correction is:
+
+1. Anti-holdup complement-assembly-aware systems that score payout on state contraction and decision pivot but not on induced control leverage - dead.
+   Better than flat advisory markets and better than assembly-capture markets, but still unstable because suppliers can rationally target update classes whose downstream control impact dominates their posted downside. (#r385, #r386)
+
+2. Systems that rely on organizational governance outside the protocol to decide which action classes are too levered for a given bond size - also weak.
+   Better than pure under-collateralization, but still structurally weak because the seam that determines whether capital improves epistemics or merely rents control is exactly the leverage-to-liability schedule, and that seam cannot live in soft ex post judgment. (#r386)
+
+3. Strongest surviving family: **action-leverage-indexed anti-holdup complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition markets**.
+   Keep #r360-#r385's surviving stack, but require each implementation-committed ask cell and each bundle-complete assembly to publish an **action-leverage schedule**: what control rights are unlocked at each confidence / maturity stage, what rollback cost class each action belongs to, what bond multiple is required to trigger that class, what clawback path survives later challenge, and when a contribution is only allowed to move a low-reversibility-preview tier rather than the full operational action. Fresh payout should attach to marginal contraction after all prior subtraction rules, but supplier downside and action permissions must scale with the irreversible mass of the induced control move. (#r386)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** not just anti-holdup complement-aware authority transfer. The exchanged object is **action-leverage-indexed anti-holdup complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivoting, observability-backed diagnostic staged-resolvable calibrated timely marginal contraction of admissible state under liability**.
+- **State model:** the global state vector must now carry a **control-surface layer** in addition to the reservation and assembly layers: action classes, leverage coefficients, rollback windows, reversibility buckets, maximum unlocked resource reallocation, pending clawback exposure, and maturity gates for escalating from preview action to full action. A paid update does not just change belief or trigger a named decision; it carries a bounded amount of operational force. (#r386)
+- **Credibility model:** capital becomes trustworthy only when it is junior not just to wrong claims, wrapper resale, ontology churn, demand slicing, inevitability skimming, last-mile assembly capture, and complement hold-up, but also to the temptation to attach barely adequate evidence to highly levered action surfaces. Money should buy warranted authority transition, not cheap optionality over other people's operational downside. (#r386)
+- **Market roles:** along with assembly custodians and reservation custodians, **action-leverage custodians / rollback auditors** become first-class because some of the highest-stakes economic questions are whether a claimed update was permitted to move too much control relative to its bond and residual challengeability. (#r386)
+- **Settlement:** in addition to all prior criteria, the mechanism must settle what action class was actually unlocked, whether the supplier posted the required leverage-aligned downside, whether the induced move was reversible inside the declared rollback envelope, whether later degradation should claw back only payout or also control privileges, and whether a buyer escalated action beyond the stage justified by the artifact's maturity. (#r386)
+
+**Why this is better or worse than LMSR / orderbooks / batch auctions:**
+- **Better:** it directly captures something those mechanisms largely externalize. Prices can influence action, but the exchange does not itself usually grant typed operational control. A knowledge market that claims to sell actionable updates must price the leverage of that action right, not just the informational delta.
+- **Better:** it sharpens why capital improves epistemics: capital should underwrite the downside of moving control under uncertainty, not merely reward whoever can trigger the biggest downstream response with the thinnest evidence.
+- **Worse:** it adds a control-rights schedule. If action leverage and rollback cost cannot be typed compactly, the protocol becomes governance over what actions knowledge is allowed to cause at each maturity stage.
+So the edge remains real only where control surfaces and reversibility classes can be discretized rather than argued case by case. (#r386)
+
+**Simplest viable mechanism sketch after #r386:**
+1. Add action-class IDs, leverage buckets, and rollback-cost classes to each implementation-committed ask cell.
+2. Let each artifact maturity stage unlock only a bounded action tier: preview, reversible partial action, or full action.
+3. Require suppliers and/or consuming demanders to post additional bond proportional to the highest action tier they want the artifact to unlock.
+4. Route low-bond or low-maturity contributions into low-leverage action tiers even if the nominal state contraction is large.
+5. Let challengers earn by proving that an artifact unlocked excessive control for its bond, that rollback cost was understated, or that a consumer escalated beyond the permitted leverage tier. (#r386)
+
+**Strongest new reason this idea fails:**
+The deepest remaining kill becomes **control-taxonomy overload**. If the operational consequences of a state update cannot be compressed into a sparse action-leverage grammar, then the protocol must either overconstrain useful action or underprice irreversible moves. (#r386)
+
+**Best surviving variant if this correction is too ambitious:**
+Restrict the family to domains where action classes are sparse and rollback costs are auditable—approval gates, reserve bands, queue moves, bounded allocations, narrow intervention ladders, or reversible operational toggles. There, the best surviving descendant is not a general market in knowledge but an **action-leverage-indexed anti-holdup complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition market**. In domains where one update can cascade through messy human discretion and irreversible downstream commitments, stop pretending the protocol can mechanically clear knowledge-to-action transfer and treat it as governed decision support with explicit risk committee overlay instead. (ref: #r385, #r386)
 
 ### #r385 refinement - even complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting fails unless indispensable complements can be provisionally reserved and progressively priced before the bundle is nearly complete, because otherwise the mechanism creates bilateral monopoly at the edge of completion and late complement owners capture the discovery surplus through hold-up
 
