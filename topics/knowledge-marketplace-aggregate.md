@@ -1,7 +1,81 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r384** - 2026-04-06T00:24Z - Added a complement-assembly correction: even inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless the protocol can score bundle-complete state contraction and route payout across complementary contributors. Otherwise only the visible last-mile integrator gets paid, precursor fragments are underfunded, and the market selects for presentable synthesis over real distributed knowledge production.
 - **#r383** - 2026-04-06T00:15Z - Added an inevitability-subtraction correction: even demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless payout is scored against a declared baseline arrival process for the same state contraction. Otherwise suppliers can monetize tiny lead-time on knowledge that was about to become available anyway, and capital buys temporal skimming rather than real epistemic transfer.
+
+### #r384 refinement - even inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting fails unless the protocol can recognize complementary partials as one payable assembly and route credit/liability across the assembly graph, because otherwise the market underpays precursor knowledge and overpays the final wrapper that makes the bundle legible
+
+#r383 correctly killed inevitability skimming by forcing payout to be scored against a declared baseline arrival process rather than against raw first-arrival status. But even that stronger family still fails if the mechanism treats each payable transfer as though one supplier, one artifact, and one ask cell should line up cleanly at settlement. In many real knowledge problems, decisive contraction is **assembled** from complementary fragments held by different actors: one supplier has local telemetry, another has causal structure, another has transfer evidence across regimes, another has implementation context, another has the exclusion that makes the whole package decision-relevant. If payout attaches mainly to whichever actor submits the final bundle-complete artifact, the protocol does not reward credible information transfer. It rewards **assembly capture / last-mile synthesis rent extraction**. Precursor contributors then rationally hoard, wait for bilateral side deals, or avoid contributing low-legibility fragments whose standalone decision-pivot score is low even though they are indispensable complements. The stronger surviving form is therefore **complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting**. Payment should attach not only to the final visible contraction but also to the typed precursor graph whose conjunction caused that contraction to become admissible, timely, and decision-pivoting. (#r384)
+
+This is a real mechanism correction, not just a collaboration bonus. #r378 introduced lineage-linked liability for reusable artifacts. #r379 introduced inherited-frontier subtraction. #r383 introduced inevitability subtraction. But those rules still leave a hole: they protect against resale of old state and against trivial lead-time skimming, yet they do not solve **complement underproduction** when valuable contraction is superadditive across multiple partials. A knowledge marketplace should now distinguish among:
+1. local tranche validity,
+2. global state coherence,
+3. demand-side consequence legibility,
+4. marginal state improvement,
+5. timeliness of transfer,
+6. calibration of residual uncertainty,
+7. staged resolvability,
+8. diagnostic contribution,
+9. observability surface maintenance,
+10. decision-pivot effect,
+11. decision-contract lock,
+12. baseline sensing obligation,
+13. implementation commitment,
+14. public-state accretion,
+15. minimal sufficient disclosure,
+16. spillover internalization,
+17. provenance-linked liability,
+18. canonical inherited frontier,
+19. incremental novelty discipline,
+20. ontology stability,
+21. transportability scope,
+22. transfer map,
+23. canonical demand partition,
+24. overlap subtraction,
+25. baseline arrival process,
+26. inevitability subtraction,
+27. complement assembly graph - the protocol can declare when multiple precursor artifacts jointly satisfy one payable contraction and what dependency edges link them,
+28. assembly payout routing - reward and liability flow across the precursor set according to typed indispensability / contribution rules rather than only to the final wrapper artifact,
+29. assembly capture - a late integrator captures most payout by packaging complementary precursor fragments whose standalone scores were low but whose conjunction created the real state movement.
+Only the first twenty-eight belong in the mechanism. The twenty-ninth collapses the family into a market where the safest profit is not discovering decisive fragments but waiting to package others' partials into a legible final answer. If the protocol cannot pay for complementarity, capital buys narrative closure rather than distributed epistemic production. (#r384)
+
+The family triage after this correction is:
+
+1. Inevitability-subtracted systems that still score artifacts mostly as singular submissions - dead.
+   Better than first-to-file bounty markets, but still unstable because high-value precursor fragments that only matter in conjunction remain underfunded, while polished last-mile assemblers extract the discovery-grade economics. (#r383, #r384)
+
+2. Systems that rely on informal reviewer judgment to decide whether a final artifact 'really depended' on multiple precursor contributors - also weak.
+   Better than explicit last-mile capture, but still structurally weak because the seam that determines payout is exactly the complement graph, and that seam cannot live in loose ex post narrative if capital is supposed to certify genuine distributed knowledge transfer. (#r384)
+
+3. Strongest surviving family: **complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition markets**.
+   Keep #r360-#r383's surviving stack, but require each payable ask cell to support a **typed assembly graph**: precursor artifact IDs, dependency edges, conjunction / substitution relations, minimum bundle-complete set, and a payout-routing rule that splits discovery-grade reward across indispensable complements while capping mere formatting or presentation wrappers. Fresh payout should attach to the marginal bundle-complete contraction beyond inherited frontier, overlap subtraction, and inevitability subtraction—not merely to the actor who made the package legible last. (#r384)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** not just inevitability-subtracted authority transfer. The exchanged object is **complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivoting, observability-backed diagnostic staged-resolvable calibrated timely marginal contraction of admissible state under liability**.
+- **State model:** the global state vector must now carry an **assembly layer**: precursor nodes, dependency edges, conjunction thresholds, substitution classes, minimum sufficient bundles, and which bundle actually caused a state cell to become decision-pivoting. A paid update is often not one artifact but a resolved assembly over several precursor claims. (#r384)
+- **Credibility model:** capital becomes trustworthy only when it is junior not just to wrong claims, wrapper resale, ontology churn, demand slicing, and inevitability skimming, but also to the temptation to free-ride on hard-to-monetize precursor fragments and collect discovery-grade payout only at the final presentation layer. Money should buy complete, decision-relevant contraction while preserving payment paths for the complementary fragments that made it possible. (#r384)
+- **Market roles:** along with scope custodians, ontology custodians, demand-partition custodians, and arrival-baseline custodians, **assembly custodians / complement-graph auditors** become first-class because some of the highest-stakes economic questions are whether a visible update was truly a new self-contained contribution or a coalition assembly whose precursor graph deserves payout continuity. (#r384)
+- **Settlement:** in addition to all prior criteria, the mechanism must settle which precursor set was necessary, whether the final artifact omitted indispensable parents, whether a contributor supplied a genuinely substitutable versus indispensable fragment, and how reward / clawback flow through the assembly graph when the assembled claim later matures or fails. (#r384)
+
+**Why this is better or worse than LMSR / orderbooks / batch auctions:**
+- **Better:** it directly addresses a pathology that price-based markets often handle indirectly through trading before resolution: dispersed partial information can move price incrementally even if no one trader holds the whole story. A direct knowledge market has to pay for complementary fragments explicitly or it will underproduce them.
+- **Better:** it sharpens why capital improves epistemics: capital should fund the assembly of sparse, distributed, decision-relevant fragments—not just whatever final narrative artifact happens to be most legible to buyers.
+- **Worse:** it adds a coalition-credit layer. If complementarity cannot be typed compactly, the protocol becomes an authorship and dependency court over who was truly indispensable.
+So the edge remains real only where high-value knowledge decomposes into a sparse, typed complement graph rather than an open-ended collaborative synthesis process. (#r384)
+
+**Simplest viable mechanism sketch after #r384:**
+1. Add precursor artifact IDs and dependency-edge types to each canonical ask cell.
+2. Let suppliers submit bounded partials with declared relation type: indispensable input, optional corroboration, transport bridge, implementation adapter, or final synthesis wrapper.
+3. Define a minimum sufficient bundle rule for payout: discovery-grade reward clears only when the bundle-complete set is satisfied and is routed across the indispensable precursor graph.
+4. Cap pure final-formatting or presentational synthesis rewards unless the wrapper itself adds net-new diagnostic or transport value beyond the precursor set.
+5. Let challengers earn by proving omitted precursor parents, false indispensability claims, fake complementarity, or last-mile wrappers that claimed full credit for a bundle they only narrated. (#r384)
+
+**Strongest new reason this idea fails:**
+The deepest remaining kill becomes **assembly-graph intractability**. If valuable knowledge emerges from dense, tacit, many-to-many collaboration rather than sparse typed complements, then the protocol cannot mechanically decide what bundle caused the contraction. The mechanism then collapses into credit-allocation governance over collective cognition. (#r384)
+
+**Best surviving variant if this correction is too ambitious:**
+Restrict the family to domains where decisive updates naturally decompose into a small number of typed complements—measurement + exclusion + transport + implementation, or local signal + bridge evidence + action adapter. There, the best surviving descendant is not a general market in knowledge but a **complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition market**. In domains where the decisive unit is emergent team reasoning rather than sparse typed complements, stop pretending the protocol can price distributed knowledge transfer mechanically and treat it as governed research production with team-level rewards instead. (ref: #r383, #r384)
 - **#r382** - 2026-04-06T00:24Z - Added a demand-partition correction: even transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless the protocol imposes a canonical demand partition and overlap-subtraction rule. Otherwise buyers can fragment one epistemic need into overlapping micro-bids and the market double-pays for the same contraction through demand slicing.
 
 ### #r383 refinement - even demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting fails unless every payable contraction is scored against a declared baseline arrival process and inevitability-subtraction rule, because otherwise suppliers get paid for shaving minutes off state movement that would have landed in time anyway
