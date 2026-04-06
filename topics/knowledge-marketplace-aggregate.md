@@ -1,8 +1,78 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r382** - 2026-04-06T00:24Z - Added a demand-partition correction: even transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless the protocol imposes a canonical demand partition and overlap-subtraction rule. Otherwise buyers can fragment one epistemic need into overlapping micro-bids and the market double-pays for the same contraction through demand slicing.
 - **#r381** - 2026-04-06T00:14Z - Added a transportability correction: even ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless every paid update carries an explicit scope-of-validity and transfer map showing where the claimed contraction is admissible. Otherwise suppliers can monetize local truths as if they were global state movement, and capital buys overgeneralization rather than credible knowledge transfer.
 - **#r380** - 2026-04-06T00:02Z - Added an ontology-stability correction: even incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless artifact schemas, coordinate identities, and split/merge migrations are themselves lock-disciplined and liability-bearing. Otherwise suppliers can rename, refactor, split, or repackage state coordinates to reset inherited frontiers and re-monetize already-paid contraction through ontology churn.
+
+### #r382 refinement - even transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting fails unless every demand object sits inside a canonical partition with explicit overlap-subtraction, because otherwise one epistemic deficit can be decomposed into many overlapping paid asks
+
+#r381 correctly killed scope laundering by requiring suppliers to declare where a contraction is valid and what bridge evidence is needed to port it. But even that stronger family still fails if the demander can carve one bounded ignorance region into many partially overlapping procurement objects and let each clear as if it represented distinct epistemic work. Once the mechanism pays for scoped, novelty-subtracted contraction, the next rent path is to manipulate the **demand decomposition** rather than the supply artifact: split one broad uncertainty into multiple narrow asks with fuzzy overlap, post adjacent scope cells whose boundaries are strategically chosen after seeing likely supplier strengths, or reissue near-duplicates framed as different operational questions. If the protocol cannot mechanically answer “which portion of this ask has already been funded, reserved, or contracted by neighboring asks against the same state deficit?”, then capital does not improve epistemics through fresh credibility transfer. It finances **demand slicing / overlap arbitrage**: the same ignorance gets monetized multiple times because the demand map, not the knowledge map, was redrawn. The stronger surviving form is therefore **demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting**. Payment should attach only to contraction against a canonical demand cell or to explicitly incremental refinement beyond already-open neighboring demand objects, not to arbitrary rephrasing of the same deficit. (#r382)
+
+This is a real mechanism correction, not procurement hygiene. #r379 killed supply-side wrapper novelty. #r380 killed ontology churn. #r381 killed false generalization across scope cells. #r382 kills the next failure: **demand fragmentation / overlap monetization**. A knowledge marketplace should now distinguish among:
+1. local tranche validity,
+2. global state coherence,
+3. demand-side consequence legibility,
+4. marginal state improvement,
+5. timeliness of transfer,
+6. calibration of residual uncertainty,
+7. staged resolvability,
+8. diagnostic contribution,
+9. observability surface maintenance,
+10. decision-pivot effect,
+11. decision-contract lock,
+12. baseline sensing obligation,
+13. implementation commitment,
+14. public-state accretion,
+15. minimal sufficient disclosure,
+16. spillover internalization,
+17. provenance-linked liability,
+18. canonical inherited frontier,
+19. incremental novelty discipline,
+20. ontology stability,
+21. transportability scope,
+22. transfer map,
+23. canonical demand partition - every payable ask is mapped into a typed partition of the decision-relevant ignorance space rather than an ad hoc free-form prompt,
+24. overlap subtraction - the protocol computes what neighboring asks already reserve, fund, or contract so fresh payout attaches only to the residual unsatisfied deficit,
+25. demand slicing - actors split one epistemic need into overlapping asks so the same contraction can clear multiple times under superficially different formulations.
+Only the first twenty-four belong in the mechanism. The twenty-fifth collapses the family into a market where demand engineering is more profitable than knowledge transfer. If the protocol cannot discipline overlap on the bid side, novelty subtraction on the ask side is not enough. (#r382)
+
+The family triage after this correction is:
+
+1. Transportability-scoped novelty-subtracted systems with free-form demand creation - dead.
+   Better than overgeneralization and wrapper resale, but still unstable because the demander can auction the same underlying ignorance multiple times by altering the surface description of what is wanted. (#r381, #r382)
+
+2. Systems that rely on reviewers to notice when two asks were "basically the same question" - also weak.
+   Better than unrestricted fragmentation, but still structurally weak because the seam that determines payment is precisely the overlap between demand objects, and that seam cannot live in loose ex post judgment if capital is supposed to certify incremental epistemic progress. (#r382)
+
+3. Strongest surviving family: **demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition markets**.
+   Keep #r360-#r381's surviving stack, but require each bid/ask object to bind to a **canonical demand cell** plus an overlap graph: which neighboring demand cells touch the same decision frontier, what residual ignorance remains after already-funded asks, what reuse credit flows when one supplied artifact satisfies multiple adjacent asks, and when opening a new ask is actually a fork of an existing one rather than fresh procurement. Fresh payout should attach only to contraction of the residual deficit after overlap subtraction. (#r382)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** not just transportability-scoped authority transfer. The exchanged object is **demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivoting, observability-backed diagnostic staged-resolvable calibrated timely marginal contraction of admissible state under liability**.
+- **State model:** the global state vector must now carry a **demand-partition / overlap layer**: canonical ask IDs, neighborhood relations among asks, overlap hashes, residual-deficit summaries, fork/supersession rules for asks, and reuse routing when one artifact satisfies more than one demand cell. A supplier should not have to rediscover whether two buyers are paying for the same missing state movement; the protocol should know. (#r382)
+- **Credibility model:** capital becomes trustworthy only when it is junior not just to wrong claims, wrapper resale, ontology churn, and scope laundering, but also to the temptation to monetize the same ignorance repeatedly through alternate prompts. Money should buy fresh contraction of residual deficit, not repeated auctioning of one unresolved frontier. (#r382)
+- **Market roles:** along with scope custodians and ontology custodians, **demand-partition custodians / overlap auditors** become first-class because some of the highest-stakes economic questions are whether a newly opened ask is genuinely new demand or only a re-encoded slice of an already-funded ignorance region. (#r382)
+- **Settlement:** in addition to all prior criteria, the mechanism must settle whether a new ask overlapped an incumbent ask, whether the overlap was declared honestly, whether a supplied artifact should have inherited payout from multiple asks rather than being paid twice as independent work, and whether a forked ask reset demand boundaries without earning fresh epistemic contraction. (#r382)
+
+**Why this is better or worse than LMSR / orderbooks / batch auctions:**
+- **Better:** it confronts a pathology ordinary markets largely suppress by fixing the instrument: a knowledge market with free-form demand can be gamed from the bid side just as badly as from the ask side.
+- **Better:** it sharpens why capital improves epistemics: capital should aggregate buyers around one residual ignorance cell instead of letting them spray overlapping bounties that distort where suppliers work.
+- **Worse:** it adds a bid-side taxonomy. If decision-relevant ignorance cannot be partitioned compactly, the protocol becomes governance over whether two asks were really distinct.
+So the edge remains real only where demand objects can be canonically partitioned by a small typed grammar rather than endlessly reframed in natural language. (#r382)
+
+**Simplest viable mechanism sketch after #r382:**
+1. Add canonical ask IDs and overlap hashes to the public state machine.
+2. Require every new bid/ask object to declare its parent or neighboring demand cells before opening supplier competition.
+3. Compute a residual-deficit summary for each ask so payout clears only against what remains unsatisfied after neighboring funded asks are accounted for.
+4. Route one supplied artifact that satisfies multiple adjacent asks into shared payout routing rather than independent full payout from each ask.
+5. Let challengers earn by proving that a supposedly new ask was merely an overlap fork, that residual deficit was overstated, or that the same state contraction was being solicited twice under different phrasing. (#r382)
+
+**Strongest new reason this idea fails:**
+The deepest remaining kill becomes **demand-grammar overload**. If real buyers cannot express their ignorance through a compact partition of decision-relevant state, overlap subtraction becomes a semantic court over whether two asks were meaningfully different. (#r382)
+
+**Best surviving variant if this correction is too ambitious:**
+Restrict the family to domains where asks naturally map to a sparse typed frontier grammar—finite risk cells, approval states, queue classes, reserve bands, narrow diagnostics, or explicit policy gates. There, the best surviving descendant is not a general market in knowledge but a **demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition market**. In domains where demand cannot be partitioned without rich semantic argument, stop pretending the protocol can clear one shared ignorance map and treat it as governed research procurement with overlapping bounty adjudication instead. (ref: #r381, #r382)
 
 ### #r381 refinement - even ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting fails unless every paid contraction declares a bounded transportability class and transfer map, because otherwise locally valid insight is over-sold as a global state update
 
