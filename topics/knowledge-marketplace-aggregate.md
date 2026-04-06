@@ -1,8 +1,84 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r385** - 2026-04-06T00:34Z - Added an anti-holdup correction: even complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless indispensable complements can be provisionally reserved and progressively priced before the bundle is nearly complete. Otherwise late-stage complement owners can wait, observe assembly progress, and extract most of the surplus through epistemic hold-up.
 - **#r384** - 2026-04-06T00:24Z - Added a complement-assembly correction: even inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless the protocol can score bundle-complete state contraction and route payout across complementary contributors. Otherwise only the visible last-mile integrator gets paid, precursor fragments are underfunded, and the market selects for presentable synthesis over real distributed knowledge production.
 - **#r383** - 2026-04-06T00:15Z - Added an inevitability-subtraction correction: even demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless payout is scored against a declared baseline arrival process for the same state contraction. Otherwise suppliers can monetize tiny lead-time on knowledge that was about to become available anyway, and capital buys temporal skimming rather than real epistemic transfer.
+
+### #r385 refinement - even complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting fails unless indispensable complements can be provisionally reserved and progressively priced before the bundle is nearly complete, because otherwise the mechanism creates bilateral monopoly at the edge of completion and late complement owners capture the discovery surplus through hold-up
+
+#r384 correctly killed last-mile assembly capture by requiring the protocol to recognize precursor assemblies and route reward/liability across indispensable complements. But even that stronger family still fails if complement contributors can wait until the rest of the bundle is almost assembled, reveal that they control a remaining indispensable fragment, and then demand near-total surplus to complete the payable contraction. Once the mechanism pays bundle-complete state movement, the next rent path is not wrapper capture but **complement hold-up / late indispensability extraction**. A supplier holding a crucial exclusion, bridge, telemetry shard, or implementation adapter can free-ride on everyone else's sunk discovery work, disclose only enough to prove indispensability, and then bargain from a bilateral-monopoly position at the moment of completion. If the protocol cannot predeclare and reserve likely complement slots before the bundle is nearly complete, then capital is not improving epistemics through smooth credibility transfer. It is underwriting **assembly brinkmanship**. The stronger surviving form is therefore **anti-holdup complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting**. Payment should attach not only to the final resolved assembly graph, but also to provisional reservation rights, bounded option prices, and staged escrow for plausibly indispensable complement classes before the bundle approaches completion. (#r385)
+
+This is a real mechanism correction, not dealmaking garnish. #r383 killed inevitability skimming. #r384 killed last-mile assembly capture. #r385 kills the next failure: **ex post complement hold-up**. A knowledge marketplace should now distinguish among:
+1. local tranche validity,
+2. global state coherence,
+3. demand-side consequence legibility,
+4. marginal state improvement,
+5. timeliness of transfer,
+6. calibration of residual uncertainty,
+7. staged resolvability,
+8. diagnostic contribution,
+9. observability surface maintenance,
+10. decision-pivot effect,
+11. decision-contract lock,
+12. baseline sensing obligation,
+13. implementation commitment,
+14. public-state accretion,
+15. minimal sufficient disclosure,
+16. spillover internalization,
+17. provenance-linked liability,
+18. canonical inherited frontier,
+19. incremental novelty discipline,
+20. ontology stability,
+21. transportability scope,
+22. transfer map,
+23. canonical demand partition,
+24. overlap subtraction,
+25. baseline arrival process,
+26. inevitability subtraction,
+27. complement assembly graph,
+28. assembly payout routing,
+29. provisional complement reservation - ask cells can name likely complement classes ex ante and open bounded reservation rights before full bundle completion,
+30. progressive complement pricing - the protocol can set or auction escalating but bounded prices/escrows for reserved complement slots as assembly progress becomes clearer,
+31. complement hold-up - a late indispensable contributor waits until others have sunk work, then extracts disproportionate surplus by controlling the last missing fragment.
+Only the first thirty belong in the mechanism. The thirty-first collapses the family into a market where the safest strategy is not early contribution to distributed knowledge production but waiting until others prove a bundle is valuable and then charging completion tolls. If the protocol cannot neutralize that bargaining seam, assembly-aware payout still does not stabilize complement production. (#r385)
+
+The family triage after this correction is:
+
+1. Complement-assembly-aware systems that discover indispensability only at final settlement - dead.
+   Better than last-mile wrapper capture, but still unstable because indispensable fragment holders can rationally delay revelation until the rest of the bundle is sunk, then tax completion. (#r384, #r385)
+
+2. Systems that rely on ex post negotiation or reviewer fairness norms to split late-stage complement surplus - also weak.
+   Better than unconstrained brinkmanship, but still structurally weak because the seam that determines surplus is exactly the ex ante price of indispensability, and that seam cannot live in soft bargaining if capital is supposed to certify credible transfer rather than bargaining power. (#r385)
+
+3. Strongest surviving family: **anti-holdup complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition markets**.
+   Keep #r360-#r384's surviving stack, but require each payable ask cell to support not only a typed assembly graph, but also an **indispensability reservation layer**: complement classes that may become necessary, provisional slot claims, expiry rules, bounded option premia, conversion from reserved slot to active bundle role, and clawback if a claimant overstated indispensability or withheld too long. Fresh payout should attach to the marginal bundle-complete contraction beyond inherited frontier, overlap subtraction, and inevitability subtraction, while forcing likely indispensable complements to reveal or reserve early enough that the protocol prices their bargaining power before the final completion edge. (#r385)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** not just complement-assembly-aware authority transfer. The exchanged object is **anti-holdup complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivoting, observability-backed diagnostic staged-resolvable calibrated timely marginal contraction of admissible state under liability**.
+- **State model:** the global state vector must now carry a **reservation layer** in addition to the assembly layer: provisional complement classes, slot claimants, option expiries, reservation prices, conversion conditions, and whether a claimed complement was declared before the bundle's completion probability was already high. A payable update is not only a resolved assembly over precursor claims; it is an assembly whose bargaining seam was disciplined before completion. (#r385)
+- **Credibility model:** capital becomes trustworthy only when it is junior not just to wrong claims, wrapper resale, ontology churn, demand slicing, inevitability skimming, and last-mile assembly capture, but also to the temptation to wait until others make a bundle valuable and then monetize indispensability at the edge. Money should buy early revelation and smooth assembly of decisive complements, not toll-collection at the last missing edge. (#r385)
+- **Market roles:** along with assembly custodians / complement-graph auditors, **reservation custodians / indispensability-slot governors** become first-class because some of the highest-stakes economic questions are whether a contributor truly reserved a likely indispensable complement early, whether another claimant can substitute it, and what bounded price is allowed once the assembly frontier advances. (#r385)
+- **Settlement:** in addition to all prior criteria, the mechanism must settle whether a complement was reserved in time, whether the reservation price/escrow was honored, whether late revelation was strategic hold-up or genuinely unforeseeable novelty, whether substitute complements were available, and how reward / clawback flow when a reserved indispensable slot never converts into a real contribution. (#r385)
+
+**Why this is better or worse than LMSR / orderbooks / batch auctions:**
+- **Better:** it directly addresses a pathology price markets often blur through continuous positions: in a direct knowledge market with typed complements, the edge of bundle completion can create bilateral monopoly unless the mechanism prices complement rights before completion is obvious.
+- **Better:** it sharpens why capital improves epistemics: capital should fund early reservation and revelation of sparse indispensable fragments, not merely reward whoever controls the last missing piece once others have sunk search costs.
+- **Worse:** it adds an option/reservation layer. If likely complement classes cannot be forecast compactly, the protocol becomes governance over who was entitled to reserve what and when.
+So the edge remains real only where indispensability can be forecast by a sparse typed grammar rather than discovered only through open-ended negotiation. (#r385)
+
+**Simplest viable mechanism sketch after #r385:**
+1. Add complement-class IDs and provisional reservation slots to each canonical ask cell.
+2. Let suppliers reserve likely indispensable slots early by posting a bond plus a bounded ask for conversion if their slot later proves necessary.
+3. Let assemblies convert reserved slots into active bundle roles under a public pricing rule: fixed ladder, small auction, or capped renegotiation window.
+4. Haircut or slash claimants who reserve broadly, fail to convert, or strategically withhold sufficient detail past the reservation deadline.
+5. Let challengers earn by proving that a late claimant could have reserved earlier, overstated indispensability, blocked substitutes, or extracted surplus inconsistent with the slot's bounded conversion rule. (#r385)
+
+**Strongest new reason this idea fails:**
+The deepest remaining kill becomes **indispensability-forecast failure**. If the mechanism cannot say in advance which complement classes are plausibly necessary, reservation markets either over-fragment into speculative slot squatting or miss the true bottlenecks and reintroduce hold-up anyway. (#r385)
+
+**Best surviving variant if this correction is too ambitious:**
+Restrict the family to domains where likely bottleneck complement classes are forecastable—measurement + exclusion + bridge + implementation, or local signal + transport proof + action adapter. There, the best surviving descendant is not a general market in knowledge but an **anti-holdup complement-assembly-aware, inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition market**. In domains where indispensability becomes legible only at the very end, stop pretending the protocol can price complement bargaining mechanically and treat it as governed assembly procurement with discretionary coalition formation instead. (ref: #r384, #r385)
 
 ### #r384 refinement - even inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting fails unless the protocol can recognize complementary partials as one payable assembly and route credit/liability across the assembly graph, because otherwise the market underpays precursor knowledge and overpays the final wrapper that makes the bundle legible
 
