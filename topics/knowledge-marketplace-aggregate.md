@@ -1,7 +1,79 @@
 # Knowledge Marketplace Mechanism - New Thread Addendum
 
 ## Run Log Addendum
+- **#r383** - 2026-04-06T00:15Z - Added an inevitability-subtraction correction: even demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless payout is scored against a declared baseline arrival process for the same state contraction. Otherwise suppliers can monetize tiny lead-time on knowledge that was about to become available anyway, and capital buys temporal skimming rather than real epistemic transfer.
 - **#r382** - 2026-04-06T00:24Z - Added a demand-partition correction: even transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless the protocol imposes a canonical demand partition and overlap-subtraction rule. Otherwise buyers can fragment one epistemic need into overlapping micro-bids and the market double-pays for the same contraction through demand slicing.
+
+### #r383 refinement - even demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting fails unless every payable contraction is scored against a declared baseline arrival process and inevitability-subtraction rule, because otherwise suppliers get paid for shaving minutes off state movement that would have landed in time anyway
+
+#r382 correctly killed demand slicing by forcing every payable ask into a canonical partition with explicit overlap subtraction. But even that stronger family still fails if the protocol scores value only by whether a supplier produced a scoped, novelty-subtracted contraction before the decision window closed, without asking a second question: **when would materially similar state have arrived anyway through routine disclosure, scheduled measurement, endogenous system telemetry, known public releases, or already-contracted neighboring work?** If a supplier can collect discovery-grade payout for being slightly earlier than an update that was already on-track to arrive before the action pivot closed, then capital is not improving epistemics through scarce credibility transfer. It is financing **inevitability skimming / temporal rent extraction**. The supplier earns for occupying the last few inches of an already-descending uncertainty curve rather than for causing a real change in what the system could know in time to act. The stronger surviving form is therefore **inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-backed diagnostic staged-resolvable calibrated timely marginal authority-transition underwriting**. Payment should attach only to contraction that arrives materially earlier than the protocol's declared baseline arrival process for that demand cell, or to contraction that changes the quality of the arriving evidence rather than merely being slightly first. (#r383)
+
+This is a real mechanism correction, not a restatement of timeliness. #r366 killed strategic withholding by indexing payout to when usable refinement arrived relative to the decision-loss clock. But #r366 still allows a rent path where suppliers harvest payout for marginally accelerating information that was already endogenous to the system and already likely to land before the action window mattered. #r373 killed demand-side under-instrumentation. #r382 killed demand slicing. #r383 kills the next failure: **inevitability skimming / lead-time overpayment**. A knowledge marketplace should now distinguish among:
+1. local tranche validity,
+2. global state coherence,
+3. demand-side consequence legibility,
+4. marginal state improvement,
+5. timeliness of transfer,
+6. calibration of residual uncertainty,
+7. staged resolvability,
+8. diagnostic contribution,
+9. observability surface maintenance,
+10. decision-pivot effect,
+11. decision-contract lock,
+12. baseline sensing obligation,
+13. implementation commitment,
+14. public-state accretion,
+15. minimal sufficient disclosure,
+16. spillover internalization,
+17. provenance-linked liability,
+18. canonical inherited frontier,
+19. incremental novelty discipline,
+20. ontology stability,
+21. transportability scope,
+22. transfer map,
+23. canonical demand partition,
+24. overlap subtraction,
+25. baseline arrival process - every demand cell carries a declared model of what state movement would occur anyway through routine internal measurement, scheduled public releases, pending contracted artifacts, or known endogenous resolution channels,
+26. inevitability subtraction - payout is computed against the residual lead-time / evidence-quality gain beyond that baseline arrival path rather than against raw first-arrival status,
+27. inevitability skimming - actors collect payout by being trivially earlier than knowledge that would have become available in time anyway.
+Only the first twenty-six belong in the mechanism. The twenty-seventh collapses the family into a market where the safest profit is to front-run inevitable disclosure by a narrow margin. If the protocol cannot distinguish decisive acceleration from trivial anticipation, capital pays temporal skimming rather than meaningful information transfer. (#r383)
+
+The family triage after this correction is:
+
+1. Demand-partitioned, transportability-scoped novelty-subtracted systems that pay the first scoped artifact without an endogenous-arrival baseline - dead.
+   Better than overlap-ridden bounty systems, but still unstable because rational suppliers can harvest high-confidence payout by chasing state contractions already about to arrive from routine processes or pending disclosures. (#r382, #r383)
+
+2. Systems that rely on reviewers to ask whether an update was 'basically inevitable soon anyway' - also weak.
+   Better than raw first-to-file payout, but still structurally weak because the seam that determines reward is exactly the counterfactual arrival path, and that seam cannot live in loose ex post intuition if capital is supposed to certify genuine epistemic contribution. (#r383)
+
+3. Strongest surviving family: **inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition markets**.
+   Keep #r360-#r382's surviving stack, but require each ask cell to publish a **baseline arrival operator**: what routine telemetry, scheduled events, neighboring contracts, or external release cadences are already expected to tighten the same state region; what uncertainty reduction those paths are expected to deliver by what times; and what payout only becomes available for beating or improving that baseline in a decision-relevant way. Fresh payout should attach to residual lead-time gained, reliability improved, or scope extended beyond the declared arrival baseline, not merely to nominal first publication. (#r383)
+
+**Why this sharpens the 10-question frame:**
+- **Base primitive:** not just demand-partitioned, transportability-scoped authority transfer. The exchanged object is **inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivoting, observability-backed diagnostic staged-resolvable calibrated timely marginal contraction of admissible state under liability**.
+- **State model:** the global state vector must now carry an **arrival-baseline layer**: expected endogenous update paths, scheduled release timestamps, routine probe cadences, pending neighboring artifacts, baseline confidence ramps, and decision-window overlap with those ramps. A supplier does not earn just for moving the state early in absolute time; it earns for moving it meaningfully earlier or better than the state was already expected to move. (#r383)
+- **Credibility model:** capital becomes trustworthy only when it is junior not just to wrong claims, wrapper resale, ontology churn, scope laundering, and demand slicing, but also to the temptation to monetize tiny lead-time on inevitable knowledge. Money should buy decisive acceleration or genuine quality improvement in public-state movement, not rent from being a few steps ahead of a baseline process that was already going to resolve the same ignorance in time. (#r383)
+- **Market roles:** along with scope custodians, ontology custodians, and demand-partition custodians, **arrival-baseline custodians / counterfactual-timing auditors** become first-class because some of the highest-stakes economic questions are whether a supplier truly accelerated knowledge beyond the endogenous schedule or merely harvested public anticipation. (#r383)
+- **Settlement:** in addition to all prior criteria, the mechanism must settle what the declared baseline arrival path predicted, whether the supplier actually beat that path by enough lead-time to matter, whether the earlier arrival changed a decision pivot that baseline timing would have missed, and whether any claimed edge was merely a trivial preview of already-imminent state movement. (#r383)
+
+**Why this is better or worse than LMSR / orderbooks / batch auctions:**
+- **Better:** it confronts a pathology ordinary markets often ignore because prices already partially capitalize expected future disclosure. A knowledge market that directly pays for state updates must explicitly subtract what the world was about to reveal for free.
+- **Better:** it sharpens why capital improves epistemics: capital should fund materially earlier or better state movement than endogenous processes supply, not reward whoever hovers closest to an inevitable announcement.
+- **Worse:** it adds a counterfactual timing layer. If baseline arrival cannot be typed compactly, the protocol becomes a court over what would have happened soon anyway.
+So the edge remains real only where endogenous arrival paths can be described by a sparse public grammar rather than open-ended hindsight stories. (#r383)
+
+**Simplest viable mechanism sketch after #r383:**
+1. Add baseline-arrival descriptors to each canonical ask ID: routine telemetry cadence, known public release schedule, pending sibling artifacts, and expected contraction profile over time.
+2. Require each supplier claim to specify whether it beats the arrival baseline on lead-time, evidence quality, scope, or calibration.
+3. Compute payout against residual value beyond the baseline path: earlier-than-baseline decision-pivot, higher-confidence contraction than baseline would have delivered, or contraction in a scope cell baseline paths would not have covered.
+4. Route trivial first-arrival claims into a low-ceiling anticipation bucket when they only shave a small interval off a baseline update that would still have landed before the action window closed.
+5. Let challengers earn by proving that a claimed breakthrough was already imminent through routine processes, that the lead-time gain was immaterial to any decision pivot, or that the supplier merely previewed an already-scheduled disclosure. (#r383)
+
+**Strongest new reason this idea fails:**
+The deepest remaining kill becomes **counterfactual-arrival governance**. If useful domains do not admit a compact baseline model for what would have become known anyway and when, then the protocol devolves into arguments about inevitability rather than credible transfer. (#r383)
+
+**Best surviving variant if this correction is too ambitious:**
+Restrict the family to domains with explicit release cadences, routine measurement loops, known telemetry refresh rates, or short-horizon state transitions whose endogenous arrival paths are easy to model. There, the best surviving descendant is not a general market in knowledge but an **inevitability-subtracted, demand-partitioned, transportability-scoped, ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored, resolution-operator-bound, calibration-scored, timeliness-indexed, marginality-scored, decision-loss-anchored, state-coherent, priority-governed, capacity-priced, liability-backed authority-transition market**. In domains where inevitable arrival is mostly narrative and cannot be typed ex ante, stop pretending the protocol can mechanically pay for acceleration and treat it as governed research procurement with discretionary bonus for early warning instead. (ref: #r382, #r383)
 - **#r381** - 2026-04-06T00:14Z - Added a transportability correction: even ontology-stable, incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless every paid update carries an explicit scope-of-validity and transfer map showing where the claimed contraction is admissible. Otherwise suppliers can monetize local truths as if they were global state movement, and capital buys overgeneralization rather than credible knowledge transfer.
 - **#r380** - 2026-04-06T00:02Z - Added an ontology-stability correction: even incremental-novelty-disciplined, provenance-linked, spillover-internalized, minimal-disclosure-disciplined, public-state-accretive, implementation-committed, baseline-obligation-locked, decision-contract-locked, decision-pivot-scored, observability-funded, diagnosticity-scored authority/liability bandwidth fails unless artifact schemas, coordinate identities, and split/merge migrations are themselves lock-disciplined and liability-bearing. Otherwise suppliers can rename, refactor, split, or repackage state coordinates to reset inherited frontiers and re-monetize already-paid contraction through ontology churn.
 
